@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Brain, Paintbrush, Shield, Save } from "lucide-react";
+import { useState } from "react";
+import { toast } from "@/components/ui/use-toast";
 
 const agents = [
   {
@@ -11,22 +13,45 @@ const agents = [
     label: "Agente Estratega",
     description: "Propone temas, ángulos y estrategia general.",
     icon: Brain,
+    defaultProvider: "groq",
+    defaultModel: "llama-4-scout-8b-instruct",
+    defaultTemp: 0.8,
   },
   {
     id: "creativo",
     label: "Agente Creativo",
     description: "Redacta copys y sugiere dirección visual.",
     icon: Paintbrush,
+    defaultProvider: "groq",
+    defaultModel: "llama-4-scout-8b-instruct",
+    defaultTemp: 0.9,
   },
   {
     id: "critico",
     label: "Agente Crítico",
     description: "Revisa contra los documentos de marca y aprueba o rechaza.",
     icon: Shield,
+    defaultProvider: "deepseek",
+    defaultModel: "deepseek-chat",
+    defaultTemp: 0.3,
   },
 ];
 
 export default function Configuracion() {
+  const [config, setConfig] = useState(
+    Object.fromEntries(
+      agents.map((a) => [
+        a.id,
+        { provider: a.defaultProvider, model: a.defaultModel, temperature: a.defaultTemp },
+      ])
+    )
+  );
+
+  const handleSave = () => {
+    localStorage.setItem("eda-agent-config", JSON.stringify(config));
+    toast({ title: "Configuración guardada", description: "Los agentes usarán los modelos seleccionados." });
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -51,36 +76,66 @@ export default function Configuracion() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Proveedor</Label>
-                <Select defaultValue="lovable">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="lovable">Lovable AI (por defecto)</SelectItem>
-                    <SelectItem value="groq">Groq (Llama)</SelectItem>
-                    <SelectItem value="deepseek">DeepSeek</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>API Key (solo si usas Groq o DeepSeek)</Label>
-                <Input
-                  type="password"
-                  placeholder="sk-..."
-                  disabled
-                />
-                <p className="text-xs text-muted-foreground">
-                  Las claves se almacenan de forma segura en Lovable Cloud.
-                </p>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Proveedor</Label>
+                  <Select
+                    value={config[agent.id]?.provider}
+                    onValueChange={(v) =>
+                      setConfig((c) => ({
+                        ...c,
+                        [agent.id]: { ...c[agent.id], provider: v },
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="groq">Groq (Llama 4 Scout)</SelectItem>
+                      <SelectItem value="deepseek">DeepSeek V3.2</SelectItem>
+                      <SelectItem value="gemini">Gemini 1.5 Flash</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Modelo</Label>
+                  <Input
+                    value={config[agent.id]?.model || ""}
+                    onChange={(e) =>
+                      setConfig((c) => ({
+                        ...c,
+                        [agent.id]: { ...c[agent.id], model: e.target.value },
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Temperatura ({config[agent.id]?.temperature})</Label>
+                  <Input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={config[agent.id]?.temperature || 0.7}
+                    onChange={(e) =>
+                      setConfig((c) => ({
+                        ...c,
+                        [agent.id]: {
+                          ...c[agent.id],
+                          temperature: parseFloat(e.target.value),
+                        },
+                      }))
+                    }
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <Button size="lg">
+      <Button size="lg" onClick={handleSave}>
         <Save className="mr-2 h-4 w-4" />
         Guardar configuración
       </Button>

@@ -1,80 +1,51 @@
-# 🔧 MejoraSocialMedia — Sistema EDA
-
-**Estrategia Digital Autónoma** para MejoraOK / Mejora Continua.
+# 🎯 MejoraSocialMedia — Estratega Digital Autónoma (EDA)
 
 Sistema completo de gestión estratégica de contenidos en Instagram mediante múltiples agentes de IA.
 
----
-
-## Estructura del Proyecto
-
-```
-mejorasocialmedia/
-├── src/                ← Frontend web (Lovable/React)
-├── extension/          ← Extensión Chrome (MejoraINSSIST)
-├── backend/            ← Servidor EDA multi-agente (Fase 2)
-├── dashboard/          ← Panel web de supervisión (Fase 5)
-├── docs/               ← Documentación y especificaciones
-├── supabase/           ← Configuración Supabase
-└── public/             ← Assets públicos
-```
+**Para:** [MejoraOK](https://mejoraok.com) — Claridad estratégica para emprendedores, líderes y profesionales argentinos.
 
 ---
 
-## Estado Actual
+## 🚀 Stack
 
-### ✅ Fase 1 — Extensión Chrome v1.1.0
-- Botón flotante 🎯 en Instagram
-- Caption Helper por Buyer Persona (8 perfiles argentinos)
-- Hashtag Packs con niveles de engagement (6 packs)
-- Quick Replies de ventas (24 respuestas)
-- Auto-detección de `/` en DMs
-- Core INSSIST: Post Later, Dark/Wide/Zen Mode, multi-cuenta
-
-### 🔲 Fase 2 — Backend EDA (Pendiente)
-- Servidor multi-agente (Ollama + Groq + DeepSeek)
-- Bóveda de conocimiento (RAG)
-- Mesa de Diálogo multi-agente
-
-### 🔲 Fase 3-6 — Ver docs/PLAN-DE-TRABAJO.md
-
----
-
-## Instalación Rápida
-
-### Extensión Chrome
-1. Clonar este repo
-2. Abrir `chrome://extensions/`
-3. Activar "Modo desarrollador"
-4. "Cargar descomprimida" → seleccionar carpeta `extension/`
-5. Ir a `instagram.com`
-
-### Frontend Web
-```bash
-npm install
-npm run dev
-```
-
----
-
-## Documentación
-
-| Documento | Descripción |
+| Capa | Tecnología |
 |---|---|
-| [Estado Actual](docs/ESTADO-ACTUAL.md) | Estado del proyecto |
-| [Arquitectura](docs/ARQUITECTURA.md) | Arquitectura técnica |
-| [Plan de Trabajo](docs/PLAN-DE-TRABAJO.md) | Roadmap por fases |
-| [Pendientes](docs/PENDIENTES.md) | Tareas y blockers |
-| [Deploy](docs/DEPLOY.md) | Guía de deployment |
-| [IA Gratuita](docs/IA-GRATUITA.md) | Catálogo de IAs gratuitas |
-| [Spec EDA](docs/SPEC-EDA.md) | Especificación del sistema |
+| Frontend | React 18 + TypeScript + Vite + shadcn/ui |
+| Backend | Supabase Edge Functions (Deno) |
+| Base de datos | PostgreSQL + pgvector |
+| IA | Groq · DeepSeek · Gemini · HuggingFace |
+| Extensión | Chrome Extension (Instagram) |
+| Deploy | GitHub Actions → Hostinger (FTP) |
 
----
+## 📦 Estructura
 
-## Contacto
-- Instagram: [@mejoraok](https://instagram.com/mejoraok)
-- Email: contacto@mejoraok.com
+```
+src/              ← Frontend React
+supabase/         ← Edge Functions + migraciones SQL
+extension/        ← Extensión Chrome MejoraINSSIST
+Documents/        ← Documentación unificada
+docs/             ← Documentación legacy
+```
 
----
+## 🛠️ Desarrollo
 
-*Basado en INSSIST (proyecto educativo). Uso personal.*
+```bash
+npm install --legacy-peer-deps
+npm run dev       # Servidor local
+npm run build     # Build de producción
+npm run test      # Tests con Vitest
+```
+
+## 🌐 Producción
+
+**URL:** https://util.mejoraok.com/MejoraSM/
+
+Deploy automático en cada push a `main` vía GitHub Actions.
+
+## 📚 Documentación
+
+Ver [`Documents/DOCUMENTACION.md`](Documents/DOCUMENTACION.md) para documentación completa.
+
+## 📄 Licencia
+
+Privado — MejoraOK © 2026
