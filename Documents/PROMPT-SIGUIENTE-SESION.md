@@ -10,16 +10,16 @@ Estoy trabajando en **MejoraSocialMedia (EDA)** — un sistema de gestión estra
 
 **Repo:** https://github.com/pabloeckert/MejoraSM
 **Producción:** https://util.mejoraok.com/MejoraSM/
-**Documentación:** `Documents/DOCUMENTACION.md`
+**Documentación:** `Documents/DOCUMENTACION.md` (documento único consolidado)
 **Setup Supabase:** `Documents/SUPABASE_SETUP.md`
 
 ## Estado actual
 
 - ✅ Extensión Chrome v1.1.0 funcional (migrada a Manifest V3)
 - ✅ Frontend React con 5 páginas + 4 hooks conectados a datos reales
-- ✅ Backend código listo (3 Edge Functions + schema SQL)
+- ✅ Backend código listo (3 Edge Functions + schema SQL ejecutado)
 - ✅ Deploy automático (GitHub Actions → Hostinger)
-- ✅ ETAPA 6 completa: strictNullChecks, 21 tests Vitest, lovable-tagger removido, browserslist, code splitting
+- ✅ ETAPA 6 parcial: strictNullChecks, 21 tests Vitest, lovable-tagger removido
 - 🔄 **ETAPA 1 en progreso** — ver abajo
 
 ## ETAPA 1: Activar Backend (en progreso)
@@ -39,7 +39,7 @@ Estoy trabajando en **MejoraSocialMedia (EDA)** — un sistema de gestión estra
    - `GROQ_API_KEY` → https://console.groq.com/keys
    - `DEEPSEEK_API_KEY` → https://platform.deepseek.com/api_keys
    - `GEMINI_API_KEY` → https://aistudio.google.com/apikey
-3. **Edge Functions** (menú izquierdo) → deploy las 3 funciones: `ai-gateway`, `orchestrator`, `vault-process`
+3. **Edge Functions** (menú izquierdo) → deploy las 3 funciones
 4. Pasarme **Project URL** + **anon key** (Settings → API) para conectar el frontend
 
 ### Para deploy de Edge Functions desde terminal:
@@ -59,8 +59,8 @@ npx supabase functions deploy vault-process
 
 - Cuando diga **"documentar"**, actualizá `Documents/DOCUMENTACION.md` con los avances
 - Repo: https://github.com/pabloeckert/MejoraSM
-- Token GitHub: [PEDIR SI ES NECESARIO]
 - No toques archivos en `docs/` (legacy, solo lectura)
 - Los hooks están en `src/hooks/`, las páginas en `src/pages/`
 - Build: `npm install --legacy-peer-deps && npm run build`
 - Tests: `npm test` (21 tests, Vitest)
+- Documentación consolidada: `Documents/DOCUMENTACION.md`

@@ -1,8 +1,8 @@
-# 📚 DOCUMENTACIÓN UNIFICADA — MejoraSocialMedia (EDA)
+# 📚 DOCUMENTACIÓN UNIFICADA — MejoraSM (EDA)
 
 **Proyecto:** MejoraSocialMedia — Estrategia Digital Autónoma para MejoraOK
-**Versión:** 2.0
-**Última actualización:** 23 de abril de 2026
+**Versión:** 3.0
+**Última actualización:** 24 de abril de 2026
 **Repositorio:** https://github.com/pabloeckert/MejoraSM
 **Producción:** https://util.mejoraok.com/MejoraSM/
 **Stack:** React + Supabase (Edge Functions + PostgreSQL + pgvector) + Chrome Extension
@@ -10,7 +10,15 @@
 ---
 
 > **📌 INSTRUCCIÓN DE MANTENIMIENTO:**
-> Cuando el usuario diga **"documentar"**, actualizar este archivo con los trabajos realizados desde la última actualización, agregando entradas al [Registro de Avances](#17-registro-de-avances) y ajustando el [Estado Actual](#4-estado-actual) según corresponda.
+> Cuando el usuario diga **"documentar"**, actualizar este archivo con los trabajos realizados desde la última actualización:
+> 1. Agregar entradas al [Registro de Avances](#14-registro-de-avances) con fecha y detalle.
+> 2. Actualizar el [Estado Actual](#4-estado-actual) según corresponda.
+> 3. Mover tareas completadas de [Plan por Etapas](#10-plan-por-etapas) a ✅.
+> 4. Ajustar [Pendientes y Bloqueadores](#11-pendientes-y-bloqueadores) si cambiaron.
+> 5. Si corresponde, actualizar la sección de [Arquitectura](#5-arquitectura-técnica) o [Stack](#2-stack-tecnológico).
+> 6. Hacer commit y push al repo.
+>
+> **Este es el documento fuente único. No editar archivos en `docs/` (legacy, solo lectura).**
 
 ---
 
@@ -25,14 +33,14 @@
 7. [Edge Functions (Backend)](#7-edge-functions-backend)
 8. [Frontend (React)](#8-frontend-react)
 9. [Extensión Chrome](#9-extensión-chrome)
-10. [Proveedores de IA](#10-proveedores-de-ia)
-11. [Deployment](#11-deployment)
-12. [Buyer Personas](#12-buyer-personas)
-13. [Plan por Etapas](#13-plan-por-etapas)
-14. [Pendientes y Bloqueadores](#14-pendientes-y-bloqueadores)
+10. [Plan por Etapas](#10-plan-por-etapas)
+11. [Pendientes y Bloqueadores](#11-pendientes-y-bloqueadores)
+12. [Proveedores de IA](#12-proveedores-de-ia)
+13. [Deployment](#13-deployment)
+14. [Registro de Avances](#14-registro-de-avances)
 15. [Decisiones Técnicas](#15-decisiones-técnicas)
 16. [Costos](#16-costos)
-17. [Registro de Avances](#17-registro-de-avances)
+17. [Buyer Personas](#17-buyer-personas)
 
 ---
 
@@ -46,24 +54,35 @@
 1. **Extensión Chrome (MejoraINSSIST)** — herramienta de asistencia directa en Instagram (v1.1.0 ✅)
 2. **Sistema EDA** — backend multi-agente con dashboard web (código listo, deploy pendiente)
 
+### Flujo de Alto Nivel
+
+```
+Usuario propone tema → Frontend
+  → orchestrator invoca 3 agentes (Estratega → Creativo → Crítico)
+  → Propuesta estructurada (hook/body/cta/hashtags)
+  → Usuario aprueba → Calendario → Publicación automática
+  → Monitor KPIs → Bucle de aprendizaje → Mejora continua
+```
+
 ---
 
 ## 2. STACK TECNOLÓGICO
 
 | Capa | Tecnología | Estado |
 |---|---|---|
-| Frontend | React 18 + TypeScript + Vite | ✅ Lovable |
+| Frontend | React 18 + TypeScript + Vite | ✅ |
 | UI | shadcn/ui + Tailwind CSS | ✅ |
 | Backend | Supabase Edge Functions (Deno) | ✅ Código listo |
-| Base de datos | Supabase PostgreSQL + pgvector | ✅ Migración SQL lista |
-| Storage | Supabase Storage | ✅ Configurado |
+| Base de datos | Supabase PostgreSQL + pgvector | ✅ Schema ejecutado |
+| Storage | Supabase Storage (bucket `vault`) | ✅ Configurado |
 | IA Principal | Groq (Llama 4 Scout 8B) | 🔲 Falta API key |
 | IA Análisis | DeepSeek V3.2 | 🔲 Falta API key |
 | IA Backup | Google Gemini 1.5 Flash | 🔲 Falta API key |
 | Embeddings | HuggingFace (all-MiniLM-L6-v2) | 🔲 Falta API key |
 | Extensión | Chrome Extension Manifest V3 | ✅ Migrada |
 | Deploy | GitHub Actions → FTP (Hostinger) | ✅ Automático |
-| Auth | Supabase Auth (opcional) | 🔲 Futuro |
+| Tests | Vitest (21 tests) | ✅ |
+| CI/CD | GitHub Actions | ✅ |
 
 **Costo total estimado: $0/mes** (todo en free tier)
 
@@ -73,22 +92,30 @@
 
 ```
 mejorasocialmedia/
-├── src/                          ← Frontend React (Lovable)
+├── src/                          ← Frontend React
 │   ├── pages/
 │   │   ├── Dashboard.tsx         ← KPIs principales
 │   │   ├── Boveda.tsx            ← Bóveda de Conocimiento
 │   │   ├── MesaDialogo.tsx       ← Mesa de Diálogo multi-agente
 │   │   ├── Laboratorio.tsx       ← Laboratorio de Contenido
 │   │   ├── Configuracion.tsx     ← Configuración de agentes
-│   │   ├── Index.tsx             ← Landing
+│   │   ├── Index.tsx             ← Landing (redirect → Dashboard)
 │   │   └── NotFound.tsx          ← 404
 │   ├── services/
 │   │   ├── ai.ts                 ← Cliente Edge Functions
 │   │   └── supabase.ts           ← CRUD completo
+│   ├── hooks/
+│   │   ├── useVault.ts           ← Upload + list + process + search docs
+│   │   ├── useDialogue.ts        ← Sesiones, mensajes, start, continue
+│   │   ├── useProposals.ts       ← List, pending, approve, reject, schedule
+│   │   ├── useMetrics.ts         ← Calendario, métricas, reglas de éxito
+│   │   ├── use-mobile.tsx        ← Detección de dispositivo
+│   │   └── use-toast.ts          ← Notificaciones
 │   ├── components/
 │   │   ├── layout/               ← AppLayout, AppSidebar
 │   │   └── ui/                   ← shadcn components (50+)
-│   └── hooks/                    ← use-mobile, use-toast
+│   ├── test/                     ← Tests Vitest (21 tests)
+│   └── lib/utils.ts
 ├── supabase/
 │   ├── migrations/
 │   │   └── 001_initial_schema.sql ← 9 tablas + RLS + vector search
@@ -99,10 +126,13 @@ mejorasocialmedia/
 ├── extension/                    ← Extensión Chrome MejoraINSSIST
 │   ├── app/                      ← Scripts (bg.js, ig-cs.js, mejora-injector.js)
 │   ├── data/                     ← Buyer personas, hashtags, replies
-│   ├── manifest.json             ← Manifest V2
-│   └── landing/                  ← Landing page
-├── docs/                         ← Documentación legacy (14 archivos)
-├── Documents/                    ← Documentación unificada (este archivo)
+│   ├── img/                      ← Assets visuales
+│   ├── js/                       ← Librerías externas
+│   ├── landing/                  ← Landing page
+│   ├── manifest.json             ← Manifest V3
+│   └── _locales/                 ← i18n (es/en/pt_BR)
+├── Documents/                    ← 📚 DOCUMENTACIÓN UNIFICADA (este archivo)
+├── docs/                         ← ⚠️ LEGACY — solo lectura, no editar
 ├── .github/workflows/deploy.yml  ← CI/CD automático
 ├── package.json
 ├── tailwind.config.ts
@@ -125,6 +155,7 @@ mejorasocialmedia/
 | Auto-detección DM | ✅ | Al escribir `/` abre panel de replies |
 | 8 Buyer Personas | ✅ | Perfiles psicográficos argentinos |
 | Core INSSIST | ✅ | Post Later, Dark/Wide/Zen, multi-cuenta |
+| Manifest V3 | ✅ | Migrada (23/04/2026) |
 | Landing page | ✅ | En subdominio |
 
 ### ✅ FASE 2: Backend EDA — CÓDIGO LISTO (sin deploy)
@@ -136,16 +167,21 @@ mejorasocialmedia/
 | orchestrator | ✅ | Mesa de Diálogo multi-agente (3 agentes) |
 | vault-process | ✅ | Procesa docs → chunks → embeddings → RAG |
 | Service layer | ✅ | Cliente API + CRUD completo (frontend) |
+| Hooks React | ✅ | useVault, useDialogue, useProposals, useMetrics |
+| Páginas conectadas | ✅ | Dashboard, Bóveda, Mesa, Configuración a datos reales |
+| Tests Vitest | ✅ | 21 tests pasando |
 | Deploy infra | ✅ | GitHub Actions → FTP automático |
 
-### 🔲 FASES 3-6: PENDIENTES
+### 🔲 ETAPAS 3-6: PENDIENTES
 
-| Fase | Descripción | Estado |
+| Etapa | Descripción | Estado |
 |---|---|---|
-| Fase 3 | Publicador y Calendario | 🔲 Pendiente |
-| Fase 4 | Monitor de KPIs | 🔲 Pendiente |
-| Fase 5 | Dashboard Conectado (UI lista, falta backend) | 🔲 En curso |
-| Fase 6 | Bucle de Aprendizaje | 🔲 Pendiente |
+| ETAPA 1 | Activar Backend (secrets + deploy functions) | 🔄 En progreso |
+| ETAPA 2 | Conectar y probar end-to-end | 🔲 Pendiente |
+| ETAPA 3 | Publicador y Calendario | 🔲 Pendiente |
+| ETAPA 4 | Monitor de KPIs | 🔲 Pendiente |
+| ETAPA 5 | Bucle de Aprendizaje | 🔲 Pendiente |
+| ETAPA 6 | Polish, Auth y Escala | 🔲 Pendiente |
 
 ---
 
@@ -216,6 +252,22 @@ mejorasocialmedia/
 8. Monitor (futuro) → trackea métricas → genera reglas
 ```
 
+### Flujo de Carga de la Extensión Chrome
+
+```
+1. Instagram carga
+2. Chrome inyecta content scripts en orden:
+   a. emoji-regex.min.js     (dependencia)
+   b. ig-cs.js               (core INSSIST — patches, interceptors)
+   c. buyer-personas.js      (window.MejoraOK.BuyerPersonas)
+   d. hashtags-db.js         (window.MejoraOK.HashtagPacks)
+   e. sales-replies.js       (window.MejoraOK.SalesReplies)
+   f. mejora-injector.js     (inyector principal)
+3. mejora-injector.js espera a que los datos estén cargados
+4. Crea botón flotante 🎯 y panel oculto
+5. MutationObserver vigila cambios en el DOM
+```
+
 ---
 
 ## 6. BASE DE DATOS
@@ -225,7 +277,7 @@ mejorasocialmedia/
 | Tabla | Propósito | Relaciones |
 |---|---|---|
 | `documents` | PDFs/Docs de la marca | → doc_chunks |
-| `doc_chunks` | Fragmentos con embeddings | ← documents |
+| `doc_chunks` | Fragmentos con embeddings (384 dims) | ← documents |
 | `agent_config` | Config de los 3 agentes | standalone |
 | `dialogue_sessions` | Sesiones de debate | → dialogue_messages, proposals |
 | `dialogue_messages` | Mensajes del debate | ← dialogue_sessions |
@@ -245,6 +297,14 @@ mejorasocialmedia/
 | Función | Uso |
 |---|---|
 | `match_documents(embedding, count, threshold)` | Búsqueda vectorial para RAG |
+
+### Configuración de Agentes (pre-seeded)
+
+| Agente | Proveedor | Modelo | Temperatura | Rol |
+|---|---|---|---|---|
+| Estratega | Groq | llama-4-scout-8b-instruct | 0.8 | Propone tema, ángulo, estrategia |
+| Creativo | Groq | llama-4-scout-8b-instruct | 0.9 | Redacta copy, hook, CTA, hashtags |
+| Crítico | DeepSeek | deepseek-chat | 0.3 | Evalúa contra docs de marca |
 
 ---
 
@@ -301,11 +361,11 @@ mejorasocialmedia/
 
 | Ruta | Página | Estado | Función |
 |---|---|---|---|
-| `/` | Dashboard | ✅ UI | KPIs principales |
-| `/boveda` | Bóveda | ✅ UI | Upload + list docs |
-| `/mesa` | Mesa de Diálogo | ✅ UI | Sesiones multi-agente |
+| `/` | Dashboard | ✅ UI + datos | KPIs principales, aprobaciones pendientes, calendario |
+| `/boveda` | Bóveda | ✅ UI + datos | Upload, búsqueda, eliminación, estado de procesamiento |
+| `/mesa` | Mesa de Diálogo | ✅ UI + datos | Crear sesión con topic, dar feedback, ver estado |
 | `/laboratorio` | Laboratorio | ✅ UI | Generador de contenido |
-| `/configuracion` | Configuración | ✅ UI | Config de agentes |
+| `/configuracion` | Configuración | ✅ UI + datos | Selectores de proveedor/modelo/temperatura por agente |
 
 ### Services
 
@@ -314,14 +374,14 @@ mejorasocialmedia/
 | `src/services/ai.ts` | callAI, generateEmbeddings, startDialogue, continueDialogue, searchVault |
 | `src/services/supabase.ts` | documentsApi, dialogueApi, proposalsApi, calendarApi, metricsApi |
 
-### Pendiente (Hooks)
+### Hooks
 
-| Hook | Función |
-|---|---|
-| `useVault.ts` | Upload + list + process + search docs |
-| `useDialogue.ts` | Start + continue + list sessions |
-| `useProposals.ts` | List + approve + reject + schedule |
-| `useMetrics.ts` | KPIs + success rules |
+| Hook | Función | Estado |
+|---|---|---|
+| `useVault.ts` | Upload + list + process + search docs | ✅ |
+| `useDialogue.ts` | Start + continue + list sessions | ✅ |
+| `useProposals.ts` | List + pending + approve + reject + schedule | ✅ |
+| `useMetrics.ts` | KPIs + calendario + reglas de éxito | ✅ |
 
 ---
 
@@ -338,106 +398,46 @@ mejorasocialmedia/
 | Buyer Personas | `data/buyer-personas.js` | 8 perfiles argentinos |
 | Core INSSIST | `bg.js`, `ig-cs.js` | Funcionalidad base |
 
-### ⚠️ Nota: Manifest V3
+### Manifest V3 ✅
 
-Extensión migrada a Manifest V3 (23/04/2026). Cambios: `action` reemplaza `browser_action`, `service_worker` reemplaza background persistente, CSP en formato objeto, `host_permissions` separados de `permissions`. Se agregó polyfill `chrome.browserAction → chrome.action` en bg.js.
-
----
-
-## 10. PROVEEDORES DE IA
-
-| Proveedor | Modelo | Uso | Free Tier | API Key |
-|---|---|---|---|---|
-| Groq | Llama 4 Scout 8B | Estratega + Creativo | 30 req/min | 🔲 Pendiente |
-| DeepSeek | V3.2 | Crítico + Análisis | Free tier | 🔲 Pendiente |
-| Gemini | 1.5 Flash | Backup + Multimodal | 60 req/min | 🔲 Pendiente |
-| HF | all-MiniLM-L6-v2 | Embeddings | Rate limit | 🔲 Pendiente |
-
-### Configuración por defecto
-
-```
-Estratega:  Groq / llama-4-scout-8b-instruct / temp 0.8
-Creativo:   Groq / llama-4-scout-8b-instruct / temp 0.9
-Crítico:    DeepSeek / deepseek-chat / temp 0.3
-```
+Migrada el 23/04/2026. Cambios: `action` reemplaza `browser_action`, `service_worker` reemplaza background persistente, CSP en formato objeto, `host_permissions` separados de `permissions`. Polyfill `chrome.browserAction → chrome.action` en bg.js.
 
 ---
 
-## 11. DEPLOYMENT
+## 10. PLAN POR ETAPAS
 
-### Frontend (automático)
-
-- **CI/CD:** GitHub Actions → FTP a Hostinger en cada push a `main`
-- **Workflow:** `.github/workflows/deploy.yml`
-- **Producción:** https://util.mejoraok.com/MejoraSM/
-- **Build:** `npm install --legacy-peer-deps && npm run build`
-
-### Backend (en progreso)
-
-```bash
-# ✅ Schema SQL ejecutado (23/04 22:35)
-# ⏳ Edge Functions deploy pendiente
-supabase functions deploy ai-gateway
-supabase functions deploy orchestrator
-supabase functions deploy vault-process
-
-# ⏳ Secrets pendientes
-supabase secrets set GROQ_API_KEY=xxx
-supabase secrets set DEEPSEEK_API_KEY=xxx
-supabase secrets set GEMINI_API_KEY=xxx
-```
-
-### Base de datos ✅
-
-Schema ejecutado en Supabase SQL Editor (23/04 22:35). 9 tablas + RLS + vector search.
-
----
-
-## 12. BUYER PERSONAS
-
-| # | Perfil | Emoji | Dolor | Deseo |
-|---|---|---|---|---|
-| 1 | El Emprendedor Saturado | 🤯 | No sabe priorizar, apaga incendios | Claridad mental, control |
-| 2 | La Líder que Necesita Validación | 👑 | Síndrome del impostor | Confianza, criterio externo |
-| 3 | El Profesional Independiente | 📈 | Bueno pero invisible | Posicionamiento, marca personal |
-| 4 | El Equipo Desalineado | 🔀 | Cada uno hace lo suyo | Alineación, roles claros |
-| 5 | El Empresario Mal Asesorado | 🔍 | Rodeado de humo | Verdad, buen asesoramiento |
-| 6 | La Nueva Generación | 🌱 | No lo valoran | Crecimiento, reconocimiento |
-| 7 | El Vendedor sin Resultados | 💸 | Trabaja mucho, vende poco | Conversión, proceso de ventas |
-| 8 | El que Necesita Orden | ⚡ | Creció rápido, desordenado | Sistema, procesos |
-
----
-
-## 13. PLAN POR ETAPAS
-
-### ETAPA 0: Consolidación y Seguridad ✅ (23/04/2026)
+### ETAPA 0: Consolidación y Documentación ✅ (23/04/2026)
 - [x] Consolidar documentación en `Documents/DOCUMENTACION.md`
 - [x] Analizar estado real vs documentado
-- [x] Crear plan por etapas
+- [x] Crear plan por etapas con dependencias y estimaciones
+- [x] Unificar documentación dispersa en documento único (24/04)
 
-### ETAPA 1: Activar Backend (en progreso — 23/04/2026)
+### ETAPA 1: Activar Backend 🔄 EN PROGRESO
 **Dependencia:** Acceso a Supabase dashboard
 **Tiempo estimado:** 1-2 horas
 
-| # | Tarea | Responsable | Estado |
+| # | Tarea | Estado | Notas |
 |---|---|---|---|
-| 1.1 | Ejecutar SQL schema en Supabase | Pablo | ✅ Success (23/04 22:35) |
-| 1.2 | Verificar bucket `vault` en Storage | Pablo | ⏳ En progreso |
-| 1.3 | Configurar API keys en Secrets | Pablo | 🔲 Pendiente (Groq, DeepSeek, Gemini) |
-| 1.4 | Deploy Edge Functions | Pablo | 🔲 Pendiente |
-| 1.5 | Verificar health check | Pablo/AI | 🔲 Pendiente |
+| 1.1 | Ejecutar SQL schema en Supabase | ✅ (23/04 22:35) | 9 tablas + RLS + vector search |
+| 1.2 | Verificar bucket `vault` en Storage | ⏳ | Debe existir (creado por schema) |
+| 1.3 | Configurar API keys en Secrets | 🔲 | Groq, DeepSeek, Gemini |
+| 1.4 | Deploy Edge Functions (3 funciones) | 🔲 | ai-gateway, orchestrator, vault-process |
+| 1.5 | Health check completo | 🔲 | Verificar tablas + functions + storage |
 
-### ETAPA 2: Conectar Frontend
+**Guía de setup:** `Documents/SUPABASE_SETUP.md`
+
+### ETAPA 2: Conectar y Probar End-to-End
 **Dependencia:** ETAPA 1 completa
 **Tiempo estimado:** 2-3 horas
 
 | # | Tarea | Notas |
 |---|---|---|
-| 2.1 | Crear hooks React (useVault, useDialogue, etc.) | Conectar UI a backend real |
-| 2.2 | Probar Mesa de Diálogo end-to-end | Tema → debate → propuesta |
-| 2.3 | Probar Bóveda de Conocimiento | Subir doc → procesar → buscar |
-| 2.4 | Dashboard con datos reales | COUNT desde Supabase |
-| 2.5 | Manejo de errores y loading states | UX robusta |
+| 2.1 | Probar Bóveda end-to-end | Subir doc → procesar → buscar (RAG) |
+| 2.2 | Probar Mesa de Diálogo end-to-end | Tema → debate multi-agente → propuesta |
+| 2.3 | Probar Dashboard con datos reales | Stats dinámicos desde Supabase |
+| 2.4 | Probar Configuración de agentes | Cambiar proveedor/modelo/temperatura |
+| 2.5 | Manejo de errores y loading states | UX robusta ante fallos de API |
+| 2.6 | Test de integración completo | Flujo completo: doc → debate → propuesta → calendario |
 
 ### ETAPA 3: Publicador y Calendario
 **Dependencia:** ETAPA 2 completa
@@ -449,6 +449,7 @@ Schema ejecutado en Supabase SQL Editor (23/04 22:35). 9 tablas + RLS + vector s
 | 3.2 | Cron job de publicación | Edge Function scheduled |
 | 3.3 | Instagram Graph API | Requiere credenciales Meta |
 | 3.4 | Sistema de aprobación previa | Cola → approve/reject |
+| 3.5 | Soporte multi-formato | Imagen, carrusel, video |
 
 ### ETAPA 4: Monitor de KPIs
 **Dependencia:** ETAPA 3 completa
@@ -470,90 +471,146 @@ Schema ejecutado en Supabase SQL Editor (23/04 22:35). 9 tablas + RLS + vector s
 | 5.1 | Tracking de métricas por post | Correlación contenido → rendimiento |
 | 5.2 | Reglas de éxito automáticas | success_rules table |
 | 5.3 | Sugerencias proactivas | "Los posts con emoji en hook rinden 2x" |
+| 5.4 | Gestor de interacciones | Likes, follows automáticos |
 
-### ETAPA 6: Limpieza Técnica ✅ COMPLETADA (23/04/2026)
+### ETAPA 6: Polish, Auth y Escala
+**Dependencia:** ETAPA 5 completa (o paralela)
+**Tiempo estimado:** 2-3 horas
 
-| # | Tarea | Estado |
-|---|---|---|
-| 6.1 | Migrar extensión a Manifest V3 | ✅ |
-| 6.2 | Activar `strictNullChecks` | ✅ |
-| 6.3 | Agregar tests reales (Vitest) — 21 tests | ✅ |
-| 6.4 | Limpiar archivos legacy de extensión | ✅ |
-| 6.5 | Quitar lovable-tagger de dependencias | ✅ |
-| 6.6 | Actualizar browserslist | ✅ |
+| # | Tarea | Estado | Notas |
+|---|---|---|---|
+| 6.1 | Migrar extensión a Manifest V3 | ✅ | Completado 23/04 |
+| 6.2 | Activar `strictNullChecks` | ✅ | Completado 23/04 |
+| 6.3 | Tests Vitest (21 tests) | ✅ | Completado 23/04 |
+| 6.4 | Limpiar archivos legacy extensión | ✅ | Completado 23/04 |
+| 6.5 | Quitar lovable-tagger | ✅ | Completado 23/04 |
+| 6.6 | Actualizar browserslist | ✅ | Completado 23/04 |
+| 6.7 | Auth: Login + proteger rutas | 🔲 | Supabase Auth |
+| 6.8 | Dark/light theme extensión | 🔲 | Baja prioridad |
+| 6.9 | Fuzzy matching buyer persona | 🔲 | Baja prioridad |
+| 6.10 | Analytics de uso extensión | 🔲 | Para bucle de aprendizaje |
 
 ### Timeline Consolidado
 
 ```
-ETAPA 0  → ✅ 23/04
-ETAPA 1  → 🔄 En progreso (23/04 — schema ejecutado, pendientes secrets + deploy)
+ETAPA 0  → ✅ 23/04 (Consolidación)
+ETAPA 1  → 🔄 En progreso (schema ✅, pendientes secrets + deploy)
 ETAPA 2  → Inmediatamente después de ETAPA 1
 ETAPA 3  → Semana siguiente
 ETAPA 4  → +1 semana
 ETAPA 5  → +1 semana
-ETAPA 6  → ✅ 23/04
+ETAPA 6  → Parcialmente ✅ (limpieza hecha, auth/temas pendientes)
 Total:   → ~4-5 semanas desde ETAPA 1
 ```
 
 ---
 
-## 14. PENDIENTES Y BLOQUEADORES
+## 11. PENDIENTES Y BLOQUEADORES
 
 ### 🔴 Bloqueadores Activos
 
 | ID | Descripción | Estado | Acción |
 |---|---|---|---|
-| B1 | API keys no configuradas en Supabase | ⏳ Pablo | ETAPA 1.3 |
-| B2 | SQL schema no ejecutado | ✅ Resuelto (23/04 22:35) | ETAPA 1.1 |
-| B3 | Edge Functions no deployadas | ⏳ Pablo | ETAPA 1.4 |
-| B4 | Manifest V2 deprecado | ✅ Resuelto | ETAPA 6.1 |
+| B1 | API keys no configuradas en Supabase | ⏳ Pablo | ETAPA 1.3 — Settings → Edge Functions → Secrets |
+| B2 | Edge Functions no deployadas | ⏳ Pablo | ETAPA 1.4 — `supabase functions deploy` |
+| B3 | Bucket `vault` sin verificar | ⏳ Pablo | ETAPA 1.2 — Storage → verificar existe |
 
 ### 🟡 Pendientes Alta Prioridad
 
-- Conectar frontend a backend real (hooks React)
-- Probar end-to-end Mesa de Diálogo
-- Probar end-to-end Bóveda
+- Conectar frontend a backend real (probar end-to-end)
+- Probar Mesa de Diálogo con IA real
+- Probar Bóveda con documentos reales
 
 ### 🟢 Pendientes Baja Prioridad
 
 - Dark/light theme en extensión
 - Fuzzy matching en buyer persona
 - Analytics de uso de la extensión
-- Tests reales con Vitest
+- Auth (login/register)
 
----
+### 🔮 Fases Futuras (post-MVP)
 
-## 15. DECISIONES TÉCNICAS
-
-| Decisión | Elección | Razón |
+| Fase | Descripción | Dependencias |
 |---|---|---|
-| Backend | Supabase Edge Functions | Gratis, integrado, sin servidor |
-| Framework | React (Lovable) | Ya existía, ecosistema grande |
-| IA principal | Groq (Llama 4 Scout 8B) | Rápido, free tier generoso |
-| IA análisis | DeepSeek V3.2 | Bueno en lógica |
-| Embeddings | HF Sentence Transformers | Gratis |
-| DB | PostgreSQL + pgvector | RAG nativo en Supabase |
-| Auth | Sin auth (personal) | Simplifica MVP |
-| Deploy frontend | GitHub Actions → FTP | Automático en push |
+| Generador Multiformato | IA genera carruseles, infografías | API de imágenes |
+| Gestor de Interacciones | Auto-likes, auto-follows | Instagram API |
+| Bucle de Aprendizaje Avanzado | Reglas automáticas, sugerencias | KPIs + métricas |
 
 ---
 
-## 16. COSTOS
+## 12. PROVEEDORES DE IA
 
-| Servicio | Free Tier | Uso estimado | Costo |
-|---|---|---|---|
-| Supabase | 500K func, 500MB DB, 1GB storage | Bajo | $0 |
-| Groq | 30 req/min | ~100 req/día | $0 |
-| DeepSeek | Free tier | ~30 req/día | $0 |
-| Gemini | 60 req/min, 1M tokens/min | Backup | $0 |
-| HF Embeddings | Rate limit generoso | ~20 req/día | $0 |
-| Lovable | Incluido | Continuo | $0 |
-| Hostinger | Plan existente | Landing | Ya pagado |
-| **Total** | | | **$0/mes** |
+| Proveedor | Modelo | Uso | Free Tier | API Key |
+|---|---|---|---|---|
+| Groq | Llama 4 Scout 8B | Estratega + Creativo | 30 req/min | 🔲 Pendiente |
+| DeepSeek | V3.2 | Crítico + Análisis | Free tier | 🔲 Pendiente |
+| Gemini | 1.5 Flash | Backup + Multimodal | 60 req/min | 🔲 Pendiente |
+| HF | all-MiniLM-L6-v2 | Embeddings | Rate limit | 🔲 Pendiente |
+
+### Configuración por defecto
+
+```
+Estratega:  Groq / llama-4-scout-8b-instruct / temp 0.8
+Creativo:   Groq / llama-4-scout-8b-instruct / temp 0.9
+Crítico:    DeepSeek / deepseek-chat / temp 0.3
+Embeddings: HF / all-MiniLM-L6-v2 (384 dims)
+```
+
+### Prompts de los Agentes
+
+**Estratega:** Propone tema, ángulo, objetivo y contexto del nicho. Responde con: TEMA, ÁNGULO, OBJETIVO, CONTEXTO.
+
+**Creativo:** Redacta copy completo. Responde con: HOOK, COPY, CTA, HASHTAGS, SUGERENCIA VISUAL.
+
+**Crítico:** Evalúa contra docs de marca. Responde con: VEREDICTO (APROBADO/REVISAR), PUNTUACIÓN (1-10 en Hook/Copy/CTA/Hashtags/Estrategia), FEEDBACK, versión corregida si REVISAR.
 
 ---
 
-## 17. REGISTRO DE AVANCES
+## 13. DEPLOYMENT
+
+### Frontend (automático)
+
+- **CI/CD:** GitHub Actions → FTP a Hostinger en cada push a `main`
+- **Workflow:** `.github/workflows/deploy.yml`
+- **Producción:** https://util.mejoraok.com/MejoraSM/
+- **Build:** `npm install --legacy-peer-deps && npm run build`
+
+### Backend (Supabase)
+
+```bash
+# Schema SQL — ✅ Ejecutado (23/04 22:35)
+# Edge Functions — ⏳ Pendiente deploy
+supabase functions deploy ai-gateway
+supabase functions deploy orchestrator
+supabase functions deploy vault-process
+
+# Secrets — ⏳ Pendiente configurar
+supabase secrets set GROQ_API_KEY=xxx
+supabase secrets set DEEPSEEK_API_KEY=xxx
+supabase secrets set GEMINI_API_KEY=xxx
+```
+
+### Instalación Local
+
+```bash
+git clone https://github.com/pabloeckert/MejoraSM.git
+cd MejoraSM
+npm install --legacy-peer-deps
+npm run dev          # Servidor local
+npm run build        # Build de producción
+npm run test         # Tests con Vitest (21 tests)
+```
+
+### Variables de Entorno (.env)
+
+```env
+VITE_SUPABASE_URL=https://exnjyxwmxknvzploeaex.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGci...
+```
+
+---
+
+## 14. REGISTRO DE AVANCES
 
 ### 22/04/2026 — Día 1 (Sesión principal)
 
@@ -572,7 +629,7 @@ Total:   → ~4-5 semanas desde ETAPA 1
 - ✅ Análisis de estado real vs documentación
 - ✅ Documentación unificada en `Documents/DOCUMENTACION.md`
 - ✅ Plan por etapas (ETAPA 0-6) con dependencias y estimaciones
-- ✅ Identificación de 4 bloqueadores activos (todos requieren acceso a Supabase)
+- ✅ Identificación de bloqueadores activos
 
 **Frontend — Hooks React creados:**
 - ✅ `src/hooks/useVault.ts` — upload, list, delete documentos
@@ -585,40 +642,26 @@ Total:   → ~4-5 semanas desde ETAPA 1
 - ✅ Bóveda — upload real, búsqueda, eliminación, estado de procesamiento
 - ✅ Mesa de Diálogo — crear sesión con topic, dar feedback, ver estado
 - ✅ Configuración — selectores de proveedor/modelo/temperatura por agente
-- ✅ Index — redirección limpia a Dashboard
 
 **Limpieza técnica:**
-- ✅ Eliminados 4 archivos legacy de extensión (caption-helper, hashtag-packs, index-web-worker, sales-quick-replies)
-- ✅ Eliminado "Nuevo Documento de texto.txt"
-- ✅ README.md actualizado con stack y estructura actual
-- ✅ .gitignore: .env, .openclaw/, archivos workspace protegidos
-- ✅ index.html: removido TODO comment
-- ✅ Dependencias actualizadas (caniuse-lite, browserslist)
+- ✅ Eliminados 4 archivos legacy de extensión
+- ✅ README.md actualizado
+- ✅ .gitignore protegido (.env, .openclaw/)
+- ✅ Dependencias actualizadas
 
 **Seguridad:**
-- ✅ .env protegido en .gitignore (Supabase keys no se commitean)
-- ✅ Archivos de workspace OpenClaw excluidos del repo
-
----
+- ✅ .env protegido en .gitignore
 
 ### 23/04/2026 — ETAPA 6: Limpieza Técnica ✅ COMPLETADA
 
-**Tareas completadas:**
-- ✅ 6.1 — Migración extensión a Manifest V3 (manifest.json reestructurado + polyfill bg.js)
-- ✅ 6.2 — `strictNullChecks` activado (tsconfig.json + tsconfig.app.json, sin errores)
-- ✅ 6.3 — Tests reales con Vitest (21 tests, todos pasando)
-  - AI service: 6 tests (callAI, startDialogue, embeddings, processDocument, searchVault)
-  - Supabase service: 5 tests (documents, dialogue, proposals, metrics, calendar APIs)
-  - Hook exports: 4 tests (useVault, useDialogue, useProposals, useMetrics)
-  - Dashboard page: 6 tests (rendering, stats, aprobaciones, calendario)
-- ✅ 6.4 — Archivos legacy de extensión eliminados (sesión anterior)
-- ✅ 6.5 — `lovable-tagger` eliminado de dependencias y vite.config.ts
-- ✅ 6.6 — Browserslist actualizado (caniuse-lite latest)
+- ✅ 6.1 — Migración extensión a Manifest V3
+- ✅ 6.2 — `strictNullChecks` activado
+- ✅ 6.3 — Tests Vitest (21 tests pasando)
+- ✅ 6.4 — Archivos legacy eliminados
+- ✅ 6.5 — `lovable-tagger` removido
+- ✅ 6.6 — Browserslist actualizado
 - ✅ Guía de setup Supabase creada (`Documents/SUPABASE_SETUP.md`)
 - ✅ Build de producción verificado (3.21s, sin errores)
-
-**Commit:** `991ec45` — "ETAPA 6: Technical cleanup"
-**Commit:** `e7a0f9e` — "chore: code splitting + doc updates"
 
 ### 23/04/2026 — ETAPA 1: Activar Backend (en progreso)
 
@@ -628,9 +671,64 @@ Total:   → ~4-5 semanas desde ETAPA 1
 - 🔲 1.4 — Deploy Edge Functions
 - 🔲 1.5 — Health check
 
-**Guía de setup:** `Documents/SUPABASE_SETUP.md`
+### 24/04/2026 — Consolidación de Documentación
+
+- ✅ Análisis completo de 18 archivos de documentación dispersos
+- ✅ Eliminación de duplicación masiva (PROYECTO-MAESTRO.md ≈ DOCUMENTACION.md)
+- ✅ Documentación consolidada en documento único (`Documents/DOCUMENTACION.md`)
+- ✅ Instrucción "documentar" integrada con flujo de actualización
+- ✅ Optimización de plan por etapas (re-numeración lógica)
+- ✅ Limpieza de datos sensibles (credenciales removidas de logs)
+- ✅ docs/ marcado como legacy (solo lectura)
 
 ---
 
-*Última actualización: 23/04/2026 — Este documento reemplaza toda la documentación previa en `docs/`.*
+## 15. DECISIONES TÉCNICAS
+
+| Decisión | Elección | Razón |
+|---|---|---|
+| Backend | Supabase Edge Functions | Gratis, integrado, sin servidor |
+| Framework | React (Lovable) | Ya existía, ecosistema grande |
+| IA principal | Groq (Llama 4 Scout 8B) | Rápido, free tier generoso |
+| IA análisis | DeepSeek V3.2 | Bueno en lógica |
+| Embeddings | HF Sentence Transformers | Gratis, 384 dims |
+| DB | PostgreSQL + pgvector | RAG nativo en Supabase |
+| Auth | Sin auth (personal) | Simplifica MVP, activar después |
+| Deploy frontend | GitHub Actions → FTP | Automático en push |
+| Extensión | Manifest V3 | Chrome elimina MV2 |
+| Documentación | Document único en Documents/ | Eliminar dispersión |
+
+---
+
+## 16. COSTOS
+
+| Servicio | Free Tier | Uso estimado | Costo |
+|---|---|---|---|
+| Supabase | 500K func, 500MB DB, 1GB storage | Bajo | $0 |
+| Groq | 30 req/min | ~100 req/día | $0 |
+| DeepSeek | Free tier | ~30 req/día | $0 |
+| Gemini | 60 req/min, 1M tokens/min | Backup | $0 |
+| HF Embeddings | Rate limit generoso | ~20 req/día | $0 |
+| Hostinger | Plan existente | Landing | Ya pagado |
+| **Total** | | | **$0/mes** |
+
+---
+
+## 17. BUYER PERSONAS
+
+| # | Perfil | Emoji | Dolor | Deseo |
+|---|---|---|---|---|
+| 1 | El Emprendedor Saturado | 🤯 | No sabe priorizar, apaga incendios | Claridad mental, control |
+| 2 | La Líder que Necesita Validación | 👑 | Síndrome del impostor | Confianza, criterio externo |
+| 3 | El Profesional Independiente | 📈 | Bueno pero invisible | Posicionamiento, marca personal |
+| 4 | El Equipo Desalineado | 🔀 | Cada uno hace lo suyo | Alineación, roles claros |
+| 5 | El Empresario Mal Asesorado | 🔍 | Rodeado de humo | Verdad, buen asesoramiento |
+| 6 | La Nueva Generación | 🌱 | No lo valoran | Crecimiento, reconocimiento |
+| 7 | El Vendedor sin Resultados | 💸 | Trabaja mucho, vende poco | Conversión, proceso de ventas |
+| 8 | El que Necesita Orden | ⚡ | Creció rápido, desordenado | Sistema, procesos |
+
+---
+
+*Este documento reemplaza toda la documentación previa en `docs/` (legacy, solo lectura).*
+*Última actualización: 24/04/2026*
 *Cuando el usuario diga "documentar", actualizar este archivo con los trabajos realizados.*
