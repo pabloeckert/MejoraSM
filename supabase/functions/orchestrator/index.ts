@@ -26,8 +26,6 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
-const AI_GATEWAY = `${Deno.env.get("SUPABASE_URL")}/functions/v1/ai-gateway`;
-
 // ═══════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════
@@ -39,18 +37,38 @@ async function callAI(
   messages: { role: string; content: string }[],
   temperature = 0.7
 ): Promise<string> {
-  const res = await fetch(AI_GATEWAY, {
+  // Llamada directa a proveedores IA (sin pasar por ai-gateway para evitar auth interno)
+  const apiKey = Deno.env.get("GROQ_API_KEY") || Deno.env.get("DEEPSEEK_API_KEY");
+  if (!apiKey) throw new Error("No hay API keys configuradas (GROQ_API_KEY o DEEPSEEK_API_KEY)");
+
+  const allMessages = system
+    ? [{ role: "system", content: system }, ...messages]
+    : messages;
+
+  // Usar Groq por defecto (más rápido y free tier generoso)
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
     },
-    body: JSON.stringify({ provider, model, system, messages, temperature }),
+    body: JSON.stringify({
+      model: model || "meta-llama/llama-4-scout-17b-16e-instruct",
+      messages: allMessages,
+      temperature,
+      max_tokens: 2048,
+    }),
   });
 
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Groq error ${res.status}: ${err.slice(0, 200)}`);
+  }
+
   const data = await res.json();
-  if (data.error) throw new Error(data.error);
-  return data.content;
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error("Groq: respuesta sin contenido");
+  return content;
 }
 
 async function getAgentConfig(agentId: string) {
@@ -63,21 +81,29 @@ async function getAgentConfig(agentId: string) {
 }
 
 async function getContextDocs(query: string): Promise<string> {
-  // Búsqueda vectorial real usando embeddings
+  // Búsqueda vectorial real usando embeddings (llamada directa a HF)
   try {
-    const searchRes = await fetch(AI_GATEWAY, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-      },
-      body: JSON.stringify({ action: "embed", texts: [query] }),
-    });
+    const hfKey = Deno.env.get("HF_API_KEY");
+    if (!hfKey) throw new Error("HF_API_KEY no configurada");
 
-    const searchData = await searchRes.json();
-    if (searchData.embeddings?.[0]) {
+    const embedRes = await fetch(
+      "https://api-inference.huggingface.com/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${hfKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ inputs: [query], options: { wait_for_model: true } }),
+      }
+    );
+
+    if (!embedRes.ok) throw new Error(`HF error: ${embedRes.status}`);
+    const embeddings = await embedRes.json();
+
+    if (embeddings?.[0]) {
       const { data: chunks } = await supabase.rpc("match_documents", {
-        query_embedding: searchData.embeddings[0],
+        query_embedding: embeddings[0],
         match_count: 5,
       });
 
@@ -211,8 +237,9 @@ SUGERENCIAS: [si fue rechazado, qué cambiar]`;
     config.temperature
   );
 
-  const aprobado = response.toUpperCase().includes("DECISION: APROBADO");
-  return { aprobado, feedback: response };
+  const feedback = response || "Sin feedback del agente crítico";
+  const aprobado = feedback.toUpperCase().includes("DECISION: APROBADO");
+  return { aprobado, feedback };
 }
 
 // ═══════════════════════════════════════
@@ -221,11 +248,14 @@ SUGERENCIAS: [si fue rechazado, qué cambiar]`;
 
 async function startSession(topic: string) {
   // 1. Crear sesión
-  const { data: session } = await supabase
+  const { data: session, error: sessionError } = await supabase
     .from("dialogue_sessions")
     .insert({ topic, status: "active" })
     .select()
     .single();
+
+  if (sessionError) throw new Error(`Error creando sesión: ${sessionError.message}`);
+  if (!session) throw new Error("No se pudo crear la sesión");
 
   // 2. Obtener contexto de la bóveda
   const contextDocs = await getContextDocs(topic);
