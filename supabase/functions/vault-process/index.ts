@@ -27,8 +27,6 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
 
-const AI_GATEWAY = `${Deno.env.get("SUPABASE_URL")}/functions/v1/ai-gateway`;
-
 // ═══════════════════════════════════════
 // CHUNKING
 // ═══════════════════════════════════════
@@ -71,22 +69,33 @@ function chunkText(text: string, maxTokens = 500, overlap = 50): string[] {
 }
 
 // ═══════════════════════════════════════
-// EMBEDDINGS
+// EMBEDDINGS (llamada directa a HF)
 // ═══════════════════════════════════════
 
 async function generateEmbeddings(texts: string[]): Promise<number[][]> {
-  const res = await fetch(AI_GATEWAY, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-    },
-    body: JSON.stringify({ action: "embed", texts }),
-  });
+  const hfKey = Deno.env.get("HF_API_KEY");
+  if (!hfKey) throw new Error("HF_API_KEY no configurada");
+
+  const res = await fetch(
+    "https://api-inference.huggingface.com/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${hfKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ inputs: texts, options: { wait_for_model: true } }),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`HF Embeddings error ${res.status}: ${err.slice(0, 200)}`);
+  }
 
   const data = await res.json();
-  if (data.error) throw new Error(data.error);
-  return data.embeddings;
+  if (!Array.isArray(data)) throw new Error("HF: respuesta no es array");
+  return data;
 }
 
 // ═══════════════════════════════════════
