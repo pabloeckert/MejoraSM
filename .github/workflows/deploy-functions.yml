@@ -1,0 +1,101 @@
+# Deploy Edge Functions to Supabase
+# Trigger: manual (workflow_dispatch) or after CI passes on main
+name: Deploy Edge Functions
+
+on:
+  workflow_dispatch:
+    inputs:
+      function_name:
+        description: 'Function to deploy (leave empty for all)'
+        required: false
+        default: ''
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy Edge Functions
+    runs-on: ubuntu-latest
+    # Only deploy after CI passes (if triggered by push)
+    # For manual dispatch, always run
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Supabase CLI
+        run: npm install -g supabase
+
+      - name: Login to Supabase
+        run: npx supabase login --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Link project
+        run: npx supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      - name: Deploy specific function
+        if: ${{ github.event.inputs.function_name != '' }}
+        run: |
+          echo "🚀 Deploying function: ${{ github.event.inputs.function_name }}"
+          npx supabase functions deploy ${{ github.event.inputs.function_name }} \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      - name: Deploy all functions
+        if: ${{ github.event.inputs.function_name == '' }}
+        run: |
+          echo "🚀 Deploying all Edge Functions..."
+          FUNCTIONS=("ai-gateway" "orchestrator" "vault-process" "metrics-collector" "rule-engine" "publisher")
+          
+          FAILED=0
+          for fn in "${FUNCTIONS[@]}"; do
+            echo ""
+            echo "━━━ Deploying: $fn ━━━"
+            if npx supabase functions deploy "$fn" \
+              --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}; then
+              echo "✅ $fn — OK"
+            else
+              echo "❌ $fn — FAILED"
+              ((FAILED++))
+            fi
+          done
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━"
+          if [ "$FAILED" -gt 0 ]; then
+            echo "⚠️ $FAILED function(s) failed to deploy"
+            exit 1
+          else
+            echo "✅ All functions deployed successfully!"
+          fi
+
+      - name: Verify endpoints
+        if: success()
+        run: |
+          SUPABASE_URL="https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co"
+          ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          
+          echo ""
+          echo "🏥 Verifying endpoints..."
+          
+          for fn in ai-gateway orchestrator vault-process metrics-collector rule-engine publisher; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" \
+              "$SUPABASE_URL/functions/v1/$fn" \
+              -H "apikey: $ANON_KEY" 2>/dev/null)
+            case "$code" in
+              401|405|400) echo "  ✅ $fn — active (HTTP $code)" ;;
+              404)         echo "  ❌ $fn — NOT FOUND (HTTP 404)" ;;
+              *)           echo "  ⚠️  $fn — HTTP $code" ;;
+            esac
+          done

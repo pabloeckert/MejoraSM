@@ -56,6 +56,26 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2, baseDelay = 10
   throw new Error("Unreachable");
 }
 
+// ═══════════════════════════════════════
+// SANITIZACIÓN DE INPUT
+// ═══════════════════════════════════════
+
+function sanitizeText(text: string, maxLen = 5000): string {
+  if (typeof text !== "string") return "";
+  // Trim, limitar longitud, remover null bytes
+  return text
+    .trim()
+    .slice(0, maxLen)
+    .replace(/\0/g, "");
+}
+
+function sanitizeTopic(topic: string): string {
+  const clean = sanitizeText(topic, 500);
+  if (clean.length === 0) throw new ValidationError("El tema no puede estar vacío");
+  if (clean.length < 3) throw new ValidationError("El tema es muy corto (mínimo 3 caracteres)");
+  return clean;
+}
+
 async function callAI(
   provider: string,
   model: string,

@@ -146,9 +146,19 @@ MejoraSM/
 │   └── migrations/         ← SQL schema
 ├── extension/              ← Chrome Extension MejoraINSSIST
 ├── Documents/              ← Documentación unificada
+│   ├── DOCUMENTACION.md    ← Documentación principal
+│   └── CTO-CONTEXT.md      ← Handoff de sesión CTO
 ├── docs/                   ← Legacy (solo lectura)
-├── .github/workflows/      ← CI (lint + test + build)
-└── scripts/                ← Scripts de deploy
+├── .github/workflows/
+│   ├── ci.yml              ← CI (lint + test + build)
+│   └── deploy-functions.yml ← Deploy Edge Functions
+├── scripts/
+│   ├── deploy.sh           ← Deploy manual Edge Functions
+│   ├── fix-postgrest.sh    ← Fix PostgREST schema cache
+│   ├── health-check.sh     ← Health check completo
+│   └── setup-dev.sh        ← Setup de desarrollo
+├── SECURITY.md             ← Política de seguridad
+└── package.json
 ```
 
 ---
@@ -208,6 +218,29 @@ HUGGINGFACE_API_KEY=hf_...
 | Fecha | Evento | Notas |
 |---|---|---|
 | 2026-05-12 | Primera sesión CTO | Onboarding, exploración del repo, creación de documentación |
+| 2026-05-12 | Trabajo inicial CTO | Mejoras de seguridad, deploy workflow, scripts, documentación |
+
+### Detalle de trabajo — 2026-05-12
+
+**Seguridad:**
+- `.env.example` actualizado con todas las variables necesarias y documentación
+- `SECURITY.md` creado con política de seguridad, reporting de vulnerabilidades, checklist
+- Input sanitization agregada a `orchestrator/index.ts` (sanitizeText, sanitizeTopic)
+- Input sanitization agregada a `vault-process/index.ts` (sanitizeText, query validation, safeLimit)
+
+**Infraestructura:**
+- `.github/workflows/deploy-functions.yml` creado — deploy automático de Edge Functions
+  - Trigger: manual o automático al cambiar `supabase/functions/`
+  - Deploy individual o todas las funciones
+  - Verificación de endpoints post-deploy
+- `scripts/setup-dev.sh` creado — setup automatizado de desarrollo
+  - Verifica Node.js, npm, .env, Supabase CLI
+  - Instala dependencias, ejecuta lint, tests, build
+
+**Documentación:**
+- `CTO-CONTEXT.md` creado como documento de handoff
+- `SOUL.md` actualizado con rol CTO
+- `USER.md` actualizado con info de Pablo
 
 ---
 

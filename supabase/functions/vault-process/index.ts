@@ -241,8 +241,16 @@ async function processDocument(documentId: string) {
 // BÚSQUEDA SEMÁNTICA (RAG)
 // ═══════════════════════════════════════
 
+function sanitizeText(text: string, maxLen = 5000): string {
+  if (typeof text !== "string") return "";
+  return text.trim().slice(0, maxLen).replace(/\0/g, "");
+}
+
 async function searchDocs(query: string, limit = 5): Promise<string[]> {
-  if (!query || query.trim().length === 0) throw new ValidationError("Query de búsqueda vacía");
+  const cleanQuery = sanitizeText(query, 1000);
+  if (!cleanQuery || cleanQuery.length === 0) throw new ValidationError("Query de búsqueda vacía");
+  if (cleanQuery.length < 2) throw new ValidationError("Query muy corta (mínimo 2 caracteres)");
+  const safeLimit = Math.min(Math.max(Number(limit) || 5, 1), 20);
 
   // Intentar búsqueda vectorial
   try {
@@ -250,7 +258,7 @@ async function searchDocs(query: string, limit = 5): Promise<string[]> {
 
     const { data: chunks, error: rpcError } = await supabase.rpc("match_documents", {
       query_embedding: queryEmbedding,
-      match_count: limit,
+      match_count: safeLimit,
     });
 
     if (rpcError) throw new Error(`RPC error: ${rpcError.message}`);
@@ -265,7 +273,7 @@ async function searchDocs(query: string, limit = 5): Promise<string[]> {
     .from("doc_chunks")
     .select("content")
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .limit(safeLimit);
 
   return chunks?.map((c: any) => c.content) || [];
 }
