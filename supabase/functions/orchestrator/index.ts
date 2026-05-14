@@ -4,27 +4,16 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const ALLOWED_ORIGINS = [
-  "https://util.mejoraok.com",
-  "https://mejorasm.vercel.app",
-  "https://mejorasm-*.vercel.app",
-  "http://localhost:8080",
-  "http://localhost:5173",
-  "http://localhost:3000",
-];
-
-function getCorsHeaders(req: Request) {
-  const origin = req.headers.get("origin") || "";
-  const allowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".vercel.app")
-    ? origin
-    : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Headers":
-      "authorization, x-client-info, apikey, content-type",
-  };
-}
+import {
+  getCorsHeaders,
+  ValidationError,
+  validateBody,
+  withRetry,
+  sanitizeText,
+  sanitizeTopic,
+  httpError,
+  logger,
+} from "../_shared/utils.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -32,49 +21,8 @@ const supabase = createClient(
 );
 
 // ═══════════════════════════════════════
-// HELPERS
+// HELPERS (utilitarias en ../_shared/utils.ts)
 // ═══════════════════════════════════════
-
-function validateBody(body: any, required: string[]) {
-  const missing = required.filter((k) => body[k] === undefined || body[k] === null);
-  if (missing.length > 0) {
-    throw new Error(`Campos requeridos faltantes: ${missing.join(", ")}`);
-  }
-}
-
-async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2, baseDelay = 1000): Promise<T> {
-  for (let i = 0; i <= maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (e: any) {
-      if (i === maxRetries) throw e;
-      const delay = baseDelay * Math.pow(2, i) + Math.random() * 500;
-      console.warn(`[orchestrator] Retry ${i + 1}/${maxRetries} after ${Math.round(delay)}ms: ${e.message}`);
-      await new Promise((r) => setTimeout(r, delay));
-    }
-  }
-  throw new Error("Unreachable");
-}
-
-// ═══════════════════════════════════════
-// SANITIZACIÓN DE INPUT
-// ═══════════════════════════════════════
-
-function sanitizeText(text: string, maxLen = 5000): string {
-  if (typeof text !== "string") return "";
-  // Trim, limitar longitud, remover null bytes
-  return text
-    .trim()
-    .slice(0, maxLen)
-    .replace(/\0/g, "");
-}
-
-function sanitizeTopic(topic: string): string {
-  const clean = sanitizeText(topic, 500);
-  if (clean.length === 0) throw new ValidationError("El tema no puede estar vacío");
-  if (clean.length < 3) throw new ValidationError("El tema es muy corto (mínimo 3 caracteres)");
-  return clean;
-}
 
 async function callAI(
   provider: string,
@@ -517,26 +465,25 @@ Deno.serve(async (req) => {
     switch (action) {
       case "start":
         validateBody(body, ["topic"]);
-        result = await startSession(topic);
+        logger.info("orchestrator", "Iniciando sesión", { topic: sanitizeText(topic, 50) });
+        result = await startSession(sanitizeTopic(topic));
         break;
 
       case "continue":
         validateBody(body, ["sessionId", "feedback"]);
-        result = await continueSession(sessionId, feedback);
+        logger.info("orchestrator", "Continuando sesión", { sessionId });
+        result = await continueSession(sessionId, sanitizeText(feedback, 5000));
         break;
 
       default:
-        throw new Error("Acción no válida. Usa 'start' o 'continue'");
+        throw new ValidationError("Acción no válida. Usa 'start' o 'continue'");
     }
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (e: any) {
-    const status = e.message?.includes("Campos requeridos") ? 400 : 500;
-    return new Response(JSON.stringify({ error: e.message }), {
-      status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  } catch (e: unknown) {
+    logger.error("orchestrator", "Request failed", { error: e instanceof Error ? e.message : String(e) });
+    return httpError(corsHeaders, e);
   }
 });

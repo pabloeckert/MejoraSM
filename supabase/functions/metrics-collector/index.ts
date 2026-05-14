@@ -5,37 +5,18 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const ALLOWED_ORIGINS = [
-  "https://util.mejoraok.com",
-  "https://mejorasm.vercel.app",
-  "https://mejorasm-*.vercel.app",
-  "http://localhost:8080",
-  "http://localhost:5173",
-  "http://localhost:3000",
-];
-
-function getCorsHeaders(req: Request) {
-  const origin = req.headers.get("origin") || "";
-  const allowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".vercel.app") ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Access-Control-Allow-Headers":
-      "authorization, x-client-info, apikey, content-type",
-  };
-}
+import {
+  getCorsHeaders,
+  ValidationError,
+  validateBody,
+  httpError,
+  logger,
+} from "../_shared/utils.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
-
-function validateBody(body: any, required: string[]) {
-  const missing = required.filter((k) => body[k] === undefined || body[k] === null);
-  if (missing.length > 0) {
-    throw new Error(`Campos requeridos faltantes: ${missing.join(", ")}`);
-  }
-}
 
 // ═══════════════════════════════════════
 // INSTAGRAM INSIGHTS API
@@ -285,11 +266,8 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (e: any) {
-    const status = e.message?.includes("Campos requeridos") ? 400 : 500;
-    return new Response(JSON.stringify({ error: e.message }), {
-      status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  } catch (e: unknown) {
+    logger.error("metrics-collector", "Request failed", { error: e instanceof Error ? e.message : String(e) });
+    return httpError(corsHeaders, e);
   }
 });
