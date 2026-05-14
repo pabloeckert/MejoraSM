@@ -1,80 +1,88 @@
 # 🚀 Prompt para Siguiente Sesión — MejoraSM
 
-**Ubicación:** `Documents/PROMPT-SIGUIENTE-SESION.md`
 **Repo:** https://github.com/pabloeckert/MejoraSM
+**Branch:** `claude/cto-analysis-framework-lXTYJ`
 **Producción:** https://util.mejoraok.com/MejoraSM/
+**Actualizado:** 2026-05-14
 
 ---
 
-## Copiar desde acá ↓
+## ▶️ Para continuar, decile esto a Claude:
 
 ---
 
-Estoy trabajando en **MejoraSocialMedia (EDA)** — sistema de gestión estratégica de contenidos en Instagram con IA para MejoraOK.
+Continuemos con **MejoraSM** — sistema de contenidos Instagram con IA para MejoraOK.
 
 **Repo:** https://github.com/pabloeckert/MejoraSM
-**Producción:** https://util.mejoraok.com/MejoraSM/
-**Documentación:** `Documents/DOCUMENTACION.md` (documento único consolidado, v3.1)
-**Setup Supabase:** `Documents/SUPABASE_SETUP.md`
+**Branch de trabajo:** `claude/cto-analysis-framework-lXTYJ`
 
-## Estado actual (24/04/2026)
+Leé estos dos archivos para ponerte al día:
+1. `Documents/CTO-CONTEXT.md` — estado actual y próximos pasos
+2. `Documents/CTO-ANALYSIS-2026-05-14.md` — análisis completo y plan por fases
 
-- ✅ Extensión Chrome v1.1.0 funcional (Manifest V3)
-- ✅ Frontend React con 5 páginas + 4 hooks conectados
-- ✅ Backend código listo (3 Edge Functions + schema SQL)
-- ✅ Deploy automático (GitHub Actions → Hostinger)
-- ✅ **9 tablas creadas en Supabase** (ejecutadas por bloques en SQL Editor)
-- ✅ Bucket `vault` + políticas RLS + función RAG + 3 agentes seed
-- ❌ **BLOQUEADOR: PostgREST no reconoce las tablas** (ver abajo)
+---
 
-## Bloqueador Crítico: PostgREST Schema Cache
+## 📍 Estado al 2026-05-14
 
-Las 9 tablas existen en el schema `public` (verificadas con `pg_tables`), pero la API REST de Supabase no las ve. Error: `PGRST205: Could not find the table in the schema cache`.
+### ✅ FASE 0-3 completadas (código pusheado):
+- BUG CRÍTICO corregido: `ValidationError` no definida en orchestrator (ReferenceError en runtime)
+- `supabase/functions/_shared/utils.ts`: módulo compartido (getCorsHeaders, ValidationError, withRetry, logger, httpError)
+- Todas las Edge Functions usan el módulo compartido — ~150 líneas de duplicación eliminadas
+- Logging estructurado JSON en todos los handlers (visible en Supabase Logs)
+- `supabase/migrations/004_security_hardening.sql`: 10 índices, constraints de validación, triggers de updated_at
+- `supabase/functions/health/index.ts`: health check endpoint (verifica DB + Groq + DeepSeek + HuggingFace en paralelo)
+- `vercel.json`: HSTS, X-XSS-Protection, CSP mejorada
+- CI/CD: test coverage automático, cancelación de runs duplicados, corre en branches `claude/**`
+- 49 tests pasando
 
-**Ya intentado (no funcionó):**
-- `NOTIFY pgrst, 'reload schema';`
-- `SELECT pg_notify('pgrst', 'reload schema');`
-- `GRANT ALL ON ALL TABLES IN SCHEMA public TO anon/authenticated;`
-- Botón "Reload schema" en dashboard de Supabase
+### 🔴 Bloqueadores que Pablo debe resolver antes de continuar:
 
-**Posibles soluciones a probar:**
-1. **Reiniciar proyecto Supabase** — Project Settings → General → Restart project
-2. **Usar Supabase CLI** — `supabase link + supabase db push` para forzar reconocimiento
-3. **Verificar plan/free tier** — puede haber limitación en el plan gratuito
-4. **Contactar soporte Supabase** — si nada funciona, es un bug del proyecto
+```bash
+# 1. CRÍTICO: Rotar credenciales (hay keys en git history)
+#    → Supabase Dashboard: regenerar anon key + service role key
+#    → Regenerar: Groq, DeepSeek, HuggingFace API keys
 
-## Tareas pendientes (ETAPA 1)
+# 2. Resolver PostgREST schema cache (BLOQUEADOR PRINCIPAL)
+#    → Supabase Dashboard → Project Settings → General → Pause → Resume
+#    → Esperar 2 min y verificar
 
-| # | Tarea | Estado |
-|---|---|---|
-| 1.1 | Ejecutar SQL schema en Supabase | ✅ (24/04, por bloques) |
-| 1.2 | Crear bucket `vault` + políticas | ✅ (24/04) |
-| 1.3 | **Resolver PostgREST schema cache** | ❌ BLOQUEADOR |
-| 1.4 | Configurar API keys en Secrets | 🔲 (Groq, DeepSeek, Gemini) |
-| 1.5 | Deploy Edge Functions | 🔲 (ai-gateway, orchestrator, vault-process) |
-| 1.6 | Health check completo | 🔲 |
+# 3. Configurar API keys en Edge Functions
+supabase login
+supabase link --project-ref exnjyxwmxknvzploeaex
+supabase secrets set GROQ_API_KEY=gsk_...
+supabase secrets set DEEPSEEK_API_KEY=sk-...
+supabase secrets set HF_API_KEY=hf_...
 
-## Lo que quiero hacer hoy
+# 4. Ejecutar migración de seguridad
+#    → SQL Editor en Supabase → copiar/pegar supabase/migrations/004_security_hardening.sql
 
-[ESCRIBÍ ACÁ LO QUE QUERÉS LOGRAR EN ESTA SESIÓN]
+# 5. Deploy Edge Functions
+bash scripts/deploy.sh
 
-## Información técnica
+# 6. Verificar todo
+bash scripts/health-check.sh TU_ANON_KEY
+```
 
-- **Supabase URL:** `https://exnjyxwmxknvzploeaex.supabase.co`
+### 🎯 Próxima FASE (FASE 6 — post-infraestructura):
+- Publisher automático funcional (Instagram Graph API)
+- Métricas reales (reach, engagement, saves)
+- Rule Engine activo (aprende de cada post publicado)
+- Learning loop completo
+
+---
+
+## 🔧 Info técnica
+
 - **Supabase Project ID:** `exnjyxwmxknvzploeaex`
-- **Tablas creadas:** documents, doc_chunks, agent_config, dialogue_sessions, dialogue_messages, proposals, calendar_events, metrics, success_rules
-- **Agentes seed:** estratega (Groq), creativo (Groq), crítico (DeepSeek)
-- **Storage bucket:** `vault` (privado)
-- **Función SQL:** `match_documents(vector(384), int, real)` — búsqueda RAG
+- **9 tablas:** documents, doc_chunks, agent_config, dialogue_sessions, dialogue_messages, proposals, calendar_events, metrics, success_rules
+- **7 Edge Functions:** ai-gateway, orchestrator, vault-process, publisher, rule-engine, metrics-collector, health
+- **Tests:** 49 tests pasando (Vitest)
+- **Build:** `npm install --legacy-peer-deps && npm run build`
+- **Tests:** `npm test`
+- **Coverage:** `npm run test:coverage`
 
-## Reglas
-
-- Cuando diga **"documentar"**, actualizá `Documents/DOCUMENTACION.md` con los avances
-- No toques archivos en `docs/` (legacy, solo lectura)
-- Build: `npm install --legacy-peer-deps && npm run build`
-- Tests: `npm test` (21 tests, Vitest)
-- Documentación consolidada: `Documents/DOCUMENTACION.md` (v3.1)
-
----
-
-## ↑ Hasta acá copiar
+## Reglas de sesión
+- NO tocar `docs/` (legacy, solo lectura)
+- Documentación activa: `Documents/`
+- Al final de cada sesión: commit + push a `claude/cto-analysis-framework-lXTYJ`
+- Actualizar `Documents/CTO-CONTEXT.md` con lo hecho en la sesión

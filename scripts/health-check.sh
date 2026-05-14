@@ -68,7 +68,7 @@ done
 
 echo ""
 echo "─── 3. Edge Functions ───"
-for fn in ai-gateway orchestrator vault-process publisher metrics-collector; do
+for fn in ai-gateway orchestrator vault-process publisher metrics-collector rule-engine health; do
   code=$(curl -s -o /dev/null -w "%{http_code}" \
     "$SUPABASE_URL/functions/v1/$fn" \
     -H "apikey: $ANON_KEY" 2>/dev/null)
@@ -78,6 +78,21 @@ for fn in ai-gateway orchestrator vault-process publisher metrics-collector; do
     *)           check "Function '$fn'" "warn" "HTTP $code" ;;
   esac
 done
+
+echo ""
+echo "─── 3b. Health Endpoint (deep check) ───"
+resp=$(curl -s "$SUPABASE_URL/functions/v1/health" \
+  -X GET \
+  -H "apikey: $ANON_KEY" 2>/dev/null)
+if echo "$resp" | grep -q '"status":"healthy"'; then
+  check "Health endpoint" "ok" "Sistema saludable"
+elif echo "$resp" | grep -q '"status":"degraded"'; then
+  check "Health endpoint" "warn" "Degradado — verificar checks individuales"
+elif echo "$resp" | grep -q '"status":"unhealthy"'; then
+  check "Health endpoint" "fail" "Sistema no saludable"
+else
+  check "Health endpoint" "warn" "No disponible (deploying?)"
+fi
 
 echo ""
 echo "─── 4. Storage ───"

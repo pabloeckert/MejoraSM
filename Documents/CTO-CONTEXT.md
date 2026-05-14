@@ -1,18 +1,18 @@
 # 🧠 CTO CONTEXT — Session Handoff Document
 
-**Última actualización:** 2026-05-12
+**Última actualización:** 2026-05-14
 **Objetivo:** Este documento permite que cualquier sesión de IA continúe exactamente donde quedó. Leerlo al inicio de cada sesión.
 
 ---
 
 ## ⚡ Quick Start para la próxima sesión
 
-Cuando Pablo diga **"continuemos"**, hacer esto:
+Cuando Pablo diga **"continuemos"**:
 
 1. Leer este archivo (`Documents/CTO-CONTEXT.md`)
-2. Leer `Documents/DOCUMENTACION.md` (estado general)
-3. Revisar `git log --oneline -20` para ver últimos commits
-4. Preguntar a Pablo: "¿En qué seguimos? ¿Algo específico o sigo con lo pendiente?"
+2. Leer `Documents/CTO-ANALYSIS-2026-05-14.md` para el plan completo por fases
+3. Ver `git log --oneline -10` para últimos commits
+4. Continuar desde la sección "Próximos pasos"
 
 ---
 
@@ -32,94 +32,70 @@ Cuando Pablo diga **"continuemos"**, hacer esto:
 - **Cliente:** MejoraOK (https://mejoraok.com)
 - **Producción:** https://util.mejoraok.com/MejoraSM/
 - **Repo:** https://github.com/pabloeckert/MejoraSM
-- **Deploy:** GitHub Actions → Hostinger (FTP)
+- **Branch de trabajo:** `claude/cto-analysis-framework-lXTYJ`
 
 ---
 
-## 📊 Estado Actual (Mayo 2026)
+## 📊 Estado Actual (2026-05-14)
 
-### ✅ Lo que FUNCIONA
+### ✅ Lo que FUNCIONA (código listo)
 - Frontend React completo (7 páginas: Dashboard, Bóveda, Mesa de Diálogo, Laboratorio, Configuración, Calendario, Propuestas)
 - UI con shadcn/ui + Tailwind (profesional, responsive)
-- 50+ componentes UI
-- Schema PostgreSQL ejecutado (9 tablas + pgvector + RLS)
-- Edge Functions escritas (ai-gateway, orchestrator, vault-process, publisher, rule-engine, metrics-collector)
-- Extensión Chrome MejoraINSSIST v1.1.0 (Manifest V3, i18n es/en/pt_BR)
-- CI con GitHub Actions (lint + test + build)
-- 21 tests con Vitest
-- ErrorBoundary y Onboarding implementados
+- 50+ componentes UI, 49 tests pasando
+- Schema PostgreSQL (9 tablas + pgvector + RLS)
+- 7 Edge Functions: ai-gateway, orchestrator, vault-process, publisher, rule-engine, metrics-collector, **health** (nueva)
+- Módulo compartido `supabase/functions/_shared/utils.ts` con todas las utilidades
+- Extensión Chrome MejoraINSSIST v1.1.0 (Manifest V3)
+- CI con GitHub Actions (lint + test + coverage + build)
+- Logging estructurado JSON en todas las Edge Functions
+- Migración de seguridad `004_security_hardening.sql` (índices, constraints, triggers)
+- CSP headers mejorados en vercel.json
 
-### 🔴 BLOQUEADORES ACTIVOS
-1. **PostgREST no reconoce tablas** — Necesita Pause/Resume en Supabase Dashboard
-2. **API keys no configuradas** — Groq, DeepSeek, HuggingFace sin keys
-3. **Edge Functions no deployadas** — Requiere `bash scripts/deploy.sh`
+### 🔴 BLOQUEADORES (requieren acción de Pablo)
+
+| # | Bloqueador | Solución | Tiempo |
+|---|-----------|----------|--------|
+| B1 | PostgREST no reconoce tablas | Pause/Resume Supabase Dashboard | 5 min |
+| B2 | API keys no configuradas (Groq, DeepSeek, HF) | `supabase secrets set KEY=value` | 10 min |
+| B3 | Edge Functions no deployadas | `bash scripts/deploy.sh` o GitHub Actions | 5 min |
+| B4 | Credenciales en git history | Rotar todas las keys | 15 min |
+
+**Instrucciones detalladas:** Ver `Documents/CTO-ANALYSIS-2026-05-14.md` sección "Bloqueadores"
 
 ### 🟠 Deuda Técnica Conocida
-- `.env` con credenciales reales commiteado (S1 - CRÍTICO)
-- RLS con políticas "Allow all" sin autenticación
-- `getContextDocs()` no hace búsqueda vectorial real
-- Deploy vía FTP (débil, sin staging)
-- Sin monitoreo ni alertas
-- Sin política de privacidad
-- Tests solo frontend, sin E2E
+- Sin auth real (RLS "allow all" — intencional para MVP single-tenant)
+- Sin tests E2E (solo unit + integration)
+- Sin staging environment (deploy directo a prod)
+- Sin monitoreo/alertas activo (health endpoint creado pero no deployado)
+- PDFs no soportados completamente en vault-process
 
 ---
 
 ## 🏗️ Arquitectura
 
 ```
-Frontend (React + Vite)
-  ↓ llama a
-Edge Functions (Supabase/Deno)
-  ↓ usa
-PostgreSQL + pgvector (Supabase)
-  ↓ consulta
-IA Providers (Groq, DeepSeek, Gemini, HuggingFace)
-```
-
-### Flujo de Contenido
-```
-Usuario propone tema → Frontend
-  → orchestrator invoca 3 agentes (Estratega → Creativo → Crítico)
-  → Propuesta estructurada (hook/body/cta/hashtags)
-  → Usuario aprueba → Calendario → Publicación automática
-  → Monitor KPIs → Bucle de aprendizaje → Mejora continua
+Frontend (React + Vite + TypeScript)
+  ↓
+Edge Functions (Supabase/Deno) — 7 funciones
+  ├── ai-gateway      → Router universal de IA (Groq/DeepSeek/Gemini/HF)
+  ├── orchestrator    → Mesa de Diálogo multi-agente
+  ├── vault-process   → Bóveda RAG (embeddings + búsqueda vectorial)
+  ├── publisher       → Publicación automática en Instagram
+  ├── rule-engine     → Motor de reglas de éxito
+  ├── metrics-collector → Métricas de Instagram
+  └── health          → Health check de todos los servicios [NUEVO]
+  ↓
+PostgreSQL + pgvector (Supabase) — 9 tablas
+  ↓
+AI Providers: Groq (LLaMA), DeepSeek, Gemini, HuggingFace
 ```
 
 ### 3 Agentes de IA
 | Agente | Provider | Modelo | Rol |
-|---|---|---|---|
-| Estratega | Groq | llama-4-scout-8b | Propone temas y estrategias |
-| Creativo | Groq | llama-4-scout-8b | Redacta copys, hooks, CTAs |
+|--------|----------|--------|-----|
+| Estratega | Groq | llama-4-scout-17b | Propone temas y estrategias |
+| Creativo | Groq | llama-4-scout-17b | Redacta copys, hooks, CTAs |
 | Crítico | DeepSeek | deepseek-chat | Evalúa calidad contra marca |
-
-### Páginas del Frontend
-| Ruta | Componente | Función |
-|---|---|---|
-| `/` | Dashboard | KPIs principales |
-| `/boveda` | Boveda | Bóveda de Conocimiento (RAG) |
-| `/mesa` | MesaDialogo | Mesa de Diálogo multi-agente |
-| `/laboratorio` | Laboratorio | Laboratorio de Contenido |
-| `/configuracion` | Configuracion | Config de agentes |
-| `/calendario` | Calendario | Calendario editorial |
-| `/propuestas` | Propuestas | Gestión de propuestas |
-
-### Tablas PostgreSQL
-- `documents` — Documentos de la bóveda
-- `doc_chunks` — Chunks con embeddings vector(384)
-- `agent_config` — Configuración de agentes
-- `dialogue_sessions` — Sesiones de diálogo
-- `dialogue_messages` — Mensajes de agentes
-- `proposals` — Propuestas de contenido
-- `calendar_events` — Calendario editorial
-- `metrics` — Métricas de Instagram
-- `success_rules` — Reglas aprendidas
-
-### Hooks React
-- `useVault` — Upload, list, process, search documentos
-- `useDialogue` — Sesiones, mensajes, start, continue
-- `useProposals` — List, pending, approve, reject, schedule
-- `useMetrics` — Calendario, métricas, reglas de éxito
 
 ---
 
@@ -129,119 +105,125 @@ Usuario propone tema → Frontend
 MejoraSM/
 ├── src/                    ← Frontend React
 │   ├── pages/              ← 7 páginas
-│   ├── services/           ← ai.ts (Edge Functions), supabase.ts (CRUD)
-│   ├── hooks/              ← 5 hooks custom
-│   ├── components/
-│   │   ├── layout/         ← AppLayout, AppSidebar
-│   │   └── ui/             ← 50+ shadcn components
-│   └── test/               ← 21 tests Vitest
+│   ├── services/           ← supabase.ts (CRUD), ai.ts (Edge Functions)
+│   ├── hooks/              ← useVault, useDialogue, useProposals, useMetrics
+│   └── test/               ← 49 tests (Vitest)
 ├── supabase/
-│   ├── functions/          ← 6 Edge Functions (Deno)
+│   ├── functions/
+│   │   ├── _shared/        ← utils.ts compartido [NUEVO]
 │   │   ├── ai-gateway/     ← Router universal de IA
-│   │   ├── orchestrator/   ← Mesa de Diálogo multi-agente
+│   │   ├── orchestrator/   ← Mesa de Diálogo
 │   │   ├── vault-process/  ← Bóveda RAG
-│   │   ├── publisher/      ← Publicación automática
+│   │   ├── publisher/      ← Publicador Instagram
 │   │   ├── rule-engine/    ← Motor de reglas
-│   │   └── metrics-collector/ ← Recolección de KPIs
-│   └── migrations/         ← SQL schema
-├── extension/              ← Chrome Extension MejoraINSSIST
-├── Documents/              ← Documentación unificada
-│   ├── DOCUMENTACION.md    ← Documentación principal
-│   └── CTO-CONTEXT.md      ← Handoff de sesión CTO
-├── docs/                   ← Legacy (solo lectura)
+│   │   ├── metrics-collector/ ← KPIs
+│   │   └── health/         ← Health check [NUEVO]
+│   └── migrations/         ← 001-004 SQL
+├── Documents/
+│   ├── CTO-CONTEXT.md      ← Este archivo (handoff de sesión)
+│   ├── CTO-ANALYSIS-2026-05-14.md ← Análisis completo + plan por fases
+│   └── ...otros docs
 ├── .github/workflows/
-│   ├── ci.yml              ← CI (lint + test + build)
+│   ├── ci.yml              ← CI (lint + test + coverage + build)
 │   └── deploy-functions.yml ← Deploy Edge Functions
 ├── scripts/
 │   ├── deploy.sh           ← Deploy manual Edge Functions
-│   ├── fix-postgrest.sh    ← Fix PostgREST schema cache
-│   ├── health-check.sh     ← Health check completo
+│   ├── health-check.sh     ← Health check completo [MEJORADO]
 │   └── setup-dev.sh        ← Setup de desarrollo
-├── SECURITY.md             ← Política de seguridad
-└── package.json
+└── vercel.json             ← Config Vercel con CSP mejorado [MEJORADO]
 ```
 
 ---
 
-## 🎯 Próximos Pasos Sugeridos
+## 🎯 Próximos Pasos
 
-### Prioridad 1: Desbloquear Producción
-- [ ] Resolver PostgREST (Pause/Resume Supabase)
-- [ ] Configurar API keys (Groq, DeepSeek, HuggingFace)
-- [ ] Deployar Edge Functions
-- [ ] Verificar que la app funcione end-to-end
+### Para Pablo (bloqueadores a resolver):
+1. **Rotar credenciales** — B4 (15 min) → CRÍTICO antes de todo
+2. **Resolver PostgREST** — B1 (5 min) → Pause/Resume en Dashboard
+3. **Configurar API keys** — B2 (10 min) → Groq, DeepSeek, HuggingFace
+4. **Deploy Edge Functions** — B3 (5 min) → bash scripts/deploy.sh
+5. **Verificar E2E** → bash scripts/health-check.sh
 
-### Prioridad 2: Seguridad
-- [ ] Rotar credenciales expuestas en `.env`
-- [ ] Implementar autenticación real (no "Allow all")
-- [ ] Agregar política de privacidad
-
-### Prioridad 3: Calidad
-- [ ] Tests E2E
-- [ ] Staging environment
-- [ ] Monitoreo y alertas
-- [ ] Health checks en Edge Functions
-
-### Prioridad 4: Features
-- [ ] Publicación automática real (publisher)
-- [ ] Motor de reglas activo
-- [ ] Métricas reales de Instagram
-- [ ] Bucle de aprendizaje completo
+### Para la IA en la próxima sesión (después de B1-B4):
+- Continuar con **FASE 6** del CTO-ANALYSIS: features completos
+  - Publisher automático funcional
+  - Métricas reales de Instagram
+  - Rule Engine activo
+  - Learning loop completo
 
 ---
 
 ## 💡 Decisiones Técnicas Clave
 
-1. **Supabase como backend** — Serverless, PostgreSQL nativo, Edge Functions en Deno
-2. **Multi-IA** — Groq (rápido/barato), DeepSeek (análisis), Gemini (backup), HuggingFace (embeddings)
-3. **Extensión Chrome separada** — Independiente del sistema EDA, asiste directo en Instagram
-4. **Deploy FTP** — Simple pero débil. Considerar migrar a Vercel/Netlify
-5. **pgvector para RAG** — Búsqueda semántica en documentos de marca
+| Decisión | Elección | Razón |
+|----------|----------|-------|
+| Backend | Supabase Edge Functions | Free tier, PostgreSQL nativo |
+| AI principal | Groq/LLaMA | Gratis, rápido, buena calidad |
+| AI crítico | DeepSeek | Precio/performance análisis profundo |
+| Embeddings | HuggingFace | Gratis, suficiente para RAG |
+| Vector DB | pgvector | Ya en PostgreSQL, sin overhead |
+| Frontend | React + Vite | Sin SSR necesario |
+| Deploy frontend | Vercel | CI/CD automático, CDN |
+| Utilidades compartidas | `_shared/utils.ts` | DRY, bug fix en un solo lugar |
 
 ---
 
-## 🔐 Variables de Entorno Necesarias
+## 🔐 Variables de Entorno
 
+### Frontend (.env)
 ```env
-VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_URL=https://exnjyxwmxknvzploeaex.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=eyJ...
+```
+
+### Edge Functions (Supabase Secrets)
+```
+SUPABASE_SERVICE_ROLE_KEY=eyJ... (auto-inyectada)
 GROQ_API_KEY=gsk_...
 DEEPSEEK_API_KEY=sk-...
-GEMINI_API_KEY=AI...
-HUGGINGFACE_API_KEY=hf_...
+HF_API_KEY=hf_...
+GEMINI_API_KEY=AI... (opcional)
+INSTAGRAM_ACCESS_TOKEN=... (para publisher)
+INSTAGRAM_BUSINESS_ACCOUNT_ID=... (para publisher)
+```
+
+### GitHub Secrets (para CI/CD)
+```
+VITE_SUPABASE_URL
+VITE_SUPABASE_PUBLISHABLE_KEY
+SUPABASE_ACCESS_TOKEN
+SUPABASE_PROJECT_REF=exnjyxwmxknvzploeaex
+SUPABASE_ANON_KEY
 ```
 
 ---
 
 ## 📝 Registro de Sesiones CTO
 
-| Fecha | Evento | Notas |
-|---|---|---|
-| 2026-05-12 | Primera sesión CTO | Onboarding, exploración del repo, creación de documentación |
-| 2026-05-12 | Trabajo inicial CTO | Mejoras de seguridad, deploy workflow, scripts, documentación |
+| Fecha | Trabajo | Commit |
+|-------|---------|--------|
+| 2026-05-12 | Primera sesión CTO: onboarding, seguridad, deploy workflow, scripts | `f972e40` |
+| 2026-05-14 | **Esta sesión**: análisis CTO completo, FASE 0-3 implementadas | `08c50f9` |
 
-### Detalle de trabajo — 2026-05-12
+### Detalle — 2026-05-14
 
-**Seguridad:**
-- `.env.example` actualizado con todas las variables necesarias y documentación
-- `SECURITY.md` creado con política de seguridad, reporting de vulnerabilidades, checklist
-- Input sanitization agregada a `orchestrator/index.ts` (sanitizeText, sanitizeTopic)
-- Input sanitization agregada a `vault-process/index.ts` (sanitizeText, query validation, safeLimit)
+**FASE 0 — Análisis:**
+- `Documents/CTO-ANALYSIS-2026-05-14.md`: análisis completo (bugs, bloqueadores, plan por fases)
 
-**Infraestructura:**
-- `.github/workflows/deploy-functions.yml` creado — deploy automático de Edge Functions
-  - Trigger: manual o automático al cambiar `supabase/functions/`
-  - Deploy individual o todas las funciones
-  - Verificación de endpoints post-deploy
-- `scripts/setup-dev.sh` creado — setup automatizado de desarrollo
-  - Verifica Node.js, npm, .env, Supabase CLI
-  - Instala dependencias, ejecuta lint, tests, build
+**FASE 1 — Code Quality:**
+- BUG CRÍTICO corregido: `ValidationError` no definida en orchestrator (ReferenceError en runtime)
+- `supabase/functions/_shared/utils.ts`: módulo compartido (~150 líneas de duplicación eliminadas)
+- Las 6 Edge Functions refactorizadas para usar `_shared/utils.ts`
+- Logging estructurado JSON en todos los handlers
+- CI mejorado: cobertura de tests, branches claude/**, concurrency group
 
-**Documentación:**
-- `CTO-CONTEXT.md` creado como documento de handoff
-- `SOUL.md` actualizado con rol CTO
-- `USER.md` actualizado con info de Pablo
+**FASE 2 — Security:**
+- `supabase/migrations/004_security_hardening.sql`: 10 índices de performance, constraints de validación, triggers de updated_at
+- `vercel.json`: HSTS, X-XSS-Protection, CSP mejorada (restringe connect-src a dominios conocidos)
+- `supabase/functions/health/index.ts`: health check endpoint (DB + Groq + DeepSeek + HuggingFace en paralelo)
+- Deploy workflow actualizado para incluir función `health`
+- `scripts/health-check.sh` mejorado con check del endpoint `/health`
 
 ---
 
-**Este documento es la fuente de verdad para la continuidad de sesión. Actualizarlo después de cada sesión significativa.**
+**Este documento es la fuente de verdad para la continuidad de sesión. Actualizarlo al final de cada sesión.**
