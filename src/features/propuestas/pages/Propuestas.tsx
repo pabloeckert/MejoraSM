@@ -35,7 +35,7 @@ import {
   useApproveProposal,
   useRejectProposal,
   useScheduleProposal,
-} from "@/hooks/useProposals";
+} from "@/features/laboratorio/hooks/useProposals";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "@/components/ui/use-toast";
 

@@ -9,8 +9,8 @@
 
 Cuando Pablo diga **"continuemos"**:
 
-1. Leer este archivo (`Documents/CTO-CONTEXT.md`)
-2. Leer `Documents/CTO-ANALYSIS-2026-05-14.md` para el plan completo por fases
+1. Leer este archivo (`docs/CTO-CONTEXT.md`)
+2. Leer `docs/CTO-ANALYSIS-2026-05-14.md` para el plan completo por fases
 3. Ver `git log --oneline -10` para últimos commits
 4. Continuar desde la sección "Próximos pasos"
 
@@ -60,7 +60,7 @@ Cuando Pablo diga **"continuemos"**:
 | B3 | Edge Functions no deployadas | `bash scripts/deploy.sh` o GitHub Actions | 5 min |
 | B4 | Credenciales en git history | Rotar todas las keys | 15 min |
 
-**Instrucciones detalladas:** Ver `Documents/CTO-ANALYSIS-2026-05-14.md` sección "Bloqueadores"
+**Instrucciones detalladas:** Ver `docs/CTO-ANALYSIS-2026-05-14.md` sección "Bloqueadores"
 
 ### 🟠 Deuda Técnica Conocida
 - Sin auth real (RLS "allow all" — intencional para MVP single-tenant)
@@ -119,7 +119,7 @@ MejoraSM/
 │   │   ├── metrics-collector/ ← KPIs
 │   │   └── health/         ← Health check [NUEVO]
 │   └── migrations/         ← 001-004 SQL
-├── Documents/
+├── docs/
 │   ├── CTO-CONTEXT.md      ← Este archivo (handoff de sesión)
 │   ├── CTO-ANALYSIS-2026-05-14.md ← Análisis completo + plan por fases
 │   └── ...otros docs
@@ -208,7 +208,7 @@ SUPABASE_ANON_KEY
 ### Detalle — 2026-05-14
 
 **FASE 0 — Análisis:**
-- `Documents/CTO-ANALYSIS-2026-05-14.md`: análisis completo (bugs, bloqueadores, plan por fases)
+- `docs/CTO-ANALYSIS-2026-05-14.md`: análisis completo (bugs, bloqueadores, plan por fases)
 
 **FASE 1 — Code Quality:**
 - BUG CRÍTICO corregido: `ValidationError` no definida en orchestrator (ReferenceError en runtime)

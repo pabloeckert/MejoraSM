@@ -32,7 +32,7 @@
 > | 2 | API keys no configuradas | Crear keys en Groq, DeepSeek, HuggingFace | 10 min |
 > | 3 | Edge Functions no deployadas | Ejecutar `bash scripts/deploy.sh` | 5 min |
 >
-> **Guía completa: [`Documents/DEPLOY-CHECKLIST.md`](DEPLOY-CHECKLIST.md)**
+> **Guía completa: [`docs/DEPLOY-CHECKLIST.md`](DEPLOY-CHECKLIST.md)**
 >
 > **Sin estos pasos, la app abre pero todo da error o muestra datos vacíos.**
 
@@ -63,8 +63,8 @@
 
 ## 0. ANÁLISIS PROFUNDO MULTIDISCIPLINARIO
 
-**Documento completo:** [`Documents/ANALISIS-PROFUNDO.md`](ANALISIS-PROFUNDO.md)
-**Plan optimizado:** [`Documents/PLAN-OPTIMIZADO.md`](PLAN-OPTIMIZADO.md) — v1.0 (29/04/2026)
+**Documento completo:** [`docs/ANALISIS-PROFUNDO.md`](ANALISIS-PROFUNDO.md)
+**Plan optimizado:** [`docs/PLAN-OPTIMIZADO.md`](PLAN-OPTIMIZADO.md) — v1.0 (29/04/2026)
 
 Análisis realizado el 24/04/2026 desde 28 perspectivas profesionales. Hallazgos críticos:
 
@@ -192,7 +192,7 @@ mejorasocialmedia/
 │   ├── landing/                  ← Landing page
 │   ├── manifest.json             ← Manifest V3
 │   └── _locales/                 ← i18n (es/en/pt_BR)
-├── Documents/                    ← 📚 DOCUMENTACIÓN UNIFICADA (este archivo)
+├── docs/                    ← 📚 DOCUMENTACIÓN UNIFICADA (este archivo)
 ├── docs/                         ← ⚠️ LEGACY — solo lectura, no editar
 ├── .github/workflows/deploy.yml  ← CI/CD automático
 ├── package.json
@@ -752,7 +752,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGci...
 
 **Documentación:**
 - ✅ Análisis de estado real vs documentación
-- ✅ Documentación unificada en `Documents/DOCUMENTACION.md`
+- ✅ Documentación unificada en `docs/DOCUMENTACION.md`
 - ✅ Plan por etapas (ETAPA 0-6) con dependencias y estimaciones
 - ✅ Identificación de bloqueadores activos
 
@@ -785,7 +785,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGci...
 - ✅ 6.4 — Archivos legacy eliminados
 - ✅ 6.5 — `lovable-tagger` removido
 - ✅ 6.6 — Browserslist actualizado
-- ✅ Guía de setup Supabase creada (`Documents/SUPABASE_SETUP.md`)
+- ✅ Guía de setup Supabase creada (`docs/SUPABASE_SETUP.md`)
 - ✅ Build de producción verificado (3.21s, sin errores)
 
 ### 23/04/2026 — ETAPA 1: Activar Backend (en progreso)
@@ -800,7 +800,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGci...
 
 - ✅ Análisis completo de 18 archivos de documentación dispersos
 - ✅ Eliminación de duplicación masiva (PROYECTO-MAESTRO.md ≈ DOCUMENTACION.md)
-- ✅ Documentación consolidada en documento único (`Documents/DOCUMENTACION.md`)
+- ✅ Documentación consolidada en documento único (`docs/DOCUMENTACION.md`)
 - ✅ Instrucción "documentar" integrada con flujo de actualización
 - ✅ Optimización de plan por etapas (re-numeración lógica)
 - ✅ Limpieza de datos sensibles (credenciales removidas de logs)
@@ -833,7 +833,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGci...
 ### 24/04/2026 — Análisis Profundo Multidisciplinario
 
 - ✅ Análisis completo desde 28 perspectivas profesionales
-- ✅ Documento `Documents/ANALISIS-PROFUNDO.md` creado (~30KB)
+- ✅ Documento `docs/ANALISIS-PROFUNDO.md` creado (~30KB)
 - ✅ Hallazgos críticos de seguridad identificados (credenciales expuestas en repo)
 - ✅ Plan optimizado por 8 etapas (ETAPA 0-7) con prioridades y dependencias
 - ✅ DOCUMENTACION.md actualizado a v4.0 con referencia al análisis
@@ -843,7 +843,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGci...
 ### 29/04/2026 — Optimización Multidisciplinaria + Consolidación v5.0
 
 **Plan Optimizado:**
-- ✅ `Documents/PLAN-OPTIMIZADO.md` creado (v1.0, ~51KB, 1467 líneas)
+- ✅ `docs/PLAN-OPTIMIZADO.md` creado (v1.0, ~51KB, 1467 líneas)
 - ✅ Análisis consolidado desde 12+ perspectivas profesionales
 - ✅ Diagrama de dependencias entre etapas
 - ✅ Cada tarea marcada como `[AI]` (ejecutable por IA) o `[USUARIO]` (requiere acción humana)
@@ -997,7 +997,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGci...
 | Auth | Sin auth (personal) | Simplifica MVP, activar después |
 | Deploy frontend | GitHub Actions → FTP | Automático en push |
 | Extensión | Manifest V3 | Chrome elimina MV2 |
-| Documentación | Document único en Documents/ | Eliminar dispersión |
+| Documentación | Document único en docs/ | Eliminar dispersión |
 
 ---
 

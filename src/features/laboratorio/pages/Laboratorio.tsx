@@ -15,8 +15,8 @@ import {
   Check,
   Sparkles,
 } from "lucide-react";
-import { useStartDialogue } from "@/hooks/useDialogue";
-import { useProposals, useApproveProposal } from "@/hooks/useProposals";
+import { useStartDialogue } from "@/features/mesa-dialogo/hooks/useDialogue";
+import { useProposals, useApproveProposal } from "@/features/laboratorio/hooks/useProposals";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "@/components/ui/use-toast";
 

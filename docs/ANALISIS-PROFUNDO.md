@@ -8,7 +8,7 @@
 ---
 
 > **📌 INSTRUCCIÓN DE MANTENIMIENTO:**
-> Cuando el usuario diga **"documentar"**, actualizar `Documents/DOCUMENTACION.md` con los trabajos realizados desde la última actualización.
+> Cuando el usuario diga **"documentar"**, actualizar `docs/DOCUMENTACION.md` con los trabajos realizados desde la última actualización.
 
 ---
 
@@ -21,7 +21,7 @@
 | 3 | 🔴 CRÍTICO | PostgREST no reconoce tablas (bloqueador funcional) | Backend |
 | 4 | 🟠 ALTO | Edge Functions sin deploy + sin API keys | Backend |
 | 5 | 🟠 ALTO | RLS con políticas "Allow all" (sin autenticación) | Seguridad |
-| 6 | 🟡 MEDIO | Documentación duplicada entre `docs/` y `Documents/` | Documentación |
+| 6 | 🟡 MEDIO | Documentación duplicada entre `docs/` y `docs/` | Documentación |
 | 7 | 🟡 MEDIO | Laboratorio.tsx es solo placeholder sin funcionalidad | Frontend |
 | 8 | 🟡 MEDIO | Configuración se guarda en localStorage, no en DB | Frontend |
 
@@ -835,10 +835,10 @@ Total sistema completo: ~6-8 semanas desde ETAPA 0
 
 ## 7. DOCUMENTACIÓN CONSOLIDADA
 
-Toda la documentación del proyecto reside en `Documents/DOCUMENTACION.md`.
+Toda la documentación del proyecto reside en `docs/DOCUMENTACION.md`.
 Los archivos en `docs/` son LEGACY (solo lectura).
 
-**Instrucción:** Cuando el usuario diga **"documentar"**, actualizar `Documents/DOCUMENTACION.md` con los trabajos realizados.
+**Instrucción:** Cuando el usuario diga **"documentar"**, actualizar `docs/DOCUMENTACION.md` con los trabajos realizados.
 
 ---
 

@@ -12,8 +12,8 @@
 ## 🔑 PARA LA PRÓXIMA SESIÓN
 
 **Cuando Pablo diga "continuemos":**
-1. Leer este archivo (`Documents/CTO-ANALYSIS-2026-05-14.md`)
-2. Leer `Documents/CTO-CONTEXT.md` para estado actual
+1. Leer este archivo (`docs/CTO-ANALYSIS-2026-05-14.md`)
+2. Leer `docs/CTO-CONTEXT.md` para estado actual
 3. Ver `git log --oneline -10` para últimos commits
 4. Continuar con la FASE pendiente marcada en la sección "Estado de Fases"
 

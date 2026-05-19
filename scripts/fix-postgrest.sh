@@ -6,10 +6,11 @@
 
 set -e
 
-PROJECT_REF="exnjyxwmxknvzploeaex"
+PROJECT_REF="${SUPABASE_PROJECT_REF:-exnjyxwmxknvzploeaex}"
 
 echo "🔧 Fix PostgREST Schema Cache"
 echo "=============================="
+echo "Project: $PROJECT_REF"
 echo ""
 
 echo "El problema: las tablas existen en PostgreSQL pero PostgREST no las ve."
