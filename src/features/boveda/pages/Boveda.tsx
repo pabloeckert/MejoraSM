@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, Trash2, Loader2, Search } from "lucide-react";
-import { useDocuments, useUploadDocument, useDeleteDocument } from "@/hooks/useVault";
+import { useDocuments, useUploadDocument, useDeleteDocument } from "@/features/boveda/hooks/useVault";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ErrorBoundary } from "@/components/ErrorBoundary";

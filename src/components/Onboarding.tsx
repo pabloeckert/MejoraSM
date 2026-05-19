@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Upload, MessageSquare, Zap, ArrowRight, Check } from "lucide-react";
-import { useDocuments } from "@/hooks/useVault";
+import { useDocuments } from "@/features/boveda/hooks/useVault";
 
 const STORAGE_KEY = "eda-onboarding-completed";
 

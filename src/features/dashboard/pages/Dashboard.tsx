@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, MessageSquare, Image, CalendarDays, Clock, Zap, ArrowRight, TrendingUp } from "lucide-react";
-import { useDocuments } from "@/hooks/useVault";
-import { useDialogueSessions } from "@/hooks/useDialogue";
-import { usePendingProposals, useProposals } from "@/hooks/useProposals";
-import { useCalendarEvents, useLatestMetrics } from "@/hooks/useMetrics";
+import { useDocuments } from "@/features/boveda/hooks/useVault";
+import { useDialogueSessions } from "@/features/mesa-dialogo/hooks/useDialogue";
+import { usePendingProposals, useProposals } from "@/features/laboratorio/hooks/useProposals";
+import { useCalendarEvents, useLatestMetrics } from "@/features/dashboard/hooks/useMetrics";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";

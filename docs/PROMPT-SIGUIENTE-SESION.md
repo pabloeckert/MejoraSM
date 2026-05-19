@@ -17,8 +17,8 @@ Continuemos con **MejoraSM** — sistema de contenidos Instagram con IA para Mej
 **Branch de trabajo:** `claude/cto-analysis-framework-lXTYJ`
 
 Leé estos dos archivos para ponerte al día:
-1. `Documents/CTO-CONTEXT.md` — estado actual y próximos pasos
-2. `Documents/CTO-ANALYSIS-2026-05-14.md` — análisis completo y plan por fases
+1. `docs/CTO-CONTEXT.md` — estado actual y próximos pasos
+2. `docs/CTO-ANALYSIS-2026-05-14.md` — análisis completo y plan por fases
 
 ---
 
@@ -83,6 +83,6 @@ bash scripts/health-check.sh TU_ANON_KEY
 
 ## Reglas de sesión
 - NO tocar `docs/` (legacy, solo lectura)
-- Documentación activa: `Documents/`
+- Documentación activa: `docs/`
 - Al final de cada sesión: commit + push a `claude/cto-analysis-framework-lXTYJ`
-- Actualizar `Documents/CTO-CONTEXT.md` con lo hecho en la sesión
+- Actualizar `docs/CTO-CONTEXT.md` con lo hecho en la sesión

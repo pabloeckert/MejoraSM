@@ -6,10 +6,11 @@
 
 set -e
 
-PROJECT_REF="exnjyxwmxknvzploeaex"
+PROJECT_REF="${SUPABASE_PROJECT_REF:-exnjyxwmxknvzploeaex}"
 
 echo "🚀 Deploy de Edge Functions — MejoraSM"
 echo "======================================="
+echo "Project: $PROJECT_REF"
 
 # 1. Verificar login
 echo ""
@@ -31,7 +32,7 @@ npx supabase link --project-ref "$PROJECT_REF" 2>/dev/null || echo "Ya linkeado"
 echo ""
 echo "3. Deployando Edge Functions..."
 
-FUNCTIONS=("ai-gateway" "orchestrator" "vault-process" "metrics-collector" "rule-engine")
+FUNCTIONS=("ai-gateway" "orchestrator" "vault-process" "metrics-collector" "rule-engine" "health" "publisher")
 
 for fn in "${FUNCTIONS[@]}"; do
   echo "  → $fn..."

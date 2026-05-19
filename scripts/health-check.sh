@@ -4,11 +4,12 @@
 # Ejecutar: bash scripts/health-check.sh ANON_KEY
 # ============================================
 
-PROJECT_REF="exnjyxwmxknvzploeaex"
+PROJECT_REF="${SUPABASE_PROJECT_REF:-exnjyxwmxknvzploeaex}"
 SUPABASE_URL="https://${PROJECT_REF}.supabase.co"
 
 echo "🏥 Health Check — MejoraSM"
 echo "=========================="
+echo "Project: $PROJECT_REF"
 
 # Necesita la anon key como argumento o variable de entorno
 ANON_KEY="${1:-$VITE_SUPABASE_PUBLISHABLE_KEY}"

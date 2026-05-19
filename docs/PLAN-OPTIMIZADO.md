@@ -1299,7 +1299,7 @@ export class ErrorBoundary extends Component<Props, State> {
 | Aspecto | Detalle |
 |---|---|
 | **Responsável** | 🤖 AI |
-| **Archivo** | `Documents/DESIGN-SYSTEM.md` (nuevo) |
+| **Archivo** | `docs/DESIGN-SYSTEM.md` (nuevo) |
 
 ---
 
@@ -1457,9 +1457,9 @@ que el usuario haga algo.** El primer bloqueo real es ETAPA 1.1 (PostgREST).
 |---|---|---|
 | `src/components/auth/` | NUEVO | Componentes de autenticación |
 | `src/App.tsx` | MODIFICAR | Rutas protegidas |
-| `Documents/DESIGN-SYSTEM.md` | NUEVO | Documentación design system |
-| `Documents/PRIVACY-POLICY.md` | NUEVO | Política de privacidad |
-| `Documents/TERMS-OF-SERVICE.md` | NUEVO | Términos de uso |
+| `docs/DESIGN-SYSTEM.md` | NUEVO | Documentación design system |
+| `docs/PRIVACY-POLICY.md` | NUEVO | Política de privacidad |
+| `docs/TERMS-OF-SERVICE.md` | NUEVO | Términos de uso |
 
 ---
 

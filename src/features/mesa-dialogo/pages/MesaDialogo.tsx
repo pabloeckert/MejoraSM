@@ -28,7 +28,7 @@ import {
   useDialogueMessages,
   useStartDialogue,
   useContinueDialogue,
-} from "@/hooks/useDialogue";
+} from "@/features/mesa-dialogo/hooks/useDialogue";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const agentIcons: Record<string, typeof Brain> = {

@@ -23,8 +23,8 @@ Sistema completo de gestión estratégica de contenidos en Instagram mediante m�
 src/              ← Frontend React
 supabase/         ← Edge Functions + migraciones SQL
 extension/        ← Extensión Chrome MejoraINSSIST
-Documents/        ← Documentación unificada
-docs/             ← Documentación legacy
+docs/             ← Documentación unificada
+scripts/          ← Scripts de deploy y utilidades
 ```
 
 ## 🛠️ Desarrollo
@@ -44,7 +44,7 @@ Deploy automático en cada push a `main` vía GitHub Actions.
 
 ## 📚 Documentación
 
-Ver [`Documents/DOCUMENTACION.md`](Documents/DOCUMENTACION.md) para documentación completa.
+Ver [`docs/DOCUMENTACION.md`](docs/DOCUMENTACION.md) para documentación completa.
 
 ## 📄 Licencia
 

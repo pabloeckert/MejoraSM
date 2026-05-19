@@ -29,8 +29,8 @@ import {
   FileText,
   Trash2,
 } from "lucide-react";
-import { useCalendarEvents, useCreateCalendarEvent } from "@/hooks/useMetrics";
-import { useProposals } from "@/hooks/useProposals";
+import { useCalendarEvents, useCreateCalendarEvent } from "@/features/dashboard/hooks/useMetrics";
+import { useProposals } from "@/features/laboratorio/hooks/useProposals";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { supabase } from "@/services/supabase";
