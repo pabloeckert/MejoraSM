@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<style>
+  /* Bw Modelica (principal). Poné los .woff2 en templates/fonts/ — mientras
+     no estén, cae a League Spartan y la pieza sigue siendo válida. */
+  @font-face {
+    font-family: "Bw Modelica";
+    src: url("fonts/BwModelica-Medium.woff2") format("woff2");
+    font-weight: 500;
+    font-display: block;
+  }
+  @font-face {
+    font-family: "Bw Modelica";
+    src: url("fonts/BwModelica-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-display: block;
+  }
+  @import url("https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600&display=swap");
+
+  :root {
+    --azul: #1A3D84;
+    --rojo: #E1061E;
+    --amarillo: #F7CC13;
+    --tinta: #2B2B2B;
+    --gris: #6B7280;
+    --blanco: #FFFFFF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+    background: var(--blanco);
+    font-family: "Bw Modelica", "League Spartan", sans-serif;
+  }
+
+  .story {
+    width: 1080px;
+    height: 1920px;
+    background: var(--blanco);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .photo {
+    width: 100%;
+    height: 1060px;
+    background-size: cover;
+    background-position: center;
+    {{PHOTO_STYLE}}
+  }
+
+  .panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 88px 96px 0;
+  }
+
+  .kicker {
+    font-family: "League Spartan", sans-serif;
+    font-weight: 600;
+    font-size: 30px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--rojo);
+    margin-bottom: 36px;
+  }
+
+  .headline {
+    font-family: "Bw Modelica", "League Spartan", sans-serif;
+    font-weight: 500;
+    font-size: 82px;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    color: var(--azul);
+    text-wrap: balance;
+    margin-bottom: 28px;
+  }
+
+  .rule {
+    width: 140px;
+    height: 10px;
+    background: var(--amarillo);
+    border-radius: 5px;
+    margin-bottom: 44px;
+  }
+
+  .subtext {
+    font-family: "League Spartan", sans-serif;
+    font-weight: 400;
+    font-size: 42px;
+    line-height: 1.4;
+    color: var(--tinta);
+    max-width: 860px;
+  }
+
+  .footer {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 0 96px 84px;
+  }
+
+  .dot { width: 16px; height: 16px; border-radius: 50%; }
+  .dot.rojo { background: var(--rojo); }
+  .dot.amarillo { background: var(--amarillo); }
+
+  .brand {
+    font-family: "Bw Modelica", "League Spartan", sans-serif;
+    font-weight: 500;
+    font-size: 32px;
+    color: var(--azul);
+  }
+
+  .site {
+    margin-left: auto;
+    font-family: "League Spartan", sans-serif;
+    font-weight: 400;
+    font-size: 28px;
+    color: var(--gris);
+    letter-spacing: 0.04em;
+  }
+
+  .story.solo-texto .photo { display: none; }
+  .story.solo-texto .panel {
+    padding: 0 110px;
+  }
+  .story.solo-texto .headline {
+    font-size: 104px;
+    line-height: 1.12;
+  }
+  .story.solo-texto .subtext {
+    font-size: 46px;
+  }
+</style>
+</head>
+<body>
+  <div class="story {{MODE_CLASS}}">
+    <div class="photo"></div>
+    <div class="panel">
+      <div class="kicker">{{KICKER}}</div>
+      <div class="headline">{{HEADLINE}}</div>
+      <div class="rule"></div>
+      <div class="subtext">{{SUBTEXT}}</div>
+    </div>
+    <div class="footer">
+      <span class="dot rojo"></span>
+      <span class="dot amarillo"></span>
+      <span class="brand">Mejora Continua</span>
+      <span class="site">mejoraok.com</span>
+    </div>
+  </div>
+</body>
+</html>

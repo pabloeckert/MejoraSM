@@ -1,0 +1,71 @@
+# Story diaria automática — genera copy con Claude (API directa), renderiza la
+# imagen de marca y publica en Instagram + Facebook. Sin Supabase: todo el motor
+# vive acá, en GitHub Actions.
+name: Daily Story
+
+on:
+  schedule:
+    - cron: "0 13 * * *" # 13:00 UTC = 10:00 ART
+  workflow_dispatch: {}
+
+concurrency:
+  group: daily-story
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  story:
+    name: Generar y publicar story
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar Playwright
+        run: npm install playwright
+
+      - name: Instalar Chromium para Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Generar briefs de copy (Claude, API directa)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node scripts/generate-brief.mjs
+
+      - name: Renderizar imágenes de las stories
+        run: node scripts/render-story.mjs
+
+      - name: Commitear imágenes renderizadas (públicas vía raw.githubusercontent.com)
+        run: |
+          git config user.name "mejora-story-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add content/published content/used content/inbox
+          git diff --cached --quiet || git commit -m "story: $(date -u +%Y-%m-%d)"
+          git push
+
+      - name: Publicar en Instagram y Facebook (Graph API directa)
+        env:
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_BUSINESS_ACCOUNT_ID: ${{ secrets.INSTAGRAM_BUSINESS_ACCOUNT_ID }}
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+          RAW_BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/main
+        run: node scripts/publish-story.mjs
+
+      - name: Subir briefs/renders como artifact (para debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-story-${{ github.run_id }}
+          path: |
+            content/work/briefs.json
+            content/work/renders.json
+          if-no-files-found: ignore
