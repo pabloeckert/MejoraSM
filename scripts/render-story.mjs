@@ -62,8 +62,8 @@ async function main() {
       .replace("{{SUBTEXT}}", escapeHtml(brief.subtext || ""));
 
     await page.setContent(template, { waitUntil: "networkidle" });
-    const outputPath = path.join(PUBLISHED_DIR, `story-${date}-${i + 1}.png`);
-    await page.screenshot({ path: outputPath, type: "png" });
+    const outputPath = path.join(PUBLISHED_DIR, `story-${date}-${i + 1}.jpg`);
+    await page.screenshot({ path: outputPath, type: "jpeg", quality: 92 });
 
     outputs.push({
       outputPath: path.relative(ROOT, outputPath),
