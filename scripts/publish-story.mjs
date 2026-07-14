@@ -1,19 +1,17 @@
 // scripts/publish-story.mjs
-// Publica las stories renderizadas (ya commiteadas al repo) DIRECTO a Meta,
-// sin pasar por Supabase. Una por una, con pausa entre publicaciones.
+// Publica las stories renderizadas (ya commiteadas al repo) vía Zernio —
+// un solo POST por story publica en Instagram y Facebook al mismo tiempo.
 //
 // Uso: node scripts/publish-story.mjs
-// Env: INSTAGRAM_ACCESS_TOKEN, INSTAGRAM_BUSINESS_ACCOUNT_ID,
-//      FACEBOOK_PAGE_ACCESS_TOKEN, FACEBOOK_PAGE_ID, RAW_BASE_URL
-// (RAW_BASE_URL = https://raw.githubusercontent.com/<owner>/<repo>/<branch>)
+// Env: ZERNIO_API_KEY, ZERNIO_INSTAGRAM_ACCOUNT_ID, ZERNIO_FACEBOOK_ACCOUNT_ID, RAW_BASE_URL
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { publishInstagramStory, publishFacebookPhoto } from "./lib/meta.mjs";
+import { publishStory } from "./lib/zernio.mjs";
 
 const ROOT = process.cwd();
 const WORK_DIR = path.join(ROOT, "content/work");
-const DELAY_MS = 8000; // amable con el rate limit de Meta
+const DELAY_MS = 5000; // pausa entre publicaciones, prudente aunque Zernio maneja rate limits solo
 
 const RAW_BASE_URL = process.env.RAW_BASE_URL;
 if (!RAW_BASE_URL) {
@@ -32,18 +30,16 @@ async function main() {
     const imageUrl = `${RAW_BASE_URL}/${r.outputPath}`;
     console.log(`\nPublicando ${i + 1}/${renders.length}: ${r.headline}`);
 
-    const instagram = await publishInstagramStory(imageUrl);
-    const facebook = await publishFacebookPhoto(imageUrl, r.caption_feed);
-    console.log("  Instagram:", JSON.stringify(instagram));
-    console.log("  Facebook: ", JSON.stringify(facebook));
+    const result = await publishStory(imageUrl, r.caption_feed);
+    console.log("  Resultado:", JSON.stringify(result));
 
-    if (!instagram.success || !facebook.success) failures++;
+    if (!result.success) failures++;
 
     if (i < renders.length - 1) await sleep(DELAY_MS);
   }
 
   if (failures > 0) {
-    console.error(`\n${failures} publicación(es) con al menos una plataforma fallada — revisar arriba.`);
+    console.error(`\n${failures} publicación(es) fallaron — revisar arriba. Recordá: Instagram falla solo ~10% de las veces por su cuenta, no siempre es un bug nuestro.`);
     process.exit(1);
   }
   console.log("\nTodas las stories publicadas en Instagram y Facebook.");

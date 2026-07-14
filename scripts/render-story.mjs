@@ -1,9 +1,9 @@
 // scripts/render-story.mjs
-// Renderiza las stories del día (1080x1920 PNG) combinando la plantilla de marca
+// Renderiza las stories del día (1080x1920 JPEG) combinando la plantilla de marca
 // con los briefs generados por generate-brief.mjs.
 //
 // Uso: node scripts/render-story.mjs
-// Salida: content/published/story-YYYY-MM-DD-N.png + content/work/renders.json
+// Salida: content/published/story-YYYY-MM-DD-N.jpg + content/work/renders.json
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
