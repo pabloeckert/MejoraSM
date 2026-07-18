@@ -6,7 +6,7 @@
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-5";
 
-export async function askClaude({ system, userText, image, maxTokens = 600, temperature = 0.8 }) {
+export async function askClaude({ system, userText, image, maxTokens = 600 }) {
   if (!ANTHROPIC_API_KEY) throw new Error("Falta ANTHROPIC_API_KEY en el entorno.");
 
   const content = [];
@@ -28,7 +28,6 @@ export async function askClaude({ system, userText, image, maxTokens = 600, temp
     body: JSON.stringify({
       model: MODEL,
       max_tokens: maxTokens,
-      temperature,
       system,
       messages: [{ role: "user", content }],
     }),
