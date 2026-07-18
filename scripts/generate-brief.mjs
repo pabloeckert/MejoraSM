@@ -1,7 +1,13 @@
 // scripts/generate-brief.mjs
 // Genera los briefs de las stories del día llamando DIRECTO a la API de Anthropic
-// (sin Supabase). Toma hasta 3 fotos de content/inbox/ — una story por foto.
-// Si no hay ninguna, genera 1 story de solo texto.
+// (sin Supabase). Recorre content/inbox/<oferta>/ (una subcarpeta por cada
+// dimensión de servicio del Manual de Marca) y toma hasta 3 fotos en total —
+// una story por foto, con el copy orientado a la oferta de esa carpeta.
+// Si no hay ninguna foto, genera 1 story de solo texto.
+//
+// Videos: por ahora se detectan pero NO se procesan (el render solo compone
+// imágenes fijas) — quedan avisados en el log, no se pierden ni se ignoran
+// en silencio. Soporte de video es un módulo aparte, todavía no construido.
 //
 // Uso: node scripts/generate-brief.mjs
 // Env: ANTHROPIC_API_KEY
@@ -23,6 +29,43 @@ const EXT_TO_MIME = {
   ".jpeg": "image/jpeg",
   ".png": "image/png",
   ".webp": "image/webp",
+};
+const VIDEO_EXTS = [".mp4", ".mov", ".avi", ".webm"];
+
+// Las 4 dimensiones + Profesionalización, tal cual el Manual de Marca (sección
+// "Servicios"). Cada carpeta de content/inbox/ corresponde a una de estas.
+const OFERTAS = {
+  personal: {
+    nombre: "Personal",
+    contexto:
+      "Todo cambio empieza en quien lidera. Liderazgo, gestión emocional, " +
+      "creencias, objetivos. El resultado: un líder más seguro y efectivo.",
+  },
+  organizacional: {
+    nombre: "Organizacional",
+    contexto:
+      "Cuando el líder está firme, el equipo lo siente. Cultura, roles, " +
+      "procesos internos, comunicación, liderazgo de equipos.",
+  },
+  comercial: {
+    nombre: "Comercial",
+    contexto:
+      "Un líder con confianza vende distinto. Ventas, pricing, fidelización, " +
+      "negociación, marketing.",
+  },
+  empresarial: {
+    nombre: "Empresarial",
+    contexto:
+      "La base sobre la que todo se sostiene. Modelo de negocio, finanzas, " +
+      "escalabilidad, calidad, transformación digital.",
+  },
+  profesionalizacion: {
+    nombre: "Profesionalización",
+    contexto:
+      "Nivel integrador, no una quinta área: el resultado de trabajar las " +
+      "cuatro dimensiones de forma conjunta y sostenida — líderes formados, " +
+      "métricas claras, procesos replicables.",
+  },
 };
 
 // Tono calibrado contra el Manual de Marca 2026 (Criterio Medular + Tono y Voz).
@@ -73,60 +116,87 @@ Respondé ÚNICAMENTE con JSON válido, sin nada antes ni después:
   "caption_feed": "1-2 frases + CTA suave para el post de Facebook (no va en la imagen)"
 }`;
 
-async function findInboxPhotos() {
-  if (!existsSync(INBOX_DIR)) return [];
-  const files = (await readdir(INBOX_DIR))
-    .filter((f) => Object.keys(EXT_TO_MIME).includes(path.extname(f).toLowerCase()))
-    .sort();
-  return files.slice(0, MAX_STORIES).map((f) => path.join(INBOX_DIR, f));
+async function findInboxItems() {
+  if (!existsSync(INBOX_DIR)) return { photos: [], videosSkipped: [] };
+
+  const ofertaDirs = Object.keys(OFERTAS);
+  const photos = [];
+  const videosSkipped = [];
+
+  for (const oferta of ofertaDirs) {
+    const dir = path.join(INBOX_DIR, oferta);
+    if (!existsSync(dir)) continue;
+    const files = (await readdir(dir)).sort();
+    for (const f of files) {
+      const ext = path.extname(f).toLowerCase();
+      if (Object.keys(EXT_TO_MIME).includes(ext)) {
+        photos.push({ path: path.join(dir, f), name: f, oferta });
+      } else if (VIDEO_EXTS.includes(ext)) {
+        videosSkipped.push({ name: f, oferta });
+      }
+    }
+  }
+
+  return { photos: photos.slice(0, MAX_STORIES), videosSkipped };
 }
 
 function extractJson(text) {
   return JSON.parse(text.trim().replace(/^```json\s*|^```\s*|```$/g, ""));
 }
 
-async function briefFor(photoPath, avoidHeadlines) {
+async function briefFor(item, avoidHeadlines) {
   const avoid =
     avoidHeadlines.length > 0
       ? ` Ya se generaron hoy estas headlines — NO repitas idea ni estructura: ${avoidHeadlines.join(" | ")}`
       : "";
 
   let image;
-  if (photoPath) {
-    const ext = path.extname(photoPath).toLowerCase();
-    const buffer = await readFile(photoPath);
+  let userText;
+
+  if (item) {
+    const oferta = OFERTAS[item.oferta];
+    const ext = path.extname(item.path).toLowerCase();
+    const buffer = await readFile(item.path);
     image = { base64: buffer.toString("base64"), media_type: EXT_TO_MIME[ext] };
+    userText =
+      `Generá la story a partir de esta foto. Es contenido de la oferta ` +
+      `"${oferta.nombre}": ${oferta.contexto} Que el copy hable de esa ` +
+      `dimensión específica, no genérico de la marca.${avoid}`;
+  } else {
+    userText = `No hay foto disponible hoy. Generá una story de solo texto.${avoid}`;
   }
 
-  const text = await askClaude({
-    system: SYSTEM_PROMPT,
-    userText: photoPath
-      ? `Generá la story a partir de esta foto.${avoid}`
-      : `No hay foto disponible hoy. Generá una story de solo texto.${avoid}`,
-    image,
-  });
-
+  const text = await askClaude({ system: SYSTEM_PROMPT, userText, image });
   return extractJson(text);
 }
 
 async function main() {
   await mkdir(WORK_DIR, { recursive: true });
-  await mkdir(USED_DIR, { recursive: true });
 
-  const photos = await findInboxPhotos();
+  const { photos, videosSkipped } = await findInboxItems();
+
+  if (videosSkipped.length > 0) {
+    console.log(`Videos detectados pero NO procesados (soporte de video aún no construido):`);
+    videosSkipped.forEach((v) => console.log(`  - ${v.oferta}/${v.name}`));
+  }
+
   const briefs = [];
   const headlines = [];
 
   if (photos.length === 0) {
     const brief = await briefFor(null, []);
     brief.mode = "solo-texto";
+    brief.oferta = null;
     brief.photoUsedPath = null;
     briefs.push(brief);
   } else {
-    for (const photoPath of photos) {
-      const brief = await briefFor(photoPath, headlines);
+    for (const item of photos) {
+      const brief = await briefFor(item, headlines);
       brief.mode = "foto";
-      brief.photoUsedPath = path.join(USED_DIR, path.basename(photoPath));
+      brief.oferta = item.oferta;
+      const usedDir = path.join(USED_DIR, item.oferta);
+      await mkdir(usedDir, { recursive: true });
+      brief.photoUsedPath = path.join(usedDir, item.name);
       briefs.push(brief);
       headlines.push(brief.headline);
     }
@@ -134,10 +204,10 @@ async function main() {
 
   await writeFile(path.join(WORK_DIR, "briefs.json"), JSON.stringify(briefs, null, 2));
   console.log(`${briefs.length} brief(s) generado(s):`);
-  briefs.forEach((b, i) => console.log(`  ${i + 1}. [${b.mode}] ${b.headline}`));
+  briefs.forEach((b, i) => console.log(`  ${i + 1}. [${b.mode}${b.oferta ? "/" + b.oferta : ""}] ${b.headline}`));
 
-  for (const photoPath of photos) {
-    await rename(photoPath, path.join(USED_DIR, path.basename(photoPath)));
+  for (const item of photos) {
+    await rename(item.path, path.join(USED_DIR, item.oferta, item.name));
   }
 }
 
