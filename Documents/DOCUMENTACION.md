@@ -184,14 +184,6 @@ mejorasocialmedia/
 │       ├── ai-gateway/           ← Router universal de IA
 │       ├── orchestrator/         ← Mesa de Diálogo multi-agente
 │       └── vault-process/        ← Bóveda RAG
-├── extension/                    ← Extensión Chrome MejoraINSSIST
-│   ├── app/                      ← Scripts (bg.js, ig-cs.js, mejora-injector.js)
-│   ├── data/                     ← Buyer personas, hashtags, replies
-│   ├── img/                      ← Assets visuales
-│   ├── js/                       ← Librerías externas
-│   ├── landing/                  ← Landing page
-│   ├── manifest.json             ← Manifest V3
-│   └── _locales/                 ← i18n (es/en/pt_BR)
 ├── Documents/                    ← 📚 DOCUMENTACIÓN UNIFICADA (este archivo)
 ├── docs/                         ← ⚠️ LEGACY — solo lectura, no editar
 ├── .github/workflows/deploy.yml  ← CI/CD automático

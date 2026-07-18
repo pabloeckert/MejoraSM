@@ -1,0 +1,5 @@
+RELEASE_NAME: MejoraInstaStories — The Idea Release
+VERSION: 1.0.0
+DATE: 2026-05-19
+MESSAGE: "Hacer que publicar historias en Instagram sea tan simple como tener una idea. Nuestra primera versión estable, diseñada con obsesión por la simplicidad y la precisión técnica."
+STATUS: FINAL_DEPLOYMENT_READY

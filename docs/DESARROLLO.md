@@ -53,11 +53,6 @@
 │  HF        → Sentence Transformers (embeddings)  │
 └──────────────────────────────────────────────────┘
 
-┌──────────────────────────────────────────────────┐
-│  EXTENSIÓN CHROME (MejoraINSSIST)                │
-│  extension/ → Ya funciona (v1.1.0)               │
-│  Conectará al backend via API para features v2   │
-└──────────────────────────────────────────────────┘
 ```
 
 ---

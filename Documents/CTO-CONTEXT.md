@@ -144,7 +144,6 @@ MejoraSM/
 │   │   ├── rule-engine/    ← Motor de reglas
 │   │   └── metrics-collector/ ← Recolección de KPIs
 │   └── migrations/         ← SQL schema
-├── extension/              ← Chrome Extension MejoraINSSIST
 ├── Documents/              ← Documentación unificada
 │   ├── DOCUMENTACION.md    ← Documentación principal
 │   └── CTO-CONTEXT.md      ← Handoff de sesión CTO

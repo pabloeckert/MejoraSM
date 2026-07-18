@@ -13,16 +13,16 @@ Sistema completo de gestión estratégica de contenidos en Instagram mediante m�
 | Frontend | React 18 + TypeScript + Vite + shadcn/ui |
 | Backend | Supabase Edge Functions (Deno) |
 | Base de datos | PostgreSQL + pgvector |
-| IA | Groq · DeepSeek · Gemini · HuggingFace |
-| Extensión | Chrome Extension (Instagram) |
-| Deploy | GitHub Actions → Hostinger (FTP) |
+| IA | Groq · DeepSeek · Gemini · HuggingFace · Anthropic (story diaria) |
+| Deploy | GitHub Actions → Hostinger (FTP) / GitHub Pages (hub) |
 
 ## 📦 Estructura
 
 ```
 src/              ← Frontend React
 supabase/         ← Edge Functions + migraciones SQL
-extension/        ← Extensión Chrome MejoraINSSIST
+scripts/          ← Sistema de story diaria autónoma
+hub/              ← Página de subida de material (GitHub Pages)
 Documents/        ← Documentación unificada
 docs/             ← Documentación legacy
 ```

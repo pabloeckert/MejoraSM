@@ -88,11 +88,6 @@ mejorasocialmedia/
 │       ├── ai-gateway/           ← Router universal de IA ✅ NUEVO
 │       ├── orchestrator/         ← Mesa de Diálogo multi-agente ✅ NUEVO
 │       └── vault-process/        ← Bóveda RAG ✅ NUEVO
-├── extension/                    ← Extensión Chrome MejoraINSSIST
-│   ├── app/                      ← Scripts (bg.js, ig-cs.js, mejora-injector.js)
-│   ├── data/                     ← Buyer personas, hashtags, replies
-│   ├── manifest.json             ← Manifest V2
-│   └── landing/                  ← Landing page
 ├── backend/                      ← Placeholder (Fase 2 servidores)
 ├── dashboard/                    ← Placeholder (Fase 5 standalone)
 ├── docs/                         ← Documentación del proyecto
