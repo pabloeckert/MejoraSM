@@ -8,6 +8,25 @@
 
 const ZERNIO_API_URL = "https://zernio.com/api/v1/posts";
 
+// Instagram procesa el media de forma asíncrona (container de Meta): un
+// status "processing"/"awaiting-finalize" recién creado es normal, no un
+// fallo — se resuelve solo unos segundos después. Reconsultamos el post
+// antes de darlo por perdido (docs.zernio.com: "Fetch the post back — its
+// status tells you exactly where it is in the pipeline").
+const POLL_ATTEMPTS = 4;
+const POLL_DELAY_MS = 8000;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchPostPlatforms(postId, apiKey) {
+  const res = await fetch(`${ZERNIO_API_URL}/${postId}`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.post?.platforms || null;
+}
+
 export async function publishStory(imageUrl, caption = "") {
   const apiKey = process.env.ZERNIO_API_KEY;
   const igAccountId = process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID;
@@ -64,12 +83,24 @@ export async function publishStory(imageUrl, caption = "") {
 
     // data.post.platforms trae el resultado por plataforma (instagram/facebook
     // pueden fallar independientemente aunque la llamada general sea 200 OK)
-    const perPlatform = data.post?.platforms || [];
+    let perPlatform = data.post?.platforms || [];
+    const postId = data.post?._id;
+
+    for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
+      const pending = perPlatform.filter(
+        (p) => p.status !== "published" && p.status !== "failed"
+      );
+      if (pending.length === 0) break;
+      await sleep(POLL_DELAY_MS);
+      const refreshed = postId ? await fetchPostPlatforms(postId, apiKey) : null;
+      if (refreshed) perPlatform = refreshed;
+    }
+
     const failed = perPlatform.filter((p) => p.status !== "published");
 
     return {
       success: failed.length === 0,
-      postId: data.post?._id,
+      postId,
       platforms: perPlatform,
       error: failed.length > 0 ? JSON.stringify(failed).slice(0, 300) : undefined,
     };
