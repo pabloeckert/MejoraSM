@@ -19,3 +19,23 @@ Concretamente:
 
 Nombrá el dolor sin juzgar → corré el eje de "hiciste mal" a "esto funciona
 así, por eso pasa" → cerrá con dirección concreta.
+
+## Autenticidad — no negociable
+
+Nada que delate IA ni suene artificial o sobre-preparado. Nada de stickers,
+encuestas, GIFs, ni texto amontonado encima de la imagen.
+
+## Patrón de copy de referencia
+
+Causa y efecto, directo: "Si se hace esto... se logra esto...". Y frases
+reflexivas de autoridad, firmes y breves, sin adorno.
+
+## Frases reales de la marca
+
+- "Hacele fácil al cliente."
+- "Los cambios llevan tiempo, son un proceso. Tratamos con personas, no con
+  máquinas, y cada uno tiene su tiempo de asimilación."
+- "Las redes no son marketing, son un canal más de comunicación — pero sin
+  plan, estrategia y acciones concretas, no tiene resultados."
+- "Las ventas se logran estableciendo objetivos y procesos claros."
+- "El compromiso y la motivación se construyen con pequeños gestos día a día."

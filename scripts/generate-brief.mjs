@@ -1,7 +1,7 @@
 // scripts/generate-brief.mjs
 // Genera los briefs de las stories del día llamando DIRECTO a la API de Anthropic
 // (sin Supabase). Recorre content/inbox/<oferta>/ (una subcarpeta por cada
-// dimensión de servicio del Manual de Marca) y toma hasta 3 fotos en total —
+// dimensión de servicio del Manual de Marca) y toma hasta 2 fotos en total —
 // una story por foto, con el copy orientado a la oferta de esa carpeta.
 // Si no hay ninguna foto, genera 1 story de solo texto.
 //
@@ -26,7 +26,7 @@ const INBOX_DIR = path.join(ROOT, "content/inbox");
 const USED_DIR = path.join(ROOT, "content/used");
 const WORK_DIR = path.join(ROOT, "content/work");
 const IDENTIDAD_DIR = path.join(ROOT, "docs/identidad-de-marca");
-const MAX_STORIES = 3;
+const MAX_STORIES = 2;
 
 const EXT_TO_MIME = {
   ".jpg": "image/jpeg",
@@ -91,7 +91,12 @@ function buildSystemPrompt(identidadDeMarca) {
 TAREA: copy para UNA story vertical de Instagram/Facebook (vive 24hs).
 Si te paso una foto, analizala primero y que el copy tenga relación real y
 específica con lo que se ve — nada de caption genérica pegada encima.
-Si no hay foto: una idea o quiebre de perspectiva breve y potente.
+Si no hay foto: elegí una de estas variantes — un tip corto y
+accionable (sobre negociación, manejo de la frustración o el estrés,
+gestión emocional, gestión del tiempo, reuniones o presentaciones
+efectivas, feedback, resolución de conflictos, ventas), un dato
+curioso empresarial o de innovación, o una frase breve para
+reflexionar. Variedad día a día — nunca lo mismo dos veces seguidas.
 
 Respondé ÚNICAMENTE con JSON válido, sin nada antes ni después:
 {
