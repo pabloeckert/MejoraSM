@@ -9,6 +9,9 @@
 // imágenes fijas) — quedan avisados en el log, no se pierden ni se ignoran
 // en silencio. Soporte de video es un módulo aparte, todavía no construido.
 //
+// La identidad de marca (criterio medular + tono y voz) se lee en cada
+// corrida desde docs/identidad-de-marca/*.md — no está hardcodeada acá.
+//
 // Uso: node scripts/generate-brief.mjs
 // Env: ANTHROPIC_API_KEY
 // Salida: content/work/briefs.json
@@ -22,6 +25,7 @@ const ROOT = process.cwd();
 const INBOX_DIR = path.join(ROOT, "content/inbox");
 const USED_DIR = path.join(ROOT, "content/used");
 const WORK_DIR = path.join(ROOT, "content/work");
+const IDENTIDAD_DIR = path.join(ROOT, "docs/identidad-de-marca");
 const MAX_STORIES = 3;
 
 const EXT_TO_MIME = {
@@ -68,40 +72,21 @@ const OFERTAS = {
   },
 };
 
-// Tono calibrado contra el Manual de Marca 2026 (Criterio Medular + Tono y Voz).
-const SYSTEM_PROMPT = `Sos el redactor de contenido de Mejora Continua (mejoraok.com), consultora de
-claridad estratégica para dueños de empresa, líderes y profesionales argentinos.
+// Lee docs/identidad-de-marca/*.md (criterio medular + tono y voz) y los
+// concatena. Zero-touch: si el Manual de Marca cambia, se edita el .md
+// correspondiente, no este script.
+async function loadIdentidadDeMarca() {
+  const files = (await readdir(IDENTIDAD_DIR))
+    .filter((f) => f.endsWith(".md"))
+    .sort();
+  const contents = await Promise.all(
+    files.map((f) => readFile(path.join(IDENTIDAD_DIR, f), "utf-8"))
+  );
+  return contents.join("\n\n").trim();
+}
 
-CRITERIO MEDULAR (manda sobre todo lo demás):
-- Nunca a la persona: el sujeto del problema siempre es lo que falta — foco,
-  estructura, criterio externo — jamás la capacidad o inteligencia del otro.
-- Calidez con verdad: directo y cálido a la vez. La calidez no es consuelo,
-  es el cuidado detrás de decir la verdad sin maquillaje.
-- No se vende por precio. Nunca "gratis" o "sin costo" como gancho.
-- El tono NO es: agresivo, motivacional vacío, jerga para parecer sofisticado,
-  frío, ni urgencia artificial. No vende: clarifica.
-
-REGISTRO: nivel "Directo" (el de primer contacto). Referencia de intensidad:
-"No te falta capacidad, te falta claridad."
-
-VOZ — esto es crítico, más que la estructura: tiene que sonar a una persona
-real escribiendo, no a una IA generando copy. Concretamente:
-- Rioplatense: "vos", nunca "tú". Cadencia natural argentina.
-- Nada de fórmulas de copywriting genérico: sin "descubrí el secreto de...",
-  sin preguntas retóricas fáciles ("¿Te pasó alguna vez que...?"), sin
-  exclamaciones de más, sin emojis.
-- Sin lunfardo ni jerga pesada — el registro sigue siendo profesional, pero
-  cercano, como alguien que sabe de lo que habla y te lo dice derecho.
-- Frases con el corte natural de alguien hablando, no oraciones perfectas
-  y balanceadas de manual de redacción. Si releyendo suena "escrito por
-  IA" (demasiado prolijo, sin aspereza, genérico), reescribilo más crudo.
-
-ESTRUCTURA de cada mensaje: nombrá el dolor sin juzgar → corré el eje de
-"hiciste mal" a "esto funciona así, por eso pasa" → cerrá con dirección concreta.
-
-PÚBLICO (por estado mental, no demografía): el emprendedor saturado que apaga
-incendios, el que creció rápido y necesita orden, el que sospecha que le venden
-humo, la líder que decide en soledad. Ninguno busca motivación: buscan claridad.
+function buildSystemPrompt(identidadDeMarca) {
+  return `${identidadDeMarca}
 
 TAREA: copy para UNA story vertical de Instagram/Facebook (vive 24hs).
 Si te paso una foto, analizala primero y que el copy tenga relación real y
@@ -115,6 +100,7 @@ Respondé ÚNICAMENTE con JSON válido, sin nada antes ni después:
   "subtext": "1-2 líneas de apoyo, máx 26 palabras, cierran con dirección",
   "caption_feed": "1-2 frases + CTA suave para el post de Facebook (no va en la imagen)"
 }`;
+}
 
 async function findInboxItems() {
   if (!existsSync(INBOX_DIR)) return { photos: [], videosSkipped: [] };
@@ -144,7 +130,7 @@ function extractJson(text) {
   return JSON.parse(text.trim().replace(/^```json\s*|^```\s*|```$/g, ""));
 }
 
-async function briefFor(item, avoidHeadlines) {
+async function briefFor(item, avoidHeadlines, systemPrompt) {
   const avoid =
     avoidHeadlines.length > 0
       ? ` Ya se generaron hoy estas headlines — NO repitas idea ni estructura: ${avoidHeadlines.join(" | ")}`
@@ -166,12 +152,15 @@ async function briefFor(item, avoidHeadlines) {
     userText = `No hay foto disponible hoy. Generá una story de solo texto.${avoid}`;
   }
 
-  const text = await askClaude({ system: SYSTEM_PROMPT, userText, image });
+  const text = await askClaude({ system: systemPrompt, userText, image });
   return extractJson(text);
 }
 
 async function main() {
   await mkdir(WORK_DIR, { recursive: true });
+
+  const identidadDeMarca = await loadIdentidadDeMarca();
+  const systemPrompt = buildSystemPrompt(identidadDeMarca);
 
   const { photos, videosSkipped } = await findInboxItems();
 
@@ -184,14 +173,14 @@ async function main() {
   const headlines = [];
 
   if (photos.length === 0) {
-    const brief = await briefFor(null, []);
+    const brief = await briefFor(null, [], systemPrompt);
     brief.mode = "solo-texto";
     brief.oferta = null;
     brief.photoUsedPath = null;
     briefs.push(brief);
   } else {
     for (const item of photos) {
-      const brief = await briefFor(item, headlines);
+      const brief = await briefFor(item, headlines, systemPrompt);
       brief.mode = "foto";
       brief.oferta = item.oferta;
       const usedDir = path.join(USED_DIR, item.oferta);
