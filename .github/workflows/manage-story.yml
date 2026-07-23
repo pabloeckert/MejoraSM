@@ -1,0 +1,52 @@
+# Acciones manuales sobre un post ya publicado en Zernio (Instagram/Facebook).
+# NUNCA genera contenido nuevo ni llama a Claude — "reintentar" reusa la misma
+# imagen y caption que ya están en content/log/historial.json, solo para la
+# plataforma elegida. Es la primera vez que un Action de este repo puede tocar
+# contenido ya publicado en redes reales: correr con cuidado y a mano.
+name: Manage Story
+
+on:
+  workflow_dispatch:
+    inputs:
+      post_id:
+        description: "Post ID de Zernio (columna del dashboard, botón Copiar ID)"
+        required: true
+        type: string
+      platform:
+        description: "Plataforma sobre la que actuar"
+        required: true
+        type: choice
+        options:
+          - instagram
+          - facebook
+      action:
+        description: "Qué hacer"
+        required: true
+        type: choice
+        options:
+          - reintentar
+          - despublicar
+
+permissions:
+  contents: read
+
+jobs:
+  manage:
+    name: "${{ inputs.action }} — ${{ inputs.platform }} — ${{ inputs.post_id }}"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Ejecutar acción
+        env:
+          ZERNIO_API_KEY: ${{ secrets.ZERNIO_API_KEY }}
+          ZERNIO_INSTAGRAM_ACCOUNT_ID: ${{ secrets.ZERNIO_INSTAGRAM_ACCOUNT_ID }}
+          ZERNIO_FACEBOOK_ACCOUNT_ID: ${{ secrets.ZERNIO_FACEBOOK_ACCOUNT_ID }}
+        run: node scripts/manage-story.mjs "${{ inputs.post_id }}" "${{ inputs.platform }}" "${{ inputs.action }}"
