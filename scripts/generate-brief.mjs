@@ -25,6 +25,7 @@ const ROOT = process.cwd();
 const INBOX_DIR = path.join(ROOT, "content/inbox");
 const USED_DIR = path.join(ROOT, "content/used");
 const WORK_DIR = path.join(ROOT, "content/work");
+const PUBLISHED_DIR = path.join(ROOT, "content/published");
 const IDENTIDAD_DIR = path.join(ROOT, "docs/identidad-de-marca");
 const MAX_STORIES = 2;
 
@@ -161,7 +162,25 @@ async function briefFor(item, avoidHeadlines, systemPrompt) {
   return extractJson(text);
 }
 
+// Freno de una-corrida-por-día: si ya hay una story publicada hoy, una
+// segunda corrida (típicamente un reintento manual tras un fallo parcial de
+// Zernio) no debe generar contenido nuevo — eso es lo que produjo la
+// duplicación real del 21/07 (ver commit de este fix).
+async function alreadyGeneratedToday(today) {
+  if (!existsSync(PUBLISHED_DIR)) return false;
+  const files = await readdir(PUBLISHED_DIR);
+  return files.some((f) => f.startsWith(`story-${today}-`));
+}
+
 async function main() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (await alreadyGeneratedToday(today)) {
+    console.log(
+      `Ya se generó contenido para hoy (${today}) — no genero de nuevo para evitar publicaciones duplicadas. Si necesitás reintentar una plataforma que falló parcialmente, hacelo manualmente contra el post existente, no re-corriendo este workflow completo.`
+    );
+    process.exit(0);
+  }
+
   await mkdir(WORK_DIR, { recursive: true });
 
   const identidadDeMarca = await loadIdentidadDeMarca();

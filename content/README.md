@@ -13,3 +13,12 @@ Flujo de la story diaria (`.github/workflows/daily-story.yml`):
 
 Para subir una foto desde el celular sin usar git: hacerlo directo desde la
 app de GitHub, o desde Dispatch de Claude Cowork apuntando a este repo.
+
+## Una corrida real por día
+
+`generate-brief.mjs` frena (exit 0, sin generar nada) si ya existe un
+`story-{hoy}-*.jpg` en `published/`. Si el workflow se re-corre el mismo día
+(ej. reintento manual tras un fallo parcial de Zernio), la segunda corrida
+no genera ni publica contenido nuevo — evita duplicar posts reales como pasó
+el 21/07. Si necesitás reintentar una plataforma que falló, hacelo a mano
+contra el post existente en Zernio, no re-corriendo el workflow completo.
