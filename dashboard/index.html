@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mejora Continua — Monitor de stories</title>
+<style>
+  @import url("https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&display=swap");
+
+  :root {
+    --azul: #1A3D84;
+    --rojo: #E1061E;
+    --amarillo: #F7CC13;
+    --verde: #1A7D3D;
+    --tinta: #2B2B2B;
+    --gris: #6B7280;
+    --blanco: #FFFFFF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "League Spartan", sans-serif;
+    background: var(--blanco);
+    color: var(--tinta);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 56px 24px 40px;
+  }
+
+  header {
+    text-align: center;
+    max-width: 640px;
+    margin-bottom: 40px;
+  }
+
+  .dots { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.rojo { background: var(--rojo); }
+  .dot.amarillo { background: var(--amarillo); }
+  .dot.azul { background: var(--azul); }
+
+  h1 {
+    font-weight: 700;
+    font-size: 34px;
+    color: var(--azul);
+    margin-bottom: 12px;
+    letter-spacing: -0.01em;
+  }
+
+  p.lead {
+    font-size: 18px;
+    color: var(--gris);
+    line-height: 1.5;
+  }
+
+  #estado {
+    font-size: 14px;
+    color: var(--gris);
+    margin-bottom: 24px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+    max-width: 1100px;
+    width: 100%;
+  }
+
+  .card {
+    border: 1px solid #E5E7EB;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card img {
+    width: 100%;
+    aspect-ratio: 9 / 16;
+    object-fit: cover;
+    background: #F3F4F6;
+    display: block;
+  }
+
+  .card-body {
+    padding: 16px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+  }
+
+  .card-fecha {
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--rojo);
+  }
+
+  .card-oferta {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--gris);
+  }
+
+  .card-headline {
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--azul);
+    line-height: 1.3;
+  }
+
+  .card-copy {
+    font-size: 14px;
+    color: var(--tinta);
+    line-height: 1.4;
+  }
+
+  .plataformas {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: auto;
+    font-size: 13px;
+  }
+
+  .plataforma {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    font-size: 12px;
+    color: var(--blanco);
+    flex-shrink: 0;
+  }
+  .badge.ok { background: var(--verde); }
+  .badge.fail { background: var(--rojo); }
+  .badge.pendiente { background: var(--amarillo); color: var(--tinta); }
+
+  .plataforma a {
+    color: var(--azul);
+    text-decoration: none;
+  }
+  .plataforma a:hover { text-decoration: underline; }
+
+  .acciones {
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #E5E7EB;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .post-id-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--gris);
+  }
+
+  .post-id-row code {
+    background: #F3F4F6;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 110px;
+  }
+
+  button.copiar {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--azul);
+    background: var(--blanco);
+    border: 1px solid var(--azul);
+    border-radius: 8px;
+    padding: 4px 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  button.copiar:hover { background: #EEF2FF; }
+  button.copiar.copiado { background: var(--verde); border-color: var(--verde); color: var(--blanco); }
+
+  a.run-workflow {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--tinta);
+    text-decoration: none;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    padding: 6px 10px;
+    text-align: center;
+  }
+  a.run-workflow:hover { border-color: var(--azul); }
+
+  .instrucciones {
+    font-size: 11px;
+    color: var(--gris);
+    line-height: 1.4;
+  }
+
+  footer {
+    margin-top: 48px;
+    max-width: 640px;
+    text-align: center;
+    font-size: 14px;
+    color: var(--gris);
+    line-height: 1.6;
+  }
+
+  .brand {
+    margin-top: 24px;
+    font-weight: 700;
+    color: var(--azul);
+    font-size: 14px;
+    letter-spacing: 0.04em;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="dots"><span class="dot rojo"></span><span class="dot amarillo"></span><span class="dot azul"></span></div>
+    <h1>Monitor de stories</h1>
+    <p class="lead">Historial real de lo publicado en Instagram y Facebook — sincronizado directo desde Zernio.</p>
+  </header>
+
+  <div id="estado">Cargando historial…</div>
+  <div class="grid" id="grid"></div>
+
+  <footer>
+    <div class="brand">MEJORA CONTINUA · mejoraok.com</div>
+  </footer>
+
+  <script>
+    const HISTORIAL_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/log/historial.json";
+    const MANAGE_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/manage-story.yml";
+
+    // Zernio no soporta despublicar Instagram (ni TikTok ni Snapchat) — solo
+    // ofrecemos el botón de despublicar para plataformas que la API soporta.
+    const UNPUBLISH_SOPORTADO = ["facebook"];
+
+    const NOMBRES_PLATAFORMA = { instagram: "Instagram", facebook: "Facebook" };
+
+    function badgeFor(status) {
+      if (status === "published") return { clase: "ok", icono: "✓" };
+      if (status === "failed") return { clase: "fail", icono: "✗" };
+      return { clase: "pendiente", icono: "…" };
+    }
+
+    function escapeHtml(str = "") {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function renderPost(post) {
+      const tieneFallo = post.platforms.some((p) => p.status === "failed");
+
+      const filasPlataforma = post.platforms
+        .map((p) => {
+          const { clase, icono } = badgeFor(p.status);
+          const nombre = NOMBRES_PLATAFORMA[p.platform] || p.platform;
+          const contenido = p.url
+            ? `<a href="${p.url}" target="_blank" rel="noopener">${nombre}</a>`
+            : nombre;
+          return `<div class="plataforma"><span class="badge ${clase}">${icono}</span> ${contenido} <span style="color:var(--gris)">(${p.status})</span></div>`;
+        })
+        .join("");
+
+      const accionesHtml = tieneFallo
+        ? `<div class="acciones">
+            <div class="post-id-row">
+              <code title="${post.id}">${post.id}</code>
+              <button class="copiar" onclick="copiarId(this, '${post.id}')">Copiar ID</button>
+            </div>
+            <a class="run-workflow" href="${MANAGE_WORKFLOW_URL}" target="_blank" rel="noopener">Ir a Actions → Run workflow</a>
+            <div class="instrucciones">
+              Con el Post ID copiado: abrí el link de arriba, "Run workflow", pegá el
+              Post ID, elegí la plataforma fallida y la acción (reintentar la crea de
+              nuevo con la misma imagen; despublicar solo funciona en
+              ${UNPUBLISH_SOPORTADO.join(", ")} — Zernio no soporta despublicar Instagram).
+            </div>
+          </div>`
+        : "";
+
+      // headline/oferta solo existen para posts publicados después de que
+      // render-story.mjs empezó a guardarlos en content/log/local-briefs.json
+      // (ver commit correspondiente) — para los anteriores no hay forma de
+      // recuperarlos retroactivamente, así que se omiten en vez de mostrar
+      // un dato falso.
+      const ofertaHtml = post.oferta ? `<div class="card-oferta">${escapeHtml(post.oferta)}</div>` : "";
+      const headlineHtml = post.headline
+        ? `<div class="card-headline">${escapeHtml(post.headline)}</div>`
+        : "";
+
+      return `
+        <div class="card">
+          ${post.imageUrl ? `<img src="${post.imageUrl}" alt="Story del ${post.date}" loading="lazy" />` : ""}
+          <div class="card-body">
+            <div class="card-fecha">${post.date}</div>
+            ${ofertaHtml}
+            ${headlineHtml}
+            <div class="card-copy">${escapeHtml(post.content).slice(0, 180)}</div>
+            <div class="plataformas">${filasPlataforma}</div>
+            ${accionesHtml}
+          </div>
+        </div>`;
+    }
+
+    function copiarId(btn, id) {
+      navigator.clipboard.writeText(id).then(() => {
+        const original = btn.textContent;
+        btn.textContent = "Copiado ✓";
+        btn.classList.add("copiado");
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.classList.remove("copiado");
+        }, 1500);
+      });
+    }
+
+    async function cargar() {
+      const estado = document.getElementById("estado");
+      const grid = document.getElementById("grid");
+      try {
+        const res = await fetch(HISTORIAL_URL, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const posts = data.posts || [];
+
+        if (posts.length === 0) {
+          estado.textContent = "Todavía no hay historial sincronizado.";
+          return;
+        }
+
+        estado.textContent = `${posts.length} story(s) — última sincronización: ${new Date(data.syncedAt).toLocaleString("es-AR")}`;
+        grid.innerHTML = posts.map(renderPost).join("");
+      } catch (e) {
+        estado.textContent = `No se pudo cargar el historial (${e.message}). Puede que todavía no haya corrido la primera sincronización.`;
+      }
+    }
+
+    cargar();
+  </script>
+</body>
+</html>

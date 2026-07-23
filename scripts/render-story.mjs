@@ -6,12 +6,15 @@
 // Salida: content/published/story-YYYY-MM-DD-N.jpg + content/work/renders.json
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
 
 const ROOT = process.cwd();
 const WORK_DIR = path.join(ROOT, "content/work");
 const PUBLISHED_DIR = path.join(ROOT, "content/published");
+const LOG_DIR = path.join(ROOT, "content/log");
+const LOCAL_BRIEFS_PATH = path.join(LOG_DIR, "local-briefs.json");
 const TEMPLATE_PATH = path.join(ROOT, "templates/story-template.html");
 
 const EXT_TO_MIME = {
@@ -69,12 +72,31 @@ async function main() {
       outputPath: path.relative(ROOT, outputPath),
       caption_feed: brief.caption_feed || "",
       headline: brief.headline,
+      oferta: brief.oferta || null,
     });
     console.log("Story renderizada:", outputPath);
   }
 
   await browser.close();
   await writeFile(path.join(WORK_DIR, "renders.json"), JSON.stringify(outputs, null, 2));
+
+  // renders.json se pisa cada día — este log en cambio es permanente, para
+  // que sync-history.mjs pueda mostrar el headline/oferta real de cada story
+  // (Zernio nunca los recibe, solo ve el caption_feed).
+  await mkdir(LOG_DIR, { recursive: true });
+  let localBriefs = existsSync(LOCAL_BRIEFS_PATH)
+    ? JSON.parse(await readFile(LOCAL_BRIEFS_PATH, "utf8"))
+    : [];
+  const nuevosPaths = new Set(outputs.map((o) => o.outputPath));
+  localBriefs = localBriefs.filter((e) => !nuevosPaths.has(e.outputPath));
+  localBriefs.push(
+    ...outputs.map((o) => ({
+      outputPath: o.outputPath,
+      headline: o.headline,
+      oferta: o.oferta,
+    }))
+  );
+  await writeFile(LOCAL_BRIEFS_PATH, JSON.stringify(localBriefs, null, 2));
 }
 
 main().catch((e) => {

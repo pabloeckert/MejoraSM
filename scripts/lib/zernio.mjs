@@ -27,6 +27,66 @@ async function fetchPostPlatforms(postId, apiKey) {
   return data.post?.platforms || null;
 }
 
+// Crea un post (POST /v1/posts) y reconsulta hasta POLL_ATTEMPTS veces antes
+// de dar por perdida una plataforma que todavía no terminó de procesar.
+// Compartido por publishStory() (todas las plataformas configuradas) y por
+// el reintento manual de una sola plataforma (scripts/manage-story.mjs).
+export async function createPostAndPoll({ apiKey, content, imageUrl, platforms }) {
+  try {
+    const res = await fetch(ZERNIO_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        content,
+        mediaItems: [{ type: "image", url: imageUrl }],
+        platforms,
+        publishNow: true,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      // 409 = Zernio detectó contenido duplicado dentro de las últimas 24hs
+      // y no creó un post nuevo — viene con existingPostId, útil para no
+      // confundirlo con un fallo genérico.
+      return {
+        success: false,
+        error: JSON.stringify(data).slice(0, 300),
+        existingPostId: data.existingPostId,
+      };
+    }
+
+    // data.post.platforms trae el resultado por plataforma (instagram/facebook
+    // pueden fallar independientemente aunque la llamada general sea 200 OK)
+    let perPlatform = data.post?.platforms || [];
+    const postId = data.post?._id;
+
+    for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
+      const pending = perPlatform.filter(
+        (p) => p.status !== "published" && p.status !== "failed"
+      );
+      if (pending.length === 0) break;
+      await sleep(POLL_DELAY_MS);
+      const refreshed = postId ? await fetchPostPlatforms(postId, apiKey) : null;
+      if (refreshed) perPlatform = refreshed;
+    }
+
+    const failed = perPlatform.filter((p) => p.status !== "published");
+
+    return {
+      success: failed.length === 0,
+      postId,
+      platforms: perPlatform,
+      error: failed.length > 0 ? JSON.stringify(failed).slice(0, 300) : undefined,
+    };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
 export async function publishStory(imageUrl, caption = "") {
   const apiKey = process.env.ZERNIO_API_KEY;
   const igAccountId = process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID;
@@ -59,51 +119,42 @@ export async function publishStory(imageUrl, caption = "") {
     };
   }
 
+  // El caption no se ve en Stories (ni en IG ni en FB) — se manda igual
+  // porque no molesta y queda como referencia en el dashboard de Zernio.
+  return createPostAndPoll({ apiKey, content: caption, imageUrl, platforms });
+}
+
+// Plataformas que Zernio permite despublicar vía API (docs.zernio.com,
+// endpoint POST /v1/posts/{id}/unpublish). Instagram, TikTok y Snapchat NO
+// están soportados — hay que verificarlo ahí antes de llamar, no asumir.
+export const UNPUBLISH_SOPORTADO = [
+  "threads", "facebook", "twitter", "linkedin", "youtube",
+  "pinterest", "reddit", "bluesky", "googlebusiness", "telegram",
+];
+
+export async function unpublishPost(postId, platform, apiKey) {
+  if (!UNPUBLISH_SOPORTADO.includes(platform)) {
+    return {
+      success: false,
+      error: `Zernio no soporta despublicar "${platform}" vía API (solo: ${UNPUBLISH_SOPORTADO.join(", ")}). Instagram/TikTok/Snapchat requieren borrado manual.`,
+    };
+  }
+
   try {
-    const res = await fetch(ZERNIO_API_URL, {
+    const res = await fetch(`${ZERNIO_API_URL}/${postId}/unpublish`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      // El caption no se ve en Stories (ni en IG ni en FB) — se manda igual
-      // porque no molesta y queda como referencia en el dashboard de Zernio.
-      body: JSON.stringify({
-        content: caption,
-        mediaItems: [{ type: "image", url: imageUrl }],
-        platforms,
-        publishNow: true,
-      }),
+      body: JSON.stringify({ platform }),
     });
 
     const data = await res.json();
     if (!res.ok) {
       return { success: false, error: JSON.stringify(data).slice(0, 300) };
     }
-
-    // data.post.platforms trae el resultado por plataforma (instagram/facebook
-    // pueden fallar independientemente aunque la llamada general sea 200 OK)
-    let perPlatform = data.post?.platforms || [];
-    const postId = data.post?._id;
-
-    for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
-      const pending = perPlatform.filter(
-        (p) => p.status !== "published" && p.status !== "failed"
-      );
-      if (pending.length === 0) break;
-      await sleep(POLL_DELAY_MS);
-      const refreshed = postId ? await fetchPostPlatforms(postId, apiKey) : null;
-      if (refreshed) perPlatform = refreshed;
-    }
-
-    const failed = perPlatform.filter((p) => p.status !== "published");
-
-    return {
-      success: failed.length === 0,
-      postId,
-      platforms: perPlatform,
-      error: failed.length > 0 ? JSON.stringify(failed).slice(0, 300) : undefined,
-    };
+    return { success: true, message: data.message };
   } catch (e) {
     return { success: false, error: e.message };
   }
