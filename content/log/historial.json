@@ -1,0 +1,131 @@
+{
+  "syncedAt": "2026-07-23T22:15:36.198Z",
+  "posts": [
+    {
+      "id": "6a622dab4944a96171293606",
+      "date": "2026-07-23",
+      "status": "published",
+      "content": "El feedback tarde no corrige nada, solo confirma lo que ya se instaló. Si algo se puede hablar hoy, no lo dejes para la próxima reunión.",
+      "headline": "El feedback que no se da, se paga después",
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-23-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3947671378350384125"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
+    {
+      "id": "6a60db5dfb409a9932143e09",
+      "date": "2026-07-22",
+      "status": "published",
+      "content": "Las reuniones no fallan por falta de tiempo, fallan por falta de objetivo claro. Definí qué se decide antes de convocar a nadie.",
+      "headline": "Reunión sin objetivo es una hora perdida entre varios",
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-22-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3946944943142514805"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
+    {
+      "id": "6a5fdb0bd81c06d1267e0440",
+      "date": "2026-07-21",
+      "status": "published",
+      "content": "Antes de mandar el invite, escribí una línea: ¿qué se define en esta reunión? Si no podés contestarla, no la agendes todavía.",
+      "headline": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-21-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3946394391644284061"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
+    {
+      "id": "6a5fd7615a5affec88f36429",
+      "date": "2026-07-21",
+      "status": "published",
+      "content": "Llenar la agenda es fácil. Que cada cosa que hay ahí sirva para algo, ya es otra historia. Si sentís que el día se te va en reuniones sin rumbo, hablemos.",
+      "headline": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-21-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3946386533900976463"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
+    {
+      "id": "6a5b8b64047540bd22d4cfb0",
+      "date": "2026-07-18",
+      "status": "published",
+      "content": "La agenda no se ordena sola, y apagar incendios todo el día no es lo mismo que avanzar. Si sentís que corrés pero no llegás, hablemos de qué te está faltando definir.",
+      "headline": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-18-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3944024327288815993"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
+    {
+      "id": "6a5b84e356ff5c89757ab6dd",
+      "date": "2026-07-18",
+      "status": "published",
+      "content": "Ocupado y avanzando no son lo mismo. La agenda llena no ordena las prioridades, las tapa. Si sentís que corrés todo el día y el negocio sigue en el mismo lugar, hablemos de qué te está faltando ver.",
+      "headline": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-18-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3944010350475449166"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    }
+  ]
+}
