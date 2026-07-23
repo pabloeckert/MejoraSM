@@ -12,13 +12,13 @@
 // Env: ZERNIO_API_KEY, ZERNIO_INSTAGRAM_ACCOUNT_ID, ZERNIO_FACEBOOK_ACCOUNT_ID, RAW_BASE_URL
 // Salida: content/log/historial.json
 
-import { writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
 const ROOT = process.cwd();
-const PUBLISHED_DIR = path.join(ROOT, "content/published");
 const LOG_DIR = path.join(ROOT, "content/log");
+const LOCAL_BRIEFS_PATH = path.join(LOG_DIR, "local-briefs.json");
 const ZERNIO_API_URL = "https://zernio.com/api/v1/posts";
 const PAGE_LIMIT = 100;
 
@@ -58,10 +58,20 @@ function platformEntry(p, post) {
   };
 }
 
-function findLocalImage(date) {
-  const filename = `story-${date}-1.jpg`;
-  if (!existsSync(path.join(PUBLISHED_DIR, filename))) return null;
-  return `${RAW_BASE_URL}/content/published/${filename}`;
+function localImageFor(date) {
+  const relPath = `content/published/story-${date}-1.jpg`;
+  if (!existsSync(path.join(ROOT, relPath))) return { imageUrl: null, outputPath: null };
+  return { imageUrl: `${RAW_BASE_URL}/${relPath}`, outputPath: relPath };
+}
+
+// Zernio nunca recibe el headline ni la oferta (son solo para el prompt de
+// Claude) — vienen de content/log/local-briefs.json, que render-story.mjs
+// mantiene de forma permanente (a diferencia de renders.json, que se pisa
+// cada día). Posts de antes de que existiera ese log quedan sin estos datos.
+async function loadLocalBriefs() {
+  if (!existsSync(LOCAL_BRIEFS_PATH)) return new Map();
+  const entries = JSON.parse(await readFile(LOCAL_BRIEFS_PATH, "utf8"));
+  return new Map(entries.map((e) => [e.outputPath, e]));
 }
 
 async function main() {
@@ -87,14 +97,20 @@ async function main() {
     for (const post of posts) byId.set(post._id, post);
   }
 
+  const localBriefs = await loadLocalBriefs();
+
   const entries = [...byId.values()].map((post) => {
     const date = (post.scheduledFor || post.createdAt || "").slice(0, 10);
+    const { imageUrl, outputPath } = localImageFor(date);
+    const brief = outputPath ? localBriefs.get(outputPath) : undefined;
     return {
       id: post._id,
       date,
       status: post.status,
       content: post.content || "",
-      imageUrl: findLocalImage(date),
+      headline: brief?.headline || null,
+      oferta: brief?.oferta || null,
+      imageUrl,
       platforms: (post.platforms || []).map((p) => platformEntry(p, post)),
     };
   });
