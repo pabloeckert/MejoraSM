@@ -72,6 +72,7 @@ async function main() {
       outputPath: path.relative(ROOT, outputPath),
       caption_feed: brief.caption_feed || "",
       headline: brief.headline,
+      kicker: brief.kicker || null,
       oferta: brief.oferta || null,
     });
     console.log("Story renderizada:", outputPath);
@@ -93,6 +94,7 @@ async function main() {
     ...outputs.map((o) => ({
       outputPath: o.outputPath,
       headline: o.headline,
+      kicker: o.kicker,
       oferta: o.oferta,
     }))
   );

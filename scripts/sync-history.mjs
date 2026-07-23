@@ -109,6 +109,7 @@ async function main() {
       status: post.status,
       content: post.content || "",
       headline: brief?.headline || null,
+      kicker: brief?.kicker || null,
       oferta: brief?.oferta || null,
       imageUrl,
       platforms: (post.platforms || []).map((p) => platformEntry(p, post)),
