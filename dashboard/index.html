@@ -219,6 +219,34 @@
     line-height: 1.4;
   }
 
+  .aviso-ig {
+    margin-top: 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #FFFBEA;
+    border: 1px solid var(--amarillo);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .aviso-ig-texto {
+    font-size: 12px;
+    color: var(--tinta);
+    line-height: 1.4;
+  }
+  .aviso-ig-texto a { color: var(--azul); }
+
+  .aviso-ig.gestionado {
+    background: #F0FBF4;
+    border-color: var(--verde);
+  }
+
+  .aviso-ig.gestionado .aviso-ig-texto {
+    color: var(--verde);
+    font-weight: 600;
+  }
+
   footer {
     margin-top: 48px;
     max-width: 640px;
@@ -253,11 +281,9 @@
 
   <script>
     const HISTORIAL_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/log/historial.json";
+    const ACCIONES_MANUALES_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/log/acciones-manuales.json";
     const MANAGE_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/manage-story.yml";
-
-    // Zernio no soporta despublicar Instagram (ni TikTok ni Snapchat) — solo
-    // ofrecemos el botón de despublicar para plataformas que la API soporta.
-    const UNPUBLISH_SOPORTADO = ["facebook"];
+    const MARK_MANUAL_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/mark-manual.yml";
 
     const NOMBRES_PLATAFORMA = { instagram: "Instagram", facebook: "Facebook" };
 
@@ -275,9 +301,51 @@
         .replace(/"/g, "&quot;");
     }
 
-    function renderPost(post) {
-      const tieneFallo = post.platforms.some((p) => p.status === "failed");
+    // Instagram no soporta despublicar por API (limitación de Meta, no
+    // nuestra) — a diferencia de Facebook, no ofrecemos "Run workflow →
+    // despublicar" para Instagram, avisamos claro y dejamos un registro de
+    // que se gestionó a mano.
+    function avisoInstagramFallido(post, p, accionesManuales) {
+      const marca = accionesManuales.get(`${post.id}:instagram`);
+      if (marca) {
+        return `<div class="aviso-ig gestionado">
+            <div class="aviso-ig-texto">✓ Gestionado a mano el ${marca.marcadoManualEn}</div>
+          </div>`;
+      }
 
+      const linkStory = p.url
+        ? ` <a href="${p.url}" target="_blank" rel="noopener">Ver la story</a>`
+        : "";
+
+      return `<div class="aviso-ig">
+          <div class="aviso-ig-texto">
+            Instagram no se puede despublicar por API — Meta no lo permite.
+            Borralo manual desde la app.${linkStory}
+          </div>
+          <div class="post-id-row">
+            <code title="${post.id}">${post.id}</code>
+            <button class="copiar" onclick="copiarId(this, '${post.id}')">Copiar ID</button>
+          </div>
+          <a class="run-workflow" href="${MARK_MANUAL_WORKFLOW_URL}" target="_blank" rel="noopener">Ya lo borré a mano →</a>
+        </div>`;
+    }
+
+    function accionesFacebookFallido(post) {
+      return `<div class="acciones">
+          <div class="post-id-row">
+            <code title="${post.id}">${post.id}</code>
+            <button class="copiar" onclick="copiarId(this, '${post.id}')">Copiar ID</button>
+          </div>
+          <a class="run-workflow" href="${MANAGE_WORKFLOW_URL}" target="_blank" rel="noopener">Ir a Actions → Run workflow</a>
+          <div class="instrucciones">
+            Con el Post ID copiado: abrí el link de arriba, "Run workflow", pegá el
+            Post ID, elegí "facebook" y la acción (reintentar la crea de nuevo
+            con la misma imagen; despublicar la baja de verdad).
+          </div>
+        </div>`;
+    }
+
+    function renderPost(post, accionesManuales) {
       const filasPlataforma = post.platforms
         .map((p) => {
           const { clase, icono } = badgeFor(p.status);
@@ -289,21 +357,14 @@
         })
         .join("");
 
-      const accionesHtml = tieneFallo
-        ? `<div class="acciones">
-            <div class="post-id-row">
-              <code title="${post.id}">${post.id}</code>
-              <button class="copiar" onclick="copiarId(this, '${post.id}')">Copiar ID</button>
-            </div>
-            <a class="run-workflow" href="${MANAGE_WORKFLOW_URL}" target="_blank" rel="noopener">Ir a Actions → Run workflow</a>
-            <div class="instrucciones">
-              Con el Post ID copiado: abrí el link de arriba, "Run workflow", pegá el
-              Post ID, elegí la plataforma fallida y la acción (reintentar la crea de
-              nuevo con la misma imagen; despublicar solo funciona en
-              ${UNPUBLISH_SOPORTADO.join(", ")} — Zernio no soporta despublicar Instagram).
-            </div>
-          </div>`
-        : "";
+      const accionesHtml = post.platforms
+        .filter((p) => p.status === "failed")
+        .map((p) =>
+          p.platform === "instagram"
+            ? avisoInstagramFallido(post, p, accionesManuales)
+            : accionesFacebookFallido(post)
+        )
+        .join("");
 
       // headline/oferta solo existen para posts publicados después de que
       // render-story.mjs empezó a guardarlos en content/log/local-briefs.json
@@ -341,11 +402,27 @@
       });
     }
 
+    // content/log/acciones-manuales.json puede no existir todavía (nadie
+    // marcó nada a mano) — un 404 acá es normal, no un error para mostrar.
+    async function cargarAccionesManuales() {
+      try {
+        const res = await fetch(ACCIONES_MANUALES_URL, { cache: "no-store" });
+        if (!res.ok) return new Map();
+        const data = await res.json();
+        return new Map((data || []).map((a) => [`${a.postId}:${a.platform}`, a]));
+      } catch {
+        return new Map();
+      }
+    }
+
     async function cargar() {
       const estado = document.getElementById("estado");
       const grid = document.getElementById("grid");
       try {
-        const res = await fetch(HISTORIAL_URL, { cache: "no-store" });
+        const [res, accionesManuales] = await Promise.all([
+          fetch(HISTORIAL_URL, { cache: "no-store" }),
+          cargarAccionesManuales(),
+        ]);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const posts = data.posts || [];
@@ -356,7 +433,7 @@
         }
 
         estado.textContent = `${posts.length} story(s) — última sincronización: ${new Date(data.syncedAt).toLocaleString("es-AR")}`;
-        grid.innerHTML = posts.map(renderPost).join("");
+        grid.innerHTML = posts.map((post) => renderPost(post, accionesManuales)).join("");
       } catch (e) {
         estado.textContent = `No se pudo cargar el historial (${e.message}). Puede que todavía no haya corrido la primera sincronización.`;
       }
