@@ -1,8 +1,8 @@
 # Acciones manuales sobre un post ya publicado en Zernio (Instagram/Facebook).
 # NUNCA genera contenido nuevo ni llama a Claude — "reintentar" reusa la misma
 # imagen y caption que ya están en content/log/historial.json, solo para la
-# plataforma elegida. Es la primera vez que un Action de este repo puede tocar
-# contenido ya publicado en redes reales: correr con cuidado y a mano.
+# plataforma elegida. Requiere escribir "confirmacion: CONFIRMO" al disparar
+# el workflow — cualquier otro valor corta antes de tocar nada.
 name: Manage Story
 
 on:
@@ -26,6 +26,10 @@ on:
         options:
           - reintentar
           - despublicar
+      confirmacion:
+        description: 'Escribí exactamente CONFIRMO para ejecutar (cualquier otro valor corta sin hacer nada)'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -36,6 +40,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Verificar confirmación
+        env:
+          CONFIRMACION: ${{ inputs.confirmacion }}
+        run: |
+          if [ "$CONFIRMACION" != "CONFIRMO" ]; then
+            echo "::error::Confirmación inválida (se esperaba exactamente CONFIRMO) — corto sin hacer nada."
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v4
 
