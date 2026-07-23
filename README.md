@@ -33,7 +33,7 @@ npm test          # Vitest
 Antes de asumir un destino de deploy, confirmar con Pablo cuál es el plan (¿Vercel? ¿otro hosting?) — no reintroducir Hostinger/FTP como si fuera el estado vigente.
 
 ### 2. Sistema de story diaria autónoma
-`scripts/` (Node/ESM) + `templates/` + `content/` + `docs/identidad-de-marca/`. Corre por GitHub Actions (`.github/workflows/daily-story.yml`, cron diario + `workflow_dispatch` manual).
+`scripts/` (Node/ESM) + `templates/` + `content/`. Corre por GitHub Actions (`.github/workflows/daily-story.yml`, cron diario + `workflow_dispatch` manual).
 
 ```
 content/inbox/<oferta>/*.jpg  → scripts/generate-brief.mjs (Claude, vía scripts/lib/claude.mjs)
@@ -44,7 +44,7 @@ content/inbox/<oferta>/*.jpg  → scripts/generate-brief.mjs (Claude, vía scrip
 ```
 
 - 5 dimensiones de marca: `personal`, `organizacional`, `comercial`, `empresarial`, `profesionalizacion` (subcarpetas de `content/inbox/` y `content/used/`).
-- El copy se orienta según `docs/identidad-de-marca/` (criterio medular, tono y voz).
+- El copy se orienta según la identidad de marca, traída en vivo en cada corrida desde el repo [MejoraIdentidad](https://github.com/pabloeckert/MejoraIdentidad) (`SKILL.md`) — sin copia local en este repo.
 - Videos en `inbox/` se detectan pero todavía no se procesan (se avisan en el log, no se pierden).
 - `content/published/` guarda las imágenes ya renderizadas y publicadas — el workflow las commitea para que sean accesibles vía `raw.githubusercontent.com`, consumido por la Graph API de Meta a través de Zernio.
 - Secrets en GitHub Actions (no en `.env` local): `ANTHROPIC_API_KEY`, `ZERNIO_API_KEY`, `ZERNIO_FACEBOOK_ACCOUNT_ID`, `ZERNIO_INSTAGRAM_ACCOUNT_ID`.

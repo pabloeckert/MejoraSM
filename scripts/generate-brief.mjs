@@ -9,8 +9,8 @@
 // imágenes fijas) — quedan avisados en el log, no se pierden ni se ignoran
 // en silencio. Soporte de video es un módulo aparte, todavía no construido.
 //
-// La identidad de marca (criterio medular + tono y voz) se lee en cada
-// corrida desde docs/identidad-de-marca/*.md — no está hardcodeada acá.
+// La identidad de marca (criterio medular + tono y voz) se inyecta
+// dinámicamente desde el repo MejoraIdentidad.
 //
 // Uso: node scripts/generate-brief.mjs
 // Env: ANTHROPIC_API_KEY
@@ -26,7 +26,7 @@ const INBOX_DIR = path.join(ROOT, "content/inbox");
 const USED_DIR = path.join(ROOT, "content/used");
 const WORK_DIR = path.join(ROOT, "content/work");
 const PUBLISHED_DIR = path.join(ROOT, "content/published");
-const IDENTIDAD_DIR = path.join(ROOT, "docs/identidad-de-marca");
+const IDENTIDAD_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraIdentidad/main/SKILL.md";
 const MAX_STORIES = 2;
 
 const EXT_TO_MIME = {
@@ -73,17 +73,24 @@ const OFERTAS = {
   },
 };
 
-// Lee docs/identidad-de-marca/*.md (criterio medular + tono y voz) y los
-// concatena. Zero-touch: si el Manual de Marca cambia, se edita el .md
-// correspondiente, no este script.
+// Trae la identidad de marca DIRECTO del repo MejoraIdentidad en cada corrida
+// — no hay copia local que desincronizar. Si mañana se agrega una sección al
+// SKILL.md de ese repo (o se corrige algo), la próxima story ya sale así,
+// sin tocar MejoraSM para nada.
 async function loadIdentidadDeMarca() {
-  const files = (await readdir(IDENTIDAD_DIR))
-    .filter((f) => f.endsWith(".md"))
-    .sort();
-  const contents = await Promise.all(
-    files.map((f) => readFile(path.join(IDENTIDAD_DIR, f), "utf-8"))
-  );
-  return contents.join("\n\n").trim();
+  try {
+    const res = await fetch(IDENTIDAD_URL);
+    if (!res.ok) {
+      console.warn(`Aviso: MejoraIdentidad respondió ${res.status} — sigo sin contexto de marca fresco.`);
+      return "";
+    }
+    const text = (await res.text()).trim();
+    console.log(`Identidad de marca cargada (${text.length} caracteres).`);
+    return text;
+  } catch (e) {
+    console.warn(`Aviso: no pude leer MejoraIdentidad (${e.message}) — sigo sin contexto de marca fresco.`);
+    return "";
+  }
 }
 
 function buildSystemPrompt(identidadDeMarca) {
