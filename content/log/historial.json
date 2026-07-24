@@ -1,5 +1,5 @@
 {
-  "syncedAt": "2026-07-23T22:15:36.198Z",
+  "syncedAt": "2026-07-24T01:46:40.296Z",
   "posts": [
     {
       "id": "6a622dab4944a96171293606",
@@ -7,6 +7,7 @@
       "status": "published",
       "content": "El feedback tarde no corrige nada, solo confirma lo que ya se instaló. Si algo se puede hablar hoy, no lo dejes para la próxima reunión.",
       "headline": "El feedback que no se da, se paga después",
+      "kicker": null,
       "oferta": null,
       "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-23-1.jpg",
       "platforms": [
@@ -28,6 +29,7 @@
       "status": "published",
       "content": "Las reuniones no fallan por falta de tiempo, fallan por falta de objetivo claro. Definí qué se decide antes de convocar a nadie.",
       "headline": "Reunión sin objetivo es una hora perdida entre varios",
+      "kicker": null,
       "oferta": null,
       "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-22-1.jpg",
       "platforms": [
@@ -49,6 +51,7 @@
       "status": "published",
       "content": "Antes de mandar el invite, escribí una línea: ¿qué se define en esta reunión? Si no podés contestarla, no la agendes todavía.",
       "headline": null,
+      "kicker": null,
       "oferta": null,
       "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-21-1.jpg",
       "platforms": [
@@ -70,6 +73,7 @@
       "status": "published",
       "content": "Llenar la agenda es fácil. Que cada cosa que hay ahí sirva para algo, ya es otra historia. Si sentís que el día se te va en reuniones sin rumbo, hablemos.",
       "headline": null,
+      "kicker": null,
       "oferta": null,
       "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-21-1.jpg",
       "platforms": [
@@ -91,6 +95,7 @@
       "status": "published",
       "content": "La agenda no se ordena sola, y apagar incendios todo el día no es lo mismo que avanzar. Si sentís que corrés pero no llegás, hablemos de qué te está faltando definir.",
       "headline": null,
+      "kicker": null,
       "oferta": null,
       "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-18-1.jpg",
       "platforms": [
@@ -112,6 +117,7 @@
       "status": "published",
       "content": "Ocupado y avanzando no son lo mismo. La agenda llena no ordena las prioridades, las tapa. Si sentís que corrés todo el día y el negocio sigue en el mismo lugar, hablemos de qué te está faltando ver.",
       "headline": null,
+      "kicker": null,
       "oferta": null,
       "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-18-1.jpg",
       "platforms": [
