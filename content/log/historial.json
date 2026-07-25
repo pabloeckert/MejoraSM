@@ -1,6 +1,28 @@
 {
-  "syncedAt": "2026-07-25T13:00:50.833Z",
+  "syncedAt": "2026-07-25T18:52:26.095Z",
   "posts": [
+    {
+      "id": "6a64c812e2711faae252b6b7",
+      "date": "2026-07-25",
+      "status": "published",
+      "content": "La semana no se ordena sola: se ordena decidiendo qué queda afuera. Si tu agenda te está manejando a vos, hablemos en una Sesión de Claridad.",
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-25-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3949102429727684811"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a622dab4944a96171293606",
       "date": "2026-07-23",
