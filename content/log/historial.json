@@ -1,6 +1,28 @@
 {
-  "syncedAt": "2026-07-26T12:57:28.281Z",
+  "syncedAt": "2026-07-26T18:56:38.898Z",
   "posts": [
+    {
+      "id": "6a661956e035f18c739f9427",
+      "date": "2026-07-26",
+      "status": "published",
+      "content": "El feedback que más cuesta escuchar es el que menos dice qué hacer con eso. Nombrá el hecho, no juzgues a quien tenés enfrente — la diferencia se nota en el resultado. ¿Cómo das feedback vos? Contanos en los comentarios.",
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-26-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3949826700657605380"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a64c812e2711faae252b6b7",
       "date": "2026-07-25",
