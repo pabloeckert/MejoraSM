@@ -1,17 +1,17 @@
-# Publica hub/ (la página para subir material) a GitHub Pages.
-# Aislado del resto: no toca webapp/, no toca Vercel, no toca nada de la app EDA.
+# Publica biblioteca/ (Biblioteca de Contenido) a GitHub Pages, en el subpath
+# /biblioteca/.
 #
 # GitHub Pages en modo "workflow" sirve UN solo artifact por sitio — por eso
 # este workflow arma un _site/ que combina hub/ (raíz) + dashboard/ (subpath) +
-# biblioteca/ (subpath), igual que deploy-dashboard.yml y deploy-biblioteca.yml.
-# Si cualquiera solo subiera su propia carpeta, se pisarían entre sí en cada
-# corrida.
-name: Deploy Hub
+# biblioteca/ (subpath), igual que deploy-hub.yml y deploy-dashboard.yml. Si
+# cualquiera solo subiera su propia carpeta, se pisarían entre sí en cada
+# corrida — así conviven en el mismo sitio sin que uno borre al otro.
+name: Deploy Biblioteca
 
 on:
   push:
     branches: [main]
-    paths: ["hub/**"]
+    paths: ["biblioteca/**"]
   workflow_dispatch: {}
 
 permissions:
@@ -39,15 +39,15 @@ jobs:
       - name: Armar sitio combinado (hub/ + dashboard/ + biblioteca/)
         run: |
           mkdir -p _site
-          cp -r hub/. _site/
+          if [ -d hub ]; then
+            cp -r hub/. _site/
+          fi
           if [ -d dashboard ]; then
             mkdir -p _site/dashboard
             cp -r dashboard/. _site/dashboard/
           fi
-          if [ -d biblioteca ]; then
-            mkdir -p _site/biblioteca
-            cp -r biblioteca/. _site/biblioteca/
-          fi
+          mkdir -p _site/biblioteca
+          cp -r biblioteca/. _site/biblioteca/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

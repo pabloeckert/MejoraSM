@@ -1,10 +1,10 @@
 # Publica dashboard/ (monitor de stories, solo lectura) a GitHub Pages.
 #
 # GitHub Pages en modo "workflow" sirve UN solo artifact por sitio — por eso
-# este workflow arma un _site/ que combina hub/ (raíz) + dashboard/ (subpath),
-# igual que deploy-hub.yml. Si cualquiera de los dos solo subiera su propia
-# carpeta, se pisarían entre sí en cada corrida — así conviven en el mismo
-# sitio sin que uno borre al otro.
+# este workflow arma un _site/ que combina hub/ (raíz) + dashboard/ (subpath) +
+# biblioteca/ (subpath), igual que deploy-hub.yml y deploy-biblioteca.yml. Si
+# cualquiera solo subiera su propia carpeta, se pisarían entre sí en cada
+# corrida — así conviven en el mismo sitio sin que uno borre al otro.
 name: Deploy Dashboard
 
 on:
@@ -35,7 +35,7 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Armar sitio combinado (hub/ + dashboard/)
+      - name: Armar sitio combinado (hub/ + dashboard/ + biblioteca/)
         run: |
           mkdir -p _site
           if [ -d hub ]; then
@@ -43,6 +43,10 @@ jobs:
           fi
           mkdir -p _site/dashboard
           cp -r dashboard/. _site/dashboard/
+          if [ -d biblioteca ]; then
+            mkdir -p _site/biblioteca
+            cp -r biblioteca/. _site/biblioteca/
+          fi
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
