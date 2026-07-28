@@ -6,7 +6,16 @@
 
 set -e
 
-PROJECT_REF="exnjyxwmxknvzploeaex"
+# Antes tenía un PROJECT_REF hardcodeado ("exnjyxwmxknvzploeaex") que no
+# coincidía con supabase/config.toml ("hsglmdarztrshihmzfph") — riesgo real
+# de deployar al proyecto Supabase equivocado. Ahora se lee directo del
+# config.toml, que es la fuente de verdad del repo. Si en algún momento
+# el proyecto real difiere de config.toml, corregir ahí, no acá.
+PROJECT_REF="$(grep -E '^project_id' "$(dirname "$0")/../supabase/config.toml" | sed -E 's/project_id = "(.*)"/\1/')"
+if [ -z "$PROJECT_REF" ]; then
+  echo "❌ No se pudo leer project_id de supabase/config.toml"
+  exit 1
+fi
 
 echo "🚀 Deploy de Edge Functions — MejoraSM"
 echo "======================================="

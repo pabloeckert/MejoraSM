@@ -1,6 +1,8 @@
 // src/services/ai.ts
 // Cliente para las Edge Functions de Supabase
 
+import { supabase } from "@/integrations/supabase/client";
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
@@ -8,11 +10,19 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.warn("[ai.ts] Variables de entorno de Supabase no configuradas. Las funciones de IA no funcionarán.");
 }
 
-const headers = {
-  "Content-Type": "application/json",
-  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-  apikey: SUPABASE_ANON_KEY ?? "",
-};
+// Las Edge Functions ahora exigen el JWT del usuario autenticado (ver
+// supabase/functions/_shared/auth.ts) — el anon key solo, sin sesión, ya no
+// alcanza. `apikey` sigue siendo el anon key (lo exige el gateway de
+// Supabase); `Authorization` lleva el access_token real de la sesión.
+async function buildHeaders() {
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token ?? SUPABASE_ANON_KEY;
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+    apikey: SUPABASE_ANON_KEY ?? "",
+  };
+}
 
 // ═══════════════════════════════════════
 // ERROR HANDLING
@@ -65,7 +75,7 @@ export async function callAI(params: {
 }) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-gateway`, {
     method: "POST",
-    headers,
+    headers: await buildHeaders(),
     body: JSON.stringify(params),
   });
   return handleResponse(res, "Error al conectar con el proveedor de IA");
@@ -74,7 +84,7 @@ export async function callAI(params: {
 export async function generateEmbeddings(texts: string[]) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-gateway`, {
     method: "POST",
-    headers,
+    headers: await buildHeaders(),
     body: JSON.stringify({ action: "embed", texts }),
   });
   const data = await handleResponse<{ embeddings: number[][] }>(res, "Error generando embeddings");
@@ -103,7 +113,7 @@ export interface ContinueResult {
 export async function startDialogue(topic: string): Promise<DialogueResult> {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/orchestrator`, {
     method: "POST",
-    headers,
+    headers: await buildHeaders(),
     body: JSON.stringify({ action: "start", topic }),
   });
   return handleResponse(res, "Error iniciando el diálogo con los agentes");
@@ -112,7 +122,7 @@ export async function startDialogue(topic: string): Promise<DialogueResult> {
 export async function continueDialogue(sessionId: string, feedback: string): Promise<ContinueResult> {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/orchestrator`, {
     method: "POST",
-    headers,
+    headers: await buildHeaders(),
     body: JSON.stringify({ action: "continue", sessionId, feedback }),
   });
   return handleResponse(res, "Error continuando el diálogo");
@@ -132,7 +142,7 @@ export interface ProcessResult {
 export async function processDocument(documentId: string): Promise<ProcessResult> {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/vault-process`, {
     method: "POST",
-    headers,
+    headers: await buildHeaders(),
     body: JSON.stringify({ action: "process", documentId }),
   });
   return handleResponse(res, "Error procesando el documento");
@@ -141,7 +151,7 @@ export async function processDocument(documentId: string): Promise<ProcessResult
 export async function searchVault(query: string, limit = 5): Promise<{ results: string[] }> {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/vault-process`, {
     method: "POST",
-    headers,
+    headers: await buildHeaders(),
     body: JSON.stringify({ action: "search", query, limit }),
   });
   return handleResponse(res, "Error buscando en la bóveda");

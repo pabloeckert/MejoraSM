@@ -1,0 +1,38 @@
+# Aplica supabase/migrations/ a la base de datos real.
+# Trigger: solo manual (workflow_dispatch) — a diferencia de deploy-functions.yml,
+# una migración de schema es más riesgosa que redeployar código de función, así
+# que no se dispara sola en cada push a supabase/migrations/**. Usa los mismos
+# secrets que ya existen en el repo para deploy-functions.yml.
+name: Deploy Migrations
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    name: Aplicar migraciones a Supabase
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Supabase CLI
+        run: npm install -g supabase
+
+      - name: Login to Supabase
+        run: npx supabase login --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Link project
+        run: npx supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      - name: Aplicar migraciones (supabase db push)
+        run: npx supabase db push --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}

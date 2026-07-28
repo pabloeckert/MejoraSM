@@ -5,6 +5,7 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAuth, unauthorizedResponse } from "../_shared/auth.ts";
 
 const ALLOWED_ORIGINS = [
   "https://util.mejoraok.com",
@@ -201,6 +202,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  const auth = await requireAuth(req);
+  if (!auth.ok) return unauthorizedResponse(auth, corsHeaders);
 
   try {
     const body = await req.json().catch(() => ({}));
