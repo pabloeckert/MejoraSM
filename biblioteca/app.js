@@ -34,6 +34,7 @@ const ICONS = {
   chevronL: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>',
   chevronR: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>',
   help: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+  plug: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 2v6"></path><path d="M15 2v6"></path><path d="M6 8h12v3a6 6 0 01-12 0z"></path><path d="M12 17v5"></path></svg>',
 };
 
 const TUTORIAL_STEPS = [
@@ -70,6 +71,17 @@ const NAV_DEFS = [
 
 const SCREEN_TITLES = { library: "Línea de tiempo", calendar: "Calendario", quick: "Carga rápida", batch: "Sesión", compose: "Armar pieza", manual: "Manual" };
 
+// Las 5 dimensiones del Manual de Marca — mapean 1:1 a las carpetas de
+// content/inbox/<oferta>/ que consume el motor de story. Distinto de las
+// categorías editoriales (que son etiquetas libres).
+const DIMENSIONS = [
+  { key: "personal", label: "Personal" },
+  { key: "organizacional", label: "Organizacional" },
+  { key: "comercial", label: "Comercial" },
+  { key: "empresarial", label: "Empresarial" },
+  { key: "profesionalizacion", label: "Profesionalización" },
+];
+
 const MONTH_NAMES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const WEEKDAY_NAMES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -95,6 +107,7 @@ const state = {
   composePositions: {},
   tutorialActive: false, tutorialStep: 0, tutorialSeen: false,
   calYear: null, calMonth: null, calSelectedId: null, calDraftWhen: "",
+  ghModalOpen: false, ghTokenDraft: "", ghChecking: false, ghStatus: null, ghUser: null,
 };
 
 let _toastTimer = null;
@@ -369,6 +382,32 @@ function onRepositionEnd() {
   window.removeEventListener("mouseup", onRepositionEnd);
 }
 
+// ---------- Conexión con GitHub (Paso 3) ----------
+App.openGhModal = function () {
+  App.setState({ ghModalOpen: true, ghTokenDraft: "", ghStatus: null, ghUser: (typeof GH !== "undefined" && GH.isConnected()) ? "conectado" : null });
+};
+App.closeGhModal = function () { App.setState({ ghModalOpen: false, ghTokenDraft: "", ghStatus: null }); };
+App.updateGhTokenDraft = function (val) { state.ghTokenDraft = val; };
+App.saveGhToken = async function () {
+  const t = (state.ghTokenDraft || "").trim();
+  if (!t) { App.setState({ ghStatus: { ok: false, msg: "Pegá un token para conectar." } }); return; }
+  GH.setToken(t);
+  App.setState({ ghChecking: true, ghStatus: null });
+  const r = await GH.whoami();
+  if (r.ok) {
+    App.setState({ ghChecking: false, ghUser: r.login, ghStatus: { ok: true, msg: `Conectado como ${r.login}` + (r.canWrite ? "" : " — pero el token NO tiene permiso de escritura sobre el repo") } });
+    App.pushToast("GitHub conectado", `Sesión iniciada como ${r.login}.`, "success");
+  } else {
+    GH.setToken("");
+    App.setState({ ghChecking: false, ghUser: null, ghStatus: { ok: false, msg: r.error } });
+  }
+};
+App.disconnectGh = function () {
+  GH.setToken("");
+  App.setState({ ghUser: null, ghStatus: null, ghTokenDraft: "" });
+  App.pushToast("GitHub desconectado", "El token se borró de este navegador.", "info");
+};
+
 // ---------- Calendario ----------
 function calEnsureMonth() {
   if (state.calYear == null || state.calMonth == null) {
@@ -607,6 +646,12 @@ function buildCategoryList() {
     : `<button type="button" class="cat-add-btn" onclick="App.openAddCategory()">${ICONS.plus} Nueva categoría</button>`;
   return `<div class="cat-list">${rows}${addRow}</div>`;
 }
+function ghStatusButtonHTML() {
+  const connected = typeof GH !== "undefined" && GH.isConnected();
+  return `<button type="button" class="icon-btn gh-status ${connected ? "on" : ""}" title="${connected ? "GitHub conectado" : "Conectar con GitHub"}" aria-label="Conexión con GitHub" onclick="App.openGhModal()">
+    ${ICONS.plug}<span class="gh-dot ${connected ? "on" : ""}"></span>
+  </button>`;
+}
 function buildSidebar() {
   return `
     <div class="sidebar-brand">
@@ -614,7 +659,10 @@ function buildSidebar() {
         <img src="assets/lockup-horizontal-color.png" alt="Mejora Continua">
         <div class="brand-dots"><span class="d-red"></span><span class="d-yellow"></span></div>
       </div>
-      <button type="button" class="icon-btn" title="Ver tutorial" aria-label="Ver tutorial" onclick="App.startTutorial()">${ICONS.help}</button>
+      <div class="sidebar-brand-actions">
+        ${ghStatusButtonHTML()}
+        <button type="button" class="icon-btn" title="Ver tutorial" aria-label="Ver tutorial" onclick="App.startTutorial()">${ICONS.help}</button>
+      </div>
     </div>
     <div class="nav-list">${NAV_DEFS.map(navRowHTML).join("")}</div>
     <div class="side-section">
@@ -635,6 +683,7 @@ function buildMobileHeader() {
     <div class="mobile-header-brand"><img src="assets/isotipo-color.png" alt=""><div class="brand-dots"><span class="d-red"></span><span class="d-yellow"></span></div></div>
     <div class="mobile-header-title">${escapeHtml(SCREEN_TITLES[state.screen])}</div>
     <div style="display:flex;gap:4px;">
+      ${ghStatusButtonHTML()}
       <button type="button" class="icon-btn" title="Ver tutorial" aria-label="Ver tutorial" onclick="App.startTutorial()">${ICONS.help}</button>
       <button type="button" class="icon-btn" title="Buscar" onclick="App.focusMobileSearch()">${ICONS.search}</button>
     </div>
@@ -1106,6 +1155,37 @@ function calEntryModalHTML() {
     </div>
   </div>`;
 }
+function ghModalHTML() {
+  const connected = typeof GH !== "undefined" && GH.isConnected();
+  const patUrl = "https://github.com/settings/tokens?type=beta";
+  const status = state.ghStatus;
+  return `<div class="overlay" onclick="if(event.target===this)App.closeGhModal()">
+    <div class="overlay-panel gh-modal" onclick="event.stopPropagation()">
+      <div class="overlay-form" style="flex:1 1 100%;">
+        <div class="overlay-top">
+          <div class="overlay-title">Conectar con GitHub</div>
+          <button type="button" class="overlay-close" onclick="App.closeGhModal()">${ICONS.x}</button>
+        </div>
+        <div class="gh-intro">Para guardar fotos y datos <b>de verdad</b> en el repo, la Biblioteca usa un <b>token personal</b> tuyo de GitHub. El token queda <b>solo en este navegador</b> (nunca se sube ni se comparte).</div>
+        ${connected ? `<div class="gh-connected"><span class="gh-dot on"></span> Conectado${state.ghUser && state.ghUser !== "conectado" ? " como <b>" + escapeHtml(state.ghUser) + "</b>" : ""}.</div>` : ""}
+        <ol class="gh-steps">
+          <li>Abrí <a href="${patUrl}" target="_blank" rel="noopener">github.com/settings/tokens</a> → <b>Generate new token</b> (fine-grained).</li>
+          <li>En <b>Repository access</b> elegí <b>Only select repositories</b> → <b>${GH.owner}/${GH.repo}</b>.</li>
+          <li>En <b>Permissions → Repository → Contents</b> ponelo en <b>Read and write</b>.</li>
+          <li>Generá el token, copialo y pegalo acá abajo.</li>
+        </ol>
+        <label class="field-label"><span>Token (empieza con <code>github_pat_</code>)</span>
+          <input type="password" autocomplete="off" placeholder="github_pat_..." value="${escapeAttr(state.ghTokenDraft)}" oninput="App.updateGhTokenDraft(this.value)" onkeydown="if(event.key==='Enter')App.saveGhToken()">
+        </label>
+        ${status ? `<div class="gh-result ${status.ok ? "ok" : "err"}">${escapeHtml(status.msg)}</div>` : ""}
+        <div class="overlay-actions">
+          ${connected ? `<button type="button" class="btn btn-secondary btn-sm" onclick="App.disconnectGh()">Desconectar</button>` : ""}
+          <button type="button" class="btn btn-primary btn-sm" ${state.ghChecking ? "disabled" : ""} onclick="App.saveGhToken()">${state.ghChecking ? "Verificando…" : "Conectar"}</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
 function tutorialOverlayHTML() {
   const step = TUTORIAL_STEPS[state.tutorialStep];
   const dots = TUTORIAL_STEPS.map((_, i) => `<span class="${i === state.tutorialStep ? "active" : ""}"></span>`).join("");
@@ -1129,6 +1209,7 @@ function renderOverlay() {
   let html = "";
   if (state.previewId) html += previewOverlayHTML();
   if (state.calSelectedId) html += calEntryModalHTML();
+  if (state.ghModalOpen) html += ghModalHTML();
   if (state.tutorialActive) html += tutorialOverlayHTML();
   root.innerHTML = html;
 }
