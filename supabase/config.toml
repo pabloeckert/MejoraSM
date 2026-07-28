@@ -1,1 +1,6 @@
-project_id = "hsglmdarztrshihmzfph"
+# project_id verificado el 2026-07-28 extrayendo la URL real de Supabase
+# (https://exnjyxwmxknvzploeaex.supabase.co) del bundle ya deployado en
+# producción (https://pabloeckert.github.io/MejoraSM/app/), construido con
+# el secret real VITE_SUPABASE_URL de GitHub Actions. El valor anterior
+# ("hsglmdarztrshihmzfph") no correspondía al proyecto realmente en uso.
+project_id = "exnjyxwmxknvzploeaex"
