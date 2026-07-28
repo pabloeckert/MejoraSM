@@ -116,7 +116,25 @@ button, input, textarea { font-family: var(--font-body); }
 }
 .sidebar-brand { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
 .sidebar-brand-mark { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sidebar-brand-actions { display: flex; gap: 4px; flex: 0 0 auto; }
 .sidebar-brand img { height: 24px; width: auto; object-fit: contain; align-self: flex-start; max-width: 100%; }
+
+/* Botón de estado de conexión con GitHub */
+.gh-status { position: relative; }
+.gh-status.on { color: var(--state-success); }
+.gh-dot { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--gray-300); border: 1.5px solid var(--white); }
+.gh-dot.on { background: var(--state-success); }
+
+/* Modal de conexión */
+.gh-modal { width: min(560px, 100%); }
+.gh-intro { font-size: 13.5px; color: var(--text-body); line-height: 1.5; }
+.gh-connected { font-size: 13px; font-weight: 600; color: var(--state-success); display: flex; align-items: center; gap: 8px; }
+.gh-connected .gh-dot { position: static; border: none; }
+.gh-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-body); line-height: 1.5; }
+.gh-steps code, .field-label code { background: var(--gray-100); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+.gh-result { font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: var(--radius-md); }
+.gh-result.ok { background: var(--state-success-bg); color: var(--state-success); }
+.gh-result.err { background: var(--state-danger-bg); color: var(--state-danger); }
 .brand-dots { display: flex; gap: 4px; }
 .brand-dots span { width: 6px; height: 6px; border-radius: 50%; }
 .brand-dots .d-red { background: var(--red-500); }
