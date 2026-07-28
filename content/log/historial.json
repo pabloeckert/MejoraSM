@@ -1,6 +1,28 @@
 {
-  "syncedAt": "2026-07-28T13:29:55.257Z",
+  "syncedAt": "2026-07-28T19:07:02.420Z",
   "posts": [
+    {
+      "id": "6a68c7f810eb767904c7cad1",
+      "date": "2026-07-28",
+      "status": "published",
+      "content": "Las reuniones no fallan por largas, fallan por no tener un objetivo claro desde el minuto cero. Probá esto en la próxima que convoques y contanos qué cambió.",
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-28-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3951301234586529689"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a661956e035f18c739f9427",
       "date": "2026-07-26",
