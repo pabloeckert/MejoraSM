@@ -8,8 +8,10 @@ import {
   CalendarDays,
   FileCheck,
   Zap,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/" },
@@ -65,6 +67,13 @@ export function AppSidebar() {
 
       {/* Footer */}
       <div className="border-t border-sidebar-border px-6 py-4">
+        <button
+          onClick={() => supabase.auth.signOut()}
+          className="mb-2 flex w-full items-center gap-2 text-xs font-medium text-sidebar-foreground/70 hover:text-sidebar-foreground"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          Cerrar sesión
+        </button>
         <p className="text-xs text-muted-foreground">EDA v1.0 — MejoraOK</p>
       </div>
     </aside>

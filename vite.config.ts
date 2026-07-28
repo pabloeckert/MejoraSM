@@ -2,8 +2,12 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
+// base: "/" para Vercel/Hostinger (raíz del dominio). En el deploy a GitHub
+// Pages (deploy-eda.yml) se pisa con VITE_BASE_PATH=/MejoraSM/app/, porque
+// convive con hub/, biblioteca/ y dashboard/ en el mismo sitio (ver CLAUDE.md).
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: process.env.VITE_BASE_PATH || "/",
   server: {
     host: "::",
     port: 8080,

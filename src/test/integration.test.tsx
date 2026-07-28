@@ -184,6 +184,10 @@ vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({
     from: mockFrom2,
     storage: { from: mockStorageFrom2 },
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: null } }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    },
   }),
 }));
 
@@ -264,8 +268,10 @@ describe("Calendario Page", () => {
   it("renders weekday headers", async () => {
     const { default: Calendario } = await import("@/pages/Calendario");
     renderWithProviders(<Calendario />);
-    // Calendar renders month/year header
-    expect(screen.getByText(/abril de 2026|mayo de 2026|marzo de 2026/i)).toBeInTheDocument();
+    // Calendar renders month/year header — se arma para el mes actual en vez
+    // de una fecha hardcodeada, que quedaba vieja apenas pasaba el mes.
+    const currentMonthYear = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(new Date());
+    expect(screen.getByText(new RegExp(currentMonthYear, "i"))).toBeInTheDocument();
   });
 
   it("renders upcoming section", async () => {

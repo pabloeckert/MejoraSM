@@ -1,3 +1,12 @@
+-- DEPRECADA — NO EJECUTAR.
+-- Duplicado de 003_indexes_constraints.sql con valores de constraints
+-- distintos (ej. dialogue_sessions_status_check difiere). Se detectó la
+-- divergencia el 2026-07-28; 003_indexes_constraints.sql queda como versión
+-- canónica (usa DO-blocks idempotentes con chequeo de pg_constraint, más
+-- seguro de re-correr). 004_reconcile_status_constraints.sql deja los
+-- constraints en el estado final acordado sin importar cuál de las dos
+-- se haya corrido antes en la base real.
+--
 -- Migration: Índices y constraints adicionales
 -- Fecha: 2026-04-29
 -- Ejecutar en Supabase SQL Editor

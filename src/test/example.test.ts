@@ -137,6 +137,10 @@ vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({
     from: mockFrom,
     storage: { from: mockStorageFrom },
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: null } }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    },
   }),
 }));
 

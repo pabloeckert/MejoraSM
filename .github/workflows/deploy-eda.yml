@@ -1,17 +1,34 @@
-# Publica dashboard/ (monitor de stories, solo lectura) a GitHub Pages.
+# Publica el EDA (src/, build de Vite) a GitHub Pages, en el subpath /app/.
+#
+# Hasta ahora el EDA no tenía ningún destino de deploy confirmado: Hostinger
+# (util.mejoraok.com) no resuelve DNS y Vercel (mejorasm.vercel.app) devuelve
+# 404 — ningún proyecto conectado (ver README.md). GitHub Pages es el único
+# destino que se puede desplegar y verificar de punta a punta sin credenciales
+# nuevas (ya hay un sitio de Pages activo para hub/dashboard/biblioteca). Si
+# más adelante se decide Vercel u otro hosting, este workflow se puede
+# desactivar sin tocar el resto.
 #
 # GitHub Pages en modo "workflow" sirve UN solo artifact por sitio — por eso
-# este workflow arma un _site/ que combina hub/ (raíz) + dashboard/ (subpath) +
-# biblioteca/ (subpath) + dist/ del EDA (subpath /app/), igual que
-# deploy-hub.yml, deploy-biblioteca.yml y deploy-eda.yml. Si cualquiera de los
-# cuatro solo subiera su propia parte, se pisarían entre sí en cada corrida —
-# así conviven en el mismo sitio sin que uno borre al otro.
-name: Deploy Dashboard
+# este workflow arma un _site/ que combina hub/ (raíz) + dashboard/ (subpath)
+# + biblioteca/ (subpath) + dist/ del EDA (subpath /app/), igual que
+# deploy-hub.yml, deploy-dashboard.yml y deploy-biblioteca.yml. Si cualquiera
+# de los cuatro solo subiera su propia parte, se pisarían entre sí.
+
+name: Deploy EDA
 
 on:
   push:
     branches: [main]
-    paths: ["dashboard/**"]
+    paths:
+      - "src/**"
+      - "index.html"
+      - "vite.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "public/**"
+      - "tailwind.config.ts"
+      - "tsconfig*.json"
+      - "components.json"
   workflow_dispatch: {}
 
 permissions:
@@ -39,7 +56,7 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Instalar dependencias EDA
+      - name: Instalar dependencias
         run: npm ci --legacy-peer-deps
 
       - name: Build EDA (Vite)
@@ -55,11 +72,11 @@ jobs:
       - name: Armar sitio combinado (hub/ + dashboard/ + biblioteca/ + app/)
         run: |
           mkdir -p _site
-          if [ -d hub ]; then
-            cp -r hub/. _site/
+          cp -r hub/. _site/
+          if [ -d dashboard ]; then
+            mkdir -p _site/dashboard
+            cp -r dashboard/. _site/dashboard/
           fi
-          mkdir -p _site/dashboard
-          cp -r dashboard/. _site/dashboard/
           if [ -d biblioteca ]; then
             mkdir -p _site/biblioteca
             cp -r biblioteca/. _site/biblioteca/
