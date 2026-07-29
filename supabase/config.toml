@@ -1,6 +1,9 @@
-# project_id verificado el 2026-07-28 extrayendo la URL real de Supabase
-# (https://exnjyxwmxknvzploeaex.supabase.co) del bundle ya deployado en
-# producción (https://pabloeckert.github.io/MejoraSM/app/), construido con
-# el secret real VITE_SUPABASE_URL de GitHub Actions. El valor anterior
-# ("hsglmdarztrshihmzfph") no correspondía al proyecto realmente en uso.
-project_id = "exnjyxwmxknvzploeaex"
+# project_id confirmado directamente por Pablo el 2026-07-28 (URL, publishable
+# key y comando `supabase link --project-ref hsglmdarztrshihmzfph`).
+#
+# Nota: un intento anterior de "confirmar" esto leyendo el bundle ya
+# deployado en producción encontró exnjyxwmxknvzploeaex — pero ese bundle
+# estaba compilado con un secret VITE_SUPABASE_URL de GitHub Actions que
+# apuntaba a un proyecto viejo/abandonado, no al que Pablo usa hoy. La fuente
+# de verdad es la confirmación directa, no lo que estuviera deployado.
+project_id = "hsglmdarztrshihmzfph"
