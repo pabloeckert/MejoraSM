@@ -2,6 +2,26 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Para la próxima sesión — estado al 2026-07-28
+
+Sesión de hardening de producción del EDA. Resumen rápido, detalle en las secciones de abajo:
+
+**✅ Confirmado funcionando en producción:**
+- Proyecto Supabase real confirmado: **`hsglmdarztrshihmzfph`** (Pablo lo dio directamente — un intento previo de inferirlo del bundle deployado encontró `exnjyxwmxknvzploeaex`, que resultó ser un proyecto viejo/abandonado al que apuntaba un secret desactualizado de GitHub. No confiar en lo que esté deployado como fuente de verdad del proyecto correcto).
+- Los secrets de GitHub (`SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`) ya apuntan a `hsglmdarztrshihmzfph`.
+- Las 6 Edge Functions (con el guard de auth nuevo, ver abajo) están deployadas y activas ahí — `deploy-functions.yml` corrió OK.
+- El frontend EDA con login está deployado en `https://pabloeckert.github.io/MejoraSM/app/`, compilado con las credenciales correctas.
+
+**🔴 Bloqueador que sigue sin resolverse — arrancar la próxima sesión por acá:**
+`supabase/migrations/` **nunca se aplicó** contra `hsglmdarztrshihmzfph`. `deploy-migrations.yml` (`supabase db push`) falla siempre en el mismo punto — el primer `CREATE POLICY` de `001_initial_schema.sql` — con un error que el CLI de Supabase no explica (probé `--debug`, no agregó info; parece un bug del CLI nuevo basado en "Effect", no algo de la sintaxis SQL — ver [issue #5091](https://github.com/supabase/cli/issues/5091) y [issue #4363](https://github.com/supabase/supabase/issues/4363), ninguno concluyente). Como falla en el primer archivo, **es probable que este proyecto todavía no tenga ninguna tabla creada** — el backend hoy está vacío, no solo sin RLS.
+
+Próximo paso sugerido: abrir `supabase.com/dashboard/project/hsglmdarztrshihmzfph/sql/new` y correr `001_initial_schema.sql` a mano ahí (el SQL Editor web no tiene el bug del CLI). Si funciona, confirma que es un bug puntual del CLI — seguir con `001_policies_fix.sql`, `002`, `003_indexes_constraints.sql` (NO la versión `_and_constraints`, deprecada), `004`, `005` en ese orden, mismo método o reintentando `db push` una vez que exista al menos la primera tabla.
+
+**Otras cosas pendientes, menor prioridad:**
+- CI (`ci.yml`) sigue en rojo — 75 errores de lint preexistentes (`@typescript-eslint/no-explicit-any` mayormente), sin relación con esta sesión. No bloquea nada (no hay branch protection en `main`) pero conviene limpiarlo en algún momento.
+- La rama `biblioteca-de-contenido` tiene el Paso 3 de Pablo sin commitear (`biblioteca/app.js`, `biblioteca/styles.css`) — se dejó tal cual, sin tocar.
+- `.env.example` no documenta `ADMIN_EMAILS` (secret de Supabase, no local) — agregado solo en este CLAUDE.md por ahora.
+
 ## Qué es este repo
 
 Un solo producto: **MejoraSM**, para la marca MejoraOK. Cinco piezas; solo la primera usa Supabase, las demás son estáticas o corren por GitHub Actions:
@@ -38,7 +58,7 @@ Hasta 2026-07-28 el EDA no tenía ningún control de acceso: RLS con políticas 
 - **Edge Functions**: `supabase/functions/_shared/auth.ts` (`requireAuth`) — cada una de las 6 funciones exige un JWT válido de un email en `ADMIN_EMAILS` (secret de Supabase, default `pablo@mejoraok.com`), o la propia `SUPABASE_SERVICE_ROLE_KEY` como Bearer token para llamadas servidor-a-servidor (cron, otra función). Sin esto, responden 401/403.
 - **`src/services/ai.ts`** arma el header `Authorization` en cada llamada con el `access_token` real de la sesión (`supabase.auth.getSession()`), no con la anon key pelada como antes. `src/services/supabase.ts` no necesitó cambios: al compartir el mismo `VITE_SUPABASE_URL`, su cliente lee la misma sesión persistida en `localStorage` que usa `src/integrations/supabase/client.ts`.
 
-**Pendiente:** aplicar `005_real_rls_and_auth.sql` (y `004_reconcile_status_constraints.sql`) contra la base real requiere correr `.github/workflows/deploy-migrations.yml` (manual) — confirmar que corrió antes de asumir que el RLS nuevo ya está vigente en producción.
+**Pendiente:** `005_real_rls_and_auth.sql` (y el resto de `supabase/migrations/`) todavía NO se aplicó contra la base real — ver "Para la próxima sesión" arriba para el detalle del bloqueador. No asumir que el RLS nuevo ya está vigente en producción hasta confirmar que `deploy-migrations.yml` corrió OK.
 
 ## Arquitectura: EDA (`src/` + `supabase/`)
 
@@ -66,7 +86,7 @@ Backend en `supabase/functions/` (Deno, Edge Functions), cada una con su propia 
 
 Se deployan con `.github/workflows/deploy-functions.yml` (push a `supabase/functions/**`, o manual con función específica) — usa `SUPABASE_ACCESS_TOKEN` y `SUPABASE_PROJECT_REF` como secrets del repo.
 
-`supabase/migrations/`: schema SQL + pgvector, numeradas y aplicadas en orden con `supabase db push` (`.github/workflows/deploy-migrations.yml`, manual). `003_indexes_and_constraints.sql` está **deprecada** (duplicaba `003_indexes_constraints.sql` con valores de constraints distintos) — no ejecutarla; `004_reconcile_status_constraints.sql` deja los constraints en un estado único sin importar cuál de las dos corrió antes contra la base real. `005_real_rls_and_auth.sql` es la que reemplaza el RLS abierto (ver sección de auth).
+`supabase/migrations/`: schema SQL + pgvector, aplicadas en orden alfabético de archivo por `supabase db push` (`.github/workflows/deploy-migrations.yml`, manual — **ver bloqueador al principio de este archivo, todavía no corrió con éxito**). Orden real: `001_initial_schema.sql` → `001_policies_fix.sql` (renombrado desde `001_fix_policies.sql`: ordenaba antes que `001_initial_schema.sql` alfabéticamente y crasheaba en una base sin tablas) → `002_fix_postgrest.sql` → `003_indexes_constraints.sql` (**`003_indexes_and_constraints.sql` está deprecada**, duplicaba esta con valores de constraints distintos, no ejecutarla) → `004_reconcile_status_constraints.sql` (deja los constraints en un estado único sin importar cuál `003` corrió antes) → `005_real_rls_and_auth.sql` (reemplaza el RLS abierto, ver sección de auth).
 
 `scripts/deploy.sh` lee el `PROJECT_REF` de `supabase/config.toml` (antes tenía uno hardcodeado que no coincidía — corregido 2026-07-28).
 
@@ -109,7 +129,7 @@ Las cuatro conviven en el **mismo sitio** de GitHub Pages (Pages en modo "workfl
 - **`hub/` + `biblioteca/` + `dashboard/` + EDA (`/app/`)**: activo y confirmado en GitHub Pages, sitio combinado (ver sección de arriba). Es el único destino de deploy del EDA verificado end-to-end — se eligió porque no requiere credenciales nuevas (usa el mismo repo + Actions que ya existían) y es totalmente reversible.
 - **EDA en Vercel/Hostinger**: **no confirmado, no usar sin decidirlo con Pablo.** `util.mejoraok.com` no resuelve DNS, `mejorasm.vercel.app` devuelve 404, y ningún workflow hace deploy FTP pese a que los secrets `FTP_HOST`/`FTP_USERNAME`/`FTP_PASSWORD` siguen en el repo (son residuo). `vercel.json` tiene config de build correcta por si en algún momento se conecta un proyecto Vercel real.
 - **`supabase/functions/`**: `deploy-functions.yml` (push a `supabase/functions/**`, o manual).
-- **`supabase/migrations/`**: `deploy-migrations.yml` (**solo manual** — a diferencia de los demás, no se dispara solo en cada push, porque una migración de schema pesa más que redeployar una función).
+- **`supabase/migrations/`**: `deploy-migrations.yml` (**solo manual** — a diferencia de los demás, no se dispara solo en cada push, porque una migración de schema pesa más que redeployar una función). Usa `supabase db push --linked --yes --debug`. **Todavía no logró aplicar nada** — ver bloqueador al principio de este archivo.
 
 ## Variables de entorno
 
