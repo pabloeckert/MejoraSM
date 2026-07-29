@@ -1,3 +1,13 @@
+-- Renombrado de 001_fix_policies.sql a 001_policies_fix.sql el 2026-07-29:
+-- Supabase CLI aplica migraciones en orden alfabético de archivo, y
+-- "001_fix_..." ordenaba ANTES que "001_initial_schema.sql" (la 'f' va
+-- antes que la 'i') — en una base nueva sin tablas, este archivo crasheaba
+-- en el primer DROP POLICY IF EXISTS porque la tabla todavía no existía.
+-- Este archivo ya es en gran parte redundante con 001_initial_schema.sql
+-- (crea lo mismo con IF NOT EXISTS) y con 005_real_rls_and_auth.sql (que
+-- reemplaza las políticas "Allow all" en serio) — se deja igual, corriendo
+-- después de 001_initial_schema.sql, sin necesidad de reescribirlo.
+--
 -- Fix: Eliminar políticas existentes y recrear todo
 -- Ejecutar esto en el SQL Editor de Supabase
 
