@@ -232,7 +232,7 @@ async function callEmbeddings(texts: string[]): Promise<number[][]> {
   const model = "sentence-transformers/all-MiniLM-L6-v2";
 
   const res = await fetch(
-    `https://api-inference.huggingface.com/pipeline/feature-extraction/${model}`,
+    `https://api-inference.huggingface.co/pipeline/feature-extraction/${model}`,
     {
       method: "POST",
       headers: {

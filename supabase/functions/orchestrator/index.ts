@@ -194,7 +194,7 @@ async function getContextDocs(query: string): Promise<string> {
     if (!hfKey) throw new Error("HF_API_KEY no configurada");
 
     const embedRes = await fetch(
-      "https://api-inference.huggingface.com/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2",
+      "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2",
       {
         method: "POST",
         headers: {

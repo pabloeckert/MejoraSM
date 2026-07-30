@@ -84,7 +84,7 @@ jobs:
         if: success()
         run: |
           SUPABASE_URL="https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co"
-          ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          ANON_KEY="${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}"
           
           echo ""
           echo "🏥 Verifying endpoints..."

@@ -127,7 +127,7 @@ async function generateEmbeddings(texts: string[]): Promise<number[][]> {
 
   const res = await withRetry(async () => {
     const r = await fetch(
-      "https://api-inference.huggingface.com/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2",
+      "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2",
       {
         method: "POST",
         headers: {
@@ -304,11 +304,12 @@ Deno.serve(async (req) => {
         result = await processDocument(documentId);
         break;
 
-      case "search":
+      case "search": {
         validateBody({ query }, ["query"]);
         const results = await searchDocs(query, limit || 5);
         result = { results };
         break;
+      }
 
       default:
         throw new ValidationError("Acción no válida. Usa 'process' o 'search'");
