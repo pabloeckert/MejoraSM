@@ -1,13 +1,13 @@
 # 🎯 MejoraSM — MejoraOK
 
-Un solo producto con tres partes que comparten backend Supabase, para la marca [MejoraOK](https://mejoraok.com).
+Cinco productos que comparten repo, para la marca [MejoraOK](https://mejoraok.com). Solo el primero usa Supabase; el resto son estáticos o corren por GitHub Actions.
 
 ---
 
-## 📦 Las tres partes
+## 📦 Los cinco productos
 
 ### 1. EDA (Estratega Digital Autónoma)
-SaaS de gestión de contenido con IA: `src/` (React 18 + TypeScript + Vite + shadcn/ui) + `supabase/` (Edge Functions Deno + Postgres/pgvector).
+SaaS de gestión de contenido con IA: `src/` (React 18 + TypeScript + Vite + shadcn/ui) + `supabase/` (Edge Functions Deno + Postgres/pgvector). Informe técnico completo — arquitectura, pantallas, Edge Functions, modelo de datos, seguridad — en **[`EDA.md`](EDA.md)**.
 
 | Capa | Tecnología |
 |---|---|
@@ -24,13 +24,9 @@ npm run lint      # ESLint
 npm test          # Vitest
 ```
 
-**Deploy: pendiente de decidir.** Hoy no hay ningún entorno de producción activo y confirmado para esta app:
-- `util.mejoraok.com` (el dominio documentado en versiones anteriores de este README) **no resuelve DNS** — no existe.
-- `mejorasm.vercel.app` (referenciado en el CORS allowlist de las Edge Functions y en `vercel.json`) **devuelve 404** — no hay deployment vivo ahí tampoco.
-- Los secrets `FTP_HOST` / `FTP_USERNAME` / `FTP_PASSWORD` siguen configurados en el repo, pero **ningún workflow los usa** (`ci.yml`, `daily-story.yml`, `deploy-functions.yml`, `deploy-hub.yml` — ninguno hace deploy FTP). Son residuo de un flujo que ya no corre.
-- `vercel.json` existe y tiene config de build de Vite correcta, pero no hay evidencia de un proyecto Vercel conectado y sirviendo hoy.
+**Deploy: activo.** **https://pabloeckert.github.io/MejoraSM/app/** — GitHub Pages, junto con `hub/`, `biblioteca/` y `dashboard/` en el mismo sitio. Requiere login (Supabase Auth); detalle de acceso y seguridad en `EDA.md`.
 
-Antes de asumir un destino de deploy, confirmar con Pablo cuál es el plan (¿Vercel? ¿otro hosting?) — no reintroducir Hostinger/FTP como si fuera el estado vigente.
+`util.mejoraok.com` y `mejorasm.vercel.app` (mencionados en versiones anteriores de este README y todavía en el CORS allowlist de las Edge Functions) no resuelven / no tienen deploy activo — son residuo, no el destino real.
 
 ### 2. Sistema de story diaria autónoma
 `scripts/` (Node/ESM) + `templates/` + `content/`. Corre por GitHub Actions (`.github/workflows/daily-story.yml`, cron diario + `workflow_dispatch` manual).
@@ -53,6 +49,16 @@ content/inbox/<oferta>/*.jpg  → scripts/generate-brief.mjs (Claude, vía scrip
 `hub/index.html` — página estática (sin build) con 5 tarjetas, una por oferta, que linkean directo a la UI de upload de GitHub para subir fotos a `content/inbox/<oferta>/` sin tocar git a mano. Desplegado a GitHub Pages vía `.github/workflows/deploy-hub.yml` (trigger: push a `hub/**`, o manual).
 
 **Deploy:** activo y confirmado en **https://pabloeckert.github.io/MejoraSM/**.
+
+### 4. Biblioteca de contenido
+`biblioteca/` — página estática (sin build) para cargar, etiquetar y organizar el contenido que alimenta `content/inbox/` del sistema de stories. Escribe al repo vía API de GitHub (PAT fine-grained guardado solo en `localStorage` del navegador, nunca commiteado).
+
+**Deploy:** activo en **https://pabloeckert.github.io/MejoraSM/biblioteca/**.
+
+### 5. Dashboard / Monitor de stories
+`dashboard/index.html` — panel de solo lectura sobre lo publicado/programado por el sistema de stories (lee `content/log/historial.json`).
+
+**Deploy:** activo en **https://pabloeckert.github.io/MejoraSM/dashboard/**.
 
 ---
 
