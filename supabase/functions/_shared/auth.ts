@@ -5,13 +5,14 @@
 // público (anon key), que cualquiera puede leer del bundle del frontend.
 // Con esto, cada función exige UNA de estas dos cosas:
 //
-//   1. Un JWT de usuario de Supabase Auth cuyo email esté en ADMIN_EMAILS
-//      (llamadas desde el frontend, sesión iniciada).
+//   1. Un JWT de usuario de Supabase Auth cuyo email esté en la tabla
+//      app_admins (llamadas desde el frontend, sesión iniciada). Es la
+//      MISMA tabla que usa is_app_admin() para el RLS de Postgres — una
+//      sola fuente de verdad para "quién es admin", no una lista aparte
+//      en un secret que se puede desincronizar (así estaba antes, con
+//      ADMIN_EMAILS + un default hardcodeado; se sacaron los dos).
 //   2. La propia SUPABASE_SERVICE_ROLE_KEY como Bearer token (llamadas
 //      servidor-a-servidor: cron de GitHub Actions, otra Edge Function).
-//
-// ADMIN_EMAILS es un secret de Supabase (coma-separado). Si no está seteado,
-// cae a "pablo@mejoraok.com" (único operador documentado en SECURITY.md).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 export interface AuthResult {
@@ -47,12 +48,27 @@ export async function requireAuth(req: Request): Promise<AuthResult> {
   }
 
   const email = (data.user.email || "").toLowerCase();
-  const allowlist = (Deno.env.get("ADMIN_EMAILS") || "pablo@mejoraok.com")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
+  if (!email) {
+    return { ok: false, status: 403, error: "Usuario autenticado pero sin permiso para esta función" };
+  }
 
-  if (!allowlist.includes(email)) {
+  if (!serviceKey) {
+    return { ok: false, status: 500, error: "Config de Supabase incompleta en la función" };
+  }
+
+  // app_admins tiene RLS sin políticas para anon/authenticated (a propósito,
+  // ver 006_real_rls_and_auth.sql) — hace falta el service role para leerla.
+  const adminClient = createClient(supabaseUrl, serviceKey);
+  const { data: adminRow, error: adminError } = await adminClient
+    .from("app_admins")
+    .select("email")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (adminError) {
+    return { ok: false, status: 500, error: "Error verificando permisos de admin" };
+  }
+  if (!adminRow) {
     return { ok: false, status: 403, error: "Usuario autenticado pero sin permiso para esta función" };
   }
 
