@@ -1,6 +1,28 @@
 {
-  "syncedAt": "2026-07-30T08:07:18.363Z",
+  "syncedAt": "2026-07-30T13:26:36.398Z",
   "posts": [
+    {
+      "id": "6a6b3cfdadbbabfb2f0a0562",
+      "date": "2026-07-30",
+      "status": "published",
+      "content": "El feedback que más incomoda no es el más duro, es el que no dice qué hacer después. ¿Cómo das feedback en tu equipo? Contanos en los comentarios.",
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-30-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3952652057022659293"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a68c7f810eb767904c7cad1",
       "date": "2026-07-28",
