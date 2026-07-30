@@ -139,9 +139,23 @@ async function findInboxItems() {
   return { photos: photos.slice(0, MAX_STORIES), videosSkipped };
 }
 
+// Tolera que el modelo agregue texto antes/después del JSON pese a la
+// instrucción de "solo JSON" — si el parseo directo falla, busca el primer
+// bloque {...} balanceado por regex antes de darlo por perdido.
 function extractJson(text) {
-  return JSON.parse(text.trim().replace(/^```json\s*|^```\s*|```$/g, ""));
+  const cleaned = text.trim().replace(/^```json\s*|^```\s*|```$/g, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) {
+      return JSON.parse(match[0]);
+    }
+    throw e;
+  }
 }
+
+const BRIEF_ATTEMPTS = 3;
 
 async function briefFor(item, avoidHeadlines, systemPrompt) {
   const avoid =
@@ -165,8 +179,19 @@ async function briefFor(item, avoidHeadlines, systemPrompt) {
     userText = `No hay foto disponible hoy. Generá una story de solo texto.${avoid}`;
   }
 
-  const text = await askClaude({ system: systemPrompt, userText, image });
-  return extractJson(text);
+  let lastError;
+  for (let attempt = 1; attempt <= BRIEF_ATTEMPTS; attempt++) {
+    const text = await askClaude({ system: systemPrompt, userText, image });
+    try {
+      return extractJson(text);
+    } catch (e) {
+      lastError = e;
+      console.error(
+        `Intento ${attempt}/${BRIEF_ATTEMPTS}: no se pudo parsear el JSON de Claude (${e.message}). Respuesta cruda:\n---\n${text}\n---`
+      );
+    }
+  }
+  throw new Error(`No se pudo generar un brief válido tras ${BRIEF_ATTEMPTS} intentos: ${lastError.message}`);
 }
 
 // Freno de una-corrida-por-día: si ya hay una story publicada hoy, una
