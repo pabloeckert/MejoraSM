@@ -225,9 +225,9 @@ BEGIN
     dc.id,
     dc.document_id,
     dc.content,
-    1 - (dc.embedding <=> query_embedding) AS similarity
+    (1 - (dc.embedding <=> query_embedding))::REAL AS similarity
   FROM doc_chunks dc
-  WHERE 1 - (dc.embedding <=> query_embedding) > similarity_threshold
+  WHERE (1 - (dc.embedding <=> query_embedding))::REAL > similarity_threshold
   ORDER BY dc.embedding <=> query_embedding
   LIMIT match_count;
 END;
