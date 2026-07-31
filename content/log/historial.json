@@ -1,6 +1,28 @@
 {
-  "syncedAt": "2026-07-31T13:39:56.112Z",
+  "syncedAt": "2026-07-31T19:07:44.247Z",
   "posts": [
+    {
+      "id": "6a6cbc5041c48667539dcae6",
+      "date": "2026-07-31",
+      "status": "published",
+      "content": "El feedback que no aterriza en una acción concreta, se olvida en un día. Si tu equipo escucha pero no cambia nada después, capaz no es el mensaje — es la estructura. Te leemos en los comentarios 👇",
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-07-31-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3953475232803106834"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a6b3cfdadbbabfb2f0a0562",
       "date": "2026-07-30",
