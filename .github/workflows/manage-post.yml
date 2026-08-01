@@ -1,0 +1,70 @@
+# Acciones manuales sobre un post de feed ya publicado en Zernio
+# (Instagram/Facebook), gemelo de manage-story.yml para propuestas del EDA.
+# Es el "monitor de reversión" (PLAN_AUTONOMIA.md Fase 2) para lo que ya
+# salió: "reintentar" reusa la misma imagen y caption ya renderizadas
+# (proposals.rendered_image_path), "despublicar" solo funciona en las
+# plataformas que Zernio soporta vía API (Instagram requiere borrado manual
+# desde la app). Requiere escribir "confirmacion: CONFIRMO" — cualquier otro
+# valor corta antes de tocar nada.
+name: Manage Post
+
+on:
+  workflow_dispatch:
+    inputs:
+      proposal_id:
+        description: "id de la propuesta en Supabase (columna proposals.id)"
+        required: true
+        type: string
+      platform:
+        description: "Plataforma sobre la que actuar"
+        required: true
+        type: choice
+        options:
+          - instagram
+          - facebook
+      action:
+        description: "Qué hacer"
+        required: true
+        type: choice
+        options:
+          - reintentar
+          - despublicar
+      confirmacion:
+        description: 'Escribí exactamente CONFIRMO para ejecutar (cualquier otro valor corta sin hacer nada)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  manage:
+    name: "${{ inputs.action }} — ${{ inputs.platform }} — ${{ inputs.proposal_id }}"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verificar confirmación
+        env:
+          CONFIRMACION: ${{ inputs.confirmacion }}
+        run: |
+          if [ "$CONFIRMACION" != "CONFIRMO" ]; then
+            echo "::error::Confirmación inválida (se esperaba exactamente CONFIRMO) — corto sin hacer nada."
+            exit 1
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Ejecutar acción
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ZERNIO_API_KEY: ${{ secrets.ZERNIO_API_KEY }}
+          ZERNIO_INSTAGRAM_ACCOUNT_ID: ${{ secrets.ZERNIO_INSTAGRAM_ACCOUNT_ID }}
+          ZERNIO_FACEBOOK_ACCOUNT_ID: ${{ secrets.ZERNIO_FACEBOOK_ACCOUNT_ID }}
+        run: node scripts/manage-post.mjs "${{ inputs.proposal_id }}" "${{ inputs.platform }}" "${{ inputs.action }}"

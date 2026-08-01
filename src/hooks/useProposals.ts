@@ -44,8 +44,16 @@ export function useRejectProposal() {
 export function useScheduleProposal() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, date }: { id: string; date: string }) =>
-      proposalsApi.schedule(id, date),
+    mutationFn: ({ id, date, oferta }: { id: string; date: string; oferta: string }) =>
+      proposalsApi.schedule(id, date, oferta),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
+  });
+}
+
+export function useCancelProposal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => proposalsApi.cancel(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
   });
 }

@@ -6,6 +6,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -35,9 +42,21 @@ import {
   useApproveProposal,
   useRejectProposal,
   useScheduleProposal,
+  useCancelProposal,
 } from "@/hooks/useProposals";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "@/components/ui/use-toast";
+
+// Mismas 4 dimensiones + Profesionalización que content/inbox/ (ver
+// scripts/generate-brief.mjs) — de acá sale la foto que usa
+// scripts/render-scheduled-posts.mjs al publicar el post agendado.
+const OFERTAS = [
+  { value: "personal", label: "Personal" },
+  { value: "organizacional", label: "Organizacional" },
+  { value: "comercial", label: "Comercial" },
+  { value: "empresarial", label: "Empresarial" },
+  { value: "profesionalizacion", label: "Profesionalización" },
+];
 
 export default function Propuestas() {
   return (
@@ -53,11 +72,13 @@ function PropuestasContent() {
   const approveMutation = useApproveProposal();
   const rejectMutation = useRejectProposal();
   const scheduleMutation = useScheduleProposal();
+  const cancelMutation = useCancelProposal();
 
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [scheduleTarget, setScheduleTarget] = useState<string | null>(null);
   const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleOferta, setScheduleOferta] = useState("");
   const [previewTarget, setPreviewTarget] = useState<any>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -86,19 +107,28 @@ function PropuestasContent() {
   };
 
   const handleSchedule = () => {
-    if (!scheduleTarget || !scheduleDate) return;
+    if (!scheduleTarget || !scheduleDate || !scheduleOferta) return;
     scheduleMutation.mutate(
-      { id: scheduleTarget, date: scheduleDate },
+      { id: scheduleTarget, date: scheduleDate, oferta: scheduleOferta },
       {
         onSuccess: () => {
           setScheduleTarget(null);
           setScheduleDate("");
+          setScheduleOferta("");
           toast({ title: "Propuesta programada" });
         },
         onError: (err: any) =>
           toast({ title: "Error", description: err.message, variant: "destructive" }),
       }
     );
+  };
+
+  const handleCancel = (id: string) => {
+    cancelMutation.mutate(id, {
+      onSuccess: () => toast({ title: "Publicación cancelada" }),
+      onError: (err: any) =>
+        toast({ title: "Error", description: err.message, variant: "destructive" }),
+    });
   };
 
   const handleCopy = (text: string, id: string) => {
@@ -117,7 +147,9 @@ function PropuestasContent() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Propuestas de Contenido</h1>
         <p className="mt-1 text-muted-foreground">
-          Revisá, aprobá o rechazá las propuestas generadas por los agentes.
+          Los posts de feed se agendan y publican solos. Esta pantalla es el monitor: revisá lo programado
+          y cancelalo si no te convence, o aprobá a mano los formatos que todavía no tienen pipeline
+          autónomo (carrusel, historia).
         </p>
       </div>
 
@@ -200,6 +232,10 @@ function PropuestasContent() {
 
         {/* PROGRAMADAS */}
         <TabsContent value="scheduled" className="mt-6">
+          <p className="mb-4 text-xs text-muted-foreground">
+            Los posts de formato "post" se agendan solos apenas los aprueba el Crítico en Mesa de Diálogo —
+            se publican solos cuando llega la fecha. Cancelá acá si alguno no te convence antes de que salga.
+          </p>
           {scheduled.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center py-12">
@@ -210,7 +246,14 @@ function PropuestasContent() {
           ) : (
             <div className="space-y-3">
               {scheduled.map((p: any) => (
-                <ProposalRow key={p.id} proposal={p} onCopy={handleCopy} copiedId={copiedId} />
+                <ProposalRow
+                  key={p.id}
+                  proposal={p}
+                  onCopy={handleCopy}
+                  copiedId={copiedId}
+                  onCancel={() => handleCancel(p.id)}
+                  isCanceling={cancelMutation.isPending}
+                />
               ))}
             </div>
           )}
@@ -228,7 +271,14 @@ function PropuestasContent() {
           ) : (
             <div className="space-y-3">
               {allProposals.map((p: any) => (
-                <ProposalRow key={p.id} proposal={p} onCopy={handleCopy} copiedId={copiedId} />
+                <ProposalRow
+                  key={p.id}
+                  proposal={p}
+                  onCopy={handleCopy}
+                  copiedId={copiedId}
+                  onCancel={p.status === "scheduled" ? () => handleCancel(p.id) : undefined}
+                  isCanceling={cancelMutation.isPending}
+                />
               ))}
             </div>
           )}
@@ -269,7 +319,16 @@ function PropuestasContent() {
       </Dialog>
 
       {/* SCHEDULE DIALOG */}
-      <Dialog open={!!scheduleTarget} onOpenChange={(v) => !v && setScheduleTarget(null)}>
+      <Dialog
+        open={!!scheduleTarget}
+        onOpenChange={(v) => {
+          if (!v) {
+            setScheduleTarget(null);
+            setScheduleDate("");
+            setScheduleOferta("");
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Programar publicación</DialogTitle>
@@ -283,13 +342,31 @@ function PropuestasContent() {
                 onChange={(e) => setScheduleDate(e.target.value)}
               />
             </div>
+            <div className="space-y-2">
+              <Label>Oferta (de dónde sale la foto del post)</Label>
+              <Select value={scheduleOferta} onValueChange={setScheduleOferta}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Elegir dimensión..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {OFERTAS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Se publica sola en la fecha elegida, con una foto de content/inbox/{scheduleOferta || "<oferta>"}/. Si la carpeta está vacía, el post sale en formato solo-texto.
+              </p>
+            </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setScheduleTarget(null)}>
                 Cancelar
               </Button>
               <Button
                 onClick={handleSchedule}
-                disabled={!scheduleDate || scheduleMutation.isPending}
+                disabled={!scheduleDate || !scheduleOferta || scheduleMutation.isPending}
               >
                 {scheduleMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Programar
@@ -450,10 +527,14 @@ function ProposalRow({
   proposal,
   onCopy,
   copiedId,
+  onCancel,
+  isCanceling,
 }: {
   proposal: any;
   onCopy: (text: string, id: string) => void;
   copiedId: string | null;
+  onCancel?: () => void;
+  isCanceling?: boolean;
 }) {
   const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
     pending: { label: "Pendiente", variant: "secondary" },
@@ -484,12 +565,29 @@ function ProposalRow({
           <p className="mt-0.5 text-xs text-muted-foreground truncate">
             {proposal.body?.slice(0, 120)}...
           </p>
+          {proposal.status === "published" && (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Ya publicada{proposal.zernio_post_id ? ` (Zernio: ${proposal.zernio_post_id})` : ""} — para
+              corregirla o bajarla, correr manualmente el workflow "Manage Post" en GitHub Actions.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-1.5 ml-4">
           {proposal.scheduled_at && (
             <span className="text-xs text-muted-foreground">
               {new Date(proposal.scheduled_at).toLocaleDateString("es-AR")}
             </span>
+          )}
+          {onCancel && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-destructive"
+              onClick={onCancel}
+              disabled={isCanceling}
+            >
+              {isCanceling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancelar"}
+            </Button>
           )}
           <Button
             variant="ghost"

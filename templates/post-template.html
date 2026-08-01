@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<style>
+  /* Bw Modelica (principal). Poné los .woff2 en templates/fonts/ — mientras
+     no estén, cae a League Spartan y la pieza sigue siendo válida. Mismo
+     criterio que templates/story-template.html. */
+  @font-face {
+    font-family: "Bw Modelica";
+    src: url("fonts/BwModelica-Medium.woff2") format("woff2");
+    font-weight: 500;
+    font-display: block;
+  }
+  @font-face {
+    font-family: "Bw Modelica";
+    src: url("fonts/BwModelica-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-display: block;
+  }
+  @import url("https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600&display=swap");
+
+  :root {
+    --azul: #1A3D84;
+    --rojo: #E1061E;
+    --amarillo: #F7CC13;
+    --tinta: #2B2B2B;
+    --gris: #6B7280;
+    --blanco: #FFFFFF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 1080px;
+    height: 1080px;
+    overflow: hidden;
+    background: var(--blanco);
+    font-family: "Bw Modelica", "League Spartan", sans-serif;
+  }
+
+  /* Feed 1:1 — a diferencia de la Story (foto arriba / panel blanco abajo,
+     pensada para consumo en secuencia), acá la foto es fondo completo:
+     la pieza tiene que funcionar sola, parada en un grid, sin contexto de
+     lo que viene antes o después. */
+  .post {
+    position: relative;
+    width: 1080px;
+    height: 1080px;
+    background: var(--tinta);
+  }
+
+  .photo {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    {{PHOTO_STYLE}}
+  }
+
+  /* Scrim degradé para que el texto sea legible sobre cualquier foto,
+     sin tapar la imagen con un bloque de color sólido (regla de marca:
+     mucho blanco/foto, color como puntuación, no como fondo dominante). */
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(43,43,43,0) 38%, rgba(43,43,43,0.82) 100%);
+  }
+
+  .tag {
+    position: absolute;
+    top: 56px;
+    left: 56px;
+    display: inline-flex;
+    align-items: center;
+    padding: 14px 28px;
+    background: var(--blanco);
+    border-radius: 999px;
+    font-family: "League Spartan", sans-serif;
+    font-weight: 600;
+    font-size: 26px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--azul);
+  }
+
+  .panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0 72px 64px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .kicker {
+    font-family: "League Spartan", sans-serif;
+    font-weight: 600;
+    font-size: 26px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: var(--amarillo);
+    margin-bottom: 22px;
+  }
+
+  .headline {
+    font-family: "Bw Modelica", "League Spartan", sans-serif;
+    font-weight: 500;
+    font-size: 62px;
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    color: var(--blanco);
+    text-wrap: balance;
+    margin-bottom: 20px;
+  }
+
+  .rule {
+    width: 110px;
+    height: 8px;
+    background: var(--rojo);
+    border-radius: 4px;
+    margin-bottom: 28px;
+  }
+
+  .subtext {
+    font-family: "League Spartan", sans-serif;
+    font-weight: 400;
+    font-size: 32px;
+    line-height: 1.4;
+    color: var(--blanco);
+    max-width: 880px;
+    opacity: 0.92;
+    margin-bottom: 36px;
+  }
+
+  .footer {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .dot { width: 14px; height: 14px; border-radius: 50%; }
+  .dot.rojo { background: var(--rojo); }
+  .dot.amarillo { background: var(--amarillo); }
+
+  .brand {
+    font-family: "Bw Modelica", "League Spartan", sans-serif;
+    font-weight: 500;
+    font-size: 28px;
+    color: var(--blanco);
+  }
+
+  .site {
+    margin-left: auto;
+    font-family: "League Spartan", sans-serif;
+    font-weight: 400;
+    font-size: 24px;
+    color: rgba(255,255,255,0.72);
+    letter-spacing: 0.04em;
+  }
+
+  /* Variante solo-texto: sin foto disponible en content/inbox/<oferta>/.
+     Mismo principio que story-template.html — cae a fondo sólido en vez
+     de tapar el hueco con una foto genérica. Blanco dominante (regla de
+     marca), texto en tinta/azul, sin scrim (no hace falta sobre blanco). */
+  .post.solo-texto { background: var(--blanco); }
+  .post.solo-texto .photo,
+  .post.solo-texto .scrim { display: none; }
+  .post.solo-texto .tag { background: var(--azul); color: var(--blanco); }
+  .post.solo-texto .panel {
+    top: 0;
+    justify-content: center;
+    height: 100%;
+    padding: 0 96px;
+  }
+  .post.solo-texto .kicker { color: var(--rojo); }
+  .post.solo-texto .headline { color: var(--azul); font-size: 72px; }
+  .post.solo-texto .subtext { color: var(--tinta); opacity: 1; }
+  .post.solo-texto .brand { color: var(--azul); }
+  .post.solo-texto .site { color: var(--gris); }
+</style>
+</head>
+<body>
+  <div class="post {{MODE_CLASS}}">
+    <div class="photo"></div>
+    <div class="scrim"></div>
+    <div class="tag">{{OFERTA_LABEL}}</div>
+    <div class="panel">
+      <div class="kicker">{{KICKER}}</div>
+      <div class="headline">{{HEADLINE}}</div>
+      <div class="rule"></div>
+      <div class="subtext">{{SUBTEXT}}</div>
+      <div class="footer">
+        <span class="dot rojo"></span>
+        <span class="dot amarillo"></span>
+        <span class="brand">Mejora Continua</span>
+        <span class="site">mejoraok.com</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

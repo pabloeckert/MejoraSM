@@ -124,6 +124,46 @@ export async function publishStory(imageUrl, caption = "") {
   return createPostAndPoll({ apiKey, content: caption, imageUrl, platforms });
 }
 
+// Gemela de publishStory() para posts de feed (EDA, scripts/publish-scheduled-posts.mjs):
+// mismo mecanismo (createPostAndPoll), único cambio real es contentType
+// "post" en vez de "story". A diferencia de las Stories, acá el caption SÍ
+// se ve en el feed — se manda el copy completo de la propuesta, no un texto
+// de referencia interno.
+export async function publishPost(imageUrl, caption = "") {
+  const apiKey = process.env.ZERNIO_API_KEY;
+  const igAccountId = process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID;
+  const fbAccountId = process.env.ZERNIO_FACEBOOK_ACCOUNT_ID;
+
+  if (!apiKey) {
+    return { success: false, error: "Falta ZERNIO_API_KEY en el entorno." };
+  }
+
+  const platforms = [];
+  if (igAccountId) {
+    platforms.push({
+      platform: "instagram",
+      accountId: igAccountId,
+      platformSpecificData: { contentType: "post" },
+    });
+  }
+  if (fbAccountId) {
+    platforms.push({
+      platform: "facebook",
+      accountId: fbAccountId,
+      platformSpecificData: { contentType: "post" },
+    });
+  }
+
+  if (platforms.length === 0) {
+    return {
+      success: false,
+      error: "Falta configurar ZERNIO_INSTAGRAM_ACCOUNT_ID y/o ZERNIO_FACEBOOK_ACCOUNT_ID.",
+    };
+  }
+
+  return createPostAndPoll({ apiKey, content: caption, imageUrl, platforms });
+}
+
 // Plataformas que Zernio permite despublicar vía API (docs.zernio.com,
 // endpoint POST /v1/posts/{id}/unpublish). Instagram, TikTok y Snapchat NO
 // están soportados — hay que verificarlo ahí antes de llamar, no asumir.

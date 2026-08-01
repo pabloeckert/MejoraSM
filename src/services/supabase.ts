@@ -115,10 +115,20 @@ export const proposalsApi = {
       .update({ status: "rejected", rejection_reason: reason })
       .eq("id", id),
 
-  schedule: (id: string, date: string) =>
+  schedule: (id: string, date: string, oferta: string) =>
     supabase
       .from("proposals")
-      .update({ status: "scheduled", scheduled_at: date })
+      .update({ status: "scheduled", scheduled_at: date, oferta })
+      .eq("id", id),
+
+  // Monitor de reversión (PLAN_AUTONOMIA.md Fase 2): cancela una propuesta
+  // todavía no publicada (autoagendada o programada a mano) antes de que el
+  // cron de publish-scheduled-posts.yml la levante. Para una ya publicada,
+  // la reversión es scripts/manage-post.mjs (workflow_dispatch), no esto.
+  cancel: (id: string) =>
+    supabase
+      .from("proposals")
+      .update({ status: "rejected", rejection_reason: "Cancelada antes de publicar" })
       .eq("id", id),
 
   pending: () =>

@@ -1,0 +1,70 @@
+# Publicador autónomo de posts de feed del EDA — mismo patrón que
+# daily-story.yml, pero la fuente es la tabla `proposals` de Supabase
+# (propuestas ya aprobadas y agendadas desde la pantalla "Propuestas" del
+# EDA), no content/inbox/ escaneado directo. Corre acá y no como Supabase
+# Edge Function porque necesita Playwright para renderizar la imagen.
+name: Publish Scheduled Posts
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: publish-scheduled-posts
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publicar propuestas agendadas
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar Playwright
+        run: npm install playwright
+
+      - name: Instalar Chromium para Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Buscar propuestas debidas y renderizar la imagen
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/render-scheduled-posts.mjs
+
+      - name: Commitear imágenes renderizadas (públicas vía raw.githubusercontent.com)
+        run: |
+          git config user.name "mejora-story-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add content/published content/used
+          git diff --cached --quiet || git commit -m "post: $(date -u +%Y-%m-%d)"
+          git push
+
+      - name: Publicar en Instagram y Facebook (vía Zernio)
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ZERNIO_API_KEY: ${{ secrets.ZERNIO_API_KEY }}
+          ZERNIO_INSTAGRAM_ACCOUNT_ID: ${{ secrets.ZERNIO_INSTAGRAM_ACCOUNT_ID }}
+          ZERNIO_FACEBOOK_ACCOUNT_ID: ${{ secrets.ZERNIO_FACEBOOK_ACCOUNT_ID }}
+          RAW_BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/main
+        run: node scripts/publish-scheduled-posts.mjs
+
+      - name: Subir manifiesto como artifact (para debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-scheduled-posts-${{ github.run_id }}
+          path: content/work/scheduled-posts.json
+          if-no-files-found: ignore

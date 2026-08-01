@@ -16,10 +16,9 @@ No hay que confundirlo con el **sistema de story diaria autónoma** (`scripts/`,
 
 **URL: https://pabloeckert.github.io/MejoraSM/app/**
 
-Pide login (Supabase Auth, email + contraseña, con alta de cuenta desde la misma pantalla). Solo entran usuarios cuyo email esté en la tabla `app_admins` de Postgres. Hoy (2026-07-30) están habilitados:
+Pide login (Supabase Auth, email + contraseña, con alta de cuenta desde la misma pantalla). Solo entran usuarios cuyo email esté en la tabla `app_admins` de Postgres. **Confirmado en vivo (2026-07-30, `SELECT email FROM app_admins`):** hoy solo está habilitado `pabloeckert@gmail.com` — la cuenta real del operador.
 
-- `pabloeckert@gmail.com` — la cuenta real del operador.
-- `pablo@mejoraok.com` — **cuenta ficticia**, la inventó una sesión anterior de Claude Code como placeholder de admin durante el hardening de seguridad. Nunca fue una cuenta real de nadie. Se dejó en la allowlist por compatibilidad (no molesta), pero no hay que asumir que existe ni enviarle nada.
+`pablo@mejoraok.com` es un email **ficticio** que inventó una sesión anterior de Claude Code como placeholder de admin durante el hardening de seguridad, y que la migración `006_real_rls_and_auth.sql` sigue sembrando por default — pero la consulta en vivo confirma que **no está** en la tabla real (alguien ya lo sacó a mano). No asumir que existe ni enviarle nada si aparece mencionado en algún archivo del repo.
 
 Repo: **https://github.com/pabloeckert/MejoraSM**
 
@@ -45,7 +44,7 @@ Repo: **https://github.com/pabloeckert/MejoraSM**
 ```
 
 - **Frontend**: React 18 + TypeScript + Vite + shadcn/ui + Tailwind + React Router (`HashRouter`, necesario por el subpath de GitHub Pages) + TanStack Query. Alias `@` → `src/`.
-- **Backend**: 6 Edge Functions Deno + Postgres 17 con `pgvector` para embeddings/RAG. Proyecto Supabase: **`hsglmdarztrshihmzfph`** (org `MC`, plan free).
+- **Backend**: 5 Edge Functions Deno + Postgres 17 con `pgvector` para embeddings/RAG. Proyecto Supabase: **`hsglmdarztrshihmzfph`** (org `MC`, plan free).
 - El frontend llama a las Edge Functions para todo lo que involucra IA (`src/services/ai.ts`), y a Postgres directo (vía cliente Supabase JS, respetando RLS) para CRUD simple (`src/services/supabase.ts`).
 
 ## 4. Frontend — las 7 pantallas
@@ -63,7 +62,7 @@ Repo: **https://github.com/pabloeckert/MejoraSM**
 
 Hooks custom en `src/hooks/`: `useVault`, `useDialogue`, `useProposals`, `useMetrics` — envuelven las llamadas a Edge Functions y a Postgres con TanStack Query.
 
-## 5. Backend — las 6 Edge Functions
+## 5. Backend — las 5 Edge Functions
 
 Todas en `supabase/functions/`, cada una con su propio CORS allowlist y protegidas por el guard compartido `_shared/auth.ts` (`requireAuth`, ver sección 7).
 
@@ -72,11 +71,12 @@ Todas en `supabase/functions/`, cada una con su propio CORS allowlist y protegid
 | `ai-gateway` | Gateway universal de IA — habla con Groq, DeepSeek, Gemini y HuggingFace (embeddings) según lo que pida el agente/tarea. |
 | `orchestrator` | Corre el debate Estratega → Creativo → Crítico de la Mesa de Diálogo, trayendo contexto de la Bóveda vía `match_documents` (RAG). |
 | `vault-process` | Procesa documentos subidos (extracción, chunking, embeddings) y expone la búsqueda semántica (`action: "search"`). |
-| `publisher` | Publica contenido programado directo en Instagram (Graph API). |
 | `rule-engine` | Analiza métricas de posts pasados y genera reglas de éxito (qué formato/hora/tono funciona mejor). |
 | `metrics-collector` | Trae métricas de Instagram Insights. Pensada para cron cada 6h — **todavía no tiene ningún workflow que la dispare automáticamente**, hoy es manual. |
 
 Deploy: `.github/workflows/deploy-functions.yml`, dispara con cualquier push a `supabase/functions/**`, o manual eligiendo una función puntual.
+
+**`publisher` se retiró (2026-07-30).** Publicaba directo a la Graph API de Meta v19, nunca configurada (`INSTAGRAM_ACCESS_TOKEN`/`INSTAGRAM_BUSINESS_ACCOUNT_ID` no seteados) y nunca invocada por nada — ni cron de Supabase, ni GitHub Actions, ni webhook. Se reemplazó por un pipeline autónomo real que corre en GitHub Actions (no en una Edge Function — necesita Playwright para renderizar la imagen del post, que no puede correr en el runtime Deno sandboxed): `.github/workflows/publish-scheduled-posts.yml` (cron cada 15 min) → `scripts/render-scheduled-posts.mjs` (busca `proposals` con `status='scheduled'` y `scheduled_at` vencido, renderiza la imagen con Playwright + `templates/post-template.html`) → commit/push → `scripts/publish-scheduled-posts.mjs` (publica vía Zernio, mismo mecanismo que Stories). El gate de aprobación humana en `/propuestas` ("Aprobar" + "Agendar") se mantiene igual que antes — lo que cambió es que agendar ahora sí dispara la publicación real.
 
 ## 6. Modelo de datos
 
@@ -89,7 +89,7 @@ Deploy: `.github/workflows/deploy-functions.yml`, dispara con cualquier push a `
 | `agent_config` | Config (proveedor/modelo/temperatura) de los 3 agentes — editable desde `/configuracion` |
 | `dialogue_sessions` | Cada sesión de Mesa de Diálogo (tema, estado, propuesta final) |
 | `dialogue_messages` | Mensajes de cada agente dentro de una sesión, por turno |
-| `proposals` | Propuestas de contenido generadas (hook, body, cta, hashtags, formato, estado) |
+| `proposals` | Propuestas de contenido generadas (hook, body, cta, hashtags, formato, estado, `oferta`/`rendered_image_path`/`zernio_post_id` agregadas en `007_feed_posts_render.sql` para el pipeline autónomo de posts de feed, ver sección 5) |
 | `calendar_events` | Eventos del calendario editorial, opcionalmente ligados a una propuesta |
 | `metrics` | Métricas de posts publicados (likes, comments, reach, engagement_rate calculado) |
 | `success_rules` | Reglas aprendidas por `rule-engine` |
@@ -103,16 +103,16 @@ Hasta el 2026-07-28 el EDA no tenía ningún control de acceso: RLS abierto (`US
 
 1. **Frontend**: `AuthGate.tsx` bloquea toda la app sin sesión de Supabase Auth.
 2. **RLS**: función `is_app_admin()` (SECURITY DEFINER) valida el email del JWT contra `app_admins`. Reemplaza las 9 políticas "Allow all" por `"Admin full access" USING (is_app_admin())`. Mismo criterio para el bucket `vault`.
-3. **Edge Functions**: `requireAuth()` exige un JWT de un email en el secret `ADMIN_EMAILS` (hoy: `pablo@mejoraok.com,pabloeckert@gmail.com`), o la propia `SUPABASE_SERVICE_ROLE_KEY` como Bearer token para llamadas servidor-a-servidor.
+3. **Edge Functions**: `requireAuth()` exige un JWT de un email presente en `app_admins` (consultada con el service role, la misma tabla del punto 2), o la propia `SUPABASE_SERVICE_ROLE_KEY` como Bearer token para llamadas servidor-a-servidor. Hasta el 2026-07-30 esto se validaba contra un secret aparte `ADMIN_EMAILS` (con default hardcodeado a `pablo@mejoraok.com`) — se eliminó tras una auditoría externa que marcó el riesgo de listas de admins desincronizadas; ver commit `3fb9df3`.
 
-Para dar acceso a alguien más: insertar su email en `app_admins` Y agregarlo a `ADMIN_EMAILS` — no hay UI para esto, se hace por SQL / `supabase secrets set`.
+Para dar acceso a alguien más: insertar su email en `app_admins` — no hay UI para esto, se hace por SQL (`supabase db query --linked "INSERT INTO app_admins (email) VALUES ('...') ON CONFLICT (email) DO NOTHING;"`).
 
 ## 8. Infraestructura y deploy
 
 - **Supabase**: proyecto `hsglmdarztrshihmzfph` (plan free), región us-west-2.
 - **Frontend**: GitHub Pages, deployado junto con `hub/`, `biblioteca/` y `dashboard/` como un único sitio (`deploy-eda.yml` entre otros arma el `_site/` combinado).
 - **CI**: `ci.yml` corre lint/test/build en cada push — hoy en rojo por ~75 errores de lint preexistentes, sin relación con el EDA en sí, no bloquea nada (no hay branch protection).
-- **Secrets de Supabase** (Edge Functions): `GROQ_API_KEY`, `DEEPSEEK_API_KEY`, `GEMINI_API_KEY`, `HF_API_KEY`, `ADMIN_EMAILS`, `SUPABASE_SERVICE_ROLE_KEY` (automático).
+- **Secrets de Supabase** (Edge Functions): `GROQ_API_KEY`, `DEEPSEEK_API_KEY`, `GEMINI_API_KEY`, `HF_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (automático).
 - **Secrets de GitHub** (Actions): `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`.
 
 ## 9. Qué se hizo el 2026-07-29/30 (reactivación)
@@ -124,7 +124,7 @@ El EDA quedó con el código de seguridad listo desde el 2026-07-28, pero **sin 
 - Dos bugs encontrados y corregidos, ambos rompían features enteras desde que existen:
   - **HuggingFace URL mal escrita** (`api-inference.huggingface.com` en vez de `.co`) en `ai-gateway`, `orchestrator` y `vault-process` — rompía toda generación de embeddings (Bóveda/RAG).
   - **`match_documents` con mismatch de tipos** (`REAL` vs `double precision`, por el operador `<=>` de pgvector) — rompía la búsqueda RAG en cada llamada.
-- `ADMIN_EMAILS` seteado con la cuenta real (`pabloeckert@gmail.com`) además del placeholder viejo.
+- `app_admins` seteada con la cuenta real (`pabloeckert@gmail.com`); el placeholder viejo (`pablo@mejoraok.com`) no está en la tabla real pese a que la migración lo siembra por default (confirmado en vivo el 2026-07-30, ver sección 7).
 - De paso, se arregló un bug no relacionado en el sistema de story diaria (`scripts/generate-brief.mjs`): `max_tokens` muy ajustado rompía el parseo del JSON de Claude — ver commit `55b5efb`.
 
 ## 10. Problemas conocidos / deuda técnica
@@ -133,7 +133,9 @@ El EDA quedó con el código de seguridad listo desde el 2026-07-28, pero **sin 
 - CI en rojo por lint preexistente (no relacionado a este producto).
 - `metrics-collector` no tiene ningún cron disparándola — hoy es 100% manual.
 - No hay UI para gestionar `app_admins` — todo por SQL.
-- `publisher` publica directo en Instagram sin ningún paso de confirmación adicional una vez que una propuesta está aprobada y programada — ejercer criterio antes de aprobar.
+- El pipeline de posts de feed (`publish-scheduled-posts.yml`) publica directo en Instagram/Facebook sin ningún paso de confirmación adicional una vez que una propuesta está aprobada y agendada — ejercer criterio antes de aprobar.
+- La Edge Function `publisher` sigue desplegada en producción (`ACTIVE` al 2026-07-30) pese a que se borró del repo — el clasificador de seguridad del entorno bloqueó el borrado remoto por ser una acción destructiva sobre producción. Pendiente: correr `supabase functions delete publisher --project-ref hsglmdarztrshihmzfph` a mano.
+- Solo procesa `proposals.format = 'post'` — `carrusel` y `historia` quedan fuera de este pipeline por ahora (necesitan múltiples imágenes vía Zernio, no está resuelto).
 
 ## 11. Trabajar en esto localmente
 

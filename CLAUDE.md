@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Plan de cierre del proyecto — `MEJORASM.md`
+
+Informe técnico y roadmap priorizado (**`MEJORASM.md`**, raíz del repo) que mide cada pieza del repo contra la fórmula ya probada de Stories (generar con IA → renderizar → publicar solo → trackear) y ordena lo que falta para que todo el proyecto — no solo el EDA — llegue a ese mismo nivel de autonomía. Leerlo antes de tomar cualquier decisión de alcance/roadmap; `CLAUDE.md` y `EDA.md` documentan cómo funciona lo que ya existe, `MEJORASM.md` documenta qué falta y en qué orden.
+
 ## Estado del EDA — actualizado 2026-07-30
 
 El EDA está **reactivado y funcional de punta a punta**. Informe técnico completo (arquitectura, pantallas, Edge Functions, modelo de datos, seguridad): **`EDA.md`** en la raíz del repo — léelo antes de tocar `src/` o `supabase/`.
@@ -11,7 +15,7 @@ Resumen de lo resuelto el 2026-07-30 (el schema llevaba desde el 2026-07-28 sin 
 - Schema completo (`001` a `006`) corrido a mano contra `hsglmdarztrshihmzfph`, evitando el CLI de Supabase (sigue roto, ver "Bug conocido del CLI" más abajo).
 - RLS real activo — confirmado, no es un supuesto.
 - Dos bugs de producción encontrados y corregidos: URL de HuggingFace mal escrita (rompía embeddings/RAG) y mismatch de tipos en `match_documents` (rompía la búsqueda RAG).
-- `ADMIN_EMAILS` incluye la cuenta real del operador, `pabloeckert@gmail.com`. **`pablo@mejoraok.com` es una cuenta ficticia** que inventó una sesión anterior de Claude Code como placeholder — quedó en la allowlist por compatibilidad, pero no es una cuenta real, no confiar en ella ni enviarle nada.
+- El acceso admin (RLS y Edge Functions) se controla hoy por una sola fuente de verdad, la tabla `app_admins`. **Confirmado en vivo (2026-07-30, `SELECT email FROM app_admins`):** la tabla real solo tiene `pabloeckert@gmail.com` — el email ficticio `pablo@mejoraok.com` que había sembrado una sesión anterior de Claude Code como placeholder **no está** en la tabla, pese a que la migración `006_real_rls_and_auth.sql` lo siembra por default; alguien ya lo sacó a mano contra la base real en algún momento posterior. No confiar en ese email ficticio ni enviarle nada si aparece en algún archivo del repo — la tabla real es la que manda.
 
 **Bug conocido del CLI (sigue sin resolverse):** `supabase db push` / `deploy-migrations.yml` fallan siempre con un error opaco del motor "Effect" del CLI (no es un problema del SQL — ver [issue #5091](https://github.com/supabase/cli/issues/5091) y [issue #4363](https://github.com/supabase/supabase/issues/4363), ninguno concluyente). Workaround encontrado y verificado: `supabase db query --linked "<SQL>"` ejecuta contra la base real sin pasar por ese motor — usarlo (o el SQL Editor del dashboard) para cualquier cambio de schema futuro, no `db push`.
 
@@ -38,8 +42,10 @@ Un solo producto: **MejoraSM**, para la marca MejoraOK. Cinco piezas; solo la pr
 ```bash
 npm run dev           # Vite dev server, app EDA (React), puerto 8080
 npm run build          # Build de producción (dist/)
+npm run preview        # Sirve el build de dist/ localmente
 npm run lint           # ESLint (*.ts/*.tsx)
 npm test               # Vitest (src/**/*.{test,spec}.{ts,tsx}, jsdom)
+npm run test:watch     # Vitest en modo watch
 ```
 
 Si `npm test` falla con `Cannot find package '@vitejs/plugin-react-swc'`, es que `node_modules` no tiene las devDependencies instaladas (falta `npm ci`/`npm install`) — no es un problema del código.
@@ -51,8 +57,8 @@ Si `npm test` falla con `Cannot find package '@vitejs/plugin-react-swc'`, es que
 Hasta 2026-07-28 el EDA no tenía ningún control de acceso: RLS con políticas `"Allow all" USING (true)`, cero login en el frontend, y las Edge Functions no validaban quién las llamaba — cualquiera con la anon key (pública en el bundle) tenía acceso total a los datos y podía disparar publicaciones reales a Instagram vía `publisher`. Esto se corrigió:
 
 - **Frontend**: `src/components/AuthGate.tsx` envuelve las rutas en `src/App.tsx` — sin sesión de Supabase Auth, se muestra `src/pages/Login.tsx` (email/password, con alta de cuenta) en vez de la app. Sign-out en `AppSidebar.tsx`.
-- **RLS**: `supabase/migrations/006_real_rls_and_auth.sql` reemplaza las 9 políticas "Allow all" por `is_app_admin()` — una función que valida el email del JWT contra la tabla `app_admins` (hoy: `pablo@mejoraok.com` [ficticio, ver arriba] y `pabloeckert@gmail.com` [real]). Mismo criterio para el bucket `vault` en Storage. Para dar acceso a alguien más, insertar su email en `app_admins` (no hay UI para esto todavía — usar `supabase db query --linked "INSERT INTO app_admins (email) VALUES ('...') ON CONFLICT (email) DO NOTHING;"`).
-- **Edge Functions**: `supabase/functions/_shared/auth.ts` (`requireAuth`) — cada una de las 6 funciones exige un JWT válido de un email en `ADMIN_EMAILS` (secret de Supabase, hoy incluye `pablo@mejoraok.com,pabloeckert@gmail.com`; default hardcodeado si el secret no está seteado: `pablo@mejoraok.com`), o la propia `SUPABASE_SERVICE_ROLE_KEY` como Bearer token para llamadas servidor-a-servidor (cron, otra función). Sin esto, responden 401/403.
+- **RLS**: `supabase/migrations/006_real_rls_and_auth.sql` reemplaza las 9 políticas "Allow all" por `is_app_admin()` — una función que valida el email del JWT contra la tabla `app_admins` (hoy, confirmado en vivo: solo `pabloeckert@gmail.com`, ver nota arriba). Mismo criterio para el bucket `vault` en Storage. Para dar acceso a alguien más, insertar su email en `app_admins` (no hay UI para esto todavía — usar `supabase db query --linked "INSERT INTO app_admins (email) VALUES ('...') ON CONFLICT (email) DO NOTHING;"`).
+- **Edge Functions**: `supabase/functions/_shared/auth.ts` (`requireAuth`) — cada una de las 6 funciones exige un JWT válido de un email presente en `app_admins` (consultada con el service role, la misma tabla que usa `is_app_admin()` para el RLS), o la propia `SUPABASE_SERVICE_ROLE_KEY` como Bearer token para llamadas servidor-a-servidor (cron, otra función). Sin esto, responden 401/403. Hasta el 2026-07-30 esto se validaba contra un secret aparte `ADMIN_EMAILS` (con un default hardcodeado a `pablo@mejoraok.com` si no estaba seteado) — una auditoría externa marcó que eso creaba listas de admins que podían desincronizarse, así que se sacaron los dos y quedó `app_admins` como única fuente. Dar acceso a alguien nuevo hoy es un solo INSERT en esa tabla, ya no hace falta tocar también un secret.
 - **`src/services/ai.ts`** arma el header `Authorization` en cada llamada con el `access_token` real de la sesión (`supabase.auth.getSession()`), no con la anon key pelada como antes. `src/services/supabase.ts` no necesitó cambios: al compartir el mismo `VITE_SUPABASE_URL`, su cliente lee la misma sesión persistida en `localStorage` que usa `src/integrations/supabase/client.ts`.
 
 **Confirmado (2026-07-30):** el schema y `006_real_rls_and_auth.sql` ya están aplicados contra la base real — el RLS de admin está vigente en producción, no es un supuesto. Detalle de cómo se aplicó en `EDA.md` sección 9.
@@ -77,15 +83,41 @@ Backend en `supabase/functions/` (Deno, Edge Functions), cada una con su propia 
 - `ai-gateway` — gateway universal de IA (Groq, DeepSeek, Gemini, HuggingFace)
 - `orchestrator` — orquesta el debate multi-agente (Estratega → Creativo → Crítico)
 - `vault-process` — extrae texto/chunks/embeddings de documentos para RAG
-- `publisher` — publica contenido programado en Instagram
 - `rule-engine` — analiza métricas y genera reglas de éxito
 - `metrics-collector` — recolecta métricas de Instagram Insights (pensado para cron cada 6h)
 
 Se deployan con `.github/workflows/deploy-functions.yml` (push a `supabase/functions/**`, o manual con función específica) — usa `SUPABASE_ACCESS_TOKEN` y `SUPABASE_PROJECT_REF` como secrets del repo.
 
-`supabase/migrations/`: schema SQL + pgvector, en orden `001` a `006` (nombres ya renumerados para que el orden alfabético coincida con el de ejecución real): `001_initial_schema.sql` → `002_policies_fix.sql` → `003_fix_postgrest.sql` → `004_indexes_constraints.sql` → `005_reconcile_status_constraints.sql` → `006_real_rls_and_auth.sql` (reemplaza el RLS abierto, ver sección de auth). Ya aplicadas contra la base real (2026-07-30) — ver "Bug conocido del CLI" arriba para cómo (no fue `supabase db push`, que sigue roto).
+**No hay Edge Function `publisher`** (se retiró el 2026-07-30 — publicaba directo a la Graph API de Meta, nunca configurada ni invocada por nada). La publicación de posts de feed ya aprobados/agendados en `/propuestas` corre en GitHub Actions, no en Supabase — ver "Arquitectura: publicación autónoma de posts de feed (EDA)" más abajo. **Pendiente:** la función sigue `ACTIVE` en el proyecto real (`hsglmdarztrshihmzfph`) porque borrarla remoto quedó bloqueado por el clasificador de seguridad del entorno (acción destructiva sobre producción) — falta correr `supabase functions delete publisher --project-ref hsglmdarztrshihmzfph` a mano.
+
+`supabase/migrations/`: schema SQL + pgvector, en orden `001` a `007` (nombres ya renumerados para que el orden alfabético coincida con el de ejecución real): `001_initial_schema.sql` → `002_policies_fix.sql` → `003_fix_postgrest.sql` → `004_indexes_constraints.sql` → `005_reconcile_status_constraints.sql` → `006_real_rls_and_auth.sql` (reemplaza el RLS abierto, ver sección de auth) → `007_feed_posts_render.sql` (agrega `oferta`/`rendered_image_path`/`zernio_post_id` a `proposals`, ver sección de publicación autónoma). Ya aplicadas contra la base real (2026-07-30) — ver "Bug conocido del CLI" arriba para cómo (no fue `supabase db push`, que sigue roto).
 
 `scripts/deploy.sh` lee el `PROJECT_REF` de `supabase/config.toml` (antes tenía uno hardcodeado que no coincidía — corregido 2026-07-28).
+
+## Arquitectura: publicación autónoma de posts de feed (EDA)
+
+Mismo patrón que la story diaria (ver sección siguiente) aplicado al módulo de Propuestas del EDA — agregado 2026-07-30 porque antes una propuesta aprobada y agendada no se publicaba nunca (nadie invocaba la Edge Function `publisher`, que además nunca tuvo configuradas sus credenciales de Meta). El gate de aprobación humana en `/propuestas` (botones "Aprobar"/"Agendar") **no cambió** — lo que se automatizó es todo lo que pasa después de agendar:
+
+```
+Propuestas aprobadas y agendadas (proposals.status='scheduled')
+  → .github/workflows/publish-scheduled-posts.yml (cron cada 15 min)
+    → scripts/render-scheduled-posts.mjs
+        - lee proposals vía REST de Supabase (status=scheduled, scheduled_at vencido, format='post')
+        - arma la imagen con content/inbox/<proposals.oferta>/ + templates/post-template.html
+          (1080x1080, con fallback a variante solo-texto si no hay foto)
+        - guarda content/work/scheduled-posts.json (manifiesto)
+    → commit + push de las imágenes renderizadas (necesario para que
+      raw.githubusercontent.com las sirva ANTES de publicarlas — mismo
+      motivo por el que daily-story.yml también commitea antes de publicar)
+    → scripts/publish-scheduled-posts.mjs
+        - lee el manifiesto, publica cada imagen vía scripts/lib/zernio.mjs
+          (publishPost(), gemela de publishStory() con contentType "post")
+        - marca la propuesta como publicada en Supabase (REST PATCH)
+```
+
+`proposals.oferta` (columna nueva en `007_feed_posts_render.sql`) la elige el operador en el diálogo "Agendar" de `src/pages/Propuestas.tsx` — determina de qué carpeta de `content/inbox/` sale la foto. Corre en GitHub Actions y no como Edge Function de Supabase porque necesita Playwright para renderizar la imagen, que no puede correr en el runtime Deno sandboxed de las Edge Functions — la misma razón por la que la story diaria tampoco vive ahí.
+
+**Fuera de alcance de este pipeline:** `proposals.format` distinto de `'post'` (carrusel, historia) — necesitan múltiples imágenes vía Zernio, no está resuelto todavía. `rule-engine` y `metrics-collector` siguen sin ningún cron que las dispare (son post-publish, no bloquean esto).
 
 ## Arquitectura: story diaria autónoma (`scripts/`, `content/`, `templates/`)
 
@@ -127,10 +159,11 @@ Las cuatro conviven en el **mismo sitio** de GitHub Pages (Pages en modo "workfl
 - **EDA en Vercel/Hostinger**: **no confirmado, no usar sin decidirlo con Pablo.** `util.mejoraok.com` no resuelve DNS, `mejorasm.vercel.app` devuelve 404, y ningún workflow hace deploy FTP pese a que los secrets `FTP_HOST`/`FTP_USERNAME`/`FTP_PASSWORD` siguen en el repo (son residuo). `vercel.json` tiene config de build correcta por si en algún momento se conecta un proyecto Vercel real.
 - **`supabase/functions/`**: `deploy-functions.yml` (push a `supabase/functions/**`, o manual).
 - **`supabase/migrations/`**: `deploy-migrations.yml` existe (`supabase db push --linked --yes --debug`, manual) pero **sigue sin funcionar** por el bug del CLI — no usarlo. Para cambios de schema, usar `supabase db query --linked "<SQL>"` o el SQL Editor del dashboard (ver "Bug conocido del CLI" arriba). El schema actual ya está aplicado así contra la base real.
+- **`publish-scheduled-posts.yml`** (posts de feed del EDA, cron cada 15 min + manual): necesita el secret de GitHub `SUPABASE_SERVICE_ROLE_KEY`, que **todavía no está creado** — sacarlo del dashboard de Supabase y cargarlo en Settings → Secrets → Actions antes de que el cron sirva para algo (si no está, el workflow falla en el primer paso). Reusa el secret `VITE_SUPABASE_URL` que ya existe como base URL de PostgREST.
 
 ## Variables de entorno
 
-Definidas en `.env.example` (copiar a `.env`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (frontend), `GROQ_API_KEY`, `DEEPSEEK_API_KEY`, `GEMINI_API_KEY`, `HF_API_KEY` (Edge Functions — se configuran como secrets en Supabase, no en `.env` local). `ADMIN_EMAILS` (Supabase secret) — lista de emails con acceso, coma-separada; hoy seteado a `pablo@mejoraok.com,pabloeckert@gmail.com`. Sin setear, cae a `pablo@mejoraok.com` únicamente (cuenta ficticia, ver arriba).
+Definidas en `.env.example` (copiar a `.env`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (frontend), `GROQ_API_KEY`, `DEEPSEEK_API_KEY`, `GEMINI_API_KEY`, `HF_API_KEY` (Edge Functions — se configuran como secrets en Supabase, no en `.env` local). El acceso admin ya no se gestiona por variable de entorno (ver sección de auth) — es un INSERT en la tabla `app_admins`.
 
 ## `backend/`
 

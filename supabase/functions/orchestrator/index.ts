@@ -249,6 +249,54 @@ async function saveMessage(
 }
 
 // ═══════════════════════════════════════
+// AUTO-AGENDA (posts de feed, PLAN_AUTONOMIA.md Fase 2)
+//
+// Objetivo de autonomía total: una propuesta aprobada por el Crítico no
+// espera un click de "Aprobar"/"Agendar" — se agenda sola. El control
+// humano pasa a ser posterior (cancelar en /propuestas mientras está
+// "scheduled", o despublicar ya publicada vía manage-post.yml), no un gate
+// previo. Solo aplica a format="post": carrusel/historia todavía no tienen
+// pipeline de publicación autónoma (ver PLAN_AUTONOMIA.md Fase 7), así que
+// esos quedan en "pending" para gestión manual como antes.
+// ═══════════════════════════════════════
+
+const OFERTAS = ["personal", "organizacional", "comercial", "empresarial", "profesionalizacion"];
+// Espaciado entre posts de feed autogenerados, para no saturar el feed con
+// varias corridas seguidas de Mesa de Diálogo el mismo día. Ajustable acá
+// sin tocar el resto del pipeline.
+const POST_SPACING_HOURS = 24;
+
+async function pickNextOferta(): Promise<string> {
+  const { data } = await supabase
+    .from("proposals")
+    .select("oferta")
+    .eq("format", "post")
+    .in("status", ["scheduled", "published"])
+    .not("oferta", "is", null);
+
+  const counts = Object.fromEntries(OFERTAS.map((o) => [o, 0]));
+  for (const row of data || []) {
+    if (row.oferta in counts) counts[row.oferta]++;
+  }
+  return OFERTAS.reduce((best, o) => (counts[o] < counts[best] ? o : best), OFERTAS[0]);
+}
+
+async function pickNextSlot(): Promise<string> {
+  const { data } = await supabase
+    .from("proposals")
+    .select("scheduled_at")
+    .eq("format", "post")
+    .in("status", ["scheduled", "published"])
+    .order("scheduled_at", { ascending: false })
+    .limit(1);
+
+  const now = Date.now();
+  const lastSlot = data?.[0]?.scheduled_at ? new Date(data[0].scheduled_at).getTime() : 0;
+  const spacingMs = POST_SPACING_HOURS * 60 * 60 * 1000;
+  return new Date(Math.max(now, lastSlot + spacingMs)).toISOString();
+}
+
+// ═══════════════════════════════════════
 // AGENTES
 // ═══════════════════════════════════════
 
@@ -408,18 +456,29 @@ async function startSession(topic: string) {
     })
     .eq("id", session.id);
 
-  // 6. Crear propuesta si fue aprobada
+  // 6. Crear propuesta si fue aprobada — autoagendada si es un formato con
+  // pipeline autónomo (ver AUTO-AGENDA arriba), pending si no.
   if (evaluacion.aprobado) {
-    await supabase.from("proposals").insert({
+    const format = proposal.format || "post";
+    const insert: Record<string, unknown> = {
       session_id: session.id,
-      format: proposal.format || "post",
+      format,
       title: proposal.hook || topic,
       body: proposal.body || contenido,
       hashtags: proposal.hashtags || [],
       hook: proposal.hook,
       cta: proposal.cta,
-      status: "pending",
-    });
+    };
+
+    if (format === "post") {
+      insert.status = "scheduled";
+      insert.oferta = await pickNextOferta();
+      insert.scheduled_at = await pickNextSlot();
+    } else {
+      insert.status = "pending";
+    }
+
+    await supabase.from("proposals").insert(insert);
   }
 
   return {
