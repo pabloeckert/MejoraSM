@@ -55,8 +55,10 @@ un botón "Aprobar".
       detalle en Fase 2).
 - [x] 3. **rule-engine / metrics-collector** — cron cada 6h/diario, probado
       en vivo con `workflow_dispatch` (HTTP 200 real en ambos).
-- [ ] 4. **Dashboard** — cubrir posts de feed (hoy rotos) + soporte para
-      borrar/corregir una publicación ya hecha (el monitor del punto 2).
+- [x] 4. **Dashboard** — cubre posts de feed + botón de gestión/reversión.
+      Código deployado y `sync-history.yml` corrido en vivo sin errores;
+      falta ejercitarlo con un post de feed real (mismo bloqueo que el punto
+      2 — todavía no se publicó ninguno).
 - [ ] 5. **Calendario** — reconectar con `proposals.scheduled_at` o sacarle
       la promesa visual de que agenda algo.
 - [ ] 6. **Biblioteca** — Paso 3, persistencia real (subida vía API de
@@ -134,12 +136,11 @@ Instagram para `/insights` — no verificable sin un post real y el token.
 🚨 Alerta de fase: sin esto, sacar el gate de la Fase 2 es publicar a
 ciegas — el dashboard es el único control real que va a quedar.
 
-- [ ] `localImageFor()` en `sync-history.mjs` soporta también el patrón
+- [x] `localImageFor()` en `sync-history.mjs` soporta también el patrón
       `post-{fecha}-N.jpg`, no solo `story-{fecha}-1.jpg`.
-- [ ] Headline/kicker de un post de feed sale de `proposals` (vía REST) o de
-      un log propio — hoy solo lo llena Stories.
-- [ ] Acción de "borrar/corregir" un post ya publicado, expuesta en el
-      dashboard (el monitor de la Fase 2).
+- [x] Headline/kicker de un post de feed sale de `proposals` (vía REST).
+- [x] Acción de "borrar/corregir" un post ya publicado, expuesta en el
+      dashboard (siempre visible para posts de feed, no solo si falló).
 
 ## Fase 5 — Calendario
 
