@@ -33,6 +33,19 @@ un botón "Aprobar".
 3. Este documento no reemplaza a `MEJORASM.md` (informe técnico de estado)
    — es el plan de ejecución que se tacha a medida que se avanza.
 
+## Fuente de verdad — confirmado 2026-08-02
+
+Surgió una duda legítima sobre si el objetivo de arriba (autonomía total,
+cero gate previo) era realmente lo que Pablo quería, o si se había pisado
+sin querer una decisión distinta tomada en otra conversación en paralelo.
+Pablo lo resolvió de forma directa y explícita: **esta conversación —la que
+armó y ejecutó este plan— es la única fuente de verdad para MejoraSM.**
+Cualquier otro insumo (otra sesión, otra persona, "Sindy" u otra) se
+incorpora solo cuando Pablo lo traiga acá de forma expresa — hasta entonces,
+no aplica y no se re-discute. El objetivo de autonomía total sin gate previo
+queda **confirmado, no en duda** — no se vuelve a plantear la pregunta de
+"esto es lo que realmente quiso" salvo que Pablo mismo la reabra.
+
 ## Objetivos de negocio
 
 - Una sola marca hoy (MejoraOK) — este plan no asume expansión a otros
