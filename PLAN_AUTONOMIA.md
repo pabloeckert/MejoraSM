@@ -68,8 +68,10 @@ un botón "Aprobar".
       su navegador (no algo que se pueda hacer sin su sesión). Categorías/
       álbumes en JSON y aprendizaje supervisado real quedan fuera de esta
       fase (ver `biblioteca/README.md`).
-- [ ] 7. **Carruseles** — extender el pipeline de feed a
-      `format='carrusel'`.
+- [~] 7. **Carruseles** — pipeline extendido a `format='carrusel'` (hasta 4
+      slides, `mediaItems` múltiples a Zernio) y auto-agenda de la Fase 2
+      ampliada a este formato. Deployado. Sin verificar contra un post real
+      (mismo bloqueo que los puntos 2 y 6).
 
 **Nota de orden:** Pablo propuso Stories → Dashboard → Calendario →
 Biblioteca → posts de feed → Carruseles → rule-engine/metrics, aclarando que
@@ -175,6 +177,12 @@ funcione.
 🚨 Alerta de fase: última pieza — no adelantarla salvo que las Fases 2 a 4
 ya estén cerradas (es extensión de formato, no de autonomía).
 
-- [ ] `render-scheduled-posts.mjs` genera múltiples imágenes cuando
-      `format='carrusel'`.
-- [ ] `publish-scheduled-posts.mjs` pasa `mediaItems` múltiples a Zernio.
+- [x] `render-scheduled-posts.mjs` genera múltiples imágenes cuando
+      `format='carrusel'` (hasta 4 slides: hook + cuerpo dividido en
+      oraciones + cta, una foto distinta por slide si hay disponibles).
+- [x] `publish-scheduled-posts.mjs` pasa `mediaItems` múltiples a Zernio.
+- [x] `orchestrator` extendido: la auto-agenda de la Fase 2 ahora también
+      cubre `carrusel`, no solo `post`.
+
+Pendiente: probar contra un post/carrusel real (bloqueado — necesita
+contenido real generado desde Mesa de Diálogo, mismo punto que la Fase 2).
