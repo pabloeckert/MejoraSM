@@ -108,6 +108,7 @@ const state = {
   tutorialActive: false, tutorialStep: 0, tutorialSeen: false,
   calYear: null, calMonth: null, calSelectedId: null, calDraftWhen: "",
   ghModalOpen: false, ghTokenDraft: "", ghChecking: false, ghStatus: null, ghUser: null,
+  uploadDimension: "personal",
 };
 
 let _toastTimer = null;
@@ -249,25 +250,83 @@ App.confirmItem = function (e, id) {
 
 // ---------- Carga de archivos ----------
 function randomCategory() { return state.categories[Math.floor(Math.random() * state.categories.length)]; }
+App.setUploadDimension = function (dim) { App.setState({ uploadDimension: dim }); };
+
+// Nombre de archivo único y seguro para el repo: <fecha-hora>-<base>.<ext>
+function safeFilename(name) {
+  const extMatch = name.match(/\.[a-z0-9]+$/i);
+  const ext = (extMatch ? extMatch[0] : ".jpg").toLowerCase();
+  let base = name.replace(/\.[a-z0-9]+$/i, "").replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "foto";
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  const rnd = Math.random().toString(36).slice(2, 5);
+  return `${stamp}-${rnd}-${base}${ext}`;
+}
+
+function dimLabel(key) { const d = DIMENSIONS.find((x) => x.key === key); return d ? d.label : key; }
+// Actualiza el estado de subida de una card sin perder foco/scroll si se puede.
+function renderItemStatus(id) {
+  const it = state.items.find((x) => x.id === id);
+  const el = document.querySelector(`.up-status[data-id="${id}"]`);
+  if (el && it) { el.outerHTML = uploadStatusHTML(it); return; }
+  render();
+}
+function uploadStatusHTML(it) {
+  if (!it.uploadState || it.uploadState === "pending") {
+    if (it.persisted) return `<span class="up-status saved" data-id="${escapeAttr(it.id)}" title="Guardada en el repo">${ICONS.check} En el repo</span>`;
+    return `<span class="up-status" data-id="${escapeAttr(it.id)}"></span>`;
+  }
+  if (it.uploadState === "uploading") return `<span class="up-status uploading" data-id="${escapeAttr(it.id)}">Guardando…</span>`;
+  if (it.uploadState === "saved") return `<span class="up-status saved" data-id="${escapeAttr(it.id)}" title="${escapeAttr(it.repoPath || "")}">${ICONS.check} En el repo</span>`;
+  if (it.uploadState === "error") return `<span class="up-status error" data-id="${escapeAttr(it.id)}" title="${escapeAttr(it.uploadError || "")}">⚠ No se guardó</span>`;
+  return `<span class="up-status" data-id="${escapeAttr(it.id)}"></span>`;
+}
+
+// Commit de una foto ya cargada en memoria al repo (content/inbox/<dim>/).
+App.persistPhoto = async function (id) {
+  const it = state.items.find((x) => x.id === id);
+  if (!it || !it.filename) return;
+  if (typeof GH === "undefined" || !GH.isConnected()) return;
+  it.uploadState = "uploading"; renderItemStatus(id);
+  try {
+    await GH.commitPhoto(it.dimension, it.filename, it.img);
+    it.uploadState = "saved"; it.persisted = true; it.repoPath = `content/inbox/${it.dimension}/${it.filename}`;
+  } catch (e) {
+    it.uploadState = "error"; it.uploadError = e.message || "Error al guardar";
+  }
+  renderItemStatus(id);
+};
 
 App.addFiles = function (fileList, targetAlbum) {
   const files = Array.from(fileList || []).filter((f) => f.type.startsWith("image/"));
   if (!files.length) return;
+  const connected = typeof GH !== "undefined" && GH.isConnected();
+  const dimension = state.uploadDimension || "personal";
   const snap = App.snapshot();
   let done = 0;
+  const newIds = [];
   files.forEach((file) => {
     const reader = new FileReader();
     reader.onload = () => {
       const guess = randomCategory();
+      const id = uid("up");
+      newIds.push(id);
       state.items = [{
-        id: uid("up"), title: file.name.replace(/\.[a-z0-9]+$/i, ""), categories: guess ? [guess] : [],
+        id, title: file.name.replace(/\.[a-z0-9]+$/i, ""), categories: guess ? [guess] : [],
         album: targetAlbum || null, context: null, proposed: true, date: "hoy", img: reader.result, pos: "50% 50%", stage: "biblioteca", stageMeta: null,
+        dimension, filename: safeFilename(file.name), persisted: false, uploadState: connected ? "pending" : null, when: null,
       }, ...state.items];
       done++;
       if (done === files.length) {
         state.lastSnapshot = snap;
         render();
-        App.pushToast(`${files.length} archivo${files.length > 1 ? "s" : ""} subido${files.length > 1 ? "s" : ""}`, "El sistema propuso etiquetas — revisalas cuando quieras.", "info", true);
+        if (connected) {
+          App.pushToast(`${files.length} foto${files.length > 1 ? "s" : ""} — guardando en el repo…`, `Dimensión: ${dimLabel(dimension)}. Se están commiteando a content/inbox/.`, "info");
+          newIds.forEach((nid) => App.persistPhoto(nid));
+        } else {
+          App.pushToast(`${files.length} foto${files.length > 1 ? "s" : ""} subida${files.length > 1 ? "s" : ""} (en memoria)`, "Conectá GitHub para guardarlas de verdad en el repo.", "info", true);
+        }
       } else {
         render();
       }
@@ -560,6 +619,7 @@ function cardHTML(it, size) {
       <div class="card-title">${escapeHtml(it.title)}</div>
       ${stepperHTML(it)}
       ${it.album ? `<div class="card-album">${escapeHtml(it.album)}</div>` : ""}
+      ${it.dimension ? `<div class="card-dim"><span class="dim-tag">${escapeHtml(dimLabel(it.dimension))}</span>${uploadStatusHTML(it)}</div>` : ""}
     </div>
     ${isList ? actions : ""}
   </div>`;
@@ -798,6 +858,17 @@ function quickCardHTML(it) {
     </div>
   </div>`;
 }
+function dimensionSelectorHTML() {
+  const connected = typeof GH !== "undefined" && GH.isConnected();
+  const opts = DIMENSIONS.map((d) => `<button type="button" class="dim-opt ${state.uploadDimension === d.key ? "active" : ""}" onclick="App.setUploadDimension('${d.key}')">${escapeHtml(d.label)}</button>`).join("");
+  return `<div class="dim-selector">
+    <div class="dim-selector-label">Dimensión del Manual de Marca <span class="dim-hint">— define la carpeta de content/inbox/ (el sistema aprenderá a proponerla)</span></div>
+    <div class="dim-opts">${opts}</div>
+    ${connected
+      ? `<div class="dim-note connected"><span class="gh-dot on"></span> Conectado a GitHub — las fotos se guardan de verdad en el repo.</div>`
+      : `<div class="dim-note">⚠ No conectado: las fotos quedan solo en memoria. <button type="button" class="link-inline" onclick="App.openGhModal()">Conectar GitHub</button></div>`}
+  </div>`;
+}
 function buildQuickScreen(mobile) {
   const recentItems = state.items.slice(0, 6);
   const list = recentItems.length
@@ -808,6 +879,7 @@ function buildQuickScreen(mobile) {
     : "";
   return `
     ${!mobile ? `<div class="screen-title">Carga rápida</div>` : ""}
+    ${dimensionSelectorHTML()}
     ${dropzoneHTML("quick", mobile)}
     ${list}
   `;
@@ -858,6 +930,7 @@ function buildBatchScreen(mobile) {
       </div>
       <div id="batch-actions" style="display:flex;gap:10px;">${p.actions}</div>
     </div>
+    ${dimensionSelectorHTML()}
     <div id="batch-dz">${p.dz}</div>
     <div id="batch-grid" class="batch-grid" style="grid-template-columns:repeat(${mobile ? 2 : 4},1fr)">${p.grid}</div>
   `;
