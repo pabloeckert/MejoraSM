@@ -59,8 +59,9 @@ un botón "Aprobar".
       Código deployado y `sync-history.yml` corrido en vivo sin errores;
       falta ejercitarlo con un post de feed real (mismo bloqueo que el punto
       2 — todavía no se publicó ninguno).
-- [ ] 5. **Calendario** — reconectar con `proposals.scheduled_at` o sacarle
-      la promesa visual de que agenda algo.
+- [x] 5. **Calendario** — pasó a ser de solo lectura sobre
+      `proposals.scheduled_at`; se sacó "Nuevo evento" (no agendaba nada de
+      verdad). Build + 52/52 tests + deploy verificados.
 - [ ] 6. **Biblioteca** — Paso 3, persistencia real (subida vía API de
       GitHub).
 - [ ] 7. **Carruseles** — extender el pipeline de feed a
@@ -147,10 +148,11 @@ ciegas — el dashboard es el único control real que va a quedar.
 🚨 Alerta de fase: acá no hay autonomía que ganar, es que deje de mentir. No
 agregar funciones nuevas — solo reconectar o achicar la promesa visual.
 
-- [ ] Decidir: ¿el calendario pasa a ser la forma real de agendar (se
-      unifica con `scheduled_at`), o se le saca todo elemento que sugiera
-      que programa algo?
-- [ ] Implementar la decisión de arriba.
+- [x] Decisión tomada: el calendario pasa a ser la vista real de
+      `scheduled_at` (solo lectura) — no se implementó un "agendar desde
+      acá" nuevo para no duplicar el monitor de reversión que ya vive en
+      Propuestas (Fase 2).
+- [x] Implementado, deployado y verificado (build + tests + deploy EDA).
 
 ## Fase 6 — Biblioteca (Paso 3)
 
