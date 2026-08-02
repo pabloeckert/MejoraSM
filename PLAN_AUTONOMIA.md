@@ -62,8 +62,12 @@ un botón "Aprobar".
 - [x] 5. **Calendario** — pasó a ser de solo lectura sobre
       `proposals.scheduled_at`; se sacó "Nuevo evento" (no agendaba nada de
       verdad). Build + 52/52 tests + deploy verificados.
-- [ ] 6. **Biblioteca** — Paso 3, persistencia real (subida vía API de
-      GitHub).
+- [~] 6. **Biblioteca** — Paso 3 (subida de fotos) integrado y deployado —
+      viene de una rama/stash que ya existía (`biblioteca-de-contenido`),
+      mergeada a `main`. Falta probar el commit real con el PAT de Pablo en
+      su navegador (no algo que se pueda hacer sin su sesión). Categorías/
+      álbumes en JSON y aprendizaje supervisado real quedan fuera de esta
+      fase (ver `biblioteca/README.md`).
 - [ ] 7. **Carruseles** — extender el pipeline de feed a
       `format='carrusel'`.
 
@@ -160,8 +164,11 @@ agregar funciones nuevas — solo reconectar o achicar la promesa visual.
 agregar features de organización nuevas hasta que la persistencia real
 funcione.
 
-- [ ] `biblioteca/github.js` sube fotos reales a `content/inbox/<oferta>/`
-      vía API de GitHub (reemplaza los datos de mentira en memoria).
+- [x] `biblioteca/github.js` sube fotos reales a `content/inbox/<oferta>/`
+      vía API de GitHub (reemplaza los datos de mentira en memoria) —
+      mergeado desde la rama `biblioteca-de-contenido` + su stash sin
+      commitear. Deploy verificado. Falta el test real con el PAT de
+      Pablo (bloqueado: necesita su sesión de navegador).
 
 ## Fase 7 — Carruseles
 
