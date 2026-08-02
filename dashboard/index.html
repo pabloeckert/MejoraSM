@@ -268,8 +268,8 @@
 <body>
   <header>
     <div class="dots"><span class="dot rojo"></span><span class="dot amarillo"></span><span class="dot azul"></span></div>
-    <h1>Monitor de stories</h1>
-    <p class="lead">Historial real de lo publicado en Instagram y Facebook — sincronizado directo desde Zernio.</p>
+    <h1>Monitor de stories y posts</h1>
+    <p class="lead">Historial real de lo publicado en Instagram y Facebook (stories y posts de feed) — sincronizado directo desde Zernio.</p>
   </header>
 
   <div id="estado">Cargando historial…</div>
@@ -282,7 +282,8 @@
   <script>
     const HISTORIAL_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/log/historial.json";
     const ACCIONES_MANUALES_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/log/acciones-manuales.json";
-    const MANAGE_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/manage-story.yml";
+    const MANAGE_STORY_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/manage-story.yml";
+    const MANAGE_POST_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/manage-post.yml";
     const MARK_MANUAL_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/mark-manual.yml";
 
     const NOMBRES_PLATAFORMA = { instagram: "Instagram", facebook: "Facebook" };
@@ -330,18 +331,52 @@
         </div>`;
     }
 
+    // Stories se gestionan por post_id de Zernio (manage-story.yml); posts de
+    // feed por el id de la propuesta en Supabase (manage-post.yml) — son
+    // workflows e ids distintos, aunque la UI se vea igual.
+    function manageTarget(post) {
+      if (post.kind === "post" && post.proposalId) {
+        return { workflowUrl: MANAGE_POST_WORKFLOW_URL, idLabel: "ID de propuesta", idValue: post.proposalId };
+      }
+      return { workflowUrl: MANAGE_STORY_WORKFLOW_URL, idLabel: "Post ID", idValue: post.id };
+    }
+
     function accionesFacebookFallido(post) {
+      const { workflowUrl, idLabel, idValue } = manageTarget(post);
       return `<div class="acciones">
           <div class="post-id-row">
-            <code title="${post.id}">${post.id}</code>
-            <button class="copiar" onclick="copiarId(this, '${post.id}')">Copiar ID</button>
+            <code title="${idValue}">${idValue}</code>
+            <button class="copiar" onclick="copiarId(this, '${idValue}')">Copiar ID</button>
           </div>
-          <a class="run-workflow" href="${MANAGE_WORKFLOW_URL}" target="_blank" rel="noopener">Ir a Actions → Run workflow</a>
+          <a class="run-workflow" href="${workflowUrl}" target="_blank" rel="noopener">Ir a Actions → Run workflow</a>
           <div class="instrucciones">
-            Con el Post ID copiado: abrí el link de arriba, "Run workflow", pegá el
-            Post ID, elegí "facebook" y la acción (reintentar la crea de nuevo
+            Con el ${idLabel} copiado: abrí el link de arriba, "Run workflow", pegalo,
+            elegí "facebook" y la acción (reintentar la crea de nuevo
             con la misma imagen; despublicar la baja de verdad). En "confirmacion"
             escribí exactamente CONFIRMO — cualquier otro valor corta sin hacer nada.
+          </div>
+        </div>`;
+    }
+
+    // Monitor de reversión (PLAN_AUTONOMIA.md Fase 2/4): a diferencia del
+    // bloque de arriba (solo aparece si Zernio ya marcó la plataforma como
+    // "failed"), esto se muestra siempre para un post de feed publicado —
+    // el control humano acá es posterior a publicar, no un gate previo, así
+    // que tiene que poder corregir/bajar algo aunque haya salido bien.
+    function gestionPostDeFeed(post) {
+      if (post.kind !== "post" || !post.proposalId) return "";
+      return `<div class="acciones">
+          <div class="instrucciones" style="margin-bottom:4px;"><strong>Post de feed</strong> — si no te convence, gestionalo:</div>
+          <div class="post-id-row">
+            <code title="${post.proposalId}">${post.proposalId}</code>
+            <button class="copiar" onclick="copiarId(this, '${post.proposalId}')">Copiar ID</button>
+          </div>
+          <a class="run-workflow" href="${MANAGE_POST_WORKFLOW_URL}" target="_blank" rel="noopener">Ir a Actions → Run workflow</a>
+          <div class="instrucciones">
+            Con el ID de propuesta copiado: "Run workflow", elegí la plataforma y
+            "despublicar" (Facebook se baja de verdad; Instagram no se puede
+            despublicar por API — hay que borrarlo a mano desde la app). En
+            "confirmacion" escribí exactamente CONFIRMO.
           </div>
         </div>`;
     }
@@ -358,14 +393,16 @@
         })
         .join("");
 
-      const accionesHtml = post.platforms
-        .filter((p) => p.status === "failed")
-        .map((p) =>
-          p.platform === "instagram"
-            ? avisoInstagramFallido(post, p, accionesManuales)
-            : accionesFacebookFallido(post)
-        )
-        .join("");
+      const fallidas = post.platforms.filter((p) => p.status === "failed");
+      const accionesHtml = fallidas.length
+        ? fallidas
+            .map((p) =>
+              p.platform === "instagram"
+                ? avisoInstagramFallido(post, p, accionesManuales)
+                : accionesFacebookFallido(post)
+            )
+            .join("")
+        : gestionPostDeFeed(post);
 
       // headline/oferta solo existen para posts publicados después de que
       // render-story.mjs empezó a guardarlos en content/log/local-briefs.json

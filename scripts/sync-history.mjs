@@ -28,6 +28,9 @@ if (!RAW_BASE_URL) {
   process.exit(1);
 }
 
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
 async function fetchAllPostsForAccount(accountId, apiKey) {
   const posts = [];
   let page = 1;
@@ -58,10 +61,40 @@ function platformEntry(p, post) {
   };
 }
 
-function localImageFor(date) {
-  const relPath = `content/published/story-${date}-1.jpg`;
-  if (!existsSync(path.join(ROOT, relPath))) return { imageUrl: null, outputPath: null };
-  return { imageUrl: `${RAW_BASE_URL}/${relPath}`, outputPath: relPath };
+// Prueba primero el patrón de Stories (story-{fecha}-1.jpg) y, si no existe,
+// el de posts de feed (post-{fecha}-N.jpg, N de render-scheduled-posts.mjs
+// según cuántas propuestas se rendericen ese día) — antes solo probaba el
+// primero, así que cada post de feed publicado quedaba sin imagen local.
+async function localImageFor(date) {
+  const storyPath = `content/published/story-${date}-1.jpg`;
+  if (existsSync(path.join(ROOT, storyPath))) {
+    return { imageUrl: `${RAW_BASE_URL}/${storyPath}`, outputPath: storyPath };
+  }
+  for (let n = 1; n <= 5; n++) {
+    const postPath = `content/published/post-${date}-${n}.jpg`;
+    if (existsSync(path.join(ROOT, postPath))) {
+      return { imageUrl: `${RAW_BASE_URL}/${postPath}`, outputPath: postPath };
+    }
+  }
+  return { imageUrl: null, outputPath: null };
+}
+
+// Posts de feed no pasan por render-story.mjs, así que nunca están en
+// local-briefs.json — su headline/oferta/id de propuesta salen directo de
+// `proposals` en Supabase, matcheando por zernio_post_id (lo que
+// scripts/publish-scheduled-posts.mjs guarda al publicar).
+async function loadFeedProposals() {
+  if (!SUPABASE_URL || !SERVICE_KEY) return new Map();
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/proposals?zernio_post_id=not.is.null&select=id,zernio_post_id,hook,title,oferta`,
+    { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } }
+  );
+  if (!res.ok) {
+    console.warn(`Aviso: no pude traer proposals de Supabase (${res.status}) — posts de feed quedan sin headline/oferta.`);
+    return new Map();
+  }
+  const rows = await res.json();
+  return new Map(rows.map((r) => [r.zernio_post_id, r]));
 }
 
 // Zernio nunca recibe el headline ni la oferta (son solo para el prompt de
@@ -98,23 +131,29 @@ async function main() {
   }
 
   const localBriefs = await loadLocalBriefs();
+  const feedProposals = await loadFeedProposals();
 
-  const entries = [...byId.values()].map((post) => {
-    const date = (post.scheduledFor || post.createdAt || "").slice(0, 10);
-    const { imageUrl, outputPath } = localImageFor(date);
-    const brief = outputPath ? localBriefs.get(outputPath) : undefined;
-    return {
-      id: post._id,
-      date,
-      status: post.status,
-      content: post.content || "",
-      headline: brief?.headline || null,
-      kicker: brief?.kicker || null,
-      oferta: brief?.oferta || null,
-      imageUrl,
-      platforms: (post.platforms || []).map((p) => platformEntry(p, post)),
-    };
-  });
+  const entries = await Promise.all(
+    [...byId.values()].map(async (post) => {
+      const date = (post.scheduledFor || post.createdAt || "").slice(0, 10);
+      const { imageUrl, outputPath } = await localImageFor(date);
+      const feedProposal = feedProposals.get(post._id);
+      const brief = !feedProposal && outputPath ? localBriefs.get(outputPath) : undefined;
+      return {
+        id: post._id,
+        date,
+        status: post.status,
+        content: post.content || "",
+        kind: feedProposal ? "post" : "story",
+        proposalId: feedProposal?.id || null,
+        headline: feedProposal?.hook || feedProposal?.title || brief?.headline || null,
+        kicker: brief?.kicker || null,
+        oferta: feedProposal?.oferta || brief?.oferta || null,
+        imageUrl,
+        platforms: (post.platforms || []).map((p) => platformEntry(p, post)),
+      };
+    })
+  );
 
   entries.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
