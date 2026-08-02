@@ -2,11 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Plan de cierre del proyecto — `MEJORASM.md`
+## Plan de cierre del proyecto — `MEJORASM.md` y `PLAN_AUTONOMIA.md`
 
-Informe técnico y roadmap priorizado (**`MEJORASM.md`**, raíz del repo) que mide cada pieza del repo contra la fórmula ya probada de Stories (generar con IA → renderizar → publicar solo → trackear) y ordena lo que falta para que todo el proyecto — no solo el EDA — llegue a ese mismo nivel de autonomía. Leerlo antes de tomar cualquier decisión de alcance/roadmap; `CLAUDE.md` y `EDA.md` documentan cómo funciona lo que ya existe, `MEJORASM.md` documenta qué falta y en qué orden.
+`MEJORASM.md` (raíz del repo): informe técnico y roadmap priorizado que mide cada pieza del repo contra la fórmula ya probada de Stories (generar con IA → renderizar → publicar solo → trackear). `CLAUDE.md` y `EDA.md` documentan cómo funciona lo que ya existe; `MEJORASM.md` documentaba qué faltaba y en qué orden (edición 2026-07-30).
 
-## Estado del EDA — actualizado 2026-07-30
+`PLAN_AUTONOMIA.md` (raíz del repo, agregado 2026-08-02): plan de ejecución **bloqueado** con checklist por fase para cerrar exactamente lo que `MEJORASM.md` dejó pendiente, hacia un objetivo más estricto que el original — **autonomía total, sin gate de aprobación humana previo a publicar** (el control pasa a ser posterior: cancelar/despublicar, no aprobar antes). Léelo antes de tocar el flujo de Propuestas/publicación — sus 7 fases ya están todas implementadas y deployadas (detalle en la sección siguiente); el propio archivo tiene el estado fase por fase, actualizado a medida que se cierra cada una. Sus "reglas de bloqueo" dicen que el alcance no se reabre por conversación suelta, solo editando ese archivo.
+
+## Estado del EDA — actualizado 2026-08-02
 
 El EDA está **reactivado y funcional de punta a punta**. Informe técnico completo (arquitectura, pantallas, Edge Functions, modelo de datos, seguridad): **`EDA.md`** en la raíz del repo — léelo antes de tocar `src/` o `supabase/`.
 
@@ -20,8 +22,28 @@ Resumen de lo resuelto el 2026-07-30 (el schema llevaba desde el 2026-07-28 sin 
 **Bug conocido del CLI (sigue sin resolverse):** `supabase db push` / `deploy-migrations.yml` fallan siempre con un error opaco del motor "Effect" del CLI (no es un problema del SQL — ver [issue #5091](https://github.com/supabase/cli/issues/5091) y [issue #4363](https://github.com/supabase/supabase/issues/4363), ninguno concluyente). Workaround encontrado y verificado: `supabase db query --linked "<SQL>"` ejecuta contra la base real sin pasar por ese motor — usarlo (o el SQL Editor del dashboard) para cualquier cambio de schema futuro, no `db push`.
 
 **Otras cosas pendientes, menor prioridad:**
-- CI (`ci.yml`) sigue en rojo — 75 errores de lint preexistentes (`@typescript-eslint/no-explicit-any` mayormente), sin relación con el EDA. No bloquea nada (no hay branch protection en `main`) pero conviene limpiarlo en algún momento.
-- La rama `biblioteca-de-contenido` tiene el Paso 3 de Pablo sin commitear (`biblioteca/app.js`, `biblioteca/styles.css`) — se dejó tal cual, sin tocar.
+- CI (`ci.yml`) sigue en rojo — 68 errores de lint preexistentes (`@typescript-eslint/no-explicit-any` mayormente), sin relación con el EDA. No bloquea nada (no hay branch protection en `main`) pero conviene limpiarlo en algún momento.
+
+### Overhaul de autonomía — 2026-08-02 (`PLAN_AUTONOMIA.md`)
+
+Pablo pidió pasar de "autonomía con gate humano" (aprobar/agendar antes de publicar) a **autonomía total**: una propuesta aprobada por el Crítico se agenda y publica sola; el control humano es posterior (cancelar antes de que salga, o despublicar/corregir después). Las 7 fases de `PLAN_AUTONOMIA.md` están implementadas y deployadas:
+
+- **Posts de feed sin gate**: `orchestrator` agenda solo una propuesta con `format` `post` o `carrusel` (elige oferta por rotación de menor uso + un horario espaciado 24h del último) — ya no pasa por "Aprobar"/"Agendar". Solo `historia` sigue sin pipeline y queda en `pending` para gestión manual. `Propuestas.tsx` es ahora el monitor: botón "Cancelar" en Programadas, y `scripts/manage-post.mjs` + `.github/workflows/manage-post.yml` (mismo patrón que `manage-story.yml`, pero contra `proposals` de Supabase en vez de `historial.json`) para reintentar/despublicar algo ya publicado.
+- **Cron real para `rule-engine`/`metrics-collector`**: `.github/workflows/rule-engine-cron.yml` (diario) y `metrics-collector-cron.yml` (cada 6h) — antes ninguna de las dos tenía disparador. Probados en vivo con `workflow_dispatch` (HTTP 200 reales).
+- **Dashboard cubre posts de feed**: `sync-history.mjs` ya no adivina la imagen de un post por fecha (podía pisarse entre varios posts el mismo día) — usa `proposals.rendered_image_path` directo. El monitor de reversión (cancelar/despublicar) también aparece ahí para posts de feed.
+- **Calendario Editorial** (`src/pages/Calendario.tsx`) pasó a ser **de solo lectura** sobre `proposals.scheduled_at` — se sacó el diálogo "Nuevo evento", que escribía en `calendar_events` sin relación real con lo que se publicaba. Agendar/cancelar de verdad vive en `/propuestas`.
+- **Biblioteca Paso 3**: se mergeó la rama `biblioteca-de-contenido` (tenía un commit + un stash con la subida de fotos sin terminar de integrar) — subida real de fotos a `content/inbox/<dimensión>/` vía API de GitHub ya integrada y deployada (detalle en la sección de hub/biblioteca/dashboard más abajo).
+- **Carruseles**: `render-scheduled-posts.mjs` genera hasta 4 slides para `format='carrusel'` (hook + cuerpo dividido en oraciones + cta, una foto por slide si hay disponibles) y `publish-scheduled-posts.mjs`/`scripts/lib/zernio.mjs` mandan `mediaItems` múltiples a Zernio.
+
+De paso se encontraron y corrigieron dos bugs reales preexistentes (no relacionados con el overhaul en sí):
+- Mesa de Diálogo estaba **rota desde antes** — los 3 agentes tenían configurado un modelo de Groq (`meta-llama/llama-4-scout-17b-16e-instruct`) que ya no existe. Corregido a `llama-3.3-70b-versatile` en `orchestrator`/`ai-gateway` y en la tabla `agent_config` real.
+- `metrics-collector` filtraba por `instagram_post_id` (columna legacy que ya no escribe nadie) en vez de `zernio_post_id` (lo que llena el pipeline actual) — nunca iba a encontrar nada.
+
+**Pendiente, todo bloqueado por necesitar acción directa de Pablo (no algo resoluble sin su sesión/credenciales):**
+- Borrar la función `publisher` — bloqueado por el clasificador de seguridad del entorno (acción destructiva en producción), igual que antes.
+- Verificar en vivo el circuito completo (auto-agenda → render → publish real vía Zernio) — dispararlo por API está bloqueado por el mismo clasificador (publica contenido real sin revisión previa). Hay que disparar un tema real desde Mesa de Diálogo en la app.
+- Probar el commit real de una foto en Biblioteca — necesita el PAT de Pablo en su propio navegador.
+- `metrics-collector` no va a traer datos reales hasta que exista el secret de Supabase `INSTAGRAM_ACCESS_TOKEN` (trámite de Meta for Developers, no de código) — sin él, el cron corre pero es un no-op explícito.
 
 ## Qué es este repo
 
@@ -73,8 +95,8 @@ Páginas (`src/pages/`) y su rol:
 - `Boveda` — bóveda de documentos de marca (RAG)
 - `MesaDialogo` — mesa de diálogo multi-agente (debate Estratega/Creativo/Crítico)
 - `Laboratorio` — laboratorio de contenido
-- `Calendario` — calendario editorial
-- `Propuestas` — cola de aprobación de propuestas de contenido
+- `Calendario` — de solo lectura desde el overhaul del 2026-08-02: refleja `proposals.scheduled_at`, no agenda nada (eso vive en Propuestas)
+- `Propuestas` — desde el overhaul del 2026-08-02, monitor de lo que se agenda/publica solo (cancelar antes de publicar); solo `format='historia'` sigue con aprobación manual real
 - `Configuracion` — configuración de agentes de IA
 
 Hooks custom en `src/hooks/` (`useVault`, `useDialogue`, `useProposals`, `useMetrics`) llaman a `src/services/ai.ts` (invoca Edge Functions) y `src/services/supabase.ts` (CRUD directo). El cliente Supabase vive en `src/integrations/supabase/client.ts` y usa `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` (ver `.env.example`). `src/components/ui/` es el set estándar de shadcn sin modificar; la UI propia está en `src/components/layout/` (AppSidebar, AppLayout).
@@ -83,8 +105,8 @@ Backend en `supabase/functions/` (Deno, Edge Functions), cada una con su propia 
 - `ai-gateway` — gateway universal de IA (Groq, DeepSeek, Gemini, HuggingFace)
 - `orchestrator` — orquesta el debate multi-agente (Estratega → Creativo → Crítico)
 - `vault-process` — extrae texto/chunks/embeddings de documentos para RAG
-- `rule-engine` — analiza métricas y genera reglas de éxito
-- `metrics-collector` — recolecta métricas de Instagram Insights (pensado para cron cada 6h)
+- `rule-engine` — analiza métricas y genera reglas de éxito (cron diario real desde 2026-08-02, `.github/workflows/rule-engine-cron.yml`)
+- `metrics-collector` — recolecta métricas de Instagram Insights (cron real cada 6h desde 2026-08-02, `.github/workflows/metrics-collector-cron.yml` — hoy es un no-op explícito porque falta el secret `INSTAGRAM_ACCESS_TOKEN`)
 
 Se deployan con `.github/workflows/deploy-functions.yml` (push a `supabase/functions/**`, o manual con función específica) — usa `SUPABASE_ACCESS_TOKEN` y `SUPABASE_PROJECT_REF` como secrets del repo.
 
@@ -96,28 +118,39 @@ Se deployan con `.github/workflows/deploy-functions.yml` (push a `supabase/funct
 
 ## Arquitectura: publicación autónoma de posts de feed (EDA)
 
-Mismo patrón que la story diaria (ver sección siguiente) aplicado al módulo de Propuestas del EDA — agregado 2026-07-30 porque antes una propuesta aprobada y agendada no se publicaba nunca (nadie invocaba la Edge Function `publisher`, que además nunca tuvo configuradas sus credenciales de Meta). El gate de aprobación humana en `/propuestas` (botones "Aprobar"/"Agendar") **no cambió** — lo que se automatizó es todo lo que pasa después de agendar:
+Mismo patrón que la story diaria (ver sección siguiente) aplicado al módulo de Propuestas del EDA. Agregado 2026-07-30 (porque antes una propuesta agendada no se publicaba nunca) y **rediseñado 2026-08-02** para sacar el gate de aprobación humana previa (ver "Overhaul de autonomía" arriba) — hoy una propuesta con `format` `post` o `carrusel` que el Crítico aprueba en Mesa de Diálogo pasa a `scheduled` **sola**, sin que nadie apriete "Aprobar"/"Agendar":
 
 ```
-Propuestas aprobadas y agendadas (proposals.status='scheduled')
+Mesa de Diálogo (Estratega → Creativo → Crítico) aprueba una propuesta
+  → orchestrator la inserta en `proposals` YA con status='scheduled'
+    (elige oferta por rotación de menor uso + scheduled_at espaciado 24h
+    del último — ver AUTO-AGENDA en supabase/functions/orchestrator/index.ts)
   → .github/workflows/publish-scheduled-posts.yml (cron cada 15 min)
     → scripts/render-scheduled-posts.mjs
-        - lee proposals vía REST de Supabase (status=scheduled, scheduled_at vencido, format='post')
-        - arma la imagen con content/inbox/<proposals.oferta>/ + templates/post-template.html
-          (1080x1080, con fallback a variante solo-texto si no hay foto)
-        - guarda content/work/scheduled-posts.json (manifiesto)
+        - lee proposals vía REST de Supabase (status=scheduled, scheduled_at
+          vencido, format in (post, carrusel))
+        - post: 1 imagen con content/inbox/<proposals.oferta>/ + templates/post-template.html
+          (1080x1080, fallback a variante solo-texto si no hay foto)
+        - carrusel: hasta 4 slides (hook + cuerpo dividido en oraciones + cta),
+          reusando el mismo template por slide, una foto distinta por slide si hay
+        - guarda content/work/scheduled-posts.json (manifiesto, outputPaths es
+          siempre un array — 1 elemento en post, varios en carrusel)
     → commit + push de las imágenes renderizadas (necesario para que
       raw.githubusercontent.com las sirva ANTES de publicarlas — mismo
       motivo por el que daily-story.yml también commitea antes de publicar)
     → scripts/publish-scheduled-posts.mjs
-        - lee el manifiesto, publica cada imagen vía scripts/lib/zernio.mjs
-          (publishPost(), gemela de publishStory() con contentType "post")
+        - lee el manifiesto, publica vía scripts/lib/zernio.mjs
+          (publishPost(), gemela de publishStory() con contentType "post" —
+          acepta un array de imageUrl para carrusel, createPostAndPoll arma
+          varios mediaItems)
         - marca la propuesta como publicada en Supabase (REST PATCH)
 ```
 
-`proposals.oferta` (columna nueva en `007_feed_posts_render.sql`) la elige el operador en el diálogo "Agendar" de `src/pages/Propuestas.tsx` — determina de qué carpeta de `content/inbox/` sale la foto. Corre en GitHub Actions y no como Edge Function de Supabase porque necesita Playwright para renderizar la imagen, que no puede correr en el runtime Deno sandboxed de las Edge Functions — la misma razón por la que la story diaria tampoco vive ahí.
+`proposals.oferta` (columna en `007_feed_posts_render.sql`) la elige `orchestrator` automáticamente — determina de qué carpeta de `content/inbox/` sale la foto. Corre en GitHub Actions y no como Edge Function de Supabase porque necesita Playwright para renderizar la imagen, que no puede correr en el runtime Deno sandboxed de las Edge Functions — la misma razón por la que la story diaria tampoco vive ahí.
 
-**Fuera de alcance de este pipeline:** `proposals.format` distinto de `'post'` (carrusel, historia) — necesitan múltiples imágenes vía Zernio, no está resuelto todavía. `rule-engine` y `metrics-collector` siguen sin ningún cron que las dispare (son post-publish, no bloquean esto).
+**Monitor de reversión** (control humano posterior, no gate previo): mientras está `scheduled`, botón "Cancelar" en `/propuestas` (pestaña Programadas). Ya publicada: `.github/workflows/manage-post.yml` (`scripts/manage-post.mjs`, workflow_dispatch con `proposal_id` + plataforma + `reintentar`/`despublicar`, exige tipear `CONFIRMO`) — Instagram no soporta despublicar por API (limitación de Meta), Facebook sí.
+
+**Fuera de alcance de este pipeline:** `format='historia'` — sin pipeline de publicación autónomo todavía, queda en `pending` para gestión manual en `/propuestas` igual que antes del overhaul.
 
 ## Arquitectura: story diaria autónoma (`scripts/`, `content/`, `templates/`)
 
@@ -149,7 +182,7 @@ Gestión de posts ya publicados, todo por `workflow_dispatch` (no hay UI propia 
 Las cuatro conviven en el **mismo sitio** de GitHub Pages (Pages en modo "workflow" solo sirve un artifact por sitio): `hub/` en la raíz, `dashboard/`, `biblioteca/` y el build del EDA (`dist/`) como subpaths (`/dashboard/`, `/biblioteca/`, `/app/`). Los cuatro workflows (`deploy-hub.yml`, `deploy-biblioteca.yml`, `deploy-dashboard.yml`, `deploy-eda.yml`) arman el mismo `_site/` combinado — cualquiera de los cuatro se dispara por push a su parte y republica el sitio entero (el EDA se buildea en los cuatro, ya que cualquiera puede disparar el republish). Si se edita la lógica de armado de `_site/` en uno, hay que replicarla en los otros tres o se pisan entre sí.
 
 - **`hub/index.html`** — 5 tarjetas, una por oferta, que linkean directo a la UI de upload de GitHub (`github.com/.../upload/main/content/inbox/<oferta>`) para subir fotos a `content/inbox/<oferta>/` sin tocar git a mano. Dispara el flujo de story diaria en la próxima corrida del workflow. Deploy activo en **https://pabloeckert.github.io/MejoraSM/**.
-- **`biblioteca/`** — interfaz para cargar, etiquetar y organizar el contenido que alimenta `content/inbox/`. Estado (ver `biblioteca/README.md`): Paso 1 (diseño) y Paso 2 (UI + interacción sobre datos de mentira en memoria, `seed-demo.js`) hechos; Paso 3 (persistencia real) en curso — `biblioteca/github.js` escribe al repo vía API de GitHub (PAT fine-grained guardado solo en `localStorage` del navegador, nunca commiteado). La lectura del repo público no necesita token; solo el commit (subir foto, guardar JSON) lo usa.
+- **`biblioteca/`** — interfaz para cargar, etiquetar y organizar el contenido que alimenta `content/inbox/`. Estado (ver `biblioteca/README.md`): Paso 1 (diseño) y Paso 2 (UI + interacción sobre datos de mentira en memoria, `seed-demo.js`) hechos; Paso 3 (persistencia real) **en curso, subida de fotos ya integrada y deployada (2026-08-02)** — `biblioteca/github.js` escribe al repo vía API de GitHub (PAT fine-grained guardado solo en `localStorage` del navegador, nunca commiteado). La lectura del repo público no necesita token; solo el commit (subir foto) lo usa. Todavía sin probar en vivo con un PAT real (necesita la sesión de navegador de Pablo). Pendiente, fuera de esta fase: persistir categorías/álbumes en JSON y el aprendizaje supervisado real.
 - **`dashboard/index.html`** — monitor de solo lectura de las stories publicadas/programadas (lee `content/log/historial.json`). A pesar de que `dashboard/README.md` todavía dice "Pendiente (Fase 5)", ya está implementado y deployado — no confiar en ese README sin verificar `index.html`.
 - **`src/` (EDA)** — deployado en `/app/` (**https://pabloeckert.github.io/MejoraSM/app/**). Requiere login (ver sección de auth). `vite.config.ts` usa `base: process.env.VITE_BASE_PATH || "/"` — en local/Vercel/Hostinger es `/`, en GitHub Pages es `/MejoraSM/app/` (seteado por los workflows de deploy).
 
@@ -159,7 +192,7 @@ Las cuatro conviven en el **mismo sitio** de GitHub Pages (Pages en modo "workfl
 - **EDA en Vercel/Hostinger**: **no confirmado, no usar sin decidirlo con Pablo.** `util.mejoraok.com` no resuelve DNS, `mejorasm.vercel.app` devuelve 404, y ningún workflow hace deploy FTP pese a que los secrets `FTP_HOST`/`FTP_USERNAME`/`FTP_PASSWORD` siguen en el repo (son residuo). `vercel.json` tiene config de build correcta por si en algún momento se conecta un proyecto Vercel real.
 - **`supabase/functions/`**: `deploy-functions.yml` (push a `supabase/functions/**`, o manual).
 - **`supabase/migrations/`**: `deploy-migrations.yml` existe (`supabase db push --linked --yes --debug`, manual) pero **sigue sin funcionar** por el bug del CLI — no usarlo. Para cambios de schema, usar `supabase db query --linked "<SQL>"` o el SQL Editor del dashboard (ver "Bug conocido del CLI" arriba). El schema actual ya está aplicado así contra la base real.
-- **`publish-scheduled-posts.yml`** (posts de feed del EDA, cron cada 15 min + manual): necesita el secret de GitHub `SUPABASE_SERVICE_ROLE_KEY`, que **todavía no está creado** — sacarlo del dashboard de Supabase y cargarlo en Settings → Secrets → Actions antes de que el cron sirva para algo (si no está, el workflow falla en el primer paso). Reusa el secret `VITE_SUPABASE_URL` que ya existe como base URL de PostgREST.
+- **`publish-scheduled-posts.yml`** (posts de feed del EDA, cron cada 15 min + manual), **`metrics-collector-cron.yml`** (cada 6h) y **`rule-engine-cron.yml`** (diario): usan el secret de GitHub `SUPABASE_SERVICE_ROLE_KEY`, creado el 2026-08-02. Ojo si hay que regenerarlo: tiene que ser la API key nueva estilo `sb_secret_...` (Settings → API Keys del proyecto Supabase, no la legacy JWT de `service_role`) — la legacy JWT funciona contra PostgREST (`/rest/v1/...`, la usan los scripts) pero el gateway de Edge Functions (`/functions/v1/...`, lo usan los cron de arriba) la rechaza con 401. Reusa el secret `VITE_SUPABASE_URL` que ya existe como base URL.
 
 ## Variables de entorno
 
