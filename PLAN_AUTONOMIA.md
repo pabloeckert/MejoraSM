@@ -48,11 +48,13 @@ un botón "Aprobar".
 
 - [x] 1. **Stories diaria** — ya autónoma de punta a punta, sin gate.
       Mantener, no tocar salvo bug.
-- [ ] 2. **Posts de feed sin gate** — sacar "Aprobar/Agendar", cerrar lo
-      técnico pendiente (secret, borrar `publisher`, probar `contentType`),
-      agregar el monitor de reversión.
-- [ ] 3. **rule-engine / metrics-collector** — disparador real (cron), para
-      que el sistema aprenda de lo que se publica y se corrige.
+- [~] 2. **Posts de feed sin gate** — código y deploy hechos (auto-agenda +
+      monitor de cancelar/despublicar). Falta: borrar `publisher` (bloqueado
+      por el clasificador de seguridad, necesita a Pablo) y el test real en
+      vivo (necesita que Pablo dispare un tema real en Mesa de Diálogo, ver
+      detalle en Fase 2).
+- [x] 3. **rule-engine / metrics-collector** — cron cada 6h/diario, probado
+      en vivo con `workflow_dispatch` (HTTP 200 real en ambos).
 - [ ] 4. **Dashboard** — cubrir posts de feed (hoy rotos) + soporte para
       borrar/corregir una publicación ya hecha (el monitor del punto 2).
 - [ ] 5. **Calendario** — reconectar con `proposals.scheduled_at` o sacarle
@@ -78,23 +80,54 @@ grande del sistema (Propuestas) sigue dependiendo de que Pablo apriete un
 botón todos los días. No se da por cerrada la fase con solo los 3
 pendientes técnicos si el gate de aprobación humana sigue ahí.
 
-- [ ] Crear el secret `SUPABASE_SERVICE_ROLE_KEY` en GitHub Actions.
-- [ ] Borrar la función `publisher` (`ACTIVE` en el proyecto real, sin uso).
+- [x] Crear el secret `SUPABASE_SERVICE_ROLE_KEY` en GitHub Actions.
+- [ ] Borrar la función `publisher` (`ACTIVE` en el proyecto real, sin uso) —
+      **bloqueado**: el clasificador de seguridad del entorno no deja
+      ejecutar esto de forma autónoma (acción destructiva en producción).
+      Pendiente: que Pablo corra
+      `npx supabase functions delete publisher --project-ref hsglmdarztrshihmzfph`.
 - [ ] Correr `publish-scheduled-posts.yml` una vez a mano y confirmar que
-      Zernio acepta `contentType: "post"`.
-- [ ] Sacar el gate "Aprobar/Agendar" de `Propuestas.tsx` — una propuesta
-      generada pasa a agendada sola.
-- [ ] Definir y construir el "monitor de reversión": dónde y cómo Pablo ve
-      lo publicado y lo borra/corrige si no le gustó (ver Fase 4).
+      Zernio acepta `contentType: "post"` — **bloqueado**: requiere una
+      propuesta real agendada, y generarla dispara un posteo real a
+      Instagram/Facebook sin revisión humana previa (es justo el
+      comportamiento nuevo). El clasificador de seguridad bloqueó mi intento
+      de disparar esto por API. Pendiente: que Pablo dispare un tema real
+      desde Mesa de Diálogo en la app (uso normal, no bloqueado para él), o
+      habilite el permiso puntual para que lo dispare Claude.
+- [x] Sacar el gate "Aprobar/Agendar" de `Propuestas.tsx` — una propuesta
+      generada pasa a agendada sola (solo `format='post'`; carrusel/historia
+      quedan en `pending` porque no tienen pipeline autónomo, ver Fase 7).
+      `orchestrator` deployado con este cambio.
+- [x] Monitor de reversión: botón "Cancelar" en Propuestas.tsx (antes de
+      publicar) + `scripts/manage-post.mjs` / `manage-post.yml`
+      (reintentar/despublicar algo ya publicado, mismo patrón que
+      `manage-story.yml`).
+
+Hallazgo no planeado, corregido de paso: Mesa de Diálogo estaba rota desde
+antes de esta fase — los 3 agentes tenían configurado un modelo de Groq
+(`meta-llama/llama-4-scout-17b-16e-instruct`) que ya no existe. Corregido a
+`llama-3.3-70b-versatile` en código (`orchestrator`, `ai-gateway`) y en la
+tabla `agent_config` real, redeployado.
 
 ## Fase 3 — rule-engine / metrics-collector
 
 🚨 Alerta de fase: sin esto el sistema publica solo pero nunca aprende —
 contradice la idea de independencia real, no solo de automatización.
 
-- [ ] Workflow de GitHub Actions con `schedule` para `metrics-collector`
-      (cada 6h, ya documentado en el código).
-- [ ] Workflow de GitHub Actions con `schedule` para `rule-engine` (diario).
+- [x] Workflow de GitHub Actions con `schedule` para `metrics-collector`
+      (cada 6h) — probado con `workflow_dispatch`, responde HTTP 200.
+- [x] Workflow de GitHub Actions con `schedule` para `rule-engine` (diario)
+      — probado con `workflow_dispatch`, responde HTTP 200.
+
+Hallazgo no planeado, corregido de paso: `metrics-collector` filtraba por
+`instagram_post_id` (columna legacy que ya no escribe nadie) en vez de
+`zernio_post_id` (lo que llena el pipeline actual) — corregido. Sigue
+pendiente, sin resolver (no es un bug de código, es un trámite externo):
+recolectar métricas reales requiere que Pablo saque un
+`INSTAGRAM_ACCESS_TOKEN` real (Meta for Developers) — sin eso, el cron
+corre pero no hace nada (no-op explícito, no un error). Además queda sin
+confirmar si `zernio_post_id` es el mismo id que pide la Graph API de
+Instagram para `/insights` — no verificable sin un post real y el token.
 
 ## Fase 4 — Dashboard
 
