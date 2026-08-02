@@ -259,10 +259,10 @@ describe("Calendario Page", () => {
     expect(screen.getByText("Calendario Editorial")).toBeInTheDocument();
   });
 
-  it("renders new event button", async () => {
+  it("renders as read-only, pointing to Propuestas for changes", async () => {
     const { default: Calendario } = await import("@/pages/Calendario");
     renderWithProviders(<Calendario />);
-    expect(screen.getByText("Nuevo evento")).toBeInTheDocument();
+    expect(screen.getByText(/Solo lectura/i)).toBeInTheDocument();
   });
 
   it("renders weekday headers", async () => {
