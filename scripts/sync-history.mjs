@@ -86,7 +86,7 @@ async function localImageFor(date) {
 async function loadFeedProposals() {
   if (!SUPABASE_URL || !SERVICE_KEY) return new Map();
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/proposals?zernio_post_id=not.is.null&select=id,zernio_post_id,hook,title,oferta`,
+    `${SUPABASE_URL}/rest/v1/proposals?zernio_post_id=not.is.null&select=id,zernio_post_id,hook,title,oferta,rendered_image_path`,
     { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } }
   );
   if (!res.ok) {
@@ -136,8 +136,14 @@ async function main() {
   const entries = await Promise.all(
     [...byId.values()].map(async (post) => {
       const date = (post.scheduledFor || post.createdAt || "").slice(0, 10);
-      const { imageUrl, outputPath } = await localImageFor(date);
       const feedProposal = feedProposals.get(post._id);
+      // Un post de feed sabe exactamente qué imagen es la suya
+      // (proposals.rendered_image_path) — no hace falta adivinar por fecha
+      // como con Stories, que es una aproximación (varios posts el mismo
+      // día podían pisarse la imagen entre sí antes de este fix).
+      const { imageUrl, outputPath } = feedProposal?.rendered_image_path
+        ? { imageUrl: `${RAW_BASE_URL}/${feedProposal.rendered_image_path}`, outputPath: feedProposal.rendered_image_path }
+        : await localImageFor(date);
       const brief = !feedProposal && outputPath ? localBriefs.get(outputPath) : undefined;
       return {
         id: post._id,

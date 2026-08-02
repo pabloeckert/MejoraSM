@@ -255,11 +255,12 @@ async function saveMessage(
 // espera un click de "Aprobar"/"Agendar" — se agenda sola. El control
 // humano pasa a ser posterior (cancelar en /propuestas mientras está
 // "scheduled", o despublicar ya publicada vía manage-post.yml), no un gate
-// previo. Solo aplica a format="post": carrusel/historia todavía no tienen
-// pipeline de publicación autónoma (ver PLAN_AUTONOMIA.md Fase 7), así que
-// esos quedan en "pending" para gestión manual como antes.
+// previo. Aplica a "post" y "carrusel" (ambos con pipeline de publicación
+// autónomo, ver PLAN_AUTONOMIA.md Fase 7) — "historia" todavía no tiene uno,
+// así que esa queda en "pending" para gestión manual como antes.
 // ═══════════════════════════════════════
 
+const AUTO_PUBLISH_FORMATS = ["post", "carrusel"];
 const OFERTAS = ["personal", "organizacional", "comercial", "empresarial", "profesionalizacion"];
 // Espaciado entre posts de feed autogenerados, para no saturar el feed con
 // varias corridas seguidas de Mesa de Diálogo el mismo día. Ajustable acá
@@ -270,7 +271,7 @@ async function pickNextOferta(): Promise<string> {
   const { data } = await supabase
     .from("proposals")
     .select("oferta")
-    .eq("format", "post")
+    .in("format", AUTO_PUBLISH_FORMATS)
     .in("status", ["scheduled", "published"])
     .not("oferta", "is", null);
 
@@ -285,7 +286,7 @@ async function pickNextSlot(): Promise<string> {
   const { data } = await supabase
     .from("proposals")
     .select("scheduled_at")
-    .eq("format", "post")
+    .in("format", AUTO_PUBLISH_FORMATS)
     .in("status", ["scheduled", "published"])
     .order("scheduled_at", { ascending: false })
     .limit(1);
@@ -470,7 +471,7 @@ async function startSession(topic: string) {
       cta: proposal.cta,
     };
 
-    if (format === "post") {
+    if (AUTO_PUBLISH_FORMATS.includes(format)) {
       insert.status = "scheduled";
       insert.oferta = await pickNextOferta();
       insert.scheduled_at = await pickNextSlot();

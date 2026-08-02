@@ -71,9 +71,12 @@ async function main() {
   let failures = 0;
 
   for (const entry of manifest) {
-    const imageUrl = `${rawBaseUrl}/${entry.outputPath}`;
+    // outputPaths: 1 elemento para un post simple, varios para un carrusel
+    // (PLAN_AUTONOMIA.md Fase 7) — publishPost/createPostAndPoll ya aceptan
+    // un array de URLs.
+    const imageUrls = entry.outputPaths.map((p) => `${rawBaseUrl}/${p}`);
     try {
-      const result = await publishPost(imageUrl, entry.caption);
+      const result = await publishPost(imageUrls.length === 1 ? imageUrls[0] : imageUrls, entry.caption);
       if (!result.success) {
         failures++;
         await markError(entry.proposalId, result.error || "Fallo desconocido publicando en Zernio");

@@ -147,9 +147,9 @@ function PropuestasContent() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Propuestas de Contenido</h1>
         <p className="mt-1 text-muted-foreground">
-          Los posts de feed se agendan y publican solos. Esta pantalla es el monitor: revisá lo programado
-          y cancelalo si no te convence, o aprobá a mano los formatos que todavía no tienen pipeline
-          autónomo (carrusel, historia).
+          Los posts y carruseles de feed se agendan y publican solos. Esta pantalla es el monitor: revisá lo
+          programado y cancelalo si no te convence, o aprobá a mano los formatos que todavía no tienen
+          pipeline autónomo (historia).
         </p>
       </div>
 
@@ -233,7 +233,7 @@ function PropuestasContent() {
         {/* PROGRAMADAS */}
         <TabsContent value="scheduled" className="mt-6">
           <p className="mb-4 text-xs text-muted-foreground">
-            Los posts de formato "post" se agendan solos apenas los aprueba el Crítico en Mesa de Diálogo —
+            Los posts y carruseles se agendan solos apenas los aprueba el Crítico en Mesa de Diálogo —
             se publican solos cuando llega la fecha. Cancelá acá si alguno no te convence antes de que salga.
           </p>
           {scheduled.length === 0 ? (

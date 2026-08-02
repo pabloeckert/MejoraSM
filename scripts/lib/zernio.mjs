@@ -31,8 +31,11 @@ async function fetchPostPlatforms(postId, apiKey) {
 // de dar por perdida una plataforma que todavía no terminó de procesar.
 // Compartido por publishStory() (todas las plataformas configuradas) y por
 // el reintento manual de una sola plataforma (scripts/manage-story.mjs).
+// imageUrl acepta una sola URL (post/story) o un array de URLs (carrusel —
+// Zernio las publica en el orden del array, ver publishPost()).
 export async function createPostAndPoll({ apiKey, content, imageUrl, platforms }) {
   try {
+    const urls = Array.isArray(imageUrl) ? imageUrl : [imageUrl];
     const res = await fetch(ZERNIO_API_URL, {
       method: "POST",
       headers: {
@@ -41,7 +44,7 @@ export async function createPostAndPoll({ apiKey, content, imageUrl, platforms }
       },
       body: JSON.stringify({
         content,
-        mediaItems: [{ type: "image", url: imageUrl }],
+        mediaItems: urls.map((url) => ({ type: "image", url })),
         platforms,
         publishNow: true,
       }),
@@ -128,7 +131,8 @@ export async function publishStory(imageUrl, caption = "") {
 // mismo mecanismo (createPostAndPoll), único cambio real es contentType
 // "post" en vez de "story". A diferencia de las Stories, acá el caption SÍ
 // se ve en el feed — se manda el copy completo de la propuesta, no un texto
-// de referencia interno.
+// de referencia interno. imageUrl puede ser un array (carrusel, PLAN_AUTONOMIA.md
+// Fase 7) — createPostAndPoll ya soporta ambos casos.
 export async function publishPost(imageUrl, caption = "") {
   const apiKey = process.env.ZERNIO_API_KEY;
   const igAccountId = process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID;
