@@ -99,7 +99,7 @@ async function callAI(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: model || "meta-llama/llama-4-scout-17b-16e-instruct",
+          model: model || "llama-3.3-70b-versatile",
           messages: allMessages,
           temperature,
           max_tokens: 2048,

@@ -1,0 +1,27 @@
+# Dispara rule-engine diariamente (PLAN_AUTONOMIA.md Fase 3). Con menos de 5
+# métricas guardadas, la función responde rulesFound:0 sin error (ver
+# analyzeMetrics() en supabase/functions/rule-engine/index.ts) — no hace
+# falta esperar a tener datos para activar el cron.
+name: Rule Engine Cron
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  analyze:
+    name: Analizar métricas y generar reglas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invocar rule-engine (analyze)
+        run: |
+          code=$(curl -s -o /tmp/response.json -w "%{http_code}" -X POST \
+            "${{ secrets.VITE_SUPABASE_URL }}/functions/v1/rule-engine" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"analyze"}')
+          echo "HTTP $code"
+          cat /tmp/response.json
+          if [ "$code" -ge 300 ]; then exit 1; fi

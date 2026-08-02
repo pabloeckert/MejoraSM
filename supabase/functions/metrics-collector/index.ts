@@ -120,6 +120,14 @@ async function getAccountInsights(accountId: string, accessToken: string) {
 // PROCESAMIENTO
 // ═══════════════════════════════════════
 
+// NOTA (pendiente real, no resuelto en este pase): postId acá es
+// zernio_post_id (el id que Zernio le da al post), no necesariamente el
+// media id real de Instagram que pide la Graph API en /{media-id}/insights.
+// sync-history.mjs nunca confirmó que Zernio devuelva ese id real en su
+// respuesta — solo platformPostUrl. Hasta no verificar el schema real de
+// Zernio con un post publicado, esta llamada puede fallar aunque
+// INSTAGRAM_ACCESS_TOKEN ya esté configurado; no es algo que se pueda
+// resolver sin pegarle a la API real con datos en vivo.
 async function collectMetrics(proposalId: string, postId: string) {
   const accessToken = Deno.env.get("INSTAGRAM_ACCESS_TOKEN");
   if (!accessToken) {
@@ -161,15 +169,27 @@ async function collectMetrics(proposalId: string, postId: string) {
 async function collectAllPending() {
   const accessToken = Deno.env.get("INSTAGRAM_ACCESS_TOKEN");
   if (!accessToken) {
-    throw new Error("INSTAGRAM_ACCESS_TOKEN no configurado");
+    // Recolectar métricas reales requiere un token de Instagram Graph API
+    // (Meta for Developers) que todavía no se configuró — es un trámite de
+    // Pablo, no algo que se resuelva con código. No cortar el cron con un
+    // error: mientras no exista el token, esto es un no-op esperado, no una
+    // falla. Apenas se configure INSTAGRAM_ACCESS_TOKEN como secret, esta
+    // misma corrida empieza a servir sin tocar nada más.
+    return {
+      message: "INSTAGRAM_ACCESS_TOKEN no configurado todavía — nada para recolectar.",
+      count: 0,
+      skipped: true,
+    };
   }
 
-  // Find proposals with instagram_post_id but no recent metrics
+  // zernio_post_id es lo que efectivamente llena el pipeline actual
+  // (scripts/publish-scheduled-posts.mjs, vía Zernio) — instagram_post_id es
+  // legacy del publisher viejo (Graph API directa) y ya no lo escribe nadie.
   const { data: proposals } = await supabase
     .from("proposals")
-    .select("id, instagram_post_id, title")
+    .select("id, zernio_post_id, title")
     .eq("status", "published")
-    .not("instagram_post_id", "is", null);
+    .not("zernio_post_id", "is", null);
 
   if (!proposals?.length) {
     return { message: "No hay posts publicados para recolectar métricas", count: 0 };
@@ -178,11 +198,11 @@ async function collectAllPending() {
   const results = [];
   for (const proposal of proposals) {
     try {
-      const result = await collectMetrics(proposal.id, proposal.instagram_post_id);
+      const result = await collectMetrics(proposal.id, proposal.zernio_post_id);
       results.push({ ...result, title: proposal.title });
     } catch (e: any) {
       results.push({
-        postId: proposal.instagram_post_id,
+        postId: proposal.zernio_post_id,
         title: proposal.title,
         error: e.message,
       });

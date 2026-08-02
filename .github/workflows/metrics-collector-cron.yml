@@ -1,0 +1,27 @@
+# Dispara metrics-collector cada 6h (PLAN_AUTONOMIA.md Fase 3). Hasta que se
+# configure el secret INSTAGRAM_ACCESS_TOKEN en Supabase, la función responde
+# un no-op limpio (ver supabase/functions/metrics-collector/index.ts) — este
+# workflow no necesita cambiar el día que ese secret se agregue.
+name: Metrics Collector Cron
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  collect:
+    name: Recolectar métricas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invocar metrics-collector (collect-all)
+        run: |
+          code=$(curl -s -o /tmp/response.json -w "%{http_code}" -X POST \
+            "${{ secrets.VITE_SUPABASE_URL }}/functions/v1/metrics-collector" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"collect-all"}')
+          echo "HTTP $code"
+          cat /tmp/response.json
+          if [ "$code" -ge 300 ]; then exit 1; fi

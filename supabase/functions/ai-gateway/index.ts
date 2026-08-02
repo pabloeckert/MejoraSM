@@ -103,7 +103,7 @@ async function callGroq(req: AIRequest): Promise<AIResponse> {
   const apiKey = Deno.env.get("GROQ_API_KEY");
   if (!apiKey) throw new ProviderError("groq", 503, "GROQ_API_KEY no configurada");
 
-  const model = req.model || "meta-llama/llama-4-scout-17b-16e-instruct";
+  const model = req.model || "llama-3.3-70b-versatile";
   const messages = req.system
     ? [{ role: "system", content: req.system }, ...req.messages]
     : req.messages;
