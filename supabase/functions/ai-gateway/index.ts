@@ -228,10 +228,8 @@ async function callGemini(req: AIRequest): Promise<AIResponse> {
 async function callEmbeddings(texts: string[]): Promise<number[][]> {
   const apiKey = Deno.env.get("HF_API_KEY");
   if (!apiKey) throw new ProviderError("hf", 503, "HF_API_KEY no configurada");
-  const model = "sentence-transformers/all-MiniLM-L6-v2";
-
   const res = await fetch(
-    `https://api-inference.huggingface.co/pipeline/feature-extraction/${model}`,
+    "https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction",
     {
       method: "POST",
       headers: {
