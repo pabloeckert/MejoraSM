@@ -1,4 +1,24 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+/* Bw Modelica — tipografía real de marca (licencia de Agencia Dominó, ver
+   src/assets/fonts/LICENCIA.txt). Mismo patrón que biblioteca/styles.css.
+   League Spartan queda como secundaria/fallback, vía Google Fonts. */
+@import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&display=swap');
+
+@font-face {
+  font-family: "Bw Modelica"; font-style: normal; font-weight: 400;
+  src: url("./assets/fonts/BwModelica-Regular.otf") format("opentype"); font-display: swap;
+}
+@font-face {
+  font-family: "Bw Modelica"; font-style: normal; font-weight: 500;
+  src: url("./assets/fonts/BwModelica-Medium.otf") format("opentype"); font-display: swap;
+}
+@font-face {
+  font-family: "Bw Modelica"; font-style: normal; font-weight: 600;
+  src: url("./assets/fonts/BwModelica-Medium.otf") format("opentype"); font-display: swap;
+}
+@font-face {
+  font-family: "Bw Modelica"; font-style: normal; font-weight: 700;
+  src: url("./assets/fonts/BwModelica-Bold.otf") format("opentype"); font-display: swap;
+}
 
 @tailwind base;
 @tailwind components;
@@ -12,13 +32,13 @@
     --card-foreground: 230 97% 18%;
     --popover: 0 0% 100%;
     --popover-foreground: 230 97% 18%;
-    --primary: 350 93% 44%;
+    --primary: 220 67% 31%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 215 65% 33%;
+    --secondary: 353 95% 45%;
     --secondary-foreground: 0 0% 100%;
     --muted: 220 14% 96%;
     --muted-foreground: 230 20% 40%;
-    --accent: 44 89% 52%;
+    --accent: 49 93% 52%;
     --accent-foreground: 230 97% 18%;
     --destructive: 350 93% 44%;
     --destructive-foreground: 0 0% 100%;
@@ -50,13 +70,13 @@
     --card-foreground: 0 0% 95%;
     --popover: 230 80% 14%;
     --popover-foreground: 0 0% 95%;
-    --primary: 350 93% 50%;
+    --primary: 220 67% 31%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 215 65% 40%;
+    --secondary: 353 95% 45%;
     --secondary-foreground: 0 0% 100%;
     --muted: 230 40% 20%;
     --muted-foreground: 220 15% 55%;
-    --accent: 44 89% 52%;
+    --accent: 49 93% 52%;
     --accent-foreground: 230 97% 10%;
     --destructive: 350 93% 50%;
     --destructive-foreground: 0 0% 100%;
@@ -88,10 +108,10 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: "Bw Modelica", "League Spartan", sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: "Bw Modelica", "League Spartan", sans-serif;
   }
 }

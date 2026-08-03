@@ -23,7 +23,9 @@ import {
   Cell,
 } from "recharts";
 
-const COLORS = ["#8b5cf6", "#06b6d4", "#f59e0b", "#ef4444", "#10b981"];
+// Paleta de marca: Azul, Rojo, Amarillo (Manual de Marca Mejora Continua) +
+// un 4to tono derivado de Azul con más luminosidad, para el 4to slice del pie.
+const COLORS = ["#1A3D84", "#E1061E", "#F7CC13", "#3F73D9"];
 
 export default function Dashboard() {
   return (
@@ -153,7 +155,7 @@ function DashboardContent() {
                       fontSize: "12px",
                     }}
                   />
-                  <Bar dataKey="engagement" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Engagement %" />
+                  <Bar dataKey="engagement" fill="#1A3D84" radius={[4, 4, 0, 0]} name="Engagement %" />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -185,7 +187,7 @@ function DashboardContent() {
                     labelLine={false}
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     outerRadius={80}
-                    fill="#8884d8"
+                    fill="#1A3D84"
                     dataKey="value"
                   >
                     {formatData.map((_, index) => (
