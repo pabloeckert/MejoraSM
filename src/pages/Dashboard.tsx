@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, MessageSquare, Image, CalendarDays, Clock, Zap, ArrowRight, TrendingUp } from "lucide-react";
+import { FileText, MessageSquare, Sparkles, CalendarDays, Clock, Zap, ArrowRight } from "lucide-react";
 import { useDocuments } from "@/hooks/useVault";
 import { useDialogueSessions } from "@/hooks/useDialogue";
 import { usePendingProposals, useProposals } from "@/hooks/useProposals";
@@ -7,6 +7,7 @@ import { useCalendarEvents, useLatestMetrics } from "@/hooks/useMetrics";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import {
   BarChart,
@@ -16,16 +17,14 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,
 } from "recharts";
 
 // Paleta de marca: Azul, Rojo, Amarillo (Manual de Marca Mejora Continua) +
-// un 4to tono derivado de Azul con más luminosidad, para el 4to slice del pie.
-const COLORS = ["#1A3D84", "#E1061E", "#F7CC13", "#3F73D9"];
+// el 4to tono derivado de Azul (#6f93cf) del design system para el pie chart.
+const COLORS = ["#1A3D84", "#E1061E", "#F7CC13", "#6f93cf"];
 
 export default function Dashboard() {
   return (
@@ -45,11 +44,42 @@ function DashboardContent() {
 
   const hasData = (documents?.length ?? 0) > 0 || (sessions?.length ?? 0) > 0;
 
-  const stats = [
-    { label: "Documentos en Bóveda", value: String(documents?.length ?? 0), icon: FileText, href: "/boveda" },
-    { label: "Diálogos creados", value: String(sessions?.length ?? 0), icon: MessageSquare, href: "/mesa" },
-    { label: "Contenidos generados", value: String(proposals?.length ?? 0), icon: Image, href: "/laboratorio" },
-    { label: "Publicaciones programadas", value: String(calendarEvents?.length ?? 0), icon: CalendarDays, href: "/calendario" },
+  const metricCards = [
+    {
+      label: "Documentos en Bóveda",
+      value: String(documents?.length ?? 0),
+      sub: "Subí fotos para empezar a nutrir Stories.",
+      href: "/boveda",
+      icon: FileText,
+      accentClassName: "text-primary",
+    },
+    {
+      label: "Diálogos creados",
+      value: String(sessions?.length ?? 0),
+      sub: "Se cuentan cuando abrís una conversación en Mesa de Diálogo.",
+      href: "/mesa",
+      icon: MessageSquare,
+      accentClassName: "text-secondary",
+    },
+    {
+      label: "Contenidos generados",
+      value: String(proposals?.length ?? 0),
+      sub: "Últimos 30 días",
+      href: "/laboratorio",
+      icon: Sparkles,
+      // yellow-600 (#c9a30d) — el amarillo de marca (--accent) es muy claro
+      // para un ícono sobre fondo blanco, el design system usa el tono más
+      // oscuro de la misma familia para este caso puntual.
+      accentClassName: "text-[#c9a30d]",
+    },
+    {
+      label: "Publicaciones programadas",
+      value: String(calendarEvents?.length ?? 0),
+      sub: "Vía Zernio, próximos 7 días",
+      href: "/calendario",
+      icon: Clock,
+      accentClassName: "text-primary",
+    },
   ];
 
   // Prepare chart data from metrics
@@ -80,10 +110,10 @@ function DashboardContent() {
   }));
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-muted-foreground">
+        <h1 className="text-[32px] font-medium leading-tight text-primary">Dashboard</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Centro de control del Estratega Digital Autónomo
         </p>
       </div>
@@ -111,19 +141,20 @@ function DashboardContent() {
         </Card>
       )}
 
-      {/* Stats */}
+      {/* Bento grid de métricas */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Link key={stat.label} to={stat.href}>
-            <Card className="transition-colors hover:bg-muted/50">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.label}
-                </CardTitle>
-                <stat.icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">{stat.value}</p>
+        {metricCards.map((m) => (
+          <Link key={m.label} to={m.href}>
+            <Card className="h-full transition-colors hover:bg-muted/40">
+              <CardContent className="flex flex-col gap-2.5 p-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12.5px] font-semibold text-muted-foreground">{m.label}</span>
+                  <m.icon className={cn("h-4 w-4 flex-shrink-0", m.accentClassName)} />
+                </div>
+                <p className="text-[34px] font-medium leading-none text-primary [font-family:var(--font-display)]">
+                  {m.value}
+                </p>
+                <p className="text-xs text-muted-foreground">{m.sub}</p>
               </CardContent>
             </Card>
           </Link>
@@ -131,20 +162,20 @@ function DashboardContent() {
       </div>
 
       {/* Charts row */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         {/* Engagement chart */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Engagement por post
-            </CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-[17px] font-medium">Engagement por post</CardTitle>
+            {engagementData.length > 0 && (
+              <span className="text-xs text-muted-foreground">Últimos {engagementData.length} posts</span>
+            )}
           </CardHeader>
           <CardContent>
             {engagementData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={engagementData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="name" className="text-xs" />
                   <YAxis className="text-xs" />
                   <Tooltip
@@ -159,13 +190,13 @@ function DashboardContent() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-[250px] items-center justify-center">
-                <div className="text-center">
-                  <TrendingUp className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
-                  <p className="text-sm text-muted-foreground">
-                    Los gráficos aparecerán cuando haya métricas de posts.
-                  </p>
-                </div>
+              <div className="flex h-[220px] flex-col items-center justify-center px-6 text-center">
+                <p className="text-[13.5px] font-semibold">
+                  Todavía no hay publicaciones con datos de engagement.
+                </p>
+                <p className="mt-1 text-[12.5px] text-muted-foreground">
+                  Se completa solo cuando Zernio confirma la primera publicación en Instagram o Facebook — no hay nada más que hacer acá.
+                </p>
               </div>
             )}
           </CardContent>
@@ -173,12 +204,12 @@ function DashboardContent() {
 
         {/* Format distribution */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Distribución por formato</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-[17px] font-medium">Distribución por formato</CardTitle>
           </CardHeader>
           <CardContent>
             {formatData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie
                     data={formatData}
@@ -186,7 +217,7 @@ function DashboardContent() {
                     cy="50%"
                     labelLine={false}
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
+                    outerRadius={72}
                     fill="#1A3D84"
                     dataKey="value"
                   >
@@ -198,13 +229,11 @@ function DashboardContent() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-[250px] items-center justify-center">
-                <div className="text-center">
-                  <Image className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
-                  <p className="text-sm text-muted-foreground">
-                    Generá contenido para ver la distribución por formato.
-                  </p>
-                </div>
+              <div className="flex h-[220px] flex-col items-center justify-center px-6 text-center">
+                <p className="text-[13.5px] font-semibold">Sin piezas generadas todavía.</p>
+                <p className="mt-1 text-[12.5px] text-muted-foreground">
+                  Subí material a la Bóveda o armá una pieza para empezar a ver la mezcla de formatos.
+                </p>
               </div>
             )}
           </CardContent>
@@ -213,15 +242,15 @@ function DashboardContent() {
 
       {/* Pending approvals */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg">Aprobaciones pendientes</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-[17px] font-medium">Aprobaciones pendientes</CardTitle>
           {pendingProposals && pendingProposals.length > 0 && (
             <Badge variant="secondary">{pendingProposals.length}</Badge>
           )}
         </CardHeader>
         <CardContent>
           {!pendingProposals || pendingProposals.length === 0 ? (
-            <div className="flex flex-col items-center py-8">
+            <div className="flex flex-col items-center py-8 text-center">
               <Clock className="mb-3 h-8 w-8 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">
                 No hay contenido pendiente de aprobación.
@@ -236,33 +265,28 @@ function DashboardContent() {
               )}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="flex flex-col">
               {pendingProposals.slice(0, 5).map((p: any) => (
-                <div key={p.id} className="flex items-center justify-between rounded-lg border p-3">
-                  <div className="flex items-center gap-3">
-                    <Clock className="h-4 w-4 text-amber-500" />
-                    <div>
-                      <p className="text-sm font-medium">{p.title || "Sin título"}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {p.dialogue_sessions?.topic || "Sin tema"}
-                      </p>
-                    </div>
+                <Link
+                  key={p.id}
+                  to="/laboratorio"
+                  className="-mx-1 flex items-center gap-3.5 rounded-md border-b border-border px-1 py-3 transition-colors last:border-0 hover:bg-muted/40"
+                >
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-muted">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">{p.format || "post"}</Badge>
-                    <Link to="/laboratorio">
-                      <Button variant="ghost" size="sm">
-                        Ver
-                      </Button>
-                    </Link>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13.5px] font-semibold">{p.title || "Sin título"}</p>
+                    <p className="truncate text-[11.5px] text-muted-foreground">
+                      {p.dialogue_sessions?.topic || "Sin tema"}
+                    </p>
                   </div>
-                </div>
+                  <Badge variant="outline" className="flex-shrink-0">{p.format || "post"}</Badge>
+                </Link>
               ))}
               {pendingProposals.length > 5 && (
-                <Link to="/laboratorio">
-                  <Button variant="ghost" size="sm" className="w-full">
-                    Ver todas ({pendingProposals.length})
-                  </Button>
+                <Link to="/laboratorio" className="mt-2 text-center text-sm font-medium text-primary hover:underline">
+                  Ver todas ({pendingProposals.length})
                 </Link>
               )}
             </div>
@@ -272,12 +296,12 @@ function DashboardContent() {
 
       {/* Calendar */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Calendario de contenido</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-[17px] font-medium">Calendario de contenido</CardTitle>
         </CardHeader>
         <CardContent>
           {!calendarEvents || calendarEvents.length === 0 ? (
-            <div className="flex h-48 flex-col items-center justify-center">
+            <div className="flex h-40 flex-col items-center justify-center text-center">
               <CalendarDays className="mb-3 h-8 w-8 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">
                 No hay publicaciones programadas.
@@ -290,17 +314,22 @@ function DashboardContent() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="flex flex-col">
               {calendarEvents.slice(0, 7).map((e: any) => (
-                <div key={e.id} className="flex items-center gap-3 rounded-lg border p-3">
-                  <CalendarDays className="h-4 w-4 text-blue-500" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{e.title}</p>
-                    <p className="text-xs text-muted-foreground">
+                <div
+                  key={e.id}
+                  className="flex items-center gap-3.5 border-b border-border py-3 last:border-0"
+                >
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-muted">
+                    <CalendarDays className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13.5px] font-semibold">{e.title}</p>
+                    <p className="text-[11.5px] text-muted-foreground">
                       {new Date(e.date).toLocaleDateString("es-AR")}
                     </p>
                   </div>
-                  <Badge variant="outline">{e.format}</Badge>
+                  <Badge variant="outline" className="flex-shrink-0">{e.format}</Badge>
                 </div>
               ))}
             </div>

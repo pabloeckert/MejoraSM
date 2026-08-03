@@ -26,25 +26,35 @@
 
 @layer base {
   :root {
+    /* Tipografía — mismos nombres que el tokens/typography.css del design system
+       exportado, sin itálicas de Bw Modelica ni bundle local de League Spartan
+       (ver @font-face arriba: solo Regular/Medium/Bold, League Spartan vía
+       Google Fonts). */
+    --font-display: "Bw Modelica", "League Spartan", sans-serif;
+    --font-heading-alt: "League Spartan", sans-serif;
+    --font-body: "Bw Modelica", "League Spartan", sans-serif;
+
+    /* Color — valores exactos del tokens/colors.css del design system exportado.
+       --primary/--secondary/--accent = blue-700/red-500/yellow-500. */
     --background: 0 0% 100%;
-    --foreground: 230 97% 18%;
+    --foreground: 0 0% 17%;
     --card: 0 0% 100%;
-    --card-foreground: 230 97% 18%;
+    --card-foreground: 0 0% 17%;
     --popover: 0 0% 100%;
-    --popover-foreground: 230 97% 18%;
+    --popover-foreground: 0 0% 17%;
     --primary: 220 67% 31%;
     --primary-foreground: 0 0% 100%;
     --secondary: 353 95% 45%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 230 20% 40%;
+    --muted: 210 11% 96%;
+    --muted-foreground: 220 9% 46%;
     --accent: 49 93% 52%;
-    --accent-foreground: 230 97% 18%;
-    --destructive: 350 93% 44%;
+    --accent-foreground: 0 0% 17%;
+    --destructive: 353 95% 45%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 90%;
-    --input: 220 13% 90%;
-    --ring: 350 93% 44%;
+    --border: 225 10% 92%;
+    --input: 225 10% 92%;
+    --ring: 220 61% 42%;
     --radius: 0.75rem;
     --sidebar-background: 230 97% 18%;
     --sidebar-foreground: 0 0% 95%;
@@ -108,10 +118,10 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: "Bw Modelica", "League Spartan", sans-serif;
+    font-family: var(--font-body);
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: "Bw Modelica", "League Spartan", sans-serif;
+    font-family: var(--font-display);
   }
 }
