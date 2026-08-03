@@ -1,6 +1,54 @@
 {
-  "syncedAt": "2026-08-03T14:15:15.336Z",
+  "syncedAt": "2026-08-03T19:18:25.327Z",
   "posts": [
+    {
+      "id": "6a70b6880b36152962715095",
+      "date": "2026-08-03",
+      "status": "published",
+      "content": "El feedback que funciona señala el hecho, no ataca a quien lo hizo — así el otro puede mejorar sin sentirse juzgado. ¿Cómo das feedback en tu equipo?",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-03-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3955661840566893156"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
+    {
+      "id": "6a70b1959bf0a77017bc3c6c",
+      "date": "2026-08-03",
+      "status": "published",
+      "content": "** ¿Estás solo en la cima? ¿O estás liderando un equipo que te sigue?\n**\n¿Alguna vez te has sentido como si estuvieras llevando el peso del mundo sobre tus hombros? Como si todas las decisiones dependieran solo de ti y no tuvieras a nadie a quien recurrir. Esto es lo que llamamos la soledad en el liderazgo.\n\nMuchos líderes y emprendedores se confunden entre liderar de manera efectiva y tomar decisiones rápidas sin considerar a su equipo. Pero la verdad es que decidir rápido no es lo mismo que liderar. Un líder efectivo sabe cómo involucrar a su equipo en el proceso de toma de decisiones, cómo escuchar sus ideas y cómo hacer que todos se sientan parte del equipo.\n\n¿Te gustaría saber si estás liderando de manera efectiva o si simplemente estás tomando decisiones rápidas sin considerar el impacto en tu equipo? Pregúntate:\n\n* ¿Me siento solo en la toma de decisiones o tengo un equipo que me apoya?\n* ¿Me tomo el tiempo para escuchar las ideas de mi equipo o simplemente les doy órdenes?\n* ¿Mi equipo se siente involucrado en el proceso de toma de decisiones o se sienten descartados?\n\nSi te has respondido que te sientes solo en la toma de decisiones o que no involucras a tu equipo en el proceso, es hora de cambiar eso. Aquí te dejo algunos consejos prácticos para mejorar tu liderazgo y evitar la soledad en la toma de decisiones:\n\n* Establece canales de comunicación abiertos y honestos con tu equipo.\n* Fomenta la colaboración y el trabajo en equipo.\n* Aprende a delegar tareas y responsabilidades de manera efectiva.\n\n**\n** ¿Quieres obtener más información y asesoramiento sobre cómo mejorar tu liderazgo y evitar la soledad en la toma de decisiones? ¡Comunícate con nosotros! Nuestros expertos en liderazgo y estrategia empresarial estarán encantados de ayudarte.",
+      "kind": "post",
+      "proposalId": "11623a51-9c57-4649-ac39-6930d9b18826",
+      "headline": "** ¿Estás solo en la cima? ¿O estás liderando un equipo que te sigue?",
+      "kicker": null,
+      "oferta": "personal",
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-08-03-1-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DblTAkfjkfl/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1334204238799058"
+        }
+      ]
+    },
     {
       "id": "6a6f53955c4ff8d9c1bdec9d",
       "date": "2026-08-02",
