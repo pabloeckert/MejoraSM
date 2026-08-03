@@ -30,14 +30,8 @@ export function AppSidebar() {
     <aside className="flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar-background">
       {/* Logo */}
       <div className="px-6 py-6">
-        {/* El lockup a color tiene el wordmark en negro — sobre el sidebar
-            navy queda ilegible, y no existe una variante horizontal blanca
-            (ver manual de marca). Se envuelve en un chip blanco para
-            mantener contraste sin tocar el fondo del sidebar. */}
-        <div className="inline-flex rounded-md bg-white px-3 py-2">
-          <img src={lockup} alt="Mejora Continua" className="h-[22px] w-auto object-contain" />
-        </div>
-        <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-widest text-sidebar-foreground/60 [font-family:var(--font-heading-alt)]">
+        <img src={lockup} alt="Mejora Continua" className="h-[22px] w-auto object-contain" />
+        <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground [font-family:var(--font-heading-alt)]">
           MejoraSM
         </p>
       </div>
@@ -53,8 +47,8 @@ export function AppSidebar() {
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
                 isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                  ? "bg-sidebar-accent text-sidebar-primary"
+                  : "text-sidebar-foreground/70 hover:bg-muted hover:text-sidebar-foreground"
               )}
             >
               <item.icon className="h-4 w-4" />
