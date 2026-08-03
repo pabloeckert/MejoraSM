@@ -7,6 +7,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth, unauthorizedResponse } from "../_shared/auth.ts";
 
 const ALLOWED_ORIGINS = [
+  "https://pabloeckert.github.io",
   "https://mejorasm-*.vercel.app",
   "http://localhost:8080",
   "http://localhost:5173",
