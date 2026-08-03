@@ -7,11 +7,11 @@ import {
   Settings,
   CalendarDays,
   FileCheck,
-  Zap,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import lockup from "@/assets/lockup-horizontal-color.png";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/" },
@@ -29,18 +29,17 @@ export function AppSidebar() {
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-sidebar-border bg-sidebar-background">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-          <Zap className="h-5 w-5 text-primary-foreground" />
+      <div className="px-6 py-6">
+        {/* El lockup a color tiene el wordmark en negro — sobre el sidebar
+            navy queda ilegible, y no existe una variante horizontal blanca
+            (ver manual de marca). Se envuelve en un chip blanco para
+            mantener contraste sin tocar el fondo del sidebar. */}
+        <div className="inline-flex rounded-md bg-white px-3 py-2">
+          <img src={lockup} alt="Mejora Continua" className="h-[22px] w-auto object-contain" />
         </div>
-        <div>
-          <h1 className="text-base font-bold tracking-tight text-sidebar-foreground">
-            EDA
-          </h1>
-          <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-            Estratega Digital
-          </p>
-        </div>
+        <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-widest text-sidebar-foreground/60 [font-family:var(--font-heading-alt)]">
+          MejoraSM
+        </p>
       </div>
 
       {/* Navigation */}
