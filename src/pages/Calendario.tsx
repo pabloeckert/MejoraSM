@@ -2,10 +2,26 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { CalendarDays, Loader2, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { useProposals } from "@/hooks/useProposals";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Link } from "react-router-dom";
+
+const STATUS_LABEL: Record<string, string> = {
+  published: "Publicada",
+  scheduled: "Programada",
+  pending: "Pendiente",
+  approved: "Aprobada",
+  rejected: "Rechazada",
+  needs_review: "Necesita revisión",
+};
 
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -30,6 +46,7 @@ function CalendarioContent() {
   const { data: proposals, isLoading } = useProposals();
 
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedProposal, setSelectedProposal] = useState<any>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -142,9 +159,11 @@ function CalendarioContent() {
                         {day}
                       </p>
                       {dayEvents.slice(0, 2).map((p: any) => (
-                        <div
+                        <button
                           key={p.id}
-                          className={`mb-0.5 truncate rounded px-1 py-0.5 text-[10px] font-medium ${
+                          type="button"
+                          onClick={() => setSelectedProposal(p)}
+                          className={`mb-0.5 block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-medium transition-colors hover:opacity-80 ${
                             p.status === "published"
                               ? "bg-muted text-muted-foreground"
                               : "bg-primary/10 text-primary"
@@ -152,7 +171,7 @@ function CalendarioContent() {
                           title={p.hook || p.title}
                         >
                           {p.hook || p.title || "Sin título"}
-                        </div>
+                        </button>
                       ))}
                       {dayEvents.length > 2 && (
                         <p className="text-[10px] text-muted-foreground">
@@ -181,7 +200,12 @@ function CalendarioContent() {
             ) : (
               <div className="space-y-3">
                 {upcoming.map((p: any) => (
-                  <div key={p.id} className="flex items-start gap-2 rounded-lg border p-3">
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSelectedProposal(p)}
+                    className="flex w-full items-start gap-2 rounded-lg border p-3 text-left transition-colors hover:bg-muted/40"
+                  >
                     <Clock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{p.hook || p.title || "Sin título"}</p>
@@ -203,13 +227,84 @@ function CalendarioContent() {
                         </Badge>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Detalle de la propuesta — solo datos de texto reales, sin imagen
+          (todavía no hay render disponible para posts/carruseles). */}
+      <Dialog open={!!selectedProposal} onOpenChange={(open) => !open && setSelectedProposal(null)}>
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+          {selectedProposal && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selectedProposal.hook || selectedProposal.title || "Sin título"}</DialogTitle>
+                <DialogDescription>
+                  {selectedProposal.dialogue_sessions?.topic || "Sin tema asociado"}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">{selectedProposal.format || "post"}</Badge>
+                <Badge variant={selectedProposal.status === "published" ? "default" : "secondary"}>
+                  {STATUS_LABEL[selectedProposal.status] || selectedProposal.status}
+                </Badge>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                {selectedProposal.published_at
+                  ? `Publicada: ${new Date(selectedProposal.published_at).toLocaleDateString("es-AR", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}`
+                  : selectedProposal.scheduled_at
+                  ? `Programada para: ${new Date(selectedProposal.scheduled_at).toLocaleDateString("es-AR", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}`
+                  : "Sin fecha de publicación ni programación"}
+              </p>
+
+              <div className="space-y-3 text-sm">
+                {selectedProposal.hook && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground">HOOK</p>
+                    <p>{selectedProposal.hook}</p>
+                  </div>
+                )}
+                {selectedProposal.body && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground">BODY</p>
+                    <p className="whitespace-pre-wrap">{selectedProposal.body}</p>
+                  </div>
+                )}
+                {selectedProposal.cta && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground">CTA</p>
+                    <p>{selectedProposal.cta}</p>
+                  </div>
+                )}
+                {selectedProposal.hashtags?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground">HASHTAGS</p>
+                    <p className="text-muted-foreground">{selectedProposal.hashtags.join(" ")}</p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
