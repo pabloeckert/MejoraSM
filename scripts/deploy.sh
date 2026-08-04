@@ -40,7 +40,7 @@ npx supabase link --project-ref "$PROJECT_REF" 2>/dev/null || echo "Ya linkeado"
 echo ""
 echo "3. Deployando Edge Functions..."
 
-FUNCTIONS=("ai-gateway" "orchestrator" "vault-process" "metrics-collector" "rule-engine")
+FUNCTIONS=("orchestrator" "vault-process" "metrics-collector" "rule-engine")
 
 for fn in "${FUNCTIONS[@]}"; do
   echo "  → $fn..."

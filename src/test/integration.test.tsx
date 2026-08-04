@@ -126,21 +126,6 @@ describe("AI Service — additional", () => {
     mockFetch.mockReset();
   });
 
-  it("searchVault sends correct action", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ results: ["chunk1"] }),
-    });
-
-    const { searchVault } = await import("@/services/ai");
-    const result = await searchVault("test query", 3);
-
-    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-    expect(callBody.action).toBe("search");
-    expect(callBody.query).toBe("test query");
-    expect(callBody.limit).toBe(3);
-  });
-
   it("processDocument sends correct documentId", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,

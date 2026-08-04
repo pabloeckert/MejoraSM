@@ -14,43 +14,6 @@ describe("AI Service", () => {
     mockFetch.mockReset();
   });
 
-  it("callAI sends correct request to ai-gateway", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ response: "hello" }),
-    });
-
-    const { callAI } = await import("@/services/ai");
-    const result = await callAI({
-      provider: "groq",
-      messages: [{ role: "user", content: "test" }],
-    });
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      "https://test.supabase.co/functions/v1/ai-gateway",
-      expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({
-          "Content-Type": "application/json",
-          Authorization: "Bearer test-key",
-        }),
-      })
-    );
-    expect(result).toEqual({ response: "hello" });
-  });
-
-  it("callAI throws on non-ok response", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      json: () => Promise.resolve({ error: "rate limited" }),
-    });
-
-    const { callAI } = await import("@/services/ai");
-    await expect(
-      callAI({ provider: "groq", messages: [{ role: "user", content: "test" }] })
-    ).rejects.toThrow("rate limited");
-  });
-
   it("startDialogue sends correct action", async () => {
     const mockResponse = {
       sessionId: "abc-123",
@@ -72,18 +35,6 @@ describe("AI Service", () => {
     expect(result.aprobado).toBe(true);
   });
 
-  it("generateEmbeddings returns embeddings array", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ embeddings: [[0.1, 0.2, 0.3]] }),
-    });
-
-    const { generateEmbeddings } = await import("@/services/ai");
-    const result = await generateEmbeddings(["test text"]);
-
-    expect(result).toEqual([[0.1, 0.2, 0.3]]);
-  });
-
   it("processDocument returns document stats", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -94,18 +45,6 @@ describe("AI Service", () => {
     const result = await processDocument("doc-1");
 
     expect(result.chunksCreated).toBe(5);
-  });
-
-  it("searchVault returns results", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ results: ["chunk1", "chunk2"] }),
-    });
-
-    const { searchVault } = await import("@/services/ai");
-    const result = await searchVault("test query");
-
-    expect(result.results).toHaveLength(2);
   });
 });
 

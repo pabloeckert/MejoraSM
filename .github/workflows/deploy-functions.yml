@@ -56,7 +56,7 @@ jobs:
         if: ${{ github.event.inputs.function_name == '' }}
         run: |
           echo "🚀 Deploying all Edge Functions..."
-          FUNCTIONS=("ai-gateway" "orchestrator" "vault-process" "metrics-collector" "rule-engine")
+          FUNCTIONS=("orchestrator" "vault-process" "metrics-collector" "rule-engine")
           
           FAILED=0
           for fn in "${FUNCTIONS[@]}"; do
@@ -89,7 +89,7 @@ jobs:
           echo ""
           echo "🏥 Verifying endpoints..."
           
-          for fn in ai-gateway orchestrator vault-process metrics-collector rule-engine; do
+          for fn in orchestrator vault-process metrics-collector rule-engine; do
             code=$(curl -s -o /dev/null -w "%{http_code}" \
               "$SUPABASE_URL/functions/v1/$fn" \
               -H "apikey: $ANON_KEY" 2>/dev/null)

@@ -62,36 +62,6 @@ async function handleResponse<T>(res: Response, fallbackMsg: string): Promise<T>
 }
 
 // ═══════════════════════════════════════
-// AI GATEWAY
-// ═══════════════════════════════════════
-
-export async function callAI(params: {
-  provider: "groq" | "deepseek" | "gemini";
-  model?: string;
-  messages: { role: string; content: string }[];
-  system?: string;
-  temperature?: number;
-  max_tokens?: number;
-}) {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-gateway`, {
-    method: "POST",
-    headers: await buildHeaders(),
-    body: JSON.stringify(params),
-  });
-  return handleResponse(res, "Error al conectar con el proveedor de IA");
-}
-
-export async function generateEmbeddings(texts: string[]) {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-gateway`, {
-    method: "POST",
-    headers: await buildHeaders(),
-    body: JSON.stringify({ action: "embed", texts }),
-  });
-  const data = await handleResponse<{ embeddings: number[][] }>(res, "Error generando embeddings");
-  return data.embeddings;
-}
-
-// ═══════════════════════════════════════
 // ORCHESTRATOR (Mesa de Diálogo)
 // ═══════════════════════════════════════
 
@@ -146,13 +116,4 @@ export async function processDocument(documentId: string): Promise<ProcessResult
     body: JSON.stringify({ action: "process", documentId }),
   });
   return handleResponse(res, "Error procesando el documento");
-}
-
-export async function searchVault(query: string, limit = 5): Promise<{ results: string[] }> {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/vault-process`, {
-    method: "POST",
-    headers: await buildHeaders(),
-    body: JSON.stringify({ action: "search", query, limit }),
-  });
-  return handleResponse(res, "Error buscando en la bóveda");
 }

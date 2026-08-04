@@ -157,13 +157,12 @@ Páginas (`src/pages/`):
 
 Hooks custom en `src/hooks/` (`useVault`, `useDialogue`, `useProposals`, `useMetrics`) llaman a `src/services/ai.ts` (invoca Edge Functions) y `src/services/supabase.ts` (CRUD directo). El cliente Supabase vive en `src/integrations/supabase/client.ts` y usa `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` (ver `.env.example`). `src/components/ui/` es el set estándar de shadcn sin modificar; la UI propia está en `src/components/layout/` (AppSidebar, AppLayout).
 
-### Backend — 5 Edge Functions
+### Backend — 4 Edge Functions
 
 Todas en `supabase/functions/` (Deno), cada una con su propia allowlist de CORS (`util.mejoraok.com`, `mejorasm.vercel.app`, localhost) y con el guard de `_shared/auth.ts`:
 
 | Función | Rol |
 |---|---|
-| `ai-gateway` | Gateway universal de IA — habla con Groq, DeepSeek, Gemini y HuggingFace (embeddings) según lo que pida el agente/tarea. |
 | `orchestrator` | Corre el debate Estratega → Creativo → Crítico de Mesa de Diálogo, trayendo contexto de la Bóveda vía `match_documents` (RAG). Autoagenda las propuestas aprobadas (ver overhaul de autonomía). |
 | `vault-process` | Procesa documentos subidos (extracción, chunking, embeddings) y expone la búsqueda semántica. |
 | `rule-engine` | Analiza métricas de posts pasados y genera reglas de éxito (qué formato/hora/tono funciona mejor). Cron diario real desde 2026-08-02 (`rule-engine-cron.yml`). |
@@ -172,6 +171,8 @@ Todas en `supabase/functions/` (Deno), cada una con su propia allowlist de CORS 
 Deploy: `.github/workflows/deploy-functions.yml` (push a `supabase/functions/**`, o manual con función específica) — usa `SUPABASE_ACCESS_TOKEN` y `SUPABASE_PROJECT_REF` como secrets del repo.
 
 **No hay Edge Function `publisher`** (se retiró el 2026-07-30 — publicaba directo a la Graph API de Meta, nunca configurada ni invocada por nada). La publicación de posts de feed corre en GitHub Actions, no en Supabase — ver "Arquitectura: publicación autónoma de posts de feed" más abajo. **Pendiente:** la función sigue `ACTIVE` en el proyecto real (`hsglmdarztrshihmzfph`) porque borrarla remoto quedó bloqueado por el clasificador de seguridad del entorno — falta correr `supabase functions delete publisher --project-ref hsglmdarztrshihmzfph` a mano.
+
+**Tampoco hay Edge Function `ai-gateway`** (código local eliminado 2026-08-04 — código muerto confirmado, sin ningún caller real en `src/`, ver "Inventario de backend" más abajo). Mismo pendiente que `publisher`: el código fuente se borró del repo, pero la función puede seguir `ACTIVE` en el proyecto real hasta que se corra `supabase functions delete ai-gateway --project-ref hsglmdarztrshihmzfph` a mano — no se intentó automatizar ese paso remoto en esta sesión.
 
 ### Modelo de datos
 
@@ -342,6 +343,50 @@ Stub vacío (solo `README.md`, sin código) para una fase futura del roadmap ("F
 ## Privacidad
 
 **Pendiente real, no resuelto:** el EDA hoy tiene login real y usuarios (aunque sea uno solo, `pabloeckert@gmail.com`) con datos personales (documentos de marca en la Bóveda, sesiones de diálogo, propuestas). Existía un borrador de política de privacidad (`Documents/PRIVACIDAD.md`, borrado en esta consolidación) pero describía un producto que ya no existe (la extensión de Chrome) y un modelo de datos viejo (RLS abierto, multi-usuario) — no es reutilizable tal cual. Si hace falta una política de privacidad real, hay que rehacerla desde cero acorde al EDA actual (sin extensión, con login/RLS real por `app_admins`, con Zernio/Anthropic como proveedores de datos además de Groq/DeepSeek/Gemini/HuggingFace/Supabase) — no inventarla sin que Pablo la revise, es un documento de cara a usuarios reales.
+
+## Inventario de backend — 2026-08-04
+
+Auditoría real de las 5 Edge Functions y los 5 cron jobs activos al momento de la auditoría, hecha sin arreglar nada de lo que se encontró — solo relevamiento. Evidencia sacada de: `gh run list` (corridas reales de GitHub Actions), `supabase db query --linked` contra la base real (`hsglmdarztrshihmzfph`), y grep del código fuente (no supuestos sobre quién llama a quién). El dashboard de logs de Supabase no estaba disponible en el momento de esta auditoría (extensión de Chrome desconectada) — donde hacía falta esa evidencia puntual, se dejó explícito que no se pudo conseguir en vez de inferirla.
+
+**`ai-gateway` y `searchVault` eliminadas 2026-08-04** — código muerto sin caller real, dogma: lo que no se usa se borra. Las filas y evidencia de abajo quedan como registro histórico de la auditoría original (mismo día, antes del borrado); el catálogo vigente de Edge Functions es el de la sección "Backend" más arriba (ahora 4 funciones).
+
+### Edge Functions (`supabase/functions/`) — estado al momento de la auditoría, antes del borrado
+
+| Función | Qué hace | Qué la dispara | De qué depende |
+|---|---|---|---|
+| `orchestrator` | Corre el debate Estratega→Creativo→Crítico de Mesa de Diálogo; si aprueba y el formato es `post`/`carrusel`, autoagenda la propuesta (síncrono, no es un cron aparte) | Request del frontend (`startDialogue`/`continueDialogue` en `useDialogue`, usado por Mesa de Diálogo y Laboratorio) | Tablas: `agent_config`, `dialogue_sessions`, `dialogue_messages`, `proposals`, `documents` (RAG vía `match_documents`). Llama directo a Anthropic/Groq/DeepSeek/Gemini |
+| `vault-process` | Extrae texto de documentos subidos a la Bóveda, los trocea en chunks, genera embeddings, expone búsqueda semántica | Request del frontend (`processDocument` en `useVault`, usado por Bóveda) | Tablas: `documents`, `doc_chunks`; bucket `vault` de Storage; `match_documents` (RPC). Llama directo a HuggingFace |
+| `rule-engine` | Analiza `metrics` y genera/actualiza `success_rules` (qué formato/hook/horario rinde mejor). Necesita ≥5 filas en `metrics` para producir algo — con menos, responde `rulesFound: 0` sin error | Cron diario (`rule-engine-cron.yml`), acción `analyze`. **No lo llama nada del frontend** (grep sin resultados en `src/`) | Tablas: `metrics` (join con `proposals`), `success_rules` |
+| `metrics-collector` | Trae métricas de Instagram Insights para posts publicados y las guarda en `metrics` | Cron cada 6h (`metrics-collector-cron.yml`), acción `collect-all`. **No lo llama nada del frontend** | Tablas: `metrics`, `proposals` (filtra `status='published'` con `zernio_post_id`). Requiere secret `INSTAGRAM_ACCESS_TOKEN` |
+
+(Eliminadas desde acá: `ai-gateway` — no tenía ningún llamador real confirmado, solo aparecía en tests que mockean `fetch`, nunca contra la función real desplegada. `vault-process` conservó `processDocument` con caller real en `useVault.ts`; se borró solo `searchVault`, que no tenía ningún importador en `src/hooks` ni `src/pages`.)
+
+### Evidencia real de ejecución — 2026-08-04
+
+| Función | ¿Corrió hoy? | Evidencia real |
+|---|---|---|
+| `orchestrator` | **Sí, confirmado** | `dialogue_sessions` con `created_at` de hoy: 4 filas — 3 en `status='approved'` (`681ff48b...` 12:15 UTC, `30905256...` y `a6080f38...` ambas 05:09-05:10 UTC) y 1 en `status='active'` sin resolver (`e096830d...`, "[TEST DIAGNOSTICO Claude Code...]", 02:19 UTC — quedó a medio dialogar, no se tocó). Una de las tres aprobadas (`681ff48b...`) se disparó y verificó en esta misma sesión contra los logs reales de la función (200, sin fallback a Groq) |
+| `rule-engine` | **Sí, el cron corrió** — la función en sí no tuvo trabajo real que hacer | `gh run list --workflow=rule-engine-cron.yml`: última corrida hoy `2026-08-04T05:44:21Z`, `completed success`. Pero `SELECT count(*) FROM metrics` = 0 y `SELECT count(*) FROM success_rules` = 0 contra la base real — consistente con el comportamiento documentado en el propio workflow (`rulesFound: 0` sin error si hay menos de 5 métricas), no es una falla |
+| `metrics-collector` | **Sí, el cron corrió 4 veces hoy** — no-op esperado, no falla | `gh run list --workflow=metrics-collector-cron.yml`: 4 corridas hoy (02:33, 08:36, 14:12, 19:37 UTC), todas `completed success`. "Success" acá es que el `curl` devolvió <300 — la función internamente devuelve `skipped: true` porque `INSTAGRAM_ACCESS_TOKEN` sigue sin configurarse (documentado en `metrics-collector/index.ts` como no-op explícito, no error). Solo hay 1 propuesta publicada con `zernio_post_id` en toda la base — sería el único candidato real cuando el secret exista |
+| `vault-process` | **No hay evidencia de que haya corrido hoy** | Última fila real en `documents`: "Criterio Medular", `created_at: 2026-08-03 21:38:09 UTC` (ayer). Último `doc_chunks`: `2026-08-03 21:52:27 UTC`. 53 chunks totales, los 53 con embedding generado (`con_embedding: 53` = `total_chunks: 53`) — evidencia de que la última vez que corrió, corrió bien de punta a punta, pero esa vez no fue hoy |
+
+### Cron jobs activos (GitHub Actions, `.github/workflows/`)
+
+| Workflow | Horario real (cron UTC) | Qué dispara | Última corrida real hoy |
+|---|---|---|---|
+| `daily-story.yml` | `0 13 * * *` (13:00 UTC = 10:00 ART) | Story diaria: genera copy (Claude), renderiza, publica a Instagram/Facebook vía Zernio — **no pasa por ninguna Edge Function**, corre como script Node en el runner | `2026-08-04T15:21:50Z`, `completed success`, 1m32s |
+| `publish-scheduled-posts.yml` | `*/15 * * * *` | Publica posts/carruseles de feed autoagendados por `orchestrator` cuando `scheduled_at` ya venció — tampoco pasa por Edge Functions, habla directo a PostgREST + Zernio | 4 corridas hoy, última `2026-08-04T21:38:28Z`, `completed success`, 1m1s |
+| `sync-history.yml` | `0 */6 * * *` | Trae el historial real desde Zernio a `content/log/historial.json` (lo que lee el dashboard) | 4 corridas hoy, última `2026-08-04T19:18:10Z`, `completed success`, 17s |
+| `metrics-collector-cron.yml` | `0 */6 * * *` | Invoca la Edge Function `metrics-collector` (`collect-all`) | 4 corridas hoy, última `2026-08-04T19:37:21Z`, `completed success` (no-op interno, ver tabla de arriba) |
+| `rule-engine-cron.yml` | `0 3 * * *` | Invoca la Edge Function `rule-engine` (`analyze`) | 1 corrida hoy, `2026-08-04T05:44:21Z`, `completed success` (2h44m tarde respecto al horario nominal — delay normal de GitHub Actions en cron, no es una falla) |
+
+Aclaración sobre "autoagendado": no es un cron en sí mismo — pasa de forma síncrona dentro de `orchestrator` cuando el Crítico aprueba una propuesta `post`/`carrusel` (elige oferta y `scheduled_at` en el mismo request de Mesa de Diálogo). El cron real que hace algo con eso después es `publish-scheduled-posts.yml`, que cada 15 minutos revisa qué quedó `scheduled` y venció.
+
+También corrió hoy, sin pipeline propio de contenido: `deploy-functions.yml` (push-triggered, no cron) — última corrida `2026-08-04T12:10:27Z`, `completed success`, 47s, en ese momento deployaba y verificaba las 5 Edge Functions de esta tabla (hoy son 4, ver nota de borrado de `ai-gateway` más arriba). Aparte, `deploy-migrations.yml` (manual only, no cron) tiene un **streak de 5/5 fallos** en sus últimas corridas reales (`2026-07-28`/`2026-07-29`) — consistente con el bug del CLI ya documentado en la sección "Deploy" más arriba, no es un hallazgo nuevo, pero es la evidencia concreta de `gh run list` que lo confirma.
+
+### Nota de método — qué se re-verificó y qué no
+
+Esta sección se re-chequeó de forma independiente el 2026-08-04 (misma fecha, sesión separada) antes de darla por buena: el catálogo de Edge Functions (código fuente + grep de callers en `src/`) y toda la evidencia de `gh run list` citada arriba coincidieron **exactamente** con una segunda lectura en vivo. Los conteos contra la base de Supabase (`dialogue_sessions`, `metrics`, `success_rules`, `documents`, `doc_chunks` de la tabla de arriba) **no se pudieron re-verificar** en esa segunda pasada — la máquina usada no tiene el CLI de Supabase instalado (ni en PATH, ni vía npm/scoop/choco), y no se instaló uno nuevo por tratarse de una investigación de solo lectura. Esos números quedan como heredados de la sesión que sí tenía acceso al CLI, no como fabricados ahora ni re-confirmados hoy.
 
 ## Notas históricas
 
