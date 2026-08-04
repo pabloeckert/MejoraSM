@@ -58,6 +58,19 @@ const OFERTAS = [
   { value: "profesionalizacion", label: "Profesionalización" },
 ];
 
+// Filtro por tipo de posteo, sobre el campo proposals.format. "historia" es
+// el valor real que usa el código (extractProposal en orchestrator/index.ts)
+// para lo que acá se etiqueta "Story". "video" todavía no lo genera nada
+// (ni orchestrator ni el pipeline de publicación) — el tab existe igual,
+// a propósito, para no ocultar la categoría aunque hoy esté vacía.
+const FORMATOS: { value: string; label: string }[] = [
+  { value: "all", label: "Todos" },
+  { value: "post", label: "Post Feed" },
+  { value: "carrusel", label: "Carrusel" },
+  { value: "historia", label: "Story" },
+  { value: "video", label: "Video" },
+];
+
 export default function Propuestas() {
   return (
     <ErrorBoundary>
@@ -81,6 +94,7 @@ function PropuestasContent() {
   const [scheduleOferta, setScheduleOferta] = useState("");
   const [previewTarget, setPreviewTarget] = useState<any>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [formatFilter, setFormatFilter] = useState<string>("all");
 
   const handleApprove = (id: string) => {
     approveMutation.mutate(id, {
@@ -137,10 +151,14 @@ function PropuestasContent() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const approved = (allProposals || []).filter((p: any) => p.status === "approved");
-  const rejected = (allProposals || []).filter((p: any) => p.status === "rejected");
-  const scheduled = (allProposals || []).filter((p: any) => p.status === "scheduled");
-  const published = (allProposals || []).filter((p: any) => p.status === "published");
+  const matchesFormat = (p: any) => formatFilter === "all" || p.format === formatFilter;
+  const filteredProposals = (allProposals || []).filter(matchesFormat);
+  const filteredPending = (pendingProposals || []).filter(matchesFormat);
+
+  const approved = filteredProposals.filter((p: any) => p.status === "approved");
+  const rejected = filteredProposals.filter((p: any) => p.status === "rejected");
+  const scheduled = filteredProposals.filter((p: any) => p.status === "scheduled");
+  const published = filteredProposals.filter((p: any) => p.status === "published");
 
   return (
     <div className="space-y-8">
@@ -153,14 +171,29 @@ function PropuestasContent() {
         </p>
       </div>
 
+      {/* Filtro por tipo de posteo */}
+      <div className="flex flex-wrap gap-2">
+        {FORMATOS.map((f) => (
+          <Button
+            key={f.value}
+            type="button"
+            size="sm"
+            variant={formatFilter === f.value ? "default" : "outline"}
+            onClick={() => setFormatFilter(f.value)}
+          >
+            {f.label}
+          </Button>
+        ))}
+      </div>
+
       <Tabs defaultValue="pending">
         <TabsList>
           <TabsTrigger value="pending" className="gap-1.5">
             <Clock className="h-3.5 w-3.5" />
             Pendientes
-            {pendingProposals && pendingProposals.length > 0 && (
+            {filteredPending.length > 0 && (
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
-                {pendingProposals.length}
+                {filteredPending.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -181,12 +214,14 @@ function PropuestasContent() {
             <div className="flex h-48 items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : !pendingProposals || pendingProposals.length === 0 ? (
+          ) : filteredPending.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center py-16">
                 <CheckCircle className="mb-4 h-12 w-12 text-muted-foreground/50" />
                 <p className="text-lg font-medium text-muted-foreground">
-                  No hay propuestas pendientes
+                  {formatFilter === "all"
+                    ? "No hay propuestas pendientes"
+                    : `No hay propuestas pendientes de tipo "${FORMATOS.find((f) => f.value === formatFilter)?.label}"`}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground/70">
                   Cuando los agentes generen contenido, aparecerá acá para tu aprobación.
@@ -195,7 +230,7 @@ function PropuestasContent() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {pendingProposals.map((p: any) => (
+              {filteredPending.map((p: any) => (
                 <ProposalCard
                   key={p.id}
                   proposal={p}
@@ -261,16 +296,20 @@ function PropuestasContent() {
 
         {/* TODAS */}
         <TabsContent value="all" className="mt-6">
-          {!allProposals || allProposals.length === 0 ? (
+          {filteredProposals.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center py-12">
                 <FileText className="mb-3 h-8 w-8 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">No hay propuestas todavía.</p>
+                <p className="text-sm text-muted-foreground">
+                  {formatFilter === "all"
+                    ? "No hay propuestas todavía."
+                    : `No hay propuestas de tipo "${FORMATOS.find((f) => f.value === formatFilter)?.label}" todavía.`}
+                </p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-3">
-              {allProposals.map((p: any) => (
+              {filteredProposals.map((p: any) => (
                 <ProposalRow
                   key={p.id}
                   proposal={p}
