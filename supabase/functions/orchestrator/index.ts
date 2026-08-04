@@ -172,9 +172,69 @@ async function callAI(
       if (!content) throw new Error("Gemini: respuesta sin contenido");
       return content;
     }
+    case "anthropic": {
+      // Misma API (Messages, no chat completions) y mismo ANTHROPIC_API_KEY
+      // que scripts/lib/claude.mjs usa para Stories.
+      const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+      if (!apiKey) throw new Error("ANTHROPIC_API_KEY no configurada");
+      const nonSystemMessages = allMessages
+        .filter((m) => m.role !== "system")
+        .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
+      const systemMsg = allMessages.find((m) => m.role === "system");
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: model || "claude-sonnet-5",
+          max_tokens: 2048,
+          temperature,
+          system: systemMsg?.content,
+          messages: nonSystemMessages,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`Anthropic error ${res.status}: ${err.slice(0, 200)}`);
+      }
+      const data = await res.json();
+      const textBlock = data.content?.find((b: any) => b.type === "text");
+      if (!textBlock?.text) throw new Error("Anthropic: respuesta sin contenido");
+      return textBlock.text;
+    }
     default:
       throw new Error(`Proveedor no soportado: ${provider}`);
   }
+}
+
+// Acción "start": Anthropic es el proveedor default (más confiable que el
+// tier gratuito de Groq, que rate-limita por TPM bajo uso normal — causa
+// real confirmada del error 500 de orchestrator, ver diagnóstico en el
+// commit). Si Anthropic falla (o falta ANTHROPIC_API_KEY), fallback a Groq
+// con el modelo que ya usa agent_config. La acción "continue" no se toca:
+// sigue usando el proveedor configurado por agente en /configuracion.
+async function callAgent(
+  config: { provider: string; model: string; temperature: number },
+  system: string,
+  messages: { role: string; content: string }[],
+  useAnthropicDefault = false
+): Promise<string> {
+  if (useAnthropicDefault) {
+    try {
+      return await withRetry(() =>
+        callAI("anthropic", "claude-sonnet-5", system, messages, config.temperature)
+      );
+    } catch (e: any) {
+      console.warn(`[orchestrator] Anthropic falló (${e.message}), fallback a Groq`);
+      return await withRetry(() =>
+        callAI("groq", "llama-3.3-70b-versatile", system, messages, config.temperature)
+      );
+    }
+  }
+  return withRetry(() => callAI(config.provider, config.model, system, messages, config.temperature));
 }
 
 async function getAgentConfig(agentId: string) {
@@ -303,7 +363,8 @@ async function pickNextSlot(): Promise<string> {
 async function runEstratega(
   topic: string,
   contextDocs: string,
-  history: string
+  history: string,
+  useAnthropicDefault = false
 ): Promise<string> {
   const config = await getAgentConfig("estratega");
   const system = `${config.system_prompt}
@@ -322,21 +383,19 @@ Incluí:
 4. Formato recomendado (post, carrusel, historia)
 5. Momento ideal de publicación`;
 
-  return withRetry(() =>
-    callAI(
-      config.provider,
-      config.model,
-      system,
-      [{ role: "user", content: `Tema: ${topic}` }],
-      config.temperature
-    )
+  return callAgent(
+    config,
+    system,
+    [{ role: "user", content: `Tema: ${topic}` }],
+    useAnthropicDefault
   );
 }
 
 async function runCreativo(
   estrategia: string,
   contextDocs: string,
-  history: string
+  history: string,
+  useAnthropicDefault = false
 ): Promise<string> {
   const config = await getAgentConfig("creativo");
   const system = `${config.system_prompt}
@@ -356,21 +415,19 @@ CTA: [call to action]
 HASHTAGS: [5-10 hashtags relevantes]
 NOTAS VISUALES: [qué imagen/video necesitás]`;
 
-  return withRetry(() =>
-    callAI(
-      config.provider,
-      config.model,
-      system,
-      [{ role: "user", content: estrategia }],
-      config.temperature
-    )
+  return callAgent(
+    config,
+    system,
+    [{ role: "user", content: estrategia }],
+    useAnthropicDefault
   );
 }
 
 async function runCritico(
   contenido: string,
   contextDocs: string,
-  history: string
+  history: string,
+  useAnthropicDefault = false
 ): Promise<{ aprobado: boolean; feedback: string }> {
   const config = await getAgentConfig("critico");
   const system = `${config.system_prompt}
@@ -388,14 +445,11 @@ DECISION: APROBADO | RECHAZADO
 RAZON: [explicación breve]
 SUGERENCIAS: [si fue rechazado, qué cambiar]`;
 
-  const response = await withRetry(() =>
-    callAI(
-      config.provider,
-      config.model,
-      system,
-      [{ role: "user", content: contenido }],
-      config.temperature
-    )
+  const response = await callAgent(
+    config,
+    system,
+    [{ role: "user", content: contenido }],
+    useAnthropicDefault
   );
 
   const feedback = response || "Sin feedback del agente crítico";
@@ -424,18 +478,18 @@ async function startSession(topic: string) {
   // 3. Ejecutar los 3 agentes secuencialmente
   const history: string[] = [];
 
-  // Estratega propone
-  const estrategia = await runEstratega(topic, contextDocs, "");
+  // Estratega propone (Anthropic default, fallback a Groq — ver callAgent)
+  const estrategia = await runEstratega(topic, contextDocs, "", true);
   history.push(`## Agente Estratega:\n${estrategia}`);
   await saveMessage(session.id, "estratega", estrategia, 1);
 
   // Creativo redacta
-  const contenido = await runCreativo(estrategia, contextDocs, history.join("\n"));
+  const contenido = await runCreativo(estrategia, contextDocs, history.join("\n"), true);
   history.push(`## Agente Creativo:\n${contenido}`);
   await saveMessage(session.id, "creativo", contenido, 2);
 
   // Crítico evalúa
-  const evaluacion = await runCritico(contenido, contextDocs, history.join("\n"));
+  const evaluacion = await runCritico(contenido, contextDocs, history.join("\n"), true);
   await saveMessage(session.id, "critico", evaluacion.feedback, 3);
 
   // 4. Extraer propuesta estructurada
