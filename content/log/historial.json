@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-04T13:47:11.895Z",
+  "syncedAt": "2026-08-04T19:18:21.884Z",
   "posts": [
+    {
+      "id": "6a7203d3d54e9f81ceb4efc4",
+      "date": "2026-08-04",
+      "status": "published",
+      "content": "¿Cuántas reuniones de esta semana arrancaron con un objetivo claro por escrito? Si la respuesta es ninguna, ahí está el problema. Contanos cómo las estructurás vos.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-04-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3956377572179100437"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a70b6880b36152962715095",
       "date": "2026-08-03",
