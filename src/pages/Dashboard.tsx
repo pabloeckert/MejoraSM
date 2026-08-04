@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, MessageSquare, Sparkles, CalendarDays, Clock, Zap, ArrowRight } from "lucide-react";
+import { FileText, MessageSquare, Sparkles, CalendarDays, Clock, Zap, ArrowRight, History } from "lucide-react";
 import { useDocuments } from "@/hooks/useVault";
 import { useDialogueSessions } from "@/hooks/useDialogue";
 import { usePendingProposals, useProposals } from "@/hooks/useProposals";
@@ -25,6 +25,16 @@ import {
 // Paleta de marca: Azul, Rojo, Amarillo (Manual de Marca Mejora Continua) +
 // el 4to tono derivado de Azul (#6f93cf) del design system para el pie chart.
 const COLORS = ["#1A3D84", "#E1061E", "#F7CC13", "#6f93cf"];
+
+// Metadata de status para la sección de últimas publicaciones — mismos 3
+// status reales del pipeline autónomo (ver PLAN_AUTONOMIA.md Fase 1):
+// published (Zernio ya lo publicó), scheduled (autoagendado, esperando el
+// cron), pending (formato "historia", sin pipeline autónomo todavía).
+const STATUS_META: Record<string, { label: string; variant: "default" | "secondary" | "outline"; dateLabel: string }> = {
+  published: { label: "Publicada", variant: "default", dateLabel: "Publicada" },
+  scheduled: { label: "Programada", variant: "secondary", dateLabel: "Programada para" },
+  pending: { label: "Pendiente", variant: "outline", dateLabel: "Creada" },
+};
 
 export default function Dashboard() {
   return (
@@ -108,6 +118,19 @@ function DashboardContent() {
     name: name === "pending" ? "Pendiente" : name === "approved" ? "Aprobado" : name === "rejected" ? "Rechazado" : name,
     value,
   }));
+
+  // Últimas 5 publicaciones (actuales y pendientes): mezcla published/
+  // scheduled/pending por la fecha que corresponda a cada una (publicada,
+  // programada o creada), orden descendente. Sin imagen — todavía no hay
+  // renders disponibles para consultar acá, solo datos de texto reales.
+  const recentActivity = (proposals || [])
+    .filter((p: any) => p.status === "published" || p.status === "scheduled" || p.status === "pending")
+    .map((p: any) => ({
+      ...p,
+      displayDate: p.published_at || p.scheduled_at || p.created_at,
+    }))
+    .sort((a: any, b: any) => new Date(b.displayDate).getTime() - new Date(a.displayDate).getTime())
+    .slice(0, 5);
 
   return (
     <div className="space-y-7">
@@ -289,6 +312,56 @@ function DashboardContent() {
                   Ver todas ({pendingProposals.length})
                 </Link>
               )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Últimas publicaciones */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-[17px] font-medium">Últimas publicaciones</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recentActivity.length === 0 ? (
+            <div className="flex h-32 flex-col items-center justify-center text-center">
+              <History className="mb-3 h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">
+                Todavía no hay propuestas publicadas, programadas ni pendientes.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {recentActivity.map((p: any) => {
+                const statusMeta = STATUS_META[p.status] ?? STATUS_META.pending;
+                return (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-3.5 border-b border-border py-3 last:border-0"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13.5px] font-semibold">
+                        {p.hook || p.title || p.dialogue_sessions?.topic || "Sin título"}
+                      </p>
+                      <p className="text-[11.5px] text-muted-foreground">
+                        {statusMeta.dateLabel}:{" "}
+                        {new Date(p.displayDate).toLocaleDateString("es-AR", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="flex-shrink-0">
+                      {p.format || "post"}
+                    </Badge>
+                    <Badge variant={statusMeta.variant} className="flex-shrink-0">
+                      {statusMeta.label}
+                    </Badge>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
