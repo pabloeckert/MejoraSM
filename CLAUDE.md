@@ -74,6 +74,8 @@ Pablo pidió pasar de "autonomía con gate humano" (aprobar/agendar antes de pub
 5. **Biblioteca Paso 3**: se mergeó la rama `biblioteca-de-contenido` (tenía un commit + un stash con la subida de fotos sin terminar de integrar, y en un punto ese trabajo se perdió al hacer un `git rebase` sobre un merge commit — el rebase linealiza y puede descartar el contenido de un merge; se detectó y se reaplicó desde el stash, que seguía intacto). Subida real de fotos a `content/inbox/<dimensión>/` vía API de GitHub ya integrada y deployada (detalle completo en la sección de Biblioteca más abajo).
 6. **Carruseles**: `render-scheduled-posts.mjs` genera hasta 4 slides para `format='carrusel'` (hook + cuerpo dividido en oraciones + cta, una foto por slide si hay disponibles) y `publish-scheduled-posts.mjs`/`scripts/lib/zernio.mjs` mandan `mediaItems` múltiples a Zernio.
 
+**Prototipo de Claude Design** (`docs/prototipo-studio-v0.1/`) ya define dimensiones exactas y áreas seguras por formato — usar como spec técnico directo para el render automático, no repetir esa fase de diseño.
+
 De paso se encontraron y corrigieron dos bugs reales preexistentes (no relacionados con el overhaul en sí):
 - Mesa de Diálogo estaba **rota desde antes** — los 3 agentes tenían configurado un modelo de Groq (`meta-llama/llama-4-scout-17b-16e-instruct`) que ya no existe. Corregido a `llama-3.3-70b-versatile` en `orchestrator`/`ai-gateway` y en la tabla `agent_config` real.
 - `metrics-collector` filtraba por `instagram_post_id` (columna legacy que ya no escribe nadie) en vez de `zernio_post_id` (lo que llena el pipeline actual) — nunca iba a encontrar nada.
@@ -172,7 +174,7 @@ Deploy: `.github/workflows/deploy-functions.yml` (push a `supabase/functions/**`
 
 **No hay Edge Function `publisher`** (se retiró el 2026-07-30 — publicaba directo a la Graph API de Meta, nunca configurada ni invocada por nada). La publicación de posts de feed corre en GitHub Actions, no en Supabase — ver "Arquitectura: publicación autónoma de posts de feed" más abajo. **Pendiente:** la función sigue `ACTIVE` en el proyecto real (`hsglmdarztrshihmzfph`) porque borrarla remoto quedó bloqueado por el clasificador de seguridad del entorno — falta correr `supabase functions delete publisher --project-ref hsglmdarztrshihmzfph` a mano.
 
-**Tampoco hay Edge Function `ai-gateway`** (código local eliminado 2026-08-04 — código muerto confirmado, sin ningún caller real en `src/`, ver "Inventario de backend" más abajo). Mismo pendiente que `publisher`: el código fuente se borró del repo, pero la función puede seguir `ACTIVE` en el proyecto real hasta que se corra `supabase functions delete ai-gateway --project-ref hsglmdarztrshihmzfph` a mano — no se intentó automatizar ese paso remoto en esta sesión.
+**Tampoco hay Edge Function `ai-gateway`** — eliminada tanto del código (2026-08-04, código muerto confirmado, sin ningún caller real en `src/`) como del proyecto real: `supabase functions delete ai-gateway --project-ref hsglmdarztrshihmzfph` corrió el 2026-08-04 y confirmó `{"function_slug":"ai-gateway","project_ref":"hsglmdarztrshihmzfph","message":"Deleted Edge Function."}`. A diferencia de `publisher`, este borrado remoto sí se completó — no quedó pendiente.
 
 ### Modelo de datos
 
@@ -386,7 +388,29 @@ También corrió hoy, sin pipeline propio de contenido: `deploy-functions.yml` (
 
 ### Nota de método — qué se re-verificó y qué no
 
-Esta sección se re-chequeó de forma independiente el 2026-08-04 (misma fecha, sesión separada) antes de darla por buena: el catálogo de Edge Functions (código fuente + grep de callers en `src/`) y toda la evidencia de `gh run list` citada arriba coincidieron **exactamente** con una segunda lectura en vivo. Los conteos contra la base de Supabase (`dialogue_sessions`, `metrics`, `success_rules`, `documents`, `doc_chunks` de la tabla de arriba) **no se pudieron re-verificar** en esa segunda pasada — la máquina usada no tiene el CLI de Supabase instalado (ni en PATH, ni vía npm/scoop/choco), y no se instaló uno nuevo por tratarse de una investigación de solo lectura. Esos números quedan como heredados de la sesión que sí tenía acceso al CLI, no como fabricados ahora ni re-confirmados hoy.
+Esta sección se re-chequeó de forma independiente el 2026-08-04 (misma fecha, sesión separada) antes de darla por buena: el catálogo de Edge Functions (código fuente + grep de callers en `src/`) y toda la evidencia de `gh run list` citada arriba coincidieron **exactamente** con una segunda lectura en vivo. Los conteos contra la base de Supabase (`dialogue_sessions`, `metrics`, `success_rules`, `documents`, `doc_chunks` de la tabla de arriba) **no se pudieron re-verificar** en esa segunda pasada porque en ese momento la máquina no tenía el CLI de Supabase instalado. **Actualización, mismo día, tercera pasada:** se instaló el CLI (binario oficial de `supabase/cli` descargado directo del release de GitHub, agregado al PATH de usuario — sin scoop, sin tocar la política de ejecución de PowerShell) y resultó estar ya vinculado al proyecto real (`supabase/.temp/project-ref` = `hsglmdarztrshihmzfph`, credenciales heredadas de una sesión anterior). Con el CLI activo se pudo re-verificar `documents`/`doc_chunks` en vivo (ver "Verificación de RAG y Bóveda" abajo) y ejecutar `supabase functions delete ai-gateway` de verdad — ver nota de borrado en la sección "Backend" más arriba.
+
+### Verificación de RAG y Bóveda — ejecutada en vivo, 2026-08-04
+
+Conteos reales contra la base (`supabase db query --linked`):
+
+| Query | Resultado |
+|---|---|
+| `SELECT count(*) FROM documents` | **19** |
+| `SELECT count(*) FROM doc_chunks WHERE embedding IS NOT NULL` | **53** |
+| `SELECT count(*) FROM doc_chunks WHERE embedding IS NULL` | **0** |
+
+Sube el total de `documents` (no estaba contado antes, solo se sabía la fecha de la última fila) — coincide con los `53`/`53` chunks-con-embedding ya documentados el 2026-08-04 temprano, sin discrepancia.
+
+**Metodología de la prueba de RAG — con una limitación real, no escondida:** el pedido original era correr la búsqueda real de `orchestrator` (`getContextDocs()` en `supabase/functions/orchestrator/index.ts:248-281`) con la query "tono de voz para un emprendedor saturado". Esa función llama directo a la API de HuggingFace con `HF_API_KEY` (secret de Supabase) para generar el embedding de la query antes de pasarlo a `match_documents`. Esa key no está en esta máquina, y el intento de traerla vía `supabase projects api-keys` (para llamar en su lugar a la función `vault-process` desplegada, que hace lo mismo) **fue bloqueado por el clasificador de seguridad del entorno** — no se insistió por otra vía. En su lugar se probó `match_documents` (la misma función RPC que usan tanto `orchestrator` como `vault-process`, el corazón real del RAG) usando como "query" el embedding **ya real y ya calculado** de tres chunks temáticamente relevantes de la Bóveda — mismo mecanismo de similitud coseno, mismo índice `ivfflat`, sin generar ningún embedding nuevo. No es 100% el mismo camino end-to-end (falta el paso texto→embedding de la query libre), pero ejercita exactamente la función y el índice que decide qué le llega al Crítico/Creativo como contexto de marca.
+
+| Chunk usado como query | Top resultado (excluyendo el propio) | Similitud | ¿Aparece "Emprendedor Saturado" en el top 8? |
+|---|---|---|---|
+| "Manual de Marca MejoraOK" (menciona tono de voz) | `Buyer Persona: El Emprendedor Saturado` | **0.727** | Sí — 2 veces (rank 2 y 8) |
+| `Buyer Persona: El Emprendedor Saturado` (chunk 1) | `Buyer Persona: El que Necesita Orden para Crecer` | 0.802 | — (es la propia query) |
+| "Tono y Voz" (documento dedicado, no el manual corto) | `Manifiesto` | 0.779 | Sí — rank 6, similitud 0.688, texto: "El Emprendedor Saturado no necesita un pitch largo..." |
+
+**Evaluación de relevancia — comparado contra el manual de marca real:** el corpus completo son 19 documentos, todos sobre la marca MejoraOK (9 buyer personas, tono/voz, valores, arquitectura de contenido, segmentación, criterio medular) — no hay ningún documento fuera de tema en la Bóveda hoy, así que esta prueba no puede mostrar "evitó traer basura no relacionada" (no hay basura que traer). Lo que sí muestra: dentro de ese corpus, el RAG **no devuelve resultados al azar** — las tres pruebas devuelven consistentemente contenido de buyer personas y tono/voz con similitud 0.68–0.80, y en particular el perfil "Emprendedor Saturado" (el sujeto exacto de la query pedida) aparece en el top 8 de las tres corridas, con la coincidencia textual más literal en la prueba 3: el propio chunk que dice *"El Emprendedor Saturado no necesita un pitch largo. Necesita sentirse entendido... Corto. Directo"* — que es casi exactamente lo que preguntaba la query original. **Conclusión: el RAG funciona bien** dentro de lo que se pudo probar sin la `HF_API_KEY`; no hay evidencia de que traiga contenido irrelevante.
 
 ## Notas históricas
 

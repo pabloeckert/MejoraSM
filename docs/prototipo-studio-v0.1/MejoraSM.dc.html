@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0}
+  body{background:#F7F6F4;color:#2B2B2B;font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  *{box-sizing:border-box}
+  a{color:#1A3D84;text-decoration:none}
+  a:hover{color:#E1061E}
+  ::selection{background:#F7CC13;color:#2B2B2B}
+  input,textarea,button{font-family:inherit}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:rgba(43,43,43,.16);border-radius:9px}
+  ::-webkit-scrollbar-track{background:transparent}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @keyframes pulseDot{0%,100%{opacity:.35;transform:scale(.9)}50%{opacity:1;transform:scale(1.15)}}
+  @keyframes shimmer{0%{background-position:-220px 0}100%{background-position:220px 0}}
+</style>
+<template id="__bundler_thumbnail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="#1A3D84"/><rect x="120" y="150" width="90" height="14" rx="7" fill="#F7CC13"/><circle cx="250" cy="157" r="18" fill="#E1061E"/><text x="200" y="250" text-anchor="middle" fill="#fff" font-family="Helvetica,sans-serif" font-size="64" font-weight="600">SM</text></svg></template>
+</helmet>
+
+<div style="display:flex;min-height:100vh;align-items:stretch">
+
+  <aside style="width:236px;flex:none;background:#FFFFFF;border-right:1px solid #ECEAE6;display:flex;flex-direction:column;position:sticky;top:0;height:100vh">
+    <div style="padding:22px 20px 16px;border-bottom:1px solid #F1EFEC">
+      <img src="assets/mejora-lockup.png" alt="Mejora Continua" style="height:24px;width:auto;display:block">
+      <div style="margin-top:10px;display:flex;align-items:center;gap:7px">
+        <span style="font:600 11px/1 'League Spartan',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#1A3D84">MejoraSM</span>
+        <span style="width:4px;height:4px;border-radius:50%;background:#F7CC13"></span>
+        <span style="font:400 10.5px/1 Inter,sans-serif;color:#9CA3AF">v0.1 interno</span>
+      </div>
+    </div>
+
+    <nav style="padding:12px 10px;display:flex;flex-direction:column;gap:2px">
+      <sc-for list="{{ nav }}" as="item" hint-placeholder-count="6">
+        <button onClick="{{ item.go }}" style="all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;background:{{ item.bg }};color:{{ item.fg }};font:500 13.5px/1.2 Inter,sans-serif;transition:background .16s ease,color .16s ease" style-hover="background:#F4F2EE">
+          <span style="width:5px;height:5px;border-radius:50%;flex:none;background:{{ item.dot }}"></span>
+          <span style="flex:1">{{ item.label }}</span>
+          <span style="font:600 10px/1 Inter,sans-serif;color:#9CA3AF">{{ item.count }}</span>
+        </button>
+      </sc-for>
+    </nav>
+
+    <div style="margin-top:auto;padding:14px 16px 18px;border-top:1px solid #F1EFEC;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="width:26px;height:26px;border-radius:50%;background:#1A3D84;color:#fff;font:600 11px/26px Inter,sans-serif;text-align:center">PL</span>
+        <div style="min-width:0">
+          <div style="font:500 12px/1.3 Inter,sans-serif">Pablo</div>
+          <div style="font:400 10.5px/1.3 Inter,sans-serif;color:#9CA3AF">admin único</div>
+        </div>
+      </div>
+      <button onClick="{{ goNotas }}" style="all:unset;cursor:pointer;font:500 11px/1.4 Inter,sans-serif;color:#6B7280;text-decoration:underline;text-underline-offset:3px" style-hover="color:#1A3D84">Notas de diseño y handoff</button>
+      <button onClick="{{ goLogin }}" style="all:unset;cursor:pointer;font:500 11px/1.4 Inter,sans-serif;color:#9CA3AF" style-hover="color:#E1061E">Ver pantalla de Login</button>
+    </div>
+  </aside>
+
+  <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+
+    <header style="position:sticky;top:0;z-index:30;backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);background:rgba(255,255,255,.78);border-bottom:1px solid #ECEAE6;padding:14px 26px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+      <div style="min-width:0;flex:1">
+        <h1 style="margin:0;font:600 20px/1.15 'League Spartan',sans-serif;letter-spacing:-.01em;color:#1A3D84">{{ screenTitle }}</h1>
+        <p style="margin:3px 0 0;font:400 12px/1.4 Inter,sans-serif;color:#6B7280;max-width:74ch">{{ screenSub }}</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:7px;padding:6px 11px;border:1px solid #ECEAE6;border-radius:999px;background:#fff">
+          <span style="width:6px;height:6px;border-radius:50%;background:#1A3D84;animation:pulseDot 2.4s ease-in-out infinite"></span>
+          <span style="font:500 11px/1 Inter,sans-serif;color:#6B7280">Bóveda: 11 documentos indexados</span>
+        </div>
+        <button onClick="{{ toggleCopilot }}" style="all:unset;cursor:pointer;padding:8px 14px;border-radius:999px;background:#1A3D84;color:#fff;font:600 12px/1 Inter,sans-serif;display:flex;align-items:center;gap:7px" style-hover="background:#16336E">
+          <span style="width:6px;height:6px;border-radius:50%;background:#F7CC13"></span>Copiloto
+        </button>
+      </div>
+    </header>
+
+    <div style="flex:1;min-width:0">
+
+      <!-- ══ STUDIO ══ -->
+      <sc-if value="{{ isStudio }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;align-items:stretch;min-height:calc(100vh - 74px)">
+
+          <div style="width:196px;flex:none;border-right:1px solid #ECEAE6;background:#FFFFFF;padding:14px 12px;display:flex;flex-direction:column;gap:8px">
+            <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.13em;text-transform:uppercase;color:#9CA3AF;padding:2px 4px 6px">Piezas · backlog</div>
+            <sc-for list="{{ pieces }}" as="p" hint-placeholder-count="5">
+              <button onClick="{{ p.select }}" style="all:unset;cursor:pointer;display:block;padding:9px 10px;border-radius:11px;border:1px solid {{ p.selBorder }};background:{{ p.selBg }};transition:border-color .15s ease" style-hover="border-color:#1A3D84">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+                  <span style="font:600 9px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:{{ p.fmtColor }}">{{ p.format }}</span>
+                  <span style="margin-left:auto;width:5px;height:5px;border-radius:50%;background:{{ p.statusColor }}"></span>
+                </div>
+                <div style="font:500 11.5px/1.35 Inter,sans-serif;color:#2B2B2B;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ p.title }}</div>
+              </button>
+            </sc-for>
+          </div>
+
+          <div style="flex:1;min-width:0;padding:22px 26px 30px;position:relative;overflow:hidden">
+            <sc-if value="{{ dark }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;inset:0;background:#131313;z-index:0"></div>
+            </sc-if>
+
+            <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:16px">
+
+              <div style="display:flex;align-items:center;gap:6px;padding:4px;border-radius:999px;background:rgba(255,255,255,.72);border:1px solid #ECEAE6;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)">
+                <sc-for list="{{ formats }}" as="f" hint-placeholder-count="4">
+                  <button onClick="{{ f.pick }}" style="all:unset;cursor:pointer;padding:7px 13px;border-radius:999px;background:{{ f.bg }};color:{{ f.fg }};font:500 11.5px/1 Inter,sans-serif;white-space:nowrap">{{ f.label }}</button>
+                </sc-for>
+              </div>
+
+              <div style="display:flex;align-items:flex-start;gap:22px;flex-wrap:wrap;justify-content:center">
+
+                <!-- teléfono -->
+                <div style="width:318px;flex:none">
+                  <div style="position:relative;border-radius:38px;background:#111;padding:9px;box-shadow:0 24px 60px -20px rgba(20,20,20,.42),0 2px 6px rgba(20,20,20,.16)">
+                    <div style="position:absolute;top:16px;left:50%;transform:translateX(-50%);width:74px;height:20px;border-radius:999px;background:#0B0B0B;z-index:6"></div>
+                    <div style="position:relative;border-radius:30px;overflow:hidden;background:#fff;height:{{ canvasH }}px">
+
+                      <sc-if value="{{ isVertical }}" hint-placeholder-val="{{ true }}">
+                        <div style="position:absolute;inset:0;background:#FFFFFF;display:flex;flex-direction:column">
+                          <div style="height:62px;flex:none;padding:34px 16px 0;display:flex;gap:4px">
+                            <span style="flex:1;height:2.5px;border-radius:2px;background:#2B2B2B;opacity:.85"></span>
+                            <span style="flex:1;height:2.5px;border-radius:2px;background:#2B2B2B;opacity:.2"></span>
+                            <span style="flex:1;height:2.5px;border-radius:2px;background:#2B2B2B;opacity:.2"></span>
+                          </div>
+                          <div style="padding:0 16px;display:flex;align-items:center;gap:8px">
+                            <span style="width:24px;height:24px;border-radius:50%;background:#1A3D84;color:#fff;font:600 9px/24px Inter,sans-serif;text-align:center">MC</span>
+                            <span style="font:600 11px/1 Inter,sans-serif;color:#2B2B2B">mejoracontinua</span>
+                            <span style="font:400 10px/1 Inter,sans-serif;color:#9CA3AF">2 h</span>
+                          </div>
+                          <div style="flex:1;min-height:0;padding:26px 26px 0;display:flex;flex-direction:column;justify-content:center">
+                            <div style="width:34px;height:4px;background:#F7CC13;margin-bottom:16px"></div>
+                            <div style="font:600 23px/1.16 'League Spartan',sans-serif;color:#1A3D84;letter-spacing:-.015em;text-wrap:pretty">{{ sel.hook }}</div>
+                            <div style="margin-top:14px;font:400 12.5px/1.55 Inter,sans-serif;color:#2B2B2B;text-wrap:pretty">{{ sel.bodyShort }}</div>
+                          </div>
+                          <div style="flex:none;padding:0 26px 34px">
+                            <div style="height:1px;background:#ECEAE6;margin-bottom:14px"></div>
+                            <div style="font:600 12px/1.3 Inter,sans-serif;color:#E1061E">{{ sel.cta }}</div>
+                            <div style="margin-top:12px;display:flex;align-items:center;gap:8px">
+                              <img src="assets/mejora-lockup.png" alt="Mejora Continua" style="height:13px;width:auto;opacity:.9">
+                            </div>
+                          </div>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ isSquareish }}" hint-placeholder-val="{{ false }}">
+                        <div style="position:absolute;inset:0;background:#FAFAF9;overflow-y:auto">
+                          <div style="height:44px;flex:none;padding:26px 14px 0;display:flex;align-items:center;gap:8px;background:#fff;border-bottom:1px solid #F1EFEC">
+                            <span style="font:600 15px/1 'League Spartan',sans-serif;color:#2B2B2B">Feed</span>
+                            <span style="margin-left:auto;font:400 10px/1 Inter,sans-serif;color:#9CA3AF">vista previa en contexto</span>
+                          </div>
+                          <div style="background:#fff;padding:10px 0 14px">
+                            <div style="padding:0 12px 9px;display:flex;align-items:center;gap:8px">
+                              <span style="width:28px;height:28px;border-radius:50%;background:#1A3D84;color:#fff;font:600 10px/28px Inter,sans-serif;text-align:center">MC</span>
+                              <div>
+                                <div style="font:600 11px/1.2 Inter,sans-serif">mejoracontinua</div>
+                                <div style="font:400 9.5px/1.2 Inter,sans-serif;color:#9CA3AF">Patrocinado · Córdoba</div>
+                              </div>
+                            </div>
+                            <div style="position:relative;width:100%;aspect-ratio:4/5;background:#fff;border-top:1px solid #F1EFEC;border-bottom:1px solid #F1EFEC;padding:30px 26px;display:flex;flex-direction:column;justify-content:center">
+                              <div style="width:30px;height:4px;background:#F7CC13;margin-bottom:14px"></div>
+                              <div style="font:600 20px/1.18 'League Spartan',sans-serif;color:#1A3D84;letter-spacing:-.015em;text-wrap:pretty">{{ sel.hook }}</div>
+                              <div style="margin-top:12px;font:400 11.5px/1.55 Inter,sans-serif;color:#2B2B2B;text-wrap:pretty">{{ sel.bodyShort }}</div>
+                              <div style="margin-top:auto;font:600 11px/1.3 Inter,sans-serif;color:#E1061E">{{ sel.cta }}</div>
+                              <sc-if value="{{ isCarrusel }}" hint-placeholder-val="{{ false }}">
+                                <div style="position:absolute;top:14px;right:14px;padding:3px 8px;border-radius:999px;background:rgba(43,43,43,.72);color:#fff;font:600 9px/1.4 Inter,sans-serif">1/6</div>
+                              </sc-if>
+                            </div>
+                            <sc-if value="{{ isCarrusel }}" hint-placeholder-val="{{ false }}">
+                              <div style="display:flex;gap:4px;justify-content:center;padding:9px 0 3px">
+                                <span style="width:5px;height:5px;border-radius:50%;background:#1A3D84"></span>
+                                <span style="width:5px;height:5px;border-radius:50%;background:#D8D4CE"></span>
+                                <span style="width:5px;height:5px;border-radius:50%;background:#D8D4CE"></span>
+                                <span style="width:5px;height:5px;border-radius:50%;background:#D8D4CE"></span>
+                                <span style="width:5px;height:5px;border-radius:50%;background:#D8D4CE"></span>
+                                <span style="width:5px;height:5px;border-radius:50%;background:#D8D4CE"></span>
+                              </div>
+                            </sc-if>
+                            <div style="padding:10px 12px 0;display:flex;gap:12px;align-items:center">
+                              <span style="font:400 15px/1 Inter,sans-serif;color:#2B2B2B">♡</span>
+                              <span style="font:400 14px/1 Inter,sans-serif;color:#2B2B2B">💬</span>
+                              <span style="margin-left:auto;font:400 9.5px/1 Inter,sans-serif;color:#9CA3AF">↗</span>
+                            </div>
+                            <div style="padding:8px 12px 0;font:400 11px/1.5 Inter,sans-serif;color:#2B2B2B">
+                              <span style="font-weight:600">mejoracontinua</span> {{ sel.bodyShort }}
+                              <span style="color:#1A3D84"> {{ sel.tags }}</span>
+                            </div>
+                            <sc-if value="{{ showSocial }}" hint-placeholder-val="{{ false }}">
+                              <div style="margin:10px 12px 0;padding:9px 10px;border-radius:10px;background:#F7F6F4;display:flex;flex-direction:column;gap:7px">
+                                <div style="font:400 10.5px/1.45 Inter,sans-serif;color:#6B7280"><span style="font-weight:600;color:#2B2B2B">lauv.gestion</span> esto me pasó tal cual el año pasado 😳</div>
+                                <div style="font:400 10.5px/1.45 Inter,sans-serif;color:#6B7280"><span style="font-weight:600;color:#2B2B2B">estudio_norte</span> ¿tienen algo para equipos chicos?</div>
+                                <div style="display:flex;gap:6px;margin-top:2px">
+                                  <span style="padding:4px 9px;border-radius:999px;background:#fff;border:1px solid #ECEAE6;font:500 9.5px/1 Inter,sans-serif;color:#1A3D84">Responder</span>
+                                  <span style="padding:4px 9px;border-radius:999px;background:#1A3D84;color:#fff;font:500 9.5px/1 Inter,sans-serif">Más información</span>
+                                </div>
+                              </div>
+                            </sc-if>
+                          </div>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ showSafe }}" hint-placeholder-val="{{ false }}">
+                        <div style="position:absolute;inset:0;z-index:4;pointer-events:none">
+                          <div style="position:absolute;left:5.6%;right:5.6%;top:{{ safeTop }};bottom:{{ safeBottom }};border:1px dashed rgba(26,61,132,.55);border-radius:4px"></div>
+                          <div style="position:absolute;left:0;right:0;top:0;height:{{ safeTop }};background:rgba(225,6,30,.10)"></div>
+                          <div style="position:absolute;left:0;right:0;bottom:0;height:{{ safeBottom }};background:rgba(225,6,30,.10)"></div>
+                          <div style="position:absolute;left:50%;transform:translateX(-50%);bottom:6px;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.92);font:600 8.5px/1.3 Inter,sans-serif;color:#1A3D84;white-space:nowrap">zona segura {{ safeLabel }}</div>
+                        </div>
+                      </sc-if>
+
+                      <sc-if value="{{ showHeat }}" hint-placeholder-val="{{ false }}">
+                        <div style="position:absolute;inset:0;z-index:5;pointer-events:none;mix-blend-mode:multiply;background:radial-gradient(circle at 30% 34%,rgba(225,6,30,.55) 0,rgba(247,204,19,.32) 26%,transparent 44%),radial-gradient(circle at 62% 74%,rgba(247,204,19,.34) 0,transparent 34%),radial-gradient(circle at 50% 92%,rgba(26,61,132,.22) 0,transparent 40%)"></div>
+                      </sc-if>
+                    </div>
+                  </div>
+
+                  <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center">
+                    <sc-for list="{{ overlays }}" as="o" hint-placeholder-count="3">
+                      <button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;padding:6px 11px;border-radius:999px;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }};font:500 10.5px/1 Inter,sans-serif">{{ o.label }}</button>
+                    </sc-for>
+                  </div>
+                  <div style="margin-top:8px;text-align:center;font:400 10px/1.5 Inter,sans-serif;color:{{ mutedOnStage }}">{{ specLine }}</div>
+                </div>
+
+                <!-- A/B -->
+                <sc-if value="{{ ab }}" hint-placeholder-val="{{ false }}">
+                  <div style="width:250px;flex:none">
+                    <div style="border-radius:26px;background:#F1EFEC;padding:7px;border:1px solid #E4E1DC">
+                      <div style="border-radius:20px;overflow:hidden;background:#fff;height:412px;padding:26px 20px;display:flex;flex-direction:column;justify-content:center">
+                        <div style="width:26px;height:3.5px;background:#E1061E;margin-bottom:12px"></div>
+                        <div style="font:600 19px/1.18 'League Spartan',sans-serif;color:#2B2B2B;letter-spacing:-.015em">{{ sel.hookB }}</div>
+                        <div style="margin-top:11px;font:400 11.5px/1.55 Inter,sans-serif;color:#6B7280">{{ sel.bodyB }}</div>
+                        <div style="margin-top:auto;font:600 11px/1.3 Inter,sans-serif;color:#1A3D84">{{ sel.ctaB }}</div>
+                      </div>
+                    </div>
+                    <div style="margin-top:12px;padding:12px;border-radius:12px;background:rgba(255,255,255,.8);border:1px solid #ECEAE6;backdrop-filter:blur(8px)">
+                      <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.11em;text-transform:uppercase;color:#9CA3AF;margin-bottom:9px">Variante B · estimación IA</div>
+                      <div style="display:flex;flex-direction:column;gap:8px">
+                        <div>
+                          <div style="display:flex;justify-content:space-between;font:500 10.5px/1.4 Inter,sans-serif;color:#2B2B2B"><span>Claridad del dolor</span><span>72</span></div>
+                          <div style="height:4px;border-radius:4px;background:#F1EFEC;margin-top:3px"><div style="width:72%;height:100%;border-radius:4px;background:#6B7280"></div></div>
+                        </div>
+                        <div>
+                          <div style="display:flex;justify-content:space-between;font:500 10.5px/1.4 Inter,sans-serif;color:#2B2B2B"><span>Fidelidad al manual</span><span>61</span></div>
+                          <div style="height:4px;border-radius:4px;background:#F1EFEC;margin-top:3px"><div style="width:61%;height:100%;border-radius:4px;background:#E1061E"></div></div>
+                        </div>
+                      </div>
+                      <div style="margin-top:10px;font:400 10px/1.5 Inter,sans-serif;color:#6B7280">B abre con un reto ("¿hasta cuándo?"). El manual pide cerrar con dirección, no con desafío. <strong style="color:#2B2B2B;font-weight:600">A queda mejor.</strong></div>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+
+              <!-- versiones -->
+              <div style="width:100%;max-width:620px;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.76);border:1px solid #ECEAE6;backdrop-filter:blur(12px) saturate(150%);-webkit-backdrop-filter:blur(12px) saturate(150%)">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:11px">
+                  <span style="font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF">Historial de versiones</span>
+                  <span style="font:400 10.5px/1 Inter,sans-serif;color:#6B7280">{{ versionLabel }}</span>
+                  <button onClick="{{ toggleAB }}" style="all:unset;cursor:pointer;margin-left:auto;padding:5px 11px;border-radius:999px;border:1px solid #ECEAE6;background:#fff;font:500 10.5px/1 Inter,sans-serif;color:#1A3D84" style-hover="border-color:#1A3D84">{{ abLabel }}</button>
+                </div>
+                <div style="display:flex;gap:9px;overflow-x:auto;padding-bottom:4px">
+                  <sc-for list="{{ versions }}" as="v" hint-placeholder-count="4">
+                    <button onClick="{{ v.pick }}" style="all:unset;cursor:pointer;flex:none;width:74px;border-radius:9px;border:1.5px solid {{ v.border }};background:#fff;padding:7px;text-align:left">
+                      <div style="height:44px;border-radius:5px;background:#F7F6F4;padding:5px;display:flex;flex-direction:column;gap:3px">
+                        <span style="width:60%;height:3px;background:#1A3D84;opacity:.75"></span>
+                        <span style="width:90%;height:2px;background:#D8D4CE"></span>
+                        <span style="width:80%;height:2px;background:#D8D4CE"></span>
+                        <span style="width:40%;height:2px;background:#E1061E;margin-top:auto"></span>
+                      </div>
+                      <div style="margin-top:5px;font:600 9px/1.2 Inter,sans-serif;color:{{ v.fg }}">{{ v.label }}</div>
+                      <div style="font:400 8.5px/1.3 Inter,sans-serif;color:#9CA3AF">{{ v.when }}</div>
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- panel derecho -->
+          <div style="width:352px;flex:none;border-left:1px solid #ECEAE6;background:#FFFFFF;display:flex;flex-direction:column">
+            <div style="padding:12px 14px;border-bottom:1px solid #F1EFEC;display:flex;gap:4px">
+              <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+                <button onClick="{{ t.pick }}" style="all:unset;cursor:pointer;flex:1;text-align:center;padding:7px 4px;border-radius:8px;background:{{ t.bg }};color:{{ t.fg }};font:500 11px/1 Inter,sans-serif">{{ t.label }}</button>
+              </sc-for>
+            </div>
+
+            <div style="flex:1;overflow-y:auto;padding:16px 14px 22px">
+
+              <sc-if value="{{ tabCritico }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:12px">
+                  <div style="display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:11px;background:#F4F7FD;border:1px solid #DEE7F7">
+                    <span style="width:7px;height:7px;border-radius:50%;background:#1A3D84"></span>
+                    <span style="font:600 11.5px/1.2 Inter,sans-serif;color:#1A3D84">El Crítico aprobó esta pieza</span>
+                    <span style="margin-left:auto;font:600 11px/1 Inter,sans-serif;color:#1A3D84">88</span>
+                  </div>
+                  <sc-for list="{{ chat }}" as="m" hint-placeholder-count="4">
+                    <div style="align-self:{{ m.align }};max-width:92%;padding:10px 12px;border-radius:13px;background:{{ m.bg }};color:{{ m.fg }};font:400 11.5px/1.6 Inter,sans-serif;animation:fadeUp .3s ease both">{{ m.text }}</div>
+                  </sc-for>
+                  <div style="display:flex;flex-wrap:wrap;gap:6px">
+                    <sc-for list="{{ quickReplies }}" as="q" hint-placeholder-count="3">
+                      <button onClick="{{ q.send }}" style="all:unset;cursor:pointer;padding:6px 11px;border-radius:999px;border:1px solid #ECEAE6;background:#fff;font:500 10.5px/1.3 Inter,sans-serif;color:#1A3D84" style-hover="border-color:#1A3D84;background:#F4F7FD">{{ q.label }}</button>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;gap:7px;padding-top:4px">
+                    <div style="flex:1;padding:9px 11px;border-radius:10px;border:1px solid #ECEAE6;font:400 11px/1.3 Inter,sans-serif;color:#9CA3AF">Preguntale al copiloto…</div>
+                    <button style="all:unset;cursor:pointer;padding:9px 13px;border-radius:10px;background:#2B2B2B;color:#fff;font:600 11px/1.3 Inter,sans-serif">Enviar</button>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ tabCapas }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <div style="padding:12px;border-radius:12px;border:1px solid #ECEAE6">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px"><span style="width:4px;height:14px;background:#1A3D84;border-radius:2px"></span><span style="font:600 11.5px/1 Inter,sans-serif">Arte</span><span style="margin-left:auto;font:400 10px/1 Inter,sans-serif;color:#9CA3AF">plantilla story-titular</span></div>
+                    <div style="display:flex;gap:8px;align-items:center">
+                      <div style="width:46px;height:82px;border-radius:6px;background:repeating-linear-gradient(135deg,#F1EFEC 0 6px,#FAFAF9 6px 12px);border:1px solid #E4E1DC"></div>
+                      <div style="font:400 10.5px/1.55 Inter,sans-serif;color:#6B7280">Fondo blanco, subrayado amarillo, lockup horizontal al pie. Sin foto: cuando haya banco de imágenes de marca, entra acá.</div>
+                    </div>
+                  </div>
+                  <div style="padding:12px;border-radius:12px;border:1px solid #ECEAE6">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px"><span style="width:4px;height:14px;background:#F7CC13;border-radius:2px"></span><span style="font:600 11.5px/1 Inter,sans-serif">Copy</span></div>
+                    <div style="font:400 10.5px/1.6 Inter,sans-serif;color:#2B2B2B;background:#FAFAF9;border-radius:8px;padding:9px">{{ sel.body }}</div>
+                    <div style="margin-top:8px;font:400 10px/1.5 Inter,sans-serif;color:#1A3D84">{{ sel.tags }}</div>
+                  </div>
+                  <div style="padding:12px;border-radius:12px;border:1px solid #ECEAE6">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px"><span style="width:4px;height:14px;background:#6B7280;border-radius:2px"></span><span style="font:600 11.5px/1 Inter,sans-serif">Audio</span><span style="margin-left:auto;font:400 10px/1 Inter,sans-serif;color:#9CA3AF">solo reel/story</span></div>
+                    <div style="display:flex;align-items:center;gap:7px">
+                      <span style="width:24px;height:24px;border-radius:50%;background:#2B2B2B;color:#fff;font:400 9px/24px Inter,sans-serif;text-align:center">▶</span>
+                      <div style="flex:1;display:flex;align-items:flex-end;gap:2px;height:22px">
+                        <sc-for list="{{ wave }}" as="w" hint-placeholder-count="24">
+                          <span style="flex:1;background:#D8D4CE;border-radius:1px;height:{{ w.h }}%"></span>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="padding:11px 12px;border-radius:12px;background:#FAFAF9;border:1px dashed #E4E1DC">
+                    <div style="font:600 9.5px/1 Inter,sans-serif;letter-spacing:.11em;text-transform:uppercase;color:#9CA3AF;margin-bottom:7px">Uso interno · no se publica</div>
+                    <div style="font:400 11px/1.5 Inter,sans-serif;color:#6B7280">Buyer persona: <strong style="color:#2B2B2B;font-weight:600">{{ sel.personaLabel }}</strong></div>
+                    <div style="font:400 11px/1.5 Inter,sans-serif;color:#6B7280">Oferta: {{ sel.oferta }} · Dimensión: {{ sel.dimLabel }}</div>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ tabMetricas }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:12px">
+                  <div style="padding:10px 11px;border-radius:10px;background:#FFF9E3;border:1px solid #F3E4A8;font:400 10.5px/1.5 Inter,sans-serif;color:#6B7280">Estimaciones de la IA <strong style="color:#2B2B2B;font-weight:600">sobre el texto</strong>, no datos de plataforma. No hay integración con Meta.</div>
+                  <sc-for list="{{ scores }}" as="s" hint-placeholder-count="4">
+                    <div>
+                      <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:500 11.5px/1.4 Inter,sans-serif;color:#2B2B2B">{{ s.label }}</span><span style="font:600 12px/1 'League Spartan',sans-serif;color:{{ s.color }}">{{ s.val }}</span></div>
+                      <div style="height:5px;border-radius:5px;background:#F1EFEC;margin-top:4px"><div style="width:{{ s.pct }};height:100%;border-radius:5px;background:{{ s.color }}"></div></div>
+                      <div style="margin-top:4px;font:400 10px/1.5 Inter,sans-serif;color:#9CA3AF">{{ s.note }}</div>
+                    </div>
+                  </sc-for>
+                  <div style="padding:12px;border-radius:12px;border:1px solid #ECEAE6">
+                    <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.11em;text-transform:uppercase;color:#9CA3AF;margin-bottom:8px">Mapa de calor · lectura</div>
+                    <div style="font:400 10.5px/1.6 Inter,sans-serif;color:#6B7280">El titular concentra la atención en el primer tercio. El CTA queda en el 8% inferior: <strong style="color:#E1061E;font-weight:600">en Story cae dentro de la zona de UI</strong>. Subilo 90px.</div>
+                    <button onClick="{{ pickHeat }}" style="all:unset;cursor:pointer;margin-top:9px;padding:6px 11px;border-radius:999px;background:#2B2B2B;color:#fff;font:500 10.5px/1 Inter,sans-serif">Ver mapa sobre la pieza</button>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ tabEquipo }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <sc-for list="{{ notes }}" as="n" hint-placeholder-count="3">
+                    <div style="padding:11px 12px;border-radius:12px;border:1px solid #ECEAE6">
+                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                        <span style="width:20px;height:20px;border-radius:50%;background:{{ n.color }};color:#fff;font:600 8.5px/20px Inter,sans-serif;text-align:center">{{ n.ini }}</span>
+                        <span style="font:600 11px/1 Inter,sans-serif">{{ n.who }}</span>
+                        <span style="margin-left:auto;font:400 9.5px/1 Inter,sans-serif;color:#9CA3AF">{{ n.when }}</span>
+                      </div>
+                      <div style="font:400 11px/1.55 Inter,sans-serif;color:#2B2B2B">{{ n.text }}</div>
+                      <div style="margin-top:6px;font:500 9.5px/1 Inter,sans-serif;color:#1A3D84">ancla · {{ n.anchor }}</div>
+                    </div>
+                  </sc-for>
+                  <div style="padding:11px 12px;border-radius:12px;border:1px dashed #E4E1DC;font:400 10.5px/1.5 Inter,sans-serif;color:#9CA3AF">Clic sobre la pieza para dejar una anotación anclada. (Solo vos usás el sistema hoy; esto queda listo para cuando entre alguien más.)</div>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="padding:12px 14px;border-top:1px solid #F1EFEC;display:flex;gap:8px">
+              <button style="all:unset;cursor:pointer;flex:1;text-align:center;padding:10px;border-radius:10px;background:#1A3D84;color:#fff;font:600 12px/1 Inter,sans-serif" style-hover="background:#16336E">Aprobar y agendar</button>
+              <button style="all:unset;cursor:pointer;padding:10px 13px;border-radius:10px;border:1px solid #ECEAE6;font:600 12px/1 Inter,sans-serif;color:#E1061E" style-hover="border-color:#E1061E">Rechazar</button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ══ MESA DE DIÁLOGO ══ -->
+      <sc-if value="{{ isMesa }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:24px 26px 40px;max-width:1180px">
+          <div style="display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:#fff;border:1px solid #ECEAE6;margin-bottom:18px">
+            <sc-for list="{{ mesaTabs }}" as="m" hint-placeholder-count="2">
+              <button onClick="{{ m.pick }}" style="all:unset;cursor:pointer;padding:7px 15px;border-radius:999px;background:{{ m.bg }};color:{{ m.fg }};font:500 12px/1 Inter,sans-serif">{{ m.label }}</button>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ mesaForm }}" hint-placeholder-val="{{ true }}">
+            <div style="display:grid;grid-template-columns:minmax(320px,1fr) minmax(340px,1.15fr);gap:20px;align-items:start">
+              <div style="background:#fff;border:1px solid #ECEAE6;border-radius:16px;padding:20px">
+                <div style="font:600 13px/1 'League Spartan',sans-serif;color:#2B2B2B;margin-bottom:14px">Brief</div>
+
+                <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF;margin-bottom:8px">Oferta (carpeta de brief)</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px">
+                  <sc-for list="{{ ofertas }}" as="o" hint-placeholder-count="5">
+                    <button onClick="{{ o.pick }}" style="all:unset;cursor:pointer;padding:7px 12px;border-radius:9px;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }};font:500 11.5px/1 Inter,sans-serif" style-hover="border-color:#1A3D84">{{ o.label }}</button>
+                  </sc-for>
+                </div>
+
+                <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF;margin-bottom:8px">Dimensión del contenido</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">
+                  <sc-for list="{{ dims }}" as="d" hint-placeholder-count="5">
+                    <button onClick="{{ d.pick }}" style="all:unset;cursor:pointer;padding:7px 12px;border-radius:9px;border:1px solid {{ d.border }};background:{{ d.bg }};color:{{ d.fg }};font:500 11.5px/1 Inter,sans-serif" style-hover="border-color:#1A3D84">{{ d.label }}</button>
+                  </sc-for>
+                </div>
+                <div style="font:400 10.5px/1.5 Inter,sans-serif;color:#9CA3AF;margin-bottom:18px">"Transversal" guarda <code style="font:400 10px/1 ui-monospace,monospace;color:#6B7280">dimension = NULL</code>: Profesionalización nunca se fuerza a una de las cuatro.</div>
+
+                <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF;margin-bottom:8px">Formato</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">
+                  <sc-for list="{{ fmtChips }}" as="f" hint-placeholder-count="5">
+                    <button onClick="{{ f.pick }}" style="all:unset;cursor:pointer;padding:7px 12px;border-radius:9px;border:1px solid {{ f.border }};background:{{ f.bg }};color:{{ f.fg }};font:500 11.5px/1 Inter,sans-serif" style-hover="border-color:#1A3D84">{{ f.label }}</button>
+                  </sc-for>
+                </div>
+                <div style="font:400 10.5px/1.5 Inter,sans-serif;color:#9CA3AF;margin-bottom:18px">{{ renderNote }}</div>
+
+                <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF;margin-bottom:8px">Buyer persona objetivo <span style="font-weight:400;letter-spacing:0;text-transform:none;color:#C7C3BC">opcional · interno</span></div>
+                <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:18px">
+                  <sc-for list="{{ personas }}" as="bp" hint-placeholder-count="8">
+                    <button onClick="{{ bp.pick }}" style="all:unset;cursor:pointer;padding:6px 10px;border-radius:999px;border:1px solid {{ bp.border }};background:{{ bp.bg }};color:{{ bp.fg }};font:500 10.5px/1 Inter,sans-serif" style-hover="border-color:#1A3D84">{{ bp.label }}</button>
+                  </sc-for>
+                </div>
+
+                <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF;margin-bottom:8px">Tema</div>
+                <div style="padding:11px 12px;border-radius:10px;border:1px solid #ECEAE6;min-height:64px;font:400 12px/1.6 Inter,sans-serif;color:#2B2B2B">Delegar sin perder criterio: por qué el dueño termina revisando todo otra vez.</div>
+
+                <button onClick="{{ generar }}" style="all:unset;cursor:pointer;margin-top:18px;width:100%;text-align:center;padding:13px;border-radius:11px;background:#1A3D84;color:#fff;font:600 13px/1 Inter,sans-serif" style-hover="background:#16336E">Abrir la Mesa de Diálogo</button>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:14px">
+                <div style="background:#fff;border:1px solid #ECEAE6;border-radius:16px;padding:18px">
+                  <div style="display:flex;align-items:center;gap:9px;margin-bottom:14px">
+                    <span style="font:600 13px/1 'League Spartan',sans-serif">Pipeline de la Mesa</span>
+                    <span style="margin-left:auto;font:400 10.5px/1 Inter,sans-serif;color:#9CA3AF">{{ pipelineState }}</span>
+                  </div>
+                  <sc-for list="{{ pipeline }}" as="s" hint-placeholder-count="5">
+                    <div style="display:flex;gap:11px;align-items:flex-start;padding-bottom:14px">
+                      <span style="width:20px;height:20px;flex:none;border-radius:50%;background:{{ s.bg }};color:{{ s.fg }};font:600 9.5px/20px Inter,sans-serif;text-align:center">{{ s.n }}</span>
+                      <div style="min-width:0">
+                        <div style="font:500 12px/1.35 Inter,sans-serif;color:#2B2B2B">{{ s.title }}</div>
+                        <div style="font:400 10.5px/1.5 Inter,sans-serif;color:#9CA3AF">{{ s.detail }}</div>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div style="background:#fff;border:1px solid #ECEAE6;border-radius:16px;overflow:hidden">
+                  <div style="padding:14px 18px;border-bottom:1px solid #F1EFEC;display:flex;align-items:center;gap:9px">
+                    <span style="font:600 13px/1 'League Spartan',sans-serif">Propuesta generada</span>
+                    <span style="padding:4px 9px;border-radius:999px;background:#F4F7FD;color:#1A3D84;font:600 10px/1 Inter,sans-serif">{{ genVerdict }}</span>
+                  </div>
+                  <div style="padding:18px">
+                    <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF">Hook</div>
+                    <div style="margin:6px 0 14px;font:600 19px/1.22 'League Spartan',sans-serif;color:#1A3D84;letter-spacing:-.015em;text-wrap:pretty">Revisás todo dos veces porque nadie escribió el criterio.</div>
+                    <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF">Cuerpo</div>
+                    <div style="margin:6px 0 14px;font:400 12.5px/1.65 Inter,sans-serif;color:#2B2B2B;text-wrap:pretty">No es que tu equipo no pueda. Es que delegaste la tarea y te quedaste con el criterio. Mientras la decisión siga viviendo en tu cabeza, todo vuelve a tu escritorio — y no importa cuánta gente sumes. El criterio se escribe: qué se decide solo, qué se consulta, qué no se toca.</div>
+                    <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF">CTA</div>
+                    <div style="margin:6px 0 14px;font:600 13px/1.4 Inter,sans-serif;color:#E1061E">Escribí las tres decisiones que hoy solo podés tomar vos. Esa lista es tu punto de partida.</div>
+                    <div style="font:400 11.5px/1.6 Inter,sans-serif;color:#1A3D84">#Liderazgo #Delegar #Criterio #MejoraContinua</div>
+                    <div style="margin-top:16px;padding:13px;border-radius:12px;background:#FAFAF9;border:1px solid #F1EFEC">
+                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                        <span style="width:7px;height:7px;border-radius:50%;background:#1A3D84"></span>
+                        <span style="font:600 11.5px/1 Inter,sans-serif;color:#1A3D84">El Crítico dice</span>
+                      </div>
+                      <div style="font:400 11.5px/1.65 Inter,sans-serif;color:#2B2B2B">Aprobado. Nombra el dolor sin juzgar y mueve el foco a la estructura ("el criterio se escribe"). El cierre da dirección concreta, no un reto. No hay precio ni "sin costo" como gancho. <span style="color:#6B7280">Una observación: el cuerpo tiene 61 palabras y para Story conviene bajarlo a 40.</span></div>
+                      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+                        <button onClick="{{ goStudio }}" style="all:unset;cursor:pointer;padding:7px 12px;border-radius:9px;background:#1A3D84;color:#fff;font:600 11px/1 Inter,sans-serif">Abrir en el Studio</button>
+                        <button style="all:unset;cursor:pointer;padding:7px 12px;border-radius:9px;border:1px solid #ECEAE6;background:#fff;font:600 11px/1 Inter,sans-serif;color:#2B2B2B">Acortar para Story</button>
+                        <button style="all:unset;cursor:pointer;padding:7px 12px;border-radius:9px;border:1px solid #ECEAE6;background:#fff;font:600 11px/1 Inter,sans-serif;color:#6B7280">Regenerar</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ mesaChat }}" hint-placeholder-val="{{ false }}">
+            <div style="max-width:760px;background:#fff;border:1px solid #ECEAE6;border-radius:16px;overflow:hidden">
+              <div style="padding:14px 18px;border-bottom:1px solid #F1EFEC;display:flex;align-items:center;gap:9px">
+                <span style="width:24px;height:24px;border-radius:50%;background:#1A3D84;color:#fff;font:600 9.5px/24px Inter,sans-serif;text-align:center">MC</span>
+                <span style="font:600 13px/1 'League Spartan',sans-serif">Copiloto de contenido</span>
+                <span style="margin-left:auto;font:400 10.5px/1 Inter,sans-serif;color:#9CA3AF">anthropic → groq (fallback listo)</span>
+              </div>
+              <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
+                <sc-for list="{{ mesaChatMsgs }}" as="m" hint-placeholder-count="5">
+                  <div style="align-self:{{ m.align }};max-width:78%;padding:12px 14px;border-radius:14px;background:{{ m.bg }};color:{{ m.fg }};font:400 12.5px/1.65 Inter,sans-serif;animation:fadeUp .3s ease both;text-wrap:pretty">{{ m.text }}</div>
+                </sc-for>
+                <div style="align-self:flex-start;display:flex;gap:5px;padding:10px 13px;border-radius:14px;border-bottom-left-radius:5px;background:#F4F2EE">
+                  <span style="width:5px;height:5px;border-radius:50%;background:#9CA3AF;animation:pulseDot 1.2s ease-in-out infinite"></span>
+                  <span style="width:5px;height:5px;border-radius:50%;background:#9CA3AF;animation:pulseDot 1.2s ease-in-out .2s infinite"></span>
+                  <span style="width:5px;height:5px;border-radius:50%;background:#9CA3AF;animation:pulseDot 1.2s ease-in-out .4s infinite"></span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;padding-top:4px">
+                  <sc-for list="{{ mesaQuick }}" as="q" hint-placeholder-count="3">
+                    <button onClick="{{ q.send }}" style="all:unset;cursor:pointer;padding:7px 12px;border-radius:999px;border:1px solid #ECEAE6;background:#fff;font:500 11px/1.3 Inter,sans-serif;color:#1A3D84" style-hover="border-color:#1A3D84;background:#F4F7FD">{{ q.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="padding:14px 18px;border-top:1px solid #F1EFEC;display:flex;gap:8px">
+                <div style="flex:1;padding:11px 13px;border-radius:11px;border:1px solid #ECEAE6;font:400 12px/1.3 Inter,sans-serif;color:#9CA3AF">Escribí el tema, la dimensión y a quién le hablás…</div>
+                <button style="all:unset;cursor:pointer;padding:11px 16px;border-radius:11px;background:#1A3D84;color:#fff;font:600 12px/1.3 Inter,sans-serif">Enviar</button>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- ══ DASHBOARD ══ -->
+      <sc-if value="{{ isDash }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:22px 26px 40px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap">
+            <div style="display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:#fff;border:1px solid #ECEAE6">
+              <sc-for list="{{ dashTabs }}" as="d" hint-placeholder-count="2">
+                <button onClick="{{ d.pick }}" style="all:unset;cursor:pointer;padding:7px 15px;border-radius:999px;background:{{ d.bg }};color:{{ d.fg }};font:500 12px/1 Inter,sans-serif">{{ d.label }}</button>
+              </sc-for>
+            </div>
+            <span style="font:400 11px/1.4 Inter,sans-serif;color:#9CA3AF">Cadencia configurada: 3 publicaciones por semana</span>
+          </div>
+
+          <sc-if value="{{ dashBento }}" hint-placeholder-val="{{ true }}">
+            <div style="display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:14px;align-items:stretch">
+
+              <div style="grid-column:span 2;grid-row:span 2;background:#fff;border:1px solid #ECEAE6;border-radius:18px;padding:22px;display:flex;flex-direction:column">
+                <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.13em;text-transform:uppercase;color:#9CA3AF">Esperando tu decisión</div>
+                <div style="margin-top:auto;display:flex;align-items:flex-end;gap:10px">
+                  <span style="font:700 84px/0.82 'League Spartan',sans-serif;color:#1A3D84;letter-spacing:-.04em">14</span>
+                  <span style="font:500 13px/1.4 Inter,sans-serif;color:#6B7280;padding-bottom:8px">propuestas<br>pendientes</span>
+                </div>
+                <div style="margin-top:18px;height:6px;border-radius:6px;display:flex;overflow:hidden;background:#F1EFEC">
+                  <span style="width:34%;background:#1A3D84"></span>
+                  <span style="width:26%;background:#F7CC13"></span>
+                  <span style="width:18%;background:#E1061E"></span>
+                  <span style="width:22%;background:#D8D4CE"></span>
+                </div>
+                <div style="margin-top:9px;display:flex;flex-wrap:wrap;gap:10px">
+                  <sc-for list="{{ statusLegend }}" as="s" hint-placeholder-count="4">
+                    <span style="display:flex;align-items:center;gap:5px;font:400 10.5px/1 Inter,sans-serif;color:#6B7280"><span style="width:6px;height:6px;border-radius:2px;background:{{ s.color }}"></span>{{ s.label }} {{ s.n }}</span>
+                  </sc-for>
+                </div>
+                <div style="margin-top:16px;padding-top:14px;border-top:1px solid #F1EFEC;font:400 11.5px/1.6 Inter,sans-serif;color:#6B7280">3 llevan más de 6 días sin revisar. El backlog no es el problema: <strong style="color:#2B2B2B;font-weight:600">el cuello está en la aprobación.</strong></div>
+              </div>
+
+              <div style="background:#fff;border:1px solid #ECEAE6;border-radius:18px;padding:16px">
+                <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF">Agendadas · 7 días</div>
+                <div style="margin-top:12px;font:700 40px/0.9 'League Spartan',sans-serif;color:#2B2B2B">3</div>
+                <div style="margin-top:8px;font:400 10.5px/1.5 Inter,sans-serif;color:#6B7280">mar · jue · sáb — cadencia cumplida</div>
+              </div>
+
+              <div style="background:#fff;border:1px solid #ECEAE6;border-radius:18px;padding:16px">
+                <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF">Aprobación del Crítico</div>
+                <div style="margin-top:12px;display:flex;align-items:baseline;gap:6px"><span style="font:700 40px/0.9 'League Spartan',sans-serif;color:#1A3D84">81</span><span style="font:500 13px/1 Inter,sans-serif;color:#9CA3AF">%</span></div>
+                <div style="margin-top:8px;font:400 10.5px/1.5 Inter,sans-serif;color:#6B7280">de las generadas pasan en el primer intento</div>
+              </div>
+
+              <div style="grid-column:span 2;background:#fff;border:1px solid #ECEAE6;border-radius:18px;padding:18px">
+                <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF;margin-bottom:14px">Por dimensión</div>
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <sc-for list="{{ dimBars }}" as="d" hint-placeholder-count="5">
+                    <div>
+                      <div style="display:flex;justify-content:space-between;font:500 11.5px/1.3 Inter,sans-serif;color:#2B2B2B"><span>{{ d.label }}</span><span style="color:#9CA3AF">{{ d.n }}</span></div>
+                      <div style="height:7px;border-radius:7px;background:#F7F6F4;margin-top:4px"><div style="width:{{ d.pct }};height:100%;border-radius:7px;background:{{ d.color }}"></div></div>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="margin-top:12px;font:400 10.5px/1.55 Inter,sans-serif;color:#9CA3AF">Transversal = <code style="font:400 10px/1 ui-monospace,monospace">dimension NULL</code> (Profesionalización).</div>
+              </div>
+
+              <div style="grid-column:span 2;background:#fff;border:1px solid #ECEAE6;border-radius:18px;padding:18px">
+                <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#9CA3AF;margin-bottom:12px">Próximas publicaciones</div>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <sc-for list="{{ upcoming }}" as="u" hint-placeholder-count="3">
+                    <button onClick="{{ goStudio }}" style="all:unset;cursor:pointer;display:flex;align-items:center;gap:11px;padding:9px 8px;border-radius:9px" style-hover="background:#FAFAF9">
+                      <span style="width:38px;flex:none;text-align:center"><span style="display:block;font:600 13px/1 'League Spartan',sans-serif;color:#1A3D84">{{ u.day }}</span><span style="display:block;font:400 9px/1.4 Inter,sans-serif;color:#9CA3AF">{{ u.dow }}</span></span>
+                      <span style="width:1px;height:26px;background:#F1EFEC"></span>
+                      <span style="flex:1;min-width:0"><span style="display:block;font:500 11.5px/1.35 Inter,sans-serif;color:#2B2B2B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.title }}</span><span style="display:block;font:400 9.5px/1.4 Inter,sans-serif;color:#9CA3AF">{{ u.meta }}</span></span>
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="grid-column:span 4;border-radius:18px;padding:18px 20px;background:rgba(255,255,255,.7);border:1px solid #ECEAE6;backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%);display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+                <span style="width:28px;height:28px;flex:none;border-radius:50%;background:#1A3D84;color:#fff;font:600 10px/28px Inter,sans-serif;text-align:center">MC</span>
+                <div style="flex:1;min-width:260px">
+                  <div style="font:600 12px/1 Inter,sans-serif;color:#1A3D84;margin-bottom:6px">Copiloto · lectura de la semana</div>
+                  <div style="font:400 12.5px/1.7 Inter,sans-serif;color:#2B2B2B;text-wrap:pretty">Nueve de las catorce pendientes hablan a <strong style="font-weight:600">Emprendedor Saturado</strong>. No está mal, pero Comercial quedó en dos piezas y es la dimensión con más consultas entrantes. Si querés, genero tres piezas comerciales para <strong style="font-weight:600">Vendedor sin Resultados</strong> y las dejo en pendientes.</div>
+                  <div style="display:flex;gap:7px;margin-top:11px;flex-wrap:wrap">
+                    <button onClick="{{ goMesa }}" style="all:unset;cursor:pointer;padding:8px 13px;border-radius:9px;background:#1A3D84;color:#fff;font:600 11.5px/1 Inter,sans-serif">Generar las tres</button>
+                    <button style="all:unset;cursor:pointer;padding:8px 13px;border-radius:9px;border:1px solid #ECEAE6;background:#fff;font:600 11.5px/1 Inter,sans-serif;color:#2B2B2B">Ver el desbalance</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ dashDense }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fff;border:1px solid #ECEAE6;border-radius:14px;overflow:hidden;max-width:960px">
+              <sc-for list="{{ denseRows }}" as="r" hint-placeholder-count="8">
+                <div style="display:flex;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid #F7F6F4">
+                  <span style="width:190px;flex:none;font:500 12px/1.3 Inter,sans-serif;color:#6B7280">{{ r.label }}</span>
+                  <span style="width:56px;flex:none;font:600 15px/1 'League Spartan',sans-serif;color:{{ r.color }}">{{ r.val }}</span>
+                  <span style="flex:1;height:5px;border-radius:5px;background:#F7F6F4"><span style="display:block;width:{{ r.pct }};height:100%;border-radius:5px;background:{{ r.color }}"></span></span>
+                  <span style="width:120px;flex:none;text-align:right;font:400 10.5px/1.3 Inter,sans-serif;color:#9CA3AF">{{ r.note }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- ══ PROPUESTAS ══ -->
+      <sc-if value="{{ isProps }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:22px 26px 40px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+            <sc-for list="{{ statusFilters }}" as="f" hint-placeholder-count="6">
+              <button onClick="{{ f.pick }}" style="all:unset;cursor:pointer;padding:7px 13px;border-radius:999px;border:1px solid {{ f.border }};background:{{ f.bg }};color:{{ f.fg }};font:500 11.5px/1 Inter,sans-serif">{{ f.label }}</button>
+            </sc-for>
+          </div>
+          <div style="background:#fff;border:1px solid #ECEAE6;border-radius:14px;overflow:hidden">
+            <div style="display:flex;gap:12px;padding:10px 16px;border-bottom:1px solid #F1EFEC;background:#FAFAF9;font:600 9.5px/1 Inter,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9CA3AF">
+              <span style="flex:1">Pieza</span>
+              <span style="width:78px;flex:none">Formato</span>
+              <span style="width:104px;flex:none">Dimensión</span>
+              <span style="width:96px;flex:none">Status</span>
+              <span style="width:150px;flex:none;text-align:right">Acciones</span>
+            </div>
+            <sc-for list="{{ rows }}" as="r" hint-placeholder-count="8">
+              <div style="display:flex;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid #F7F6F4;transition:background .14s ease" style-hover="background:#FAFAF9">
+                <span style="flex:1;min-width:0">
+                  <button onClick="{{ r.open }}" style="all:unset;cursor:pointer;display:block;font:500 12.5px/1.4 Inter,sans-serif;color:#2B2B2B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" style-hover="color:#1A3D84">{{ r.title }}</button>
+                  <span style="display:block;font:400 10.5px/1.5 Inter,sans-serif;color:#9CA3AF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.hook }}</span>
+                </span>
+                <span style="width:78px;flex:none;font:500 10.5px/1 Inter,sans-serif;color:{{ r.fmtColor }};text-transform:uppercase;letter-spacing:.06em">{{ r.format }}</span>
+                <span style="width:104px;flex:none;font:400 11px/1.3 Inter,sans-serif;color:#6B7280">{{ r.dimLabel }}</span>
+                <span style="width:96px;flex:none"><span style="display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;background:{{ r.statusBg }};color:{{ r.statusFg }};font:600 10px/1.2 Inter,sans-serif">{{ r.statusLabel }}</span></span>
+                <span style="width:150px;flex:none;display:flex;gap:5px;justify-content:flex-end">
+                  <button onClick="{{ r.open }}" style="all:unset;cursor:pointer;padding:5px 10px;border-radius:8px;border:1px solid #ECEAE6;font:500 10.5px/1.3 Inter,sans-serif;color:#2B2B2B" style-hover="border-color:#1A3D84;color:#1A3D84">Editar</button>
+                  <button style="all:unset;cursor:pointer;padding:5px 10px;border-radius:8px;background:#1A3D84;color:#fff;font:500 10.5px/1.3 Inter,sans-serif">Aprobar</button>
+                  <button style="all:unset;cursor:pointer;padding:5px 8px;border-radius:8px;border:1px solid #ECEAE6;font:500 10.5px/1.3 Inter,sans-serif;color:#E1061E" style-hover="border-color:#E1061E">✕</button>
+                </span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="margin-top:12px;font:400 10.5px/1.5 Inter,sans-serif;color:#9CA3AF">El buyer persona es un filtro interno: no aparece en la fila ni en el contenido publicado. Se ve en el detalle de la pieza, marcado como uso interno.</div>
+        </div>
+      </sc-if>
+
+      <!-- ══ CALENDARIO ══ -->
+      <sc-if value="{{ isCal }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:22px 26px 40px">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+            <span style="font:600 15px/1 'League Spartan',sans-serif;color:#2B2B2B">Agosto 2026</span>
+            <span style="font:400 11px/1 Inter,sans-serif;color:#9CA3AF">auto-scheduler · 3 por semana · sin dos piezas el mismo día</span>
+          </div>
+          <div style="background:#fff;border:1px solid #ECEAE6;border-radius:16px;overflow:hidden">
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid #F1EFEC;background:#FAFAF9">
+              <sc-for list="{{ dows }}" as="d" hint-placeholder-count="7">
+                <span style="padding:9px 12px;font:600 9.5px/1 Inter,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9CA3AF">{{ d.label }}</span>
+              </sc-for>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr)">
+              <sc-for list="{{ days }}" as="d" hint-placeholder-count="35">
+                <div style="min-height:104px;border-right:1px solid #F7F6F4;border-bottom:1px solid #F7F6F4;padding:8px 9px;background:{{ d.bg }}">
+                  <div style="font:600 10.5px/1 Inter,sans-serif;color:{{ d.numColor }};margin-bottom:6px">{{ d.n }}</div>
+                  <sc-if value="{{ d.has }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ goStudio }}" style="all:unset;cursor:pointer;display:block;width:100%;padding:7px 8px;border-radius:8px;background:{{ d.chipBg }};border-left:2.5px solid {{ d.chipAccent }}" style-hover="filter:brightness(.97)">
+                      <span style="display:block;font:600 9px/1 Inter,sans-serif;color:{{ d.chipAccent }};text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">{{ d.chipFmt }} · {{ d.chipTime }}</span>
+                      <span style="display:block;font:500 10.5px/1.35 Inter,sans-serif;color:#2B2B2B">{{ d.chipTitle }}</span>
+                    </button>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ══ LOGIN ══ -->
+      <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:calc(100vh - 74px);display:flex;align-items:center;justify-content:center;padding:40px 24px;background:radial-gradient(1200px 600px at 50% -10%,#FFFFFF 0,#F7F6F4 70%)">
+          <div style="width:100%;max-width:392px">
+            <div style="background:#fff;border:1px solid #ECEAE6;border-radius:18px;padding:30px 28px;box-shadow:0 18px 44px -22px rgba(43,43,43,.22)">
+              <img src="assets/mejora-lockup.png" alt="Mejora Continua" style="height:22px;width:auto;display:block;margin-bottom:22px">
+              <h2 style="margin:0 0 6px;font:600 21px/1.2 'League Spartan',sans-serif;color:#1A3D84;letter-spacing:-.015em">Entrar a MejoraSM</h2>
+              <p style="margin:0 0 22px;font:400 12px/1.6 Inter,sans-serif;color:#6B7280">Acceso solo para emails cargados en <code style="font:400 11px/1 ui-monospace,monospace">app_admins</code>. No hay registro público.</p>
+
+              <sc-if value="{{ loginPass }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:11px">
+                  <div>
+                    <div style="font:500 10.5px/1 Inter,sans-serif;color:#6B7280;margin-bottom:6px">Email</div>
+                    <div style="padding:11px 12px;border-radius:10px;border:1px solid #ECEAE6;font:400 12.5px/1.3 Inter,sans-serif;color:#2B2B2B">pablo@mejoraok.com</div>
+                  </div>
+                  <div>
+                    <div style="font:500 10.5px/1 Inter,sans-serif;color:#6B7280;margin-bottom:6px">Contraseña</div>
+                    <div style="padding:11px 12px;border-radius:10px;border:1px solid #ECEAE6;font:400 12.5px/1.3 Inter,sans-serif;color:#9CA3AF;letter-spacing:.2em">••••••••••</div>
+                  </div>
+                  <button onClick="{{ goDash }}" style="all:unset;cursor:pointer;margin-top:6px;text-align:center;padding:13px;border-radius:11px;background:#1A3D84;color:#fff;font:600 13px/1 Inter,sans-serif" style-hover="background:#16336E">Entrar</button>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ loginOtp }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;gap:11px">
+                  <div>
+                    <div style="font:500 10.5px/1 Inter,sans-serif;color:#6B7280;margin-bottom:6px">Email</div>
+                    <div style="padding:11px 12px;border-radius:10px;border:1px solid #ECEAE6;font:400 12.5px/1.3 Inter,sans-serif;color:#2B2B2B">pablo@mejoraok.com</div>
+                  </div>
+                  <div>
+                    <div style="font:500 10.5px/1 Inter,sans-serif;color:#6B7280;margin-bottom:6px">Código de 6 dígitos</div>
+                    <div style="display:flex;gap:7px">
+                      <sc-for list="{{ otpBoxes }}" as="b" hint-placeholder-count="6">
+                        <span style="flex:1;aspect-ratio:1;border-radius:9px;border:1px solid {{ b.border }};display:flex;align-items:center;justify-content:center;font:600 16px/1 'League Spartan',sans-serif;color:#2B2B2B">{{ b.v }}</span>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="font:400 10.5px/1.55 Inter,sans-serif;color:#9CA3AF">Código enviado por email. Este camino no crea cuentas nuevas: si el email no está en <code style="font:400 10px/1 ui-monospace,monospace">app_admins</code>, no llega nada.</div>
+                  <button onClick="{{ goDash }}" style="all:unset;cursor:pointer;margin-top:4px;text-align:center;padding:13px;border-radius:11px;background:#1A3D84;color:#fff;font:600 13px/1 Inter,sans-serif" style-hover="background:#16336E">Verificar y entrar</button>
+                </div>
+              </sc-if>
+
+              <button onClick="{{ toggleLoginMode }}" style="all:unset;cursor:pointer;display:block;width:100%;text-align:center;margin-top:16px;padding-top:16px;border-top:1px solid #F1EFEC;font:500 11.5px/1.4 Inter,sans-serif;color:#1A3D84">{{ loginAltLabel }}</button>
+            </div>
+            <p style="margin:14px 2px 0;font:400 10.5px/1.6 Inter,sans-serif;color:#9CA3AF">Sin redirect automático post-login: la sesión se maneja a mano y el routing va por hash, para que funcione servido desde un subdirectorio.</p>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ══ NOTAS ══ -->
+      <sc-if value="{{ isNotas }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:26px 26px 60px;max-width:920px">
+          <div style="background:#fff;border:1px solid #ECEAE6;border-radius:16px;padding:26px 28px">
+            <div style="font:600 10px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#E1061E;margin-bottom:12px">Decisión de diseño · leer primero</div>
+            <h2 style="margin:0 0 14px;font:600 24px/1.2 'League Spartan',sans-serif;color:#1A3D84;letter-spacing:-.02em;text-wrap:pretty">Tu brief pedía dark mode, Spatial UI 3D y Liquid Glass con gradientes. El manual de marca dice otra cosa — y elegiste que mande el manual.</h2>
+            <p style="margin:0 0 20px;font:400 13px/1.75 Inter,sans-serif;color:#2B2B2B;text-wrap:pretty">Así que traduje cada tendencia del brief a la versión que la marca sí admite, en lugar de descartarla. Lo que buscabas — que la pieza tenga todo el protagonismo — se logra igual, con blanco base y el color viniendo del contenido.</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+              <sc-for list="{{ tradeoffs }}" as="t" hint-placeholder-count="6">
+                <div style="padding:14px;border-radius:12px;background:#FAFAF9;border:1px solid #F1EFEC">
+                  <div style="font:600 11.5px/1.3 Inter,sans-serif;color:#2B2B2B;margin-bottom:6px">{{ t.title }}</div>
+                  <div style="font:400 11px/1.6 Inter,sans-serif;color:#6B7280">{{ t.text }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="margin-top:16px;background:#fff;border:1px solid #ECEAE6;border-radius:16px;padding:24px 28px">
+            <div style="font:600 15px/1 'League Spartan',sans-serif;color:#2B2B2B;margin-bottom:14px">Supuestos que tomé</div>
+            <sc-for list="{{ assumptions }}" as="a" hint-placeholder-count="6">
+              <div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid #F7F6F4">
+                <span style="width:5px;height:5px;flex:none;border-radius:50%;background:#F7CC13;margin-top:7px"></span>
+                <span style="font:400 12.5px/1.65 Inter,sans-serif;color:#2B2B2B;text-wrap:pretty">{{ a.text }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="margin-top:16px;background:#fff;border:1px solid #ECEAE6;border-radius:16px;padding:24px 28px">
+            <div style="font:600 15px/1 'League Spartan',sans-serif;color:#2B2B2B;margin-bottom:6px">Medidas que respeta el Studio</div>
+            <p style="margin:0 0 14px;font:400 11.5px/1.6 Inter,sans-serif;color:#6B7280">Las zonas seguras están calculadas sobre el lienzo real, no aproximadas.</p>
+            <sc-for list="{{ specs }}" as="s" hint-placeholder-count="4">
+              <div style="display:flex;gap:12px;align-items:baseline;padding:8px 0;border-bottom:1px solid #F7F6F4">
+                <span style="width:150px;flex:none;font:500 12px/1.4 Inter,sans-serif;color:#2B2B2B">{{ s.label }}</span>
+                <span style="width:110px;flex:none;font:400 11.5px/1.4 ui-monospace,monospace;color:#1A3D84">{{ s.size }}</span>
+                <span style="flex:1;font:400 11px/1.55 Inter,sans-serif;color:#6B7280">{{ s.safe }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="margin-top:16px;background:#fff;border:1px solid #ECEAE6;border-radius:16px;padding:24px 28px">
+            <div style="font:600 15px/1 'League Spartan',sans-serif;color:#2B2B2B;margin-bottom:14px">Próximos pasos</div>
+            <sc-for list="{{ nextSteps }}" as="n" hint-placeholder-count="5">
+              <div style="display:flex;gap:11px;padding:9px 0;border-bottom:1px solid #F7F6F4">
+                <span style="font:600 11px/1.6 ui-monospace,monospace;color:#9CA3AF;flex:none">{{ n.n }}</span>
+                <span style="font:400 12.5px/1.65 Inter,sans-serif;color:#2B2B2B;text-wrap:pretty">{{ n.text }}</span>
+              </div>
+            </sc-for>
+            <p style="margin:16px 0 0;font:400 11px/1.6 Inter,sans-serif;color:#9CA3AF">Tipografía: Bw Modelica es paga y no está en este entorno, así que estos mockups usan <strong style="color:#6B7280;font-weight:600">League Spartan</strong> (títulos, es la secundaria oficial y open source) e <strong style="color:#6B7280;font-weight:600">Inter</strong> (cuerpo). Reemplazo temporal declarado, según el manual.</p>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </main>
+
+  <!-- copiloto flotante -->
+  <sc-if value="{{ copilot }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;right:22px;bottom:22px;width:340px;z-index:80;border-radius:18px;background:rgba(255,255,255,.82);border:1px solid rgba(43,43,43,.10);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);box-shadow:0 22px 50px -18px rgba(43,43,43,.3);animation:fadeUp .26s ease both;overflow:hidden">
+      <div style="padding:13px 15px;border-bottom:1px solid rgba(43,43,43,.07);display:flex;align-items:center;gap:9px">
+        <span style="width:22px;height:22px;border-radius:50%;background:#1A3D84;color:#fff;font:600 9px/22px Inter,sans-serif;text-align:center">MC</span>
+        <span style="font:600 12px/1 Inter,sans-serif;color:#2B2B2B">Copiloto</span>
+        <button onClick="{{ toggleCopilot }}" style="all:unset;cursor:pointer;margin-left:auto;font:400 14px/1 Inter,sans-serif;color:#9CA3AF">✕</button>
+      </div>
+      <div style="padding:15px;display:flex;flex-direction:column;gap:10px">
+        <div style="font:400 12px/1.7 Inter,sans-serif;color:#2B2B2B;text-wrap:pretty">{{ copilotLine }}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <button onClick="{{ goMesa }}" style="all:unset;cursor:pointer;padding:7px 12px;border-radius:9px;background:#1A3D84;color:#fff;font:600 11px/1 Inter,sans-serif">Ir a la Mesa</button>
+          <button onClick="{{ goProps }}" style="all:unset;cursor:pointer;padding:7px 12px;border-radius:9px;border:1px solid rgba(43,43,43,.12);background:rgba(255,255,255,.7);font:600 11px/1 Inter,sans-serif;color:#2B2B2B">Ver pendientes</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;layoutDashboard&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;bento&quot;,&quot;denso&quot;],&quot;default&quot;:&quot;bento&quot;,&quot;tsType&quot;:&quot;'bento'|'denso'&quot;,&quot;section&quot;:&quot;Variantes&quot;},&quot;modoMesa&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;formulario&quot;,&quot;conversacion&quot;],&quot;default&quot;:&quot;formulario&quot;,&quot;tsType&quot;:&quot;'formulario'|'conversacion'&quot;,&quot;section&quot;:&quot;Variantes&quot;},&quot;escenarioOscuro&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Variantes&quot;}}">
+const AZ = '#1A3D84', RO = '#E1061E', AM = '#F7CC13', TI = '#2B2B2B', GR = '#6B7280', LI = '#ECEAE6';
+
+const PERSONAS = [
+  ['emprendedor_saturado', 'Emprendedor Saturado'],
+  ['lider_necesita_validacion', 'Líder que Necesita Validación'],
+  ['profesional_independiente', 'Profesional Independiente'],
+  ['equipo_desalineado', 'Equipo Desalineado'],
+  ['empresario_mal_asesorado', 'Empresario Mal Asesorado'],
+  ['nueva_generacion', 'Nueva Generación'],
+  ['vendedor_sin_resultados', 'Vendedor sin Resultados'],
+  ['necesita_orden_para_crecer', 'Necesita Orden para Crecer']
+];
+
+const PIECES = [
+  { id: 1, format: 'historia', dimension: 'personal', oferta: 'personal', persona: 'emprendedor_saturado', status: 'pending',
+    title: 'Trabajás doce horas y sentís que no avanzaste',
+    hook: 'Trabajás doce horas y sentís que no avanzaste.',
+    body: 'No te falta esfuerzo. Te falta un orden que decida por vos qué no se hace hoy. Cuando todo entra por el mismo embudo, el día lo gana lo urgente y lo importante espera. Elegí las tres cosas que sí mueven el negocio esta semana y protegelas del resto.',
+    bodyShort: 'No te falta esfuerzo: te falta un orden que decida qué no se hace hoy.',
+    cta: 'Elegí las tres cosas que mueven el negocio esta semana.',
+    hookB: '¿Hasta cuándo vas a trabajar así?', bodyB: 'Doce horas por día no es compromiso, es desorden. Cambialo.', ctaB: 'Escribinos hoy mismo.',
+    tags: '#Foco #Emprender #MejoraContinua' },
+  { id: 2, format: 'post', dimension: 'comercial', oferta: 'comercial', persona: 'vendedor_sin_resultados', status: 'approved',
+    title: 'Vendés todos los días y la caja no lo refleja',
+    hook: 'Vendés todos los días y la caja no lo refleja.',
+    body: 'No es falta de ganas. Es que estás vendiendo sin dirección comercial: sin saber a quién le sirve de verdad lo que ofrecés, ni a qué precio deja margen. Así el esfuerzo se dispersa. Empezá por mirar los últimos diez cierres: cuáles dejaron plata y cuáles solo movimiento.',
+    bodyShort: 'No es falta de ganas: es vender sin dirección comercial.',
+    cta: 'Mirá tus últimos diez cierres y separá los que dejaron margen.',
+    hookB: 'Vendés mucho y ganás poco.', bodyB: 'El problema no es el volumen. Es el precio y a quién le vendés.', ctaB: 'Revisá tu pricing esta semana.',
+    tags: '#Ventas #Pricing #MejoraContinua' },
+  { id: 3, format: 'carrusel', dimension: 'organizacional', oferta: 'organizacional', persona: 'equipo_desalineado', status: 'scheduled',
+    title: 'Tu equipo no está desmotivado. Está desalineado.',
+    hook: 'Tu equipo no está desmotivado. Está desalineado.',
+    body: 'Cada uno entiende algo distinto por "hacerlo bien". No es actitud, es información: nadie escribió el criterio. Cuando el estándar vive en la cabeza de una sola persona, el resto adivina. Poné por escrito qué significa terminado, y la mitad de las tensiones se caen solas.',
+    bodyShort: 'Cada uno entiende algo distinto por "hacerlo bien". No es actitud, es criterio sin escribir.',
+    cta: 'Escribí qué significa "terminado" para las tres tareas que más se rehacen.',
+    hookB: 'Tu equipo no rinde.', bodyB: 'Y no es culpa de ellos. Falta alineación.', ctaB: '¿Hablamos?',
+    tags: '#Equipos #Cultura #MejoraContinua' },
+  { id: 4, format: 'post', dimension: null, oferta: 'profesionalizacion', persona: 'empresario_mal_asesorado', status: 'pending',
+    title: 'Si nadie te explica el porqué, no te están asesorando',
+    hook: 'Si nadie te explica el porqué, no te están asesorando.',
+    body: 'Te dan un informe, un tablero, una recomendación — y no podés reconstruir cómo llegaron ahí. Eso no te deja criterio, te deja dependencia. Un buen acompañamiento se mide por lo que podés decidir solo después. Pedí que te muestren el razonamiento, no el resultado.',
+    bodyShort: 'Te dan la recomendación pero no el razonamiento. Eso deja dependencia, no criterio.',
+    cta: 'Pedí que te muestren cómo llegaron a esa conclusión.',
+    hookB: 'Te están vendiendo humo.', bodyB: 'Muchos consultores no explican nada.', ctaB: 'Consultanos sin costo.',
+    tags: '#Criterio #Profesionalización #MejoraContinua' },
+  { id: 5, format: 'reel', dimension: 'personal', oferta: 'personal', persona: 'lider_necesita_validacion', status: 'approved',
+    title: 'Decidís sola. Eso no te hace más fuerte.',
+    hook: 'Decidís sola. Eso no te hace más fuerte.',
+    body: 'No estás liderando mal, estás liderando sola. Sin nadie que discuta tus decisiones, cada duda se vuelve más grande de lo que es. No necesitás que te aprueben: necesitás una mirada externa honesta que te devuelva perspectiva. Elegí una persona y contale la decisión que estás postergando.',
+    bodyShort: 'No estás liderando mal. Estás liderando sola.',
+    cta: 'Contale a alguien la decisión que estás postergando.',
+    hookB: 'Liderar sola te está costando caro.', bodyB: 'No aguantes más. Buscá ayuda ya.', ctaB: 'Escribinos.',
+    tags: '#Liderazgo #Perspectiva #MejoraContinua' },
+  { id: 6, format: 'historia', dimension: 'empresarial', oferta: 'empresarial', persona: 'necesita_orden_para_crecer', status: 'rejected',
+    title: 'Creciste rápido. Eso también se puede romper.',
+    hook: 'Creciste rápido. Eso también se puede romper.',
+    body: 'La estructura que te trajo hasta acá no es la que te sostiene el año que viene. No hay nada mal hecho: hay procesos que servían para cinco personas y ahora son quince. Escalar sin orden multiplica los errores igual que las ventas.',
+    bodyShort: 'La estructura que te trajo hasta acá no es la que te sostiene el año que viene.',
+    cta: 'Listá los tres procesos que hoy dependen de una sola persona.',
+    hookB: 'Vas a desbarrancar.', bodyB: 'Creciste sin orden y se te viene abajo.', ctaB: 'Actuá ahora.',
+    tags: '#Escalabilidad #Procesos #MejoraContinua' },
+  { id: 7, format: 'post', dimension: 'comercial', oferta: 'comercial', persona: 'profesional_independiente', status: 'published',
+    title: 'Ser bueno en lo tuyo no es tener un negocio',
+    hook: 'Ser bueno en lo tuyo no es tener un negocio.',
+    body: 'Podés ser el mejor en lo que hacés y aun así no tener estructura: agenda, precio, seguimiento, alguien que te cubra. Eso no se resuelve con más talento. Se resuelve armando el sistema alrededor de tu oficio.',
+    bodyShort: 'Podés ser el mejor en lo que hacés y aun así no tener estructura.',
+    cta: 'Poné por escrito tu precio, tu agenda y tu proceso de seguimiento.',
+    hookB: 'Sos bueno pero no ganás.', bodyB: 'Te falta negocio, no talento.', ctaB: 'Hablemos.',
+    tags: '#Independientes #Estructura #MejoraContinua' },
+  { id: 8, format: 'carrusel', dimension: 'personal', oferta: 'personal', persona: 'nueva_generacion', status: 'pending',
+    title: 'Heredaste la empresa. La autoridad no se hereda.',
+    hook: 'Heredaste la empresa. La autoridad no se hereda.',
+    body: 'El apellido te abre la puerta de la oficina, no la confianza del equipo. Y competir con la versión idealizada del que estaba antes es una pelea que no se gana. Tu autoridad se construye con decisiones propias que se sostienen en el tiempo.',
+    bodyShort: 'El apellido te abre la puerta de la oficina, no la confianza del equipo.',
+    cta: 'Tomá una decisión que sea claramente tuya y sostenela tres meses.',
+    hookB: 'Nadie te respeta todavía.', bodyB: 'Ser el hijo del dueño no alcanza.', ctaB: 'Empezá hoy.',
+    tags: '#NuevaGeneración #Liderazgo #MejoraContinua' }
+];
+
+const FMT_COLOR = { historia: AZ, story: AZ, post: TI, carrusel: '#7A5AF8', reel: RO };
+const STATUS = {
+  pending:   { label: 'Pendiente', color: AM,       bg: '#FFF9E3', fg: '#8A6D00' },
+  approved:  { label: 'Aprobada',  color: AZ,       bg: '#F4F7FD', fg: AZ },
+  scheduled: { label: 'Agendada',  color: '#7A5AF8', bg: '#F4F1FE', fg: '#5B3FD6' },
+  rejected:  { label: 'Rechazada', color: RO,       bg: '#FDF0F1', fg: RO },
+  published: { label: 'Publicada', color: GR,       bg: '#F4F4F5', fg: GR }
+};
+const DIMLABEL = { personal: 'Personal', organizacional: 'Organizacional', comercial: 'Comercial', empresarial: 'Empresarial' };
+
+class Component extends DCLogic {
+  state = {
+    screen: 'studio', selId: 1, fmt: 'story', overlay: 'safe', tab: 'critico', ab: false,
+    dark: null, dashLayout: null, mesaMode: null, filter: 'all', version: 3,
+    loginMode: 'pass', copilot: false, chatExtra: []
+  };
+
+  pick(k, v) { return () => this.setState({ [k]: v }); }
+
+  chipStyle(on) {
+    return on
+      ? { bg: AZ, fg: '#fff', border: AZ }
+      : { bg: '#fff', fg: TI, border: LI };
+  }
+  pillStyle(on) {
+    return on ? { bg: '#2B2B2B', fg: '#fff' } : { bg: 'transparent', fg: GR };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const dark = s.dark ?? (this.props.escenarioOscuro || false);
+    const dashLayout = s.dashLayout ?? (this.props.layoutDashboard || 'bento');
+    const mesaMode = s.mesaMode ?? (this.props.modoMesa || 'formulario');
+    const sel = PIECES.find(p => p.id === s.selId) || PIECES[0];
+    const isVertical = s.fmt === 'story' || s.fmt === 'reel';
+    const isCarrusel = s.fmt === 'carrusel';
+
+    const titles = {
+      studio: ['Studio de pieza', 'Previsualización nativa, capas, comparador A/B y validación de marca — sin salir de la vista.'],
+      mesa: ['Mesa de Diálogo', 'Brief → redacción con contexto de la Bóveda → el Crítico valida contra el manual → propuesta pendiente.'],
+      dashboard: ['Dashboard', 'Estado real del backlog. Las estimaciones son de la IA sobre el copy: no hay datos de plataforma conectados.'],
+      propuestas: ['Propuestas', 'Todo lo que generó el sistema. Aprobás, rechazás con motivo, o editás antes de aprobar.'],
+      calendario: ['Calendario', 'Contenido aprobado y agendado por el auto-scheduler, tres veces por semana.'],
+      login: ['Login', 'Email + contraseña, o código de un solo uso. Solo emails ya cargados en app_admins.'],
+      notas: ['Notas de diseño', 'Supuestos, la tensión entre el brief y el manual de marca, y qué falta para conectar Supabase.']
+    };
+    const t = titles[s.screen] || titles.studio;
+
+    const navDef = [
+      ['studio', 'Studio de pieza', '8'], ['mesa', 'Mesa de Diálogo', ''],
+      ['propuestas', 'Propuestas', '14'], ['calendario', 'Calendario', '3'],
+      ['dashboard', 'Dashboard', ''], ['notas', 'Notas de diseño', '']
+    ];
+
+    const fmtDefs = [['story', 'Story 9:16'], ['reel', 'Reel 9:16'], ['post', 'Post 4:5'], ['carrusel', 'Carrusel 4:5'], ['fb', 'Feed Facebook']];
+    const safeMap = {
+      story: ['13%', '21.9%', 'IG/FB Story · 1080×1920'],
+      reel: ['13%', '26%', 'Reel · 1080×1920, UI inferior más alta'],
+      post: ['6%', '6%', 'Post 1080×1350'],
+      carrusel: ['6%', '6%', 'Carrusel 1080×1350'],
+      fb: ['6%', '6%', 'Feed FB 1080×1350']
+    };
+    const sm = safeMap[s.fmt] || safeMap.story;
+    const specs = {
+      story: '1080 × 1920 px · seguro 1080×1420 · 250 px arriba, 420 px abajo',
+      reel: '1080 × 1920 px · seguro 1080×1250 · UI y descripción comen 500 px abajo',
+      post: '1080 × 1350 px · margen de seguridad 64 px',
+      carrusel: '1080 × 1350 px × 6 slides · margen 64 px',
+      fb: '1080 × 1350 px · el feed recorta a 4:5 en mobile'
+    };
+
+    const critChat = [
+      { who: 'ai', text: 'Leí la pieza contra los seis chunks del manual que más se parecen. Aprobada, con una observación.' },
+      { who: 'me', text: '¿Qué observación?' },
+      { who: 'ai', text: 'El cuerpo tiene 47 palabras. En Story, con la zona segura de 1080×1420, eso queda a 11 px de tipografía real: ilegible en mobile. No es un problema de tono, es de lienzo.' },
+      { who: 'ai', text: 'También: el CTA está en el 8% inferior y ahí va la UI de la plataforma. Lo subo 90 px y queda dentro del área segura.' },
+      ...(s.chatExtra || [])
+    ].map(m => ({
+      text: m.text, align: m.who === 'me' ? 'flex-end' : 'flex-start',
+      corner: m.who === 'me' ? 'bottom-right' : 'bottom-left',
+      bg: m.who === 'me' ? AZ : '#F4F2EE', fg: m.who === 'me' ? '#fff' : TI
+    }));
+
+    const addChat = (q, a) => () => this.setState(st => ({
+      chatExtra: [...(st.chatExtra || []), { who: 'me', text: q }, { who: 'ai', text: a }]
+    }));
+
+    const mesaChatDef = [
+      { who: 'me', text: 'Quiero algo para dueños que revisan todo dos veces. Personal, formato post.' },
+      { who: 'ai', text: 'Antes de escribir: ¿el dolor es que no confía en el equipo, o que nunca escribió cómo se decide? Son dos piezas distintas y el manual pide señalar la estructura, no la persona.' },
+      { who: 'me', text: 'Lo segundo. Nunca escribió el criterio.' },
+      { who: 'ai', text: 'Busqué en la Bóveda: hay tres pasajes del criterio medular y uno de tono nivel Acompañamiento Activo que aplican. Con eso escribo. Te aviso que el cierre no va a ser un reto ni un "¿te animás?", va a ser una instrucción concreta.' }
+    ];
+
+    return {
+      screenTitle: t[0], screenSub: t[1],
+      nav: navDef.map(([id, label, count]) => {
+        const on = s.screen === id;
+        return { label, count, go: this.pick('screen', id), bg: on ? '#F4F7FD' : 'transparent', fg: on ? AZ : TI, dot: on ? AZ : '#D8D4CE' };
+      }),
+      goStudio: this.pick('screen', 'studio'), goMesa: this.pick('screen', 'mesa'),
+      goProps: this.pick('screen', 'propuestas'), goDash: this.pick('screen', 'dashboard'),
+      goLogin: this.pick('screen', 'login'), goNotas: this.pick('screen', 'notas'),
+      isStudio: s.screen === 'studio', isMesa: s.screen === 'mesa', isDash: s.screen === 'dashboard',
+      isProps: s.screen === 'propuestas', isCal: s.screen === 'calendario', isLogin: s.screen === 'login',
+      isNotas: s.screen === 'notas',
+
+      copilot: s.copilot, toggleCopilot: () => this.setState(st => ({ copilot: !st.copilot })),
+      copilotLine: 'Tres propuestas aprobadas siguen sin fecha y la semana que viene queda con un solo post. El auto-scheduler las toma solo si están aprobadas: dos están pendientes desde el martes.',
+
+      // studio
+      dark, sel: { ...sel, personaLabel: (PERSONAS.find(p => p[0] === sel.persona) || [])[1], dimLabel: sel.dimension ? DIMLABEL[sel.dimension] : 'Transversal (NULL)' },
+      pieces: PIECES.map(p => {
+        const on = p.id === s.selId;
+        return { title: p.title, format: p.format, select: this.pick('selId', p.id),
+          selBorder: on ? AZ : LI, selBg: on ? '#F4F7FD' : '#fff',
+          fmtColor: FMT_COLOR[p.format] || GR, statusColor: STATUS[p.status].color };
+      }),
+      formats: fmtDefs.map(([id, label]) => {
+        const on = s.fmt === id; const st = this.pillStyle(on);
+        return { label, pick: this.pick('fmt', id), bg: st.bg, fg: st.fg };
+      }),
+      isVertical, isSquareish: !isVertical, isCarrusel, showSocial: s.fmt === 'fb' || s.fmt === 'post',
+      canvasH: isVertical ? 566 : 566,
+      showSafe: s.overlay === 'safe', showHeat: s.overlay === 'heat',
+      safeTop: sm[0], safeBottom: sm[1], safeLabel: sm[2], specLine: specs[s.fmt],
+      mutedOnStage: dark ? 'rgba(255,255,255,.55)' : GR,
+      overlays: [['none', 'Sin capas'], ['safe', 'Zona segura'], ['heat', 'Mapa de calor']].map(([id, label]) => {
+        const on = s.overlay === id;
+        return { label, pick: this.pick('overlay', id), bg: on ? TI : (dark ? 'rgba(255,255,255,.08)' : '#fff'), fg: on ? '#fff' : (dark ? 'rgba(255,255,255,.75)' : TI), border: on ? TI : (dark ? 'rgba(255,255,255,.18)' : LI) };
+      }).concat([{ label: dark ? 'Escenario claro' : 'Escenario oscuro', pick: () => this.setState({ dark: !dark }), bg: dark ? 'rgba(255,255,255,.08)' : '#fff', fg: dark ? 'rgba(255,255,255,.75)' : GR, border: dark ? 'rgba(255,255,255,.18)' : LI }]),
+      pickHeat: this.pick('overlay', 'heat'),
+      ab: s.ab, toggleAB: () => this.setState(st => ({ ab: !st.ab })), abLabel: s.ab ? 'Cerrar comparador A/B' : 'Comparar A/B',
+      versions: [['v1', 'hace 3 d'], ['v2', 'hace 2 d'], ['v3', 'ayer'], ['v4', 'hace 2 h']].map((v, i) => {
+        const on = s.version === i + 1;
+        return { label: v[0], when: v[1], pick: this.pick('version', i + 1), border: on ? AZ : LI, fg: on ? AZ : GR };
+      }),
+      versionLabel: 'v' + s.version + ' de 4 · el Crítico rechazó v2 por cerrar con un reto',
+      tabs: [['critico', 'Crítico'], ['capas', 'Capas'], ['metricas', 'Métricas'], ['equipo', 'Equipo']].map(([id, label]) => {
+        const on = s.tab === id;
+        return { label, pick: this.pick('tab', id), bg: on ? '#F4F2EE' : 'transparent', fg: on ? TI : GR };
+      }),
+      tabCritico: s.tab === 'critico', tabCapas: s.tab === 'capas', tabMetricas: s.tab === 'metricas', tabEquipo: s.tab === 'equipo',
+      chat: critChat,
+      quickReplies: [
+        { label: 'Acortalo a 40 palabras', send: addChat('Acortalo a 40 palabras.', 'Listo: saqué la frase explicativa del medio, que repetía el hook. Queda en 38 palabras y el titular respira. Lo dejé como v4, sin tocar el CTA.') },
+        { label: '¿Por qué rechazaste v2?', send: addChat('¿Por qué rechazaste v2?', 'v2 cerraba con "¿te animás a cambiarlo?". Eso es un reto, y el manual pide cerrar con dirección concreta. Además el cuerpo culpaba a la persona ("no te organizás"), cuando el problema es la falta de estructura.') },
+        { label: 'Mostrame el pasaje del manual', send: addChat('Mostrame el pasaje del manual que usaste.', 'Chunk 7 de criterio_medular.pdf: el sujeto del problema siempre es lo que falta — foco, estructura, criterio externo — nunca la capacidad del otro. Similaridad 0.89.') }
+      ],
+      wave: Array.from({ length: 26 }, (_, i) => ({ h: 22 + Math.round(70 * Math.abs(Math.sin(i * 0.9))) })),
+      scores: [
+        { label: 'Fidelidad al manual', val: 88, pct: '88%', color: AZ, note: 'nombra el dolor sin juzgar · cierra con dirección' },
+        { label: 'Claridad del dolor', val: 91, pct: '91%', color: AZ, note: 'el hook es el dolor textual del perfil' },
+        { label: 'Legibilidad en mobile', val: 54, pct: '54%', color: RO, note: 'cuerpo demasiado largo para 9:16' },
+        { label: 'Riesgo de precio como gancho', val: 3, pct: '3%', color: '#8A6D00', note: 'no aparece precio ni "sin costo"' }
+      ],
+      notes: [
+        { who: 'Pablo', ini: 'PL', when: 'ayer', color: AZ, text: 'El "doce horas" me suena a cliché. Probemos con un dato de tiempo más específico.', anchor: 'titular' },
+        { who: 'Sindy', ini: 'SN', when: 'hace 2 d', color: RO, text: 'El lockup queda pegado al borde inferior. Subilo dentro del área segura.', anchor: 'pie de pieza' },
+        { who: 'Copiloto', ini: 'MC', when: 'hace 2 d', color: GR, text: 'El amarillo aparece dos veces en la misma pieza. El manual lo quiere como puntuación, una sola vez alcanza.', anchor: 'subrayado' }
+      ],
+
+      // mesa
+      mesaTabs: [['formulario', 'Brief estructurado'], ['conversacion', 'Conversación']].map(([id, label]) => {
+        const on = mesaMode === id; const st = this.pillStyle(on);
+        return { label, pick: this.pick('mesaMode', id), bg: st.bg, fg: st.fg };
+      }),
+      mesaForm: mesaMode === 'formulario', mesaChat: mesaMode === 'conversacion',
+      ofertas: ['personal', 'organizacional', 'comercial', 'empresarial', 'profesionalizacion'].map((o, i) => ({
+        label: o === 'profesionalizacion' ? 'Profesionalización' : DIMLABEL[o], ...this.chipStyle(i === 0), pick: () => {}
+      })),
+      dims: [['personal', 'Personal'], ['organizacional', 'Organizacional'], ['comercial', 'Comercial'], ['empresarial', 'Empresarial'], [null, 'Transversal · NULL']].map((d, i) => ({
+        label: d[1], ...this.chipStyle(i === 0), pick: () => {}
+      })),
+      fmtChips: ['post', 'carrusel', 'historia', 'reel', 'story'].map((f, i) => ({
+        label: f, ...this.chipStyle(i === 2), pick: () => {}
+      })),
+      renderNote: 'Solo historia/story tiene render visual automático (render-story). En post y carrusel, rendered_image_path queda en NULL y el flujo sigue igual.',
+      personas: PERSONAS.map((p, i) => ({ label: p[1], ...this.chipStyle(i === 0), pick: () => {} })),
+      generar: this.pick('screen', 'studio'),
+      pipelineState: 'completado en 11.4 s',
+      pipeline: [
+        { n: '1', title: 'Búsqueda en la Bóveda', detail: '6 chunks recuperados de 11 documentos · pgvector, similaridad ≥ 0.72', bg: '#F4F7FD', fg: AZ },
+        { n: '2', title: 'Redacción · Anthropic', detail: 'proveedor primario respondió · sin parámetro temperature', bg: '#F4F7FD', fg: AZ },
+        { n: '3', title: 'Crítico · segunda pasada', detail: 'valida tono, criterio medular y regla de precio', bg: '#F4F7FD', fg: AZ },
+        { n: '4', title: 'Insert en proposals', detail: "status='pending' · buyer_persona guardado, nunca publicado", bg: '#F4F7FD', fg: AZ },
+        { n: '5', title: 'Render visual', detail: 'solo formato historia/story · el resto queda en NULL', bg: '#F7F6F4', fg: GR }
+      ],
+      genVerdict: 'Crítico: aprobada · 88',
+      mesaChatMsgs: mesaChatDef.map(m => ({
+        text: m.text, align: m.who === 'me' ? 'flex-end' : 'flex-start',
+        corner: m.who === 'me' ? 'bottom-right' : 'bottom-left',
+        bg: m.who === 'me' ? AZ : '#F4F2EE', fg: m.who === 'me' ? '#fff' : TI
+      })),
+      mesaQuick: [
+        { label: 'Escribila para Story', send: () => this.setState({ screen: 'studio', fmt: 'story' }) },
+        { label: 'Hacela más cortante', send: () => {} },
+        { label: 'Otra para Vendedor sin Resultados', send: () => {} }
+      ],
+
+      // dashboard
+      dashTabs: [['bento', 'Bento'], ['denso', 'Lista densa']].map(([id, label]) => {
+        const on = dashLayout === id; const st = this.pillStyle(on);
+        return { label, pick: this.pick('dashLayout', id), bg: st.bg, fg: st.fg };
+      }),
+      dashBento: dashLayout === 'bento', dashDense: dashLayout === 'denso',
+      statusLegend: [
+        { label: 'Aprobadas', n: 9, color: AZ }, { label: 'Pendientes', n: 14, color: AM },
+        { label: 'Rechazadas', n: 5, color: RO }, { label: 'Publicadas', n: 12, color: '#D8D4CE' }
+      ],
+      dimBars: [
+        { label: 'Personal', n: 14, pct: '100%', color: AZ },
+        { label: 'Organizacional', n: 9, pct: '64%', color: AZ },
+        { label: 'Empresarial', n: 7, pct: '50%', color: AZ },
+        { label: 'Comercial', n: 2, pct: '14%', color: RO },
+        { label: 'Transversal (NULL)', n: 8, pct: '57%', color: AM }
+      ],
+      upcoming: [
+        { day: '06', dow: 'jue', title: 'Tu equipo no está desmotivado. Está desalineado.', meta: 'carrusel · 09:30 · Organizacional' },
+        { day: '08', dow: 'sáb', title: 'Decidís sola. Eso no te hace más fuerte.', meta: 'reel · 11:00 · Personal' },
+        { day: '11', dow: 'mar', title: 'Vendés todos los días y la caja no lo refleja.', meta: 'post · 09:30 · Comercial' }
+      ],
+      denseRows: [
+        { label: 'Pendientes', val: 14, pct: '100%', color: AM, note: '3 con más de 6 días' },
+        { label: 'Aprobadas sin fecha', val: 3, pct: '21%', color: AZ, note: 'el scheduler las toma hoy' },
+        { label: 'Agendadas · 7 días', val: 3, pct: '21%', color: '#7A5AF8', note: 'mar · jue · sáb' },
+        { label: 'Rechazadas por el Crítico', val: 5, pct: '36%', color: RO, note: '4 por cierre con reto' },
+        { label: 'Publicadas · agosto', val: 12, pct: '86%', color: GR, note: 'cadencia sostenida' },
+        { label: 'Dimensión Comercial', val: 2, pct: '14%', color: RO, note: 'subrepresentada' },
+        { label: 'Con render visual', val: 9, pct: '64%', color: AZ, note: 'solo historia/story' },
+        { label: 'Bóveda · chunks indexados', val: 214, pct: '100%', color: AZ, note: '11 documentos' }
+      ],
+
+      // propuestas
+      statusFilters: [['all', 'Todas'], ['pending', 'Pendientes'], ['approved', 'Aprobadas'], ['scheduled', 'Agendadas'], ['rejected', 'Rechazadas'], ['published', 'Publicadas']].map(([id, label]) => {
+        const on = s.filter === id;
+        return { label, pick: this.pick('filter', id), bg: on ? TI : '#fff', fg: on ? '#fff' : TI, border: on ? TI : LI };
+      }),
+      rows: PIECES.filter(p => s.filter === 'all' || p.status === s.filter).map(p => ({
+        title: p.title, hook: p.bodyShort, format: p.format, fmtColor: FMT_COLOR[p.format] || GR,
+        dimLabel: p.dimension ? DIMLABEL[p.dimension] : 'Transversal',
+        statusLabel: STATUS[p.status].label, statusBg: STATUS[p.status].bg, statusFg: STATUS[p.status].fg,
+        open: () => this.setState({ screen: 'studio', selId: p.id, fmt: p.format === 'carrusel' ? 'carrusel' : (p.format === 'post' ? 'post' : 'story') })
+      })),
+
+      // calendario
+      dows: ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'].map(d => ({ label: d })),
+      days: Array.from({ length: 35 }, (_, i) => {
+        const n = i - 4;
+        const inMonth = n >= 1 && n <= 31;
+        const sched = {
+          4: ['post', '09:30', 'Ser bueno en lo tuyo no es tener un negocio', GR, '#F4F4F5'],
+          6: ['carrusel', '09:30', 'Tu equipo no está desmotivado', '#5B3FD6', '#F4F1FE'],
+          8: ['reel', '11:00', 'Decidís sola. Eso no te hace más fuerte', AZ, '#F4F7FD'],
+          11: ['post', '09:30', 'Vendés todos los días y la caja no lo refleja', AZ, '#F4F7FD'],
+          13: ['historia', '18:00', 'Trabajás doce horas y no avanzaste', AZ, '#F4F7FD'],
+          15: ['carrusel', '10:00', 'Heredaste la empresa', '#5B3FD6', '#F4F1FE'],
+          18: ['post', '09:30', 'Si nadie te explica el porqué', AZ, '#F4F7FD'],
+          20: ['reel', '11:00', 'Creciste rápido', AZ, '#F4F7FD']
+        }[n];
+        return {
+          n: inMonth ? String(n) : '', has: !!sched, bg: inMonth ? '#fff' : '#FCFCFB',
+          numColor: n === 4 ? AZ : (inMonth ? GR : '#E4E1DC'),
+          chipFmt: sched ? sched[0] : '', chipTime: sched ? sched[1] : '', chipTitle: sched ? sched[2] : '',
+          chipAccent: sched ? sched[3] : AZ, chipBg: sched ? sched[4] : '#fff'
+        };
+      }),
+
+      // login
+      loginPass: s.loginMode === 'pass', loginOtp: s.loginMode === 'otp',
+      toggleLoginMode: () => this.setState(st => ({ loginMode: st.loginMode === 'pass' ? 'otp' : 'pass' })),
+      loginAltLabel: s.loginMode === 'pass' ? 'Entrar con código de un solo uso →' : '← Entrar con contraseña',
+      otpBoxes: ['4', '9', '2', '', '', ''].map(v => ({ v, border: v ? AZ : LI })),
+
+      // notas
+      tradeoffs: [
+        { title: 'Dark mode → escenario oscuro puntual', text: 'La app es blanca. El único lugar donde el fondo se apaga es el escenario del Studio, y solo si lo prendés: ahí la pieza gana contraste sin romper la regla de blanco base. Botón "Escenario oscuro" bajo el teléfono.' },
+        { title: 'Spatial UI 3D → un teléfono, una pieza', text: 'El manual descarta Spatial UI por falta de caso de uso, y un mockup en perspectiva miente sobre la legibilidad real. El teléfono está de frente, a escala, con las zonas seguras dibujadas encima.' },
+        { title: 'Liquid Glass → glass blanco de bajo blur', text: 'Vidrio solo en paneles flotantes: header, tarjeta del copiloto, historial de versiones. Sin gradiente de color detrás, que es lo que el manual prohíbe.' },
+        { title: 'Refracción según el color de la pieza', text: 'No lo implementé: hoy todas las piezas son blancas con acento de marca, así que el efecto no tendría de dónde tomar color. Vuelve a tener sentido cuando entren fotos.' },
+        { title: 'Tipografía cinética → jerarquía firme', text: 'Los pesos no cambian con los datos. Lo que sí es audaz es la escala: el KPI principal a 84 px en League Spartan, y el resto muy por debajo. Jerarquía de tres segundos con un solo número grande.' },
+        { title: 'Personalización por rol → un solo rol', text: 'Dijiste que lo usás solo vos. No hay switch analista/directivo: hay un usuario, admin, con todo visible. Los comentarios de equipo quedan armados para cuando entre alguien más.' }
+      ],
+      assumptions: [
+        { text: 'Es un prototipo de diseño en HTML, clickeable: la navegación, los filtros, las capas del preview y el comparador A/B funcionan de verdad. Los datos son fijos y no hay Supabase detrás.' },
+        { text: 'Las métricas son estimaciones de la IA sobre el texto, y está escrito en pantalla. Nada de alcance, impresiones o engagement: no hay integración con Meta.' },
+        { text: 'El mapa de calor es una lectura del layout que hace la IA (dónde cae el ojo por contraste y posición), no eye-tracking real. Lo uso para una sola cosa concreta: detectar cuándo el CTA cae en la zona de UI.' },
+        { text: 'buyer_persona vive en la pestaña Capas del detalle, bajo un cartel de uso interno, y como filtro en Propuestas. No aparece en las filas del listado ni en ninguna pieza.' },
+        { text: 'El copy de las ocho piezas lo escribí siguiendo la estructura del manual — dolor sin juicio, foco a la estructura, cierre con dirección. Sirve de referencia de tono para los prompts, pero conviene que lo revises: es contenido inventado, no publicado.' },
+        { text: 'Formatos previsualizados: Story y Reel 9:16, Post y Carrusel 4:5, y feed de Facebook. LinkedIn y TikTok quedaron afuera porque no los marcaste.' }
+      ],
+      specs: [
+        { label: 'IG/FB Story', size: '1080×1920', safe: 'área segura 1080×1420 — 250 px arriba, 420 px abajo' },
+        { label: 'Reel', size: '1080×1920', safe: 'la UI y la descripción comen hasta 500 px abajo' },
+        { label: 'Post / Carrusel', size: '1080×1350', safe: 'margen de 64 px en los cuatro lados' },
+        { label: 'Feed Facebook', size: '1080×1350', safe: 'en mobile recorta a 4:5, el titular nunca al borde' }
+      ],
+      nextSteps: [
+        { n: '01', text: 'Decidí sobre el escenario oscuro del Studio: si te convence, queda; si no, lo saco y la app es blanca de punta a punta.' },
+        { n: '02', text: 'Faltan las plantillas de diseño por formato: hoy hay una sola (titular + subrayado amarillo + lockup). Con tres o cuatro más el feed deja de ser monótono.' },
+        { n: '03', text: 'Necesito fotos de marca reales para que el preview deje de ser solo tipografía sobre blanco — y para que la refracción por color tenga sentido.' },
+        { n: '04', text: 'Falta la pantalla de la Bóveda: subir documentos, ver chunks indexados y qué pasaje citó el Crítico en cada validación.' },
+        { n: '05', text: 'Handoff a Claude Code: este prototipo define pantallas, estados y copy. El esquema de proposals, las cinco Edge Functions y el orden de fallback entre proveedores están en tu brief y no los cambié.' }
+      ]
+    };
+  }
+}
+
+</script>
+</body>
+</html>
