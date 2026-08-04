@@ -191,7 +191,6 @@ async function callAI(
         body: JSON.stringify({
           model: model || "claude-sonnet-5",
           max_tokens: 2048,
-          temperature,
           system: systemMsg?.content,
           messages: nonSystemMessages,
         }),
