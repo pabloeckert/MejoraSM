@@ -38,3 +38,24 @@ IDENTITY.md
 HEARTBEAT.md
 BOOTSTRAP.md
 supabase/.temp/
+
+# Secretos locales — todo lo que se guarde acá, git lo ignora siempre.
+# Ver scripts/guardar-clave.ps1 para guardar una clave nueva ahí adentro.
+/secrets/
+
+# Capturas de pantalla que suelen contener claves (bitmap sin comprimir de
+# una captura, o nombre de archivo que ya avisa qué contiene). No es
+# infalible — un nombre de archivo arbitrario igual puede tener una clave
+# adentro — pero cubre el caso común.
+*.bmp
+*[Kk]ey*.png
+*[Kk]ey*.jpg
+*[Kk]ey*.jpeg
+*[Aa]pi*.png
+*[Aa]pi*.jpg
+*[Aa]pi*.jpeg
+*[Cc]lave*.png
+*[Cc]lave*.jpg
+*[Cc]lave*.jpeg
+Captura*de*pantalla*.png
+Screenshot*.png
