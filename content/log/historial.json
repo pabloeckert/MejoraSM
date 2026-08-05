@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-05T13:42:32.197Z",
+  "syncedAt": "2026-08-05T19:13:58.349Z",
   "posts": [
+    {
+      "id": "6a7352a6c6cea7c619b5dda0",
+      "date": "2026-08-05",
+      "status": "published",
+      "content": "Las reuniones no fallan por falta de tiempo, fallan por falta de objetivo. Escribí el objetivo antes de mandar el invite y notá la diferencia. ¿Cuál es tu método para que una reunión no se te vaya de las manos?",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-05-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3957096602241381949"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a733992eb70294ba1f7abfb",
       "date": "2026-08-05",
