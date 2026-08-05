@@ -609,6 +609,19 @@ Pablo reportó títulos con tildes/ñ rotos generados por `orchestrator`. Se inv
 
 **Conclusión: no había nada que arreglar en `orchestrator`.** El pedido original asumía un bug de guardado/lectura que la evidencia real descarta — dejarlo documentado así en vez de inventar un cambio de código innecesario.
 
+## Limpieza de datos de prueba de rule-engine — 2026-08-05
+
+Borradas las 10 filas de prueba `[TEST/QA]` sembradas para forzar la corrida de `rule-engine` (ver "rule-engine — corrida real con datos de prueba" más arriba):
+```sql
+DELETE FROM metrics WHERE post_id LIKE 'TEST-QA-%';        -- 10 filas
+DELETE FROM proposals WHERE id::text LIKE '7e57da7a-%';    -- 10 filas
+```
+`metrics` quedó en **2 filas reales genuinas** (el post de prueba de Zernio + el post real de la corrida end-to-end del 2026-08-05).
+
+También se borraron las **4 filas de `success_rules`** que esos datos de prueba habían generado (`format=carrusel`, `hook=question`, `timing=hour 9`, `hashtag=min_count 5`) — el cron diario ya las había re-aplicado una vez (`times_applied: 2`), pero seguían siendo 100% derivadas de los datos de prueba, sin ningún dato real detrás. No tenía sentido dejarlas: son reglas que el sistema real usaría para decidir qué priorizar, y estaban basadas en señal inventada.
+
+**Confirmado que `rule-engine` sigue funcionando bien sin ellas:** `POST /rule-engine {"action":"analyze"}` → `HTTP 200`, `{"rulesFound":0,"rulesSaved":0,"rules":[]}` — exactamente el comportamiento esperado y ya documentado en el código (`analyzeMetrics()` devuelve `[]` con menos de 5 filas), no un error. Vuelve a quedar en el mismo estado "esperando datos reales" que antes de la prueba — correcto, dado que solo hay 2 métricas reales genuinas hoy.
+
 ## Notas históricas
 
 Visión fundacional original del EDA (spec escrita por Pablo antes de que existiera código, sigue siendo la intención de fondo del proyecto): *"Construir una aplicación de gestión estratégica de contenidos que funcione mediante la interacción de múltiples Agentes de IA. El sistema debe ser capaz de procesar la identidad de marca localmente, debatir estrategias y ejecutar publicaciones automáticas aprendiendo de los resultados."* — Bóveda → RAG, Mesa de Diálogo → 3 agentes (Estratega/Creativo/Crítico), Bucle de Aprendizaje → `rule-engine`/`success_rules`, son la realización de esa visión original. Un detalle que si cambió: el spec original dejaba el "Modo Supervisión" (aprobación antes de publicar) como opcional — el sistema real fue más allá, no hay ningún gate de aprobación humana desde el overhaul del 2026-08-02.
