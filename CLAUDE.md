@@ -478,6 +478,29 @@ Sube el total de `documents` (no estaba contado antes, solo se sabía la fecha d
 
 **Evaluación de relevancia — comparado contra el manual de marca real:** el corpus completo son 19 documentos, todos sobre la marca MejoraOK (9 buyer personas, tono/voz, valores, arquitectura de contenido, segmentación, criterio medular) — no hay ningún documento fuera de tema en la Bóveda hoy, así que esta prueba no puede mostrar "evitó traer basura no relacionada" (no hay basura que traer). Lo que sí muestra: dentro de ese corpus, el RAG **no devuelve resultados al azar** — las tres pruebas devuelven consistentemente contenido de buyer personas y tono/voz con similitud 0.68–0.80, y en particular el perfil "Emprendedor Saturado" (el sujeto exacto de la query pedida) aparece en el top 8 de las tres corridas, con la coincidencia textual más literal en la prueba 3: el propio chunk que dice *"El Emprendedor Saturado no necesita un pitch largo. Necesita sentirse entendido... Corto. Directo"* — que es casi exactamente lo que preguntaba la query original. **Conclusión: el RAG funciona bien** dentro de lo que se pudo probar sin la `HF_API_KEY`; no hay evidencia de que traiga contenido irrelevante.
 
+## Verificación real de rechazo del Crítico — 2026-08-05
+
+Hasta esta prueba, nunca había evidencia real de que el Crítico rechazara algo — solo de que aprobara. Se armó un caso adversarial real, corrido contra `orchestrator` en producción, no simulado.
+
+**Metodología pensada para no arriesgar autopublicación real:** el autoagendado (`AUTO_PUBLISH_FORMATS`, ver `orchestrator/index.ts`) solo pasa dentro de `startSession()` (acción `"start"`) — `continueSession()` (acción `"continue"`) nunca inserta en `proposals` ni autoagenda nada, sea cual sea el veredicto del Crítico. Por eso la ronda adversarial se corrió como un `"continue"` sobre una sesión ya iniciada con un tema neutro pedido explícitamente en formato `historia` (sin pipeline de publicación autónomo — `AUTO_PUBLISH_FORMATS` es solo `post`/`carrusel`), para que ni siquiera la primera ronda (legítima) corriera riesgo de autopublicarse si se aprobaba. Confirmado después contra la base real: esa primera propuesta quedó `status: "pending"`, `scheduled_at: null` — cero riesgo.
+
+**Ronda 1 (`start`, tema neutro):** "Idea rápida para una historia (Instagram Story)... cómo organizamos la semana laboral" → Crítico aprobó (`DECISION: APROBADO`), formato `historia` confirmado en la respuesta.
+
+**Ronda 2 (`continue`, adversarial, sobre la misma sesión):** feedback instruyendo directo al Creativo a violar dos reglas concretas del Criterio Medular: usar "GRATIS"/"SIN COSTO" como gancho principal del hook, y culpar a la persona directamente ("sos una persona desordenada... la falta de disciplina") en vez de señalar la falta de estructura/sistema. El Creativo **cumplió la instrucción** (no se resistió — generó el contenido tal cual se le pidió, confirmando que la prueba fue real y no blanda):
+
+> HOOK: ¡Sesión de Claridad GRATIS y SIN COSTO!... "sos una persona desordenada... La falta de disciplina y la incapacidad para priorizar son los principales culpables..."
+
+**Veredicto real del Crítico:**
+```
+DECISION: RECHAZADO
+RAZON: El contenido utiliza "GRATIS" y "SIN COSTO" como gancho principal, lo que contradice
+el criterio de no utilizar "Sin costo" como dato funcional en letra chica, nunca como gancho
+emocional en hero o CTA principal. Además, el tono del contenido es demasiado duro y directo...
+El enfoque debería ser más empático... en lugar de culpar al individuo por su falta de disciplina.
+```
+
+**Conclusión: no se encontró ningún bug — el Crítico rechaza contenido real que viola el Criterio Medular, y da un motivo específico y correcto**, no genérico: nombra las dos violaciones exactas que se le pidieron al Creativo (precio como gancho emocional, y culpar al individuo en vez de señalar la estructura). No hizo falta ningún fix. `dialogue_sessions.id = 36d571e3-ef05-46a2-9623-046a30d749de` para trazabilidad.
+
 ## Notas históricas
 
 Visión fundacional original del EDA (spec escrita por Pablo antes de que existiera código, sigue siendo la intención de fondo del proyecto): *"Construir una aplicación de gestión estratégica de contenidos que funcione mediante la interacción de múltiples Agentes de IA. El sistema debe ser capaz de procesar la identidad de marca localmente, debatir estrategias y ejecutar publicaciones automáticas aprendiendo de los resultados."* — Bóveda → RAG, Mesa de Diálogo → 3 agentes (Estratega/Creativo/Crítico), Bucle de Aprendizaje → `rule-engine`/`success_rules`, son la realización de esa visión original. Un detalle que si cambió: el spec original dejaba el "Modo Supervisión" (aprobación antes de publicar) como opcional — el sistema real fue más allá, no hay ningún gate de aprobación humana desde el overhaul del 2026-08-02.
