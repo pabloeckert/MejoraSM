@@ -119,6 +119,43 @@ Hasta 2026-07-28 el EDA no tenía ningún control de acceso: RLS con políticas 
 
 **Cuenta de acceso:** ya existe una cuenta real (`pabloeckert@gmail.com`, creada y confirmada 2026-07-30, con al menos un login exitoso registrado). No hay flujo de "olvidé mi contraseña" en `Login.tsx` — si hace falta resetearla, solo se puede vía la Admin API de Supabase (acción que cambia la credencial de una cuenta real; no hacerla sin que Pablo la pida expresamente).
 
+### Verificación real de Login OTP — 2026-08-04
+
+Probado de punta a punta contra producción, por consola (`curl` directo a los endpoints de Supabase Auth, no a mano en el navegador) — evidencia reproducible, no captura de pantalla.
+
+**Bug real encontrado y corregido en el camino:** el primer intento devolvió un mail "Your Magic Link" con botón, no un código de 6 dígitos, pese a que `Login.tsx:52-63` (`signInWithOtp` + `verifyOtp({ type: "email" })`) ya está escrito para pedir un código por texto. Causa confirmada por código + documentación oficial de Supabase (no por haber abierto el dashboard, que no fue accesible desde acá — ver más abajo): `signInWithOtp` para email es un solo flujo de API, sin parámetro que elija código vs. link — la diferencia depende 100% de qué variable use la plantilla de email del dashboard (`{{ .ConfirmationURL }}` = link, `{{ .Token }}` = código de 6 dígitos). La plantilla "Magic Link" del proyecto nunca se había editado para usar `{{ .Token }}`. Pablo la corrigió a mano en el dashboard (Authentication → Email Templates → Magic Link) — no fue un cambio de código, es config de cuenta.
+
+**Nota de método:** se intentó abrir el dashboard de Supabase vía el Browser pane de Claude Code para verificar la plantilla directo, pero el panel no compositaba frames en esa sesión (`screenshot` fallaba con "the Browser pane is not displayed") pese a que la navegación, red y consola confirmaban que la página había cargado logueada — no se pudo diagnosticar la causa desde acá. El diagnóstico de la plantilla se hizo por código + doc oficial, y la corrección la aplicó Pablo directamente.
+
+**Paso 1 — `signInWithOtp` (después de corregida la plantilla):**
+```bash
+curl -X POST "https://hsglmdarztrshihmzfph.supabase.co/auth/v1/otp" \
+  -H "apikey: sb_publishable_GXn6-T6gWNSzZR-sIQ6_5g_97ZCFxWp" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"pabloeckert@gmail.com","create_user":false}'
+```
+Resultado: `HTTP 200`, body `{}`. Llegó el mail "Tu código de acceso" con un código numérico (no más magic link).
+
+**Paso 2 — `verifyOtp` con el código real recibido:**
+```bash
+curl -X POST "https://hsglmdarztrshihmzfph.supabase.co/auth/v1/verify" \
+  -H "apikey: sb_publishable_GXn6-T6gWNSzZR-sIQ6_5g_97ZCFxWp" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"pabloeckert@gmail.com","token":"<código real>","type":"email"}'
+```
+Resultado: `HTTP 200`. Devolvió un `access_token` (JWT) y `refresh_token` reales, `expires_in: 3600`. El JWT decodificado confirma: `email: pabloeckert@gmail.com`, `role: authenticated`, `amr: [{"method":"otp",...}]` (o sea, quedó registrado como login por OTP, no por password), `user.last_sign_in_at` con el timestamp real de esta prueba.
+
+**Paso 3 — la sesión sirve para un endpoint autenticado real (`proposals`, protegido por RLS `is_app_admin()`):**
+```bash
+# Con el access_token del paso 2:
+curl "https://hsglmdarztrshihmzfph.supabase.co/rest/v1/proposals?select=id,status,format,created_at&limit=3" \
+  -H "apikey: sb_publishable_GXn6-T6gWNSzZR-sIQ6_5g_97ZCFxWp" \
+  -H "Authorization: Bearer <access_token>"
+```
+Resultado: `HTTP 200`, devolvió 3 filas reales de `proposals`. **Control en paralelo**, misma query sin `Authorization` (solo `apikey`): también `HTTP 200` pero body `[]` — RLS bloquea el acceso sin sesión de admin válida (PostgREST no devuelve 401 acá, devuelve 200 con filas vacías; el JWT del OTP es lo que hace la diferencia real).
+
+**Conclusión: Login OTP funciona de punta a punta en producción**, confirmado con evidencia reproducible — envío de código, verificación, y sesión válida que efectivamente atraviesa el RLS de admin. El único paso no automatizable fue leer el código del mail (necesita el inbox real de Pablo) y la corrección de la plantilla en el dashboard (config de cuenta, la aplicó Pablo).
+
 **Reporte de vulnerabilidades:** contactar directo a Pablo Eckert — **`pabloeckert@gmail.com`** (no `pablo@mejoraok.com`, que es el email ficticio mencionado arriba; `SECURITY.md`, ya borrado en la consolidación, tenía ese error). Nunca abrir un issue público de GitHub para reportar un problema de seguridad.
 
 ## Arquitectura: EDA (`src/` + `supabase/`)
