@@ -571,6 +571,30 @@ Con los puntos 1-4 cerrados, se corrió el circuito completo una vez, real, sin 
 
 **Conclusión: el circuito completo funciona de punta a punta sin supervisión humana**, tal como está diseñado — desde el tema hasta las métricas reales, sin que nadie apruebe nada en el medio. El único paso donde intervine manualmente fue disparar `metrics-collector` antes de que le tocara su cron de 6h (para no alargar la prueba); todo lo demás —incluida la publicación real a Instagram/Facebook— corrió solo.
 
+**⚠️ Efecto colateral real, no cosmético — Pablo tiene que saberlo:** la corrida de esta prueba generó un **carrusel real, publicado de verdad en Instagram/Facebook** (tema: "por qué esperar al momento ideal para pedir ayuda profesional sale más caro", 3 slides, `zernio_post_id: 6a72afe966cd54ae189ec9db`). Nadie lo vio antes de salir — ni yo lo revisé con criterio editorial, ni Pablo — porque probar "sin supervisión" significa exactamente eso. El contenido pasó por el Crítico real y fue aprobado con motivo coherente, no es contenido adversarial ni de mala calidad (ver el ángulo/hooks completos en la sección de arriba), pero es contenido que salió a la marca real sin que ningún humano lo autorizara puntualmente. Si no es aceptable como pieza real de marca, hay que despublicarlo a mano (Instagram no soporta despublicar por API — ver `manage-post.yml` / `UNPUBLISH_SOPORTADO` en `scripts/lib/zernio.mjs`).
+
+## Motor backend — cierre 2026-08-05
+
+Resumen ejecutivo de los 5 puntos trabajados hoy para blindar el motor en código puro (sin tocar UI). Pensado para que Pablo dé el visto bueno antes de pasar a frontend — honesto, no optimista: lo que sigue medio resuelto o pendiente está marcado como tal, no maquillado.
+
+| # | Punto | Estado | Evidencia |
+|---|---|---|---|
+| 1 | `deploy-migrations.yml` | 🟡 **Probablemente resuelto, sin confirmación 100%** | Dry-run limpio con CLI v2.111.0, sin el error del motor Effect. `db push` real y `workflow_dispatch` real quedaron bloqueados por el clasificador del entorno — falta que Pablo lo corra una vez para cerrar del todo |
+| 2 | Rechazo real del Crítico | 🟢 **Confirmado, sin bugs** | Caso adversarial real (precio como gancho + culpar al individuo) — rechazado con motivo específico y correcto. `dialogue_sessions.id=36d571e3-...` |
+| 3 | `rule-engine` con datos reales | 🟡 **Lógica confirmada, pero con datos de prueba, no reales** | 10 filas de prueba (identificables, borrables) generaron 4 reglas coherentes con la señal diseñada. Los datos reales genuinos siguen siendo insuficientes (2 métricas reales hoy) — las reglas actuales en `success_rules` **no reflejan comportamiento real de audiencia todavía** |
+| 4 | Duplicado de autoagendado | 🟡 **Causa más probable + fix aplicado, no confirmación forense** | Gap de idempotencia real en `markPublished()` (no chequeaba éxito del PATCH) — corregido + capa extra de re-chequeo de status. Probada la lógica contra datos reales, no el flujo completo con Playwright/Zernio real. No hay logs del incidente puntual de la semana pasada para confirmar que fue exactamente esto |
+| 5 | Corrida end-to-end real sin supervisión | 🟢 **Confirmado de punta a punta** | Mesa de Diálogo → aprobado → autoagenda → cron real (sin disparo manual) → publicado real en Instagram/Facebook → métricas reales. Ver efecto colateral arriba — generó un post real sin revisión humana previa |
+
+**Lo que queda genuinamente pendiente, sin ambigüedad:**
+- **Confirmar `deploy-migrations.yml` con una corrida real** — Pablo tiene que dispararlo una vez (`workflow_dispatch` manual), debería aplicar limpio y sin efecto (las migraciones pendientes son no-ops sobre el schema real).
+- **`rule-engine` necesita datos reales genuinos** — hoy sus 4 reglas están basadas en datos de prueba. Cuando haya ≥5 métricas reales (posts reales con tiempo de sincronizar en Zernio), conviene volver a correr `analyze` y evaluar si las reglas de prueba siguen teniendo sentido o hay que limpiarlas.
+- **Limpiar los datos de prueba de `rule-engine`** cuando ya no hagan falta: `DELETE FROM metrics WHERE post_id LIKE 'TEST-QA-%'; DELETE FROM proposals WHERE id::text LIKE '7e57da7a-%';`
+- **Revisar el post real publicado en esta prueba** (`zernio_post_id: 6a72afe966cd54ae189ec9db`) — decidir si queda como está o se despublica a mano.
+- **`publisher`** sigue `ACTIVE` en el proyecto real — pendiente de antes, sin resolver hoy (bloqueado por el clasificador, ver sección "Backend" más arriba).
+- Hallazgo menor sin arreglar: el regex de detección de emoji en `rule-engine` no cubre el bloque Unicode de Dingbats (✨✅❤️) — bajo impacto, no bloqueante.
+
+**Lo que sí quedó realmente blindado hoy:** el Crítico rechaza contenido real que viola el Criterio Medular (no solo aprueba, ya hay evidencia de ambos lados); el circuito completo de autonomía total (Mesa de Diálogo → autoagenda → publish real → métricas) corre de punta a punta sin gate humano, confirmado con una corrida real, no simulada; y el gap de idempotencia más probable detrás del duplicado de la semana pasada quedó cerrado con un fix concreto y probado.
+
 ## Notas históricas
 
 Visión fundacional original del EDA (spec escrita por Pablo antes de que existiera código, sigue siendo la intención de fondo del proyecto): *"Construir una aplicación de gestión estratégica de contenidos que funcione mediante la interacción de múltiples Agentes de IA. El sistema debe ser capaz de procesar la identidad de marca localmente, debatir estrategias y ejecutar publicaciones automáticas aprendiendo de los resultados."* — Bóveda → RAG, Mesa de Diálogo → 3 agentes (Estratega/Creativo/Crítico), Bucle de Aprendizaje → `rule-engine`/`success_rules`, son la realización de esa visión original. Un detalle que si cambió: el spec original dejaba el "Modo Supervisión" (aprobación antes de publicar) como opcional — el sistema real fue más allá, no hay ningún gate de aprobación humana desde el overhaul del 2026-08-02.
