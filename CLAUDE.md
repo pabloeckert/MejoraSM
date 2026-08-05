@@ -622,6 +622,22 @@ También se borraron las **4 filas de `success_rules`** que esos datos de prueba
 
 **Confirmado que `rule-engine` sigue funcionando bien sin ellas:** `POST /rule-engine {"action":"analyze"}` → `HTTP 200`, `{"rulesFound":0,"rulesSaved":0,"rules":[]}` — exactamente el comportamiento esperado y ya documentado en el código (`analyzeMetrics()` devuelve `[]` con menos de 5 filas), no un error. Vuelve a quedar en el mismo estado "esperando datos reales" que antes de la prueba — correcto, dado que solo hay 2 métricas reales genuinas hoy.
 
+## Ruteo automático de modelo de IA — 2026-08-05
+
+`orchestrator` elegía el modelo por agente leyendo `agent_config.provider`/`agent_config.model` (editable a mano en `/configuracion`) para el Crítico y para toda la acción `"continue"` — solo Estratega/Creativo en la acción `"start"` tenían Anthropic hardcodeado como default. Se reemplazó por una función programática, `pickModel()`, que aplica el mismo criterio de la skill `optimo-de-uso` (mínima potencia suficiente — Sonnet por default, escalar solo si la tarea objetivamente lo justifica) a los 3 agentes, en cualquier ronda.
+
+**Regla concreta (`pickModel(agent, isReevaluation)` en `orchestrator/index.ts`):**
+- Estratega y Creativo: **siempre `claude-sonnet-5`** — trabajo de propuesta/redacción, no de arbitraje, sin variables cruzadas que justifiquen más potencia.
+- Crítico en una evaluación de primera pasada (`action: "start"`): `claude-sonnet-5` — evaluación directa, contenido nuevo contra el manual.
+- Crítico en una re-evaluación (`action: "continue"`, después de un rechazo): **`claude-opus-5`** — acá sí hay razonamiento con más variables cruzadas: ponderar el rechazo anterior, el feedback nuevo del Creativo y el criterio de marca a la vez.
+- Fallback sin cambios: si Anthropic falla (cualquier modelo), cae a Groq `llama-3.3-70b-versatile` — mismo mecanismo que ya existía.
+
+**Efecto colateral real que hay que saber:** `agent_config.provider`/`.model` (los dropdowns de `/configuracion`) **ya no se usan para elegir el modelo** — quedan como columnas vivas en la tabla pero el código las ignora para esto. `agent_config.system_prompt` y `.temperature` siguen leyéndose y aplicándose normalmente, no se tocaron. No se tocó `/configuracion` (UI) en este cambio — si hace falta reflejar esto visualmente ahí, es un cambio de UI aparte.
+
+**Probado real, deployado (`supabase functions deploy orchestrator`):**
+- Ronda `"start"` (primera evaluación, debería usar Sonnet): `HTTP 200`, rechazada por el Crítico con motivo coherente (violación de Identidad Visual) — sin riesgo, `startSession` no agenda nada si no aprueba.
+- Ronda `"continue"` sobre la misma sesión (re-evaluación, debería escalar a Opus): `HTTP 200`, aprobada con feedback coherente y detallado citando la regla exacta de Identidad Visual que se corrigió. Confirma que `claude-opus-5` es un model ID real y válido que Anthropic acepta — no se pudo verificar el nombre exacto del modelo en logs (esta versión del CLI no tiene `functions logs` para funciones remotas), pero la llamada exitosa + la lógica de `pickModel()` (determinística, trivial de revisar en el código) son evidencia suficiente. Sin riesgo de autopublicación — `continueSession` nunca inserta en `proposals`, confirmado antes en este mismo documento.
+
 ## Notas históricas
 
 Visión fundacional original del EDA (spec escrita por Pablo antes de que existiera código, sigue siendo la intención de fondo del proyecto): *"Construir una aplicación de gestión estratégica de contenidos que funcione mediante la interacción de múltiples Agentes de IA. El sistema debe ser capaz de procesar la identidad de marca localmente, debatir estrategias y ejecutar publicaciones automáticas aprendiendo de los resultados."* — Bóveda → RAG, Mesa de Diálogo → 3 agentes (Estratega/Creativo/Crítico), Bucle de Aprendizaje → `rule-engine`/`success_rules`, son la realización de esa visión original. Un detalle que si cambió: el spec original dejaba el "Modo Supervisión" (aprobación antes de publicar) como opcional — el sistema real fue más allá, no hay ningún gate de aprobación humana desde el overhaul del 2026-08-02.

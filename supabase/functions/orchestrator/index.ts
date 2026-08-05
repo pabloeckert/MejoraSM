@@ -209,31 +209,41 @@ async function callAI(
   }
 }
 
-// Acción "start": Anthropic es el proveedor default (más confiable que el
-// tier gratuito de Groq, que rate-limita por TPM bajo uso normal — causa
-// real confirmada del error 500 de orchestrator, ver diagnóstico en el
-// commit). Si Anthropic falla (o falta ANTHROPIC_API_KEY), fallback a Groq
-// con el modelo que ya usa agent_config. La acción "continue" no se toca:
-// sigue usando el proveedor configurado por agente en /configuracion.
+// Ruteo de modelo — 2026-08-05, reemplaza la dependencia de agent_config
+// (provider/model editables en /configuracion, que ahora se ignoran para
+// esto; agent_config.temperature y .system_prompt se siguen usando).
+// Mismo criterio que la skill optimo-de-uso: mínima potencia suficiente,
+// Sonnet por default, Opus solo cuando la tarea objetivamente lo justifica.
+//
+// La única tarea de los 3 agentes con "razonamiento con muchas variables
+// cruzadas" real es el Crítico re-evaluando en una ronda de "continue":
+// tiene que ponderar a la vez el rechazo anterior, el feedback nuevo del
+// Creativo y el criterio de marca — más variables que una primera
+// evaluación (que ya es directa: contenido nuevo contra el manual). Por
+// eso es el único caso que escala a Opus. Estratega y Creativo — trabajo
+// de propuesta/redacción, no de arbitraje — siempre Sonnet, en cualquier
+// ronda.
+function pickModel(agent: "estratega" | "creativo" | "critico", isReevaluation: boolean): string {
+  if (agent === "critico" && isReevaluation) return "claude-opus-5";
+  return "claude-sonnet-5";
+}
+
 async function callAgent(
-  config: { provider: string; model: string; temperature: number },
+  agent: "estratega" | "creativo" | "critico",
+  isReevaluation: boolean,
+  temperature: number,
   system: string,
-  messages: { role: string; content: string }[],
-  useAnthropicDefault = false
+  messages: { role: string; content: string }[]
 ): Promise<string> {
-  if (useAnthropicDefault) {
-    try {
-      return await withRetry(() =>
-        callAI("anthropic", "claude-sonnet-5", system, messages, config.temperature)
-      );
-    } catch (e: any) {
-      console.warn(`[orchestrator] Anthropic falló (${e.message}), fallback a Groq`);
-      return await withRetry(() =>
-        callAI("groq", "llama-3.3-70b-versatile", system, messages, config.temperature)
-      );
-    }
+  const model = pickModel(agent, isReevaluation);
+  try {
+    return await withRetry(() => callAI("anthropic", model, system, messages, temperature));
+  } catch (e: any) {
+    console.warn(`[orchestrator] Anthropic (${model}) falló (${e.message}), fallback a Groq`);
+    return await withRetry(() =>
+      callAI("groq", "llama-3.3-70b-versatile", system, messages, temperature)
+    );
   }
-  return withRetry(() => callAI(config.provider, config.model, system, messages, config.temperature));
 }
 
 async function getAgentConfig(agentId: string) {
@@ -362,8 +372,7 @@ async function pickNextSlot(): Promise<string> {
 async function runEstratega(
   topic: string,
   contextDocs: string,
-  history: string,
-  useAnthropicDefault = false
+  history: string
 ): Promise<string> {
   const config = await getAgentConfig("estratega");
   const system = `${config.system_prompt}
@@ -382,19 +391,16 @@ Incluí:
 4. Formato recomendado (post, carrusel, historia)
 5. Momento ideal de publicación`;
 
-  return callAgent(
-    config,
-    system,
-    [{ role: "user", content: `Tema: ${topic}` }],
-    useAnthropicDefault
-  );
+  return callAgent("estratega", false, config.temperature, system, [
+    { role: "user", content: `Tema: ${topic}` },
+  ]);
 }
 
 async function runCreativo(
   estrategia: string,
   contextDocs: string,
   history: string,
-  useAnthropicDefault = false
+  isReevaluation = false
 ): Promise<string> {
   const config = await getAgentConfig("creativo");
   const system = `${config.system_prompt}
@@ -414,19 +420,16 @@ CTA: [call to action]
 HASHTAGS: [5-10 hashtags relevantes]
 NOTAS VISUALES: [qué imagen/video necesitás]`;
 
-  return callAgent(
-    config,
-    system,
-    [{ role: "user", content: estrategia }],
-    useAnthropicDefault
-  );
+  return callAgent("creativo", isReevaluation, config.temperature, system, [
+    { role: "user", content: estrategia },
+  ]);
 }
 
 async function runCritico(
   contenido: string,
   contextDocs: string,
   history: string,
-  useAnthropicDefault = false
+  isReevaluation = false
 ): Promise<{ aprobado: boolean; feedback: string }> {
   const config = await getAgentConfig("critico");
   const system = `${config.system_prompt}
@@ -444,12 +447,9 @@ DECISION: APROBADO | RECHAZADO
 RAZON: [explicación breve]
 SUGERENCIAS: [si fue rechazado, qué cambiar]`;
 
-  const response = await callAgent(
-    config,
-    system,
-    [{ role: "user", content: contenido }],
-    useAnthropicDefault
-  );
+  const response = await callAgent("critico", isReevaluation, config.temperature, system, [
+    { role: "user", content: contenido },
+  ]);
 
   const feedback = response || "Sin feedback del agente crítico";
   const aprobado = feedback.toUpperCase().includes("DECISION: APROBADO");
@@ -477,18 +477,18 @@ async function startSession(topic: string) {
   // 3. Ejecutar los 3 agentes secuencialmente
   const history: string[] = [];
 
-  // Estratega propone (Anthropic default, fallback a Groq — ver callAgent)
-  const estrategia = await runEstratega(topic, contextDocs, "", true);
+  // Estratega propone (Sonnet, fallback a Groq — ver pickModel/callAgent)
+  const estrategia = await runEstratega(topic, contextDocs, "");
   history.push(`## Agente Estratega:\n${estrategia}`);
   await saveMessage(session.id, "estratega", estrategia, 1);
 
-  // Creativo redacta
-  const contenido = await runCreativo(estrategia, contextDocs, history.join("\n"), true);
+  // Creativo redacta (Sonnet, primera pasada)
+  const contenido = await runCreativo(estrategia, contextDocs, history.join("\n"), false);
   history.push(`## Agente Creativo:\n${contenido}`);
   await saveMessage(session.id, "creativo", contenido, 2);
 
-  // Crítico evalúa
-  const evaluacion = await runCritico(contenido, contextDocs, history.join("\n"), true);
+  // Crítico evalúa (Sonnet, primera pasada — no es reevaluación)
+  const evaluacion = await runCritico(contenido, contextDocs, history.join("\n"), false);
   await saveMessage(session.id, "critico", evaluacion.feedback, 3);
 
   // 4. Extraer propuesta estructurada
@@ -587,19 +587,24 @@ async function continueSession(sessionId: string, feedback: string) {
   // El feedback del usuario se agrega al historial
   const fullHistory = `${history}\n\n## Usuario:\n${feedback}`;
 
-  // Re-ejecutar Creativo con feedback
+  // Re-ejecutar Creativo con feedback (Sonnet igual — reescribir copy no
+  // cambia de naturaleza por ser una revisión)
   const contenido = await runCreativo(
     feedback,
     contextDocs,
-    fullHistory
+    fullHistory,
+    true
   );
   await saveMessage(sessionId, "creativo", contenido, nextTurn);
 
-  // Re-ejecutar Crítico
+  // Re-ejecutar Crítico — acá sí escala a Opus (isReevaluation=true): tiene
+  // que ponderar el rechazo anterior + el feedback nuevo + el criterio de
+  // marca a la vez, ver pickModel() más arriba.
   const evaluacion = await runCritico(
     contenido,
     contextDocs,
-    `${fullHistory}\n\n## Creativo (revisión):\n${contenido}`
+    `${fullHistory}\n\n## Creativo (revisión):\n${contenido}`,
+    true
   );
   await saveMessage(sessionId, "critico", evaluacion.feedback, nextTurn + 1);
 
