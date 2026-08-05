@@ -501,6 +501,33 @@ El enfoque debería ser más empático... en lugar de culpar al individuo por su
 
 **Conclusión: no se encontró ningún bug — el Crítico rechaza contenido real que viola el Criterio Medular, y da un motivo específico y correcto**, no genérico: nombra las dos violaciones exactas que se le pidieron al Creativo (precio como gancho emocional, y culpar al individuo en vez de señalar la estructura). No hizo falta ningún fix. `dialogue_sessions.id = 36d571e3-ef05-46a2-9623-046a30d749de` para trazabilidad.
 
+## rule-engine — corrida real con datos de prueba — 2026-08-05
+
+`metrics` tenía **1 sola fila real** (la del post de prueba de Zernio) — `rule-engine` exige `>=5` filas para producir algo (`analyzeMetrics()` devuelve `[]` si no). Nunca había corrido su lógica completa.
+
+**⚠️ Se insertaron 10 filas de prueba, no reales — identificables y borrables:**
+- `proposals.id` con prefijo `7e57da7a-0000-4000-8000-...` (leet de "testdata") y `title` con prefijo `[TEST/QA] rule-engine seed`.
+- `metrics.post_id` con prefijo `TEST-QA-` (A a J).
+- `zernio_post_id` se dejó `NULL` a propósito en las 10 — así `metrics-collector` (que filtra `zernio_post_id IS NOT NULL`) nunca las va a tocar ni intentar traerles métricas reales de Zernio.
+- Para borrarlas cuando ya no hagan falta: `DELETE FROM metrics WHERE post_id LIKE 'TEST-QA-%'; DELETE FROM proposals WHERE id::text LIKE '7e57da7a-%';`
+
+**Diseño de los datos:** rango de `reach`/`impressions` basado en el único dato real de Zernio (reach 47, impressions 117) — entre 90 y 150 impresiones, con variación deliberada en likes/comments/shares/saves para generar señal real en distintas categorías (3 formatos, hooks con/sin "¿?", con/sin hashtags, distintos horarios). No se inventaron números al voleo — el objetivo era que `rule-engine` tuviera algo real que detectar, no solo pasar el mínimo de `>=5` filas.
+
+**Resultado real de `POST /rule-engine {"action":"analyze"}`:**
+```json
+{"rulesFound":4,"rulesSaved":4,"rules":[
+  {"type":"format","condition":{"format":"carrusel"},"action":{"reason":"Formato carrusel rinde 16.8% engagement vs 10.38% promedio"},"confidence":"70%","evidence":"4 posts con engagement promedio de 16.8%"},
+  {"type":"hook","condition":{"pattern":"question"},"action":{"reason":"Los hooks con pregunta rinden mejor"},"confidence":"70%","evidence":"2/4 posts de alto rendimiento usan hooks con pregunta"},
+  {"type":"timing","condition":{"hour":9},"action":{"reason":"Publicar a las 9:00 hs rinde mejor"},"confidence":"70%","evidence":"Posts a las 9:00 hs tienen 25.82% engagement promedio"},
+  {"type":"hashtag","condition":{"min_count":5},"action":{"reason":"Usar hashtags mejora el engagement"},"confidence":"70%","evidence":"Con hashtags: 19.88% vs Sin: 2.46%"}
+]}
+```
+Confirmado además contra `success_rules` real: las 4 reglas quedaron guardadas (`times_applied: 1`, `confidence: 0.7` cada una).
+
+**Coherencia real, no solo "no tiró error":** cada regla generada corresponde exactamente a la señal que se diseñó en los datos (el grupo `carrusel` incluía además la fila real de Zernio con engagement 0%, y el promedio de 16.8% que reportó el sistema matemáticamente da con esa mezcla de 3 filas de prueba + 1 real). No hubo que ajustar nada — la lógica de `analyzeMetrics()` funciona como está documentada en el código.
+
+**Hallazgo menor, no bloqueante, no corregido (fuera de alcance de esta prueba):** la categoría "hook con emoji" no disparó regla pese a diseñarse para eso — el regex de detección de emoji en `rule-engine/index.ts` (`\u{1F600}-\u{1F64F}`, `\u{1F300}-\u{1F5FF}`, `\u{1F680}-\u{1F6FF}`, `\u{1F1E0}-\u{1F1FF}`) no cubre el bloque Unicode de Dingbats (2600-27BF), así que emojis comunes como ✨✅❤️ no se detectan — solo emojis del plano suplementario como 🚀. Es un gap real del regex, pero menor y no pedido en esta tarea — queda anotado, no arreglado.
+
 ## Notas históricas
 
 Visión fundacional original del EDA (spec escrita por Pablo antes de que existiera código, sigue siendo la intención de fondo del proyecto): *"Construir una aplicación de gestión estratégica de contenidos que funcione mediante la interacción de múltiples Agentes de IA. El sistema debe ser capaz de procesar la identidad de marca localmente, debatir estrategias y ejecutar publicaciones automáticas aprendiendo de los resultados."* — Bóveda → RAG, Mesa de Diálogo → 3 agentes (Estratega/Creativo/Crítico), Bucle de Aprendizaje → `rule-engine`/`success_rules`, son la realización de esa visión original. Un detalle que si cambió: el spec original dejaba el "Modo Supervisión" (aprobación antes de publicar) como opcional — el sistema real fue más allá, no hay ningún gate de aprobación humana desde el overhaul del 2026-08-02.
