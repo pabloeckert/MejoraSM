@@ -528,6 +528,33 @@ Confirmado además contra `success_rules` real: las 4 reglas quedaron guardadas 
 
 **Hallazgo menor, no bloqueante, no corregido (fuera de alcance de esta prueba):** la categoría "hook con emoji" no disparó regla pese a diseñarse para eso — el regex de detección de emoji en `rule-engine/index.ts` (`\u{1F600}-\u{1F64F}`, `\u{1F300}-\u{1F5FF}`, `\u{1F680}-\u{1F6FF}`, `\u{1F1E0}-\u{1F1FF}`) no cubre el bloque Unicode de Dingbats (2600-27BF), así que emojis comunes como ✨✅❤️ no se detectan — solo emojis del plano suplementario como 🚀. Es un gap real del regex, pero menor y no pedido en esta tarea — queda anotado, no arreglado.
 
+## Duplicado real de autoagendado — investigación 2026-08-05
+
+Pablo reportó que la semana pasada un carrusel se autoagendó/publicó duplicado. Se investigó el código real de `orchestrator` y del pipeline de publicación (`render-scheduled-posts.mjs` + `publish-scheduled-posts.mjs`) buscando la causa — sin suponerla.
+
+**Lo que se descartó con evidencia real:**
+- `orchestrator.startSession()` inserta un solo `INSERT INTO proposals` por corrida — no hay ningún bucle ni doble insert posible ahí. `continueSession()` (acción `"continue"`) directamente nunca inserta nada.
+- No hay ningún duplicado real visible hoy en `proposals` (`SELECT * WHERE format='carrusel'` — cada fila tiene título distinto, sin repetidos) — un duplicado a nivel de fila de propuesta no dejó rastro, o nunca ocurrió a ese nivel.
+- `publish-scheduled-posts.yml` ya tiene `concurrency: {group: publish-scheduled-posts, cancel-in-progress: false}` desde el primer commit del archivo (no es un fix agregado ahora) — dos corridas de GitHub Actions de este mismo workflow no pueden correr en paralelo, se encolan. Se descarta "doble trigger simultáneo del cron" como causa a nivel de GitHub Actions.
+- Las 36 corridas reales de `publish-scheduled-posts.yml` desde que existe (`gh run list`) son todas `"conclusion":"success"` — no hay ninguna corrida marcada como fallida que explique el duplicado a simple vista.
+
+**Causa más probable, con evidencia de código real (no confirmada al 100% contra el incidente puntual — no hay logs de esa corrida específica para probarlo):** `render-scheduled-posts.mjs` selecciona propuestas por `status='scheduled' AND scheduled_at<=ahora` pero nunca las "reclama" (no las marca como "en proceso" antes de renderizar/publicar) — el `status` sigue siendo `'scheduled'` durante todo el render y todo el publish. Peor: `publish-scheduled-posts.mjs::markPublished()` **nunca chequeaba si el PATCH que marca `status='published'` realmente tenía éxito** (no miraba `res.ok`). Esto arma exactamente el gap que explica el síntoma: si Zernio publicó bien pero ese PATCH fallaba en silencio (red, timeout, hiccup de PostgREST), la propuesta seguía viéndose `"scheduled"` — la corrida siguiente (secuencial, no en paralelo, no hace falta ninguna carrera real) la volvía a renderizar y publicar. Y como es la MISMA fila de `proposals`, el segundo `zernio_post_id` pisa al primero al guardarse — por eso no queda ningún duplicado visible hoy en la tabla, aunque haya habido dos posts reales en Instagram/Facebook.
+
+**Fix mínimo aplicado** (`scripts/publish-scheduled-posts.mjs`):
+1. `markPublished()` ahora chequea `res.ok` y lanza si el PATCH falla — el fallo queda visible y real (marca la corrida como fallida), no silencioso.
+2. Nueva `isStillScheduled(proposalId)` — antes de publicar cada entrada del manifiesto, re-consulta el `status` real en Supabase; si ya no es `"scheduled"` (ya se publicó), la salta. Cubre además el caso de un manifiesto viejo reprocesado a mano.
+
+**Probado real** (sin necesidad de Playwright ni de publicar nada, contra la query REST exacta que usa el fix):
+```bash
+# Propuesta ya published (real, de la prueba de rule-engine):
+GET /rest/v1/proposals?id=eq.7e57da7a-...000a&select=status → [{"status":"published"}]
+# Propuesta real que sigue scheduled:
+GET /rest/v1/proposals?id=eq.c074942a-...&select=status → [{"status":"scheduled"}]
+```
+Confirma que la lógica distingue correctamente los dos casos — la primera se saltearía, la segunda seguiría el flujo normal. No se probó el flujo completo con Playwright/Zernio real para no arriesgar una publicación real solo para testear el fix.
+
+**Honestidad sobre el nivel de confirmación:** esto es la causa más probable con evidencia de código real y verificable, no una confirmación forense del incidente puntual de la semana pasada (no hay logs de esa corrida específica retenidos). El fix cierra el gap real encontrado independientemente de si fue exactamente esto lo que pasó esa vez.
+
 ## Notas históricas
 
 Visión fundacional original del EDA (spec escrita por Pablo antes de que existiera código, sigue siendo la intención de fondo del proyecto): *"Construir una aplicación de gestión estratégica de contenidos que funcione mediante la interacción de múltiples Agentes de IA. El sistema debe ser capaz de procesar la identidad de marca localmente, debatir estrategias y ejecutar publicaciones automáticas aprendiendo de los resultados."* — Bóveda → RAG, Mesa de Diálogo → 3 agentes (Estratega/Creativo/Crítico), Bucle de Aprendizaje → `rule-engine`/`success_rules`, son la realización de esa visión original. Un detalle que si cambió: el spec original dejaba el "Modo Supervisión" (aprobación antes de publicar) como opcional — el sistema real fue más allá, no hay ningún gate de aprobación humana desde el overhaul del 2026-08-02.
