@@ -1,7 +1,8 @@
 # Dispara metrics-collector cada 6h (PLAN_AUTONOMIA.md Fase 3). Hasta que se
-# configure el secret INSTAGRAM_ACCESS_TOKEN en Supabase, la función responde
-# un no-op limpio (ver supabase/functions/metrics-collector/index.ts) — este
-# workflow no necesita cambiar el día que ese secret se agregue.
+# configure el secret ZERNIO_API_KEY en Supabase (separado del mismo secret
+# ya cargado en GitHub Actions — son dos secret stores distintos), la función
+# responde un no-op limpio (ver supabase/functions/metrics-collector/index.ts)
+# — este workflow no necesita cambiar el día que ese secret se agregue.
 name: Metrics Collector Cron
 
 on:

@@ -1,5 +1,5 @@
 // supabase/functions/metrics-collector/index.ts
-// Recolecta métricas de Instagram Insights y las guarda en la DB
+// Recolecta métricas desde la API de analíticas de Zernio y las guarda en la DB
 // Uso: POST /metrics-collector { action: "collect", proposalId, postId }
 // Cron: ejecutar cada 6 horas
 
@@ -38,10 +38,16 @@ function validateBody(body: any, required: string[]) {
 }
 
 // ═══════════════════════════════════════
-// INSTAGRAM INSIGHTS API
+// ZERNIO ANALYTICS API
 // ═══════════════════════════════════════
+// docs.zernio.com — GET /v1/analytics?postId={id}
+// Acepta tanto Zernio Post IDs como External Post IDs (auto-resuelve) — el
+// zernio_post_id que ya guarda `proposals` sirve directo como postId, sin
+// necesidad de resolverlo al media ID real de la plataforma (esa incógnita
+// quedaba documentada como pendiente en la versión anterior de este archivo,
+// que pegaba directo a graph.facebook.com/{postId}/insights).
 
-interface InstagramMetrics {
+interface ZernioMetrics {
   likes: number;
   comments: number;
   shares: number;
@@ -50,91 +56,58 @@ interface InstagramMetrics {
   impressions: number;
 }
 
-async function getPostInsights(postId: string, accessToken: string): Promise<InstagramMetrics> {
-  // Instagram Graph API — Get insights for a media object
-  // https://developers.facebook.com/docs/instagram-api/reference/ig-media/insights
-  const fields = "likes,comments,shares,saved,reach,impressions";
-  const url = `https://graph.facebook.com/v19.0/${postId}/insights?metric=${fields}&access_token=${accessToken}`;
+const ZERNIO_ANALYTICS_URL = "https://zernio.com/api/v1/analytics";
 
-  const res = await fetch(url);
+async function getPostAnalytics(postId: string, apiKey: string): Promise<ZernioMetrics> {
+  const url = `${ZERNIO_ANALYTICS_URL}?postId=${encodeURIComponent(postId)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+
+  if (res.status === 402) {
+    throw new Error(
+      "Zernio Analytics error 402: el plan actual no incluye el add-on de Analytics (planes legacy lo necesitan aparte; viene incluido en los planes usage-based)."
+    );
+  }
+  if (res.status === 424) {
+    throw new Error(
+      "Zernio Analytics error 424: el post falló en publicar en todas las plataformas — no hay analíticas disponibles para este postId."
+    );
+  }
+  if (res.status === 202) {
+    throw new Error(
+      "Zernio Analytics: sync pendiente (202) — todavía no terminó de sincronizar las métricas desde la plataforma, reintentar en la próxima corrida."
+    );
+  }
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Instagram API error ${res.status}: ${err.slice(0, 200)}`);
+    throw new Error(`Zernio Analytics error ${res.status}: ${err.slice(0, 200)}`);
   }
 
   const data = await res.json();
-  const metrics: InstagramMetrics = {
-    likes: 0,
-    comments: 0,
-    shares: 0,
-    saves: 0,
-    reach: 0,
-    impressions: 0,
+  const a = data.analytics || {};
+  return {
+    likes: a.likes ?? 0,
+    comments: a.comments ?? 0,
+    shares: a.shares ?? 0,
+    saves: a.saves ?? 0,
+    reach: a.reach ?? 0,
+    impressions: a.impressions ?? 0,
   };
-
-  // Parse insights response
-  for (const insight of data.data || []) {
-    const value = insight.values?.[0]?.value ?? 0;
-    switch (insight.name) {
-      case "likes":
-        metrics.likes = value;
-        break;
-      case "comments":
-        metrics.comments = value;
-        break;
-      case "shares":
-        metrics.shares = value;
-        break;
-      case "saved":
-        metrics.saves = value;
-        break;
-      case "reach":
-        metrics.reach = value;
-        break;
-      case "impressions":
-        metrics.impressions = value;
-        break;
-    }
-  }
-
-  return metrics;
-}
-
-async function getAccountInsights(accountId: string, accessToken: string) {
-  // Get account-level metrics (last 7 days)
-  const since = Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60;
-  const until = Math.floor(Date.now() / 1000);
-  const url = `https://graph.facebook.com/v19.0/${accountId}/insights?metric=impressions,reach,follower_count&period=day&since=${since}&until=${until}&access_token=${accessToken}`;
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Instagram Account Insights error ${res.status}: ${err.slice(0, 200)}`);
-  }
-
-  return await res.json();
 }
 
 // ═══════════════════════════════════════
 // PROCESAMIENTO
 // ═══════════════════════════════════════
 
-// NOTA (pendiente real, no resuelto en este pase): postId acá es
-// zernio_post_id (el id que Zernio le da al post), no necesariamente el
-// media id real de Instagram que pide la Graph API en /{media-id}/insights.
-// sync-history.mjs nunca confirmó que Zernio devuelva ese id real en su
-// respuesta — solo platformPostUrl. Hasta no verificar el schema real de
-// Zernio con un post publicado, esta llamada puede fallar aunque
-// INSTAGRAM_ACCESS_TOKEN ya esté configurado; no es algo que se pueda
-// resolver sin pegarle a la API real con datos en vivo.
 async function collectMetrics(proposalId: string, postId: string) {
-  const accessToken = Deno.env.get("INSTAGRAM_ACCESS_TOKEN");
-  if (!accessToken) {
-    throw new Error("INSTAGRAM_ACCESS_TOKEN no configurado. Configurar en Supabase Secrets.");
+  const apiKey = Deno.env.get("ZERNIO_API_KEY");
+  if (!apiKey) {
+    throw new Error("ZERNIO_API_KEY no configurado. Configurar en Supabase Secrets.");
   }
 
-  // 1. Get insights from Instagram
-  const metrics = await getPostInsights(postId, accessToken);
+  // 1. Get analytics from Zernio
+  const metrics = await getPostAnalytics(postId, apiKey);
 
   // 2. Save to DB
   const { data: existing } = await supabase
@@ -166,16 +139,17 @@ async function collectMetrics(proposalId: string, postId: string) {
 }
 
 async function collectAllPending() {
-  const accessToken = Deno.env.get("INSTAGRAM_ACCESS_TOKEN");
-  if (!accessToken) {
-    // Recolectar métricas reales requiere un token de Instagram Graph API
-    // (Meta for Developers) que todavía no se configuró — es un trámite de
-    // Pablo, no algo que se resuelva con código. No cortar el cron con un
-    // error: mientras no exista el token, esto es un no-op esperado, no una
-    // falla. Apenas se configure INSTAGRAM_ACCESS_TOKEN como secret, esta
-    // misma corrida empieza a servir sin tocar nada más.
+  const apiKey = Deno.env.get("ZERNIO_API_KEY");
+  if (!apiKey) {
+    // ZERNIO_API_KEY ya existe como secret de GitHub Actions (lo usan
+    // scripts/lib/zernio.mjs para publicar), pero acá corre como Supabase
+    // Edge Function — es un secret de Supabase aparte, todavía no
+    // configurado ahí. No cortar el cron con un error: mientras no exista,
+    // esto es un no-op esperado, no una falla. Apenas se configure
+    // ZERNIO_API_KEY como secret de Supabase, esta misma corrida empieza a
+    // servir sin tocar nada más.
     return {
-      message: "INSTAGRAM_ACCESS_TOKEN no configurado todavía — nada para recolectar.",
+      message: "ZERNIO_API_KEY no configurado en Supabase Secrets todavía — nada para recolectar.",
       count: 0,
       skipped: true,
     };
