@@ -555,6 +555,22 @@ Confirma que la lógica distingue correctamente los dos casos — la primera se 
 
 **Honestidad sobre el nivel de confirmación:** esto es la causa más probable con evidencia de código real y verificable, no una confirmación forense del incidente puntual de la semana pasada (no hay logs de esa corrida específica retenidos). El fix cierra el gap real encontrado independientemente de si fue exactamente esto lo que pasó esa vez.
 
+## Corrida real de punta a punta, sin supervisión — 2026-08-05
+
+Con los puntos 1-4 cerrados, se corrió el circuito completo una vez, real, sin ningún gate humano en el medio — exactamente el diseño de "autonomía total" del overhaul del 2026-08-02. Cada paso con timestamp real, sin intervención manual salvo donde se aclara explícitamente.
+
+| Paso | Timestamp real (UTC) | Qué pasó |
+|---|---|---|
+| Mesa de Diálogo (`start`), tema real sin forzar formato | `03:19:54` → `03:20:59` | Estratega → Creativo → Crítico. **Aprobado**, formato `carrusel` (elegido por el sistema, no por mí) |
+| Autoagenda | `03:20:57` | `proposals` (`58a6f316-...`) insertada `status=scheduled`, `scheduled_at` casi inmediato (no había slots recientes de post/carrusel en las últimas 24hs) |
+| Cron real (`publish-scheduled-posts.yml`, sin disparo manual) | corrida a las `03:36:17` | Lo recogió solo — **no intervine**, dejé correr el cron de GitHub Actions tal cual está agendado (`*/15 * * * *`) |
+| Render + publish real vía Zernio | `published_at: 03:38:10` | `status=published`, `zernio_post_id=6a72afe966cd54ae189ec9db`, imagen real commiteada (`content/published/post-2026-08-05-1-1.jpg`) |
+| `metrics-collector` (disparado a mano para no esperar el cron de 6h) | 9 intentos, `04:23:19` → `04:48:08` (~1h10 desde publicado) | Los primeros 8 intentos: `202 sync pendiente` (comportamiento documentado del spec de Zernio, no una falla). Intento 9: éxito real — `{"reach":8,"impressions":12,"likes":0,"comments":0,"shares":0,"saves":0}`, coherente con un post recién publicado y con poco alcance todavía |
+
+**Nota de método — un bug propio, no del sistema:** para esperar el cron sin intervenir manualmente se armó un primer script de monitoreo (poll cada 90s) que nunca detectó el cambio de estado real (la publicación sí ocurrió a las `03:38:10`, confirmado después por consulta directa) — el regex del script no consideraba el espacio que el CLI de Supabase imprime en su JSON con formato (`"status": "published"` vs. `"status":"published"` sin espacio). Bug del script de prueba, no del pipeline real — se corrigió para el segundo monitor (el de `metrics-collector`), que sí funcionó bien.
+
+**Conclusión: el circuito completo funciona de punta a punta sin supervisión humana**, tal como está diseñado — desde el tema hasta las métricas reales, sin que nadie apruebe nada en el medio. El único paso donde intervine manualmente fue disparar `metrics-collector` antes de que le tocara su cron de 6h (para no alargar la prueba); todo lo demás —incluida la publicación real a Instagram/Facebook— corrió solo.
+
 ## Notas históricas
 
 Visión fundacional original del EDA (spec escrita por Pablo antes de que existiera código, sigue siendo la intención de fondo del proyecto): *"Construir una aplicación de gestión estratégica de contenidos que funcione mediante la interacción de múltiples Agentes de IA. El sistema debe ser capaz de procesar la identidad de marca localmente, debatir estrategias y ejecutar publicaciones automáticas aprendiendo de los resultados."* — Bóveda → RAG, Mesa de Diálogo → 3 agentes (Estratega/Creativo/Crítico), Bucle de Aprendizaje → `rule-engine`/`success_rules`, son la realización de esa visión original. Un detalle que si cambió: el spec original dejaba el "Modo Supervisión" (aprobación antes de publicar) como opcional — el sistema real fue más allá, no hay ningún gate de aprobación humana desde el overhaul del 2026-08-02.
