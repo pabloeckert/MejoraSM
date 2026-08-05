@@ -595,6 +595,20 @@ Resumen ejecutivo de los 5 puntos trabajados hoy para blindar el motor en códig
 
 **Lo que sí quedó realmente blindado hoy:** el Crítico rechaza contenido real que viola el Criterio Medular (no solo aprueba, ya hay evidencia de ambos lados); el circuito completo de autonomía total (Mesa de Diálogo → autoagenda → publish real → métricas) corre de punta a punta sin gate humano, confirmado con una corrida real, no simulada; y el gap de idempotencia más probable detrás del duplicado de la semana pasada quedó cerrado con un fix concreto y probado.
 
+## Bug de encoding UTF-8 — investigado 2026-08-05, descartado como bug de código
+
+Pablo reportó títulos con tildes/ñ rotos generados por `orchestrator`. Se investigó con evidencia real, sin asumir la causa — **conclusión: no hay ningún bug en el código.**
+
+**Evidencia real:**
+- `SELECT title, hook, body, cta FROM proposals` — cero filas con artefactos de mojibake (`Ã`, `Â`, `�`) en todo el contenido generado por los agentes de IA. Las tildes/ñ de sesiones reales de producción (`681ff48b...`, `30905256...`, `5d505d06...`, etc.) están perfectas: "Por qué", "Cómo", "está", "rápido".
+- Sí se encontró corrupción real (`�`, U+FFFD) pero **solo en `dialogue_sessions.topic` de dos sesiones**, y ambas eran pruebas propias de esta sesión de Claude Code (`36d571e3...`, `b78548c3...`) — nunca en contenido generado por los agentes ni en sesiones reales de la app.
+
+**Causa real confirmada:** el problema no está en `orchestrator` ni en cómo Deno/Postgres manejan UTF-8 (ambos lo hacen bien por spec — JSON es UTF-8 obligatorio). Está en cómo se pasaron esos dos topics de prueba: como argumento literal con tildes directo en la línea de comandos de `curl` desde Git Bash/PowerShell en Windows — un problema de codepage de la terminal de esta máquina, no del repo. **Prueba real que lo confirma:** se armó un topic nuevo con tildes/ñ (`"cómo señalar la organización sin atacar a la persona..."`), guardado primero en un archivo `.json` verificado en hex (`c3 b3` = "ó", UTF-8 real) y enviado con `curl --data-binary @archivo` (evita que la shell reinterprete el argumento) — se guardó perfecto en `dialogue_sessions.topic`, sin ningún `�`. La app real (React, `fetch`/`JSON.stringify` del browser) nunca tiene este problema — siempre codifica UTF-8 correctamente; el bug solo podía aparecer en pruebas manuales por shell como las mías.
+
+**Limpieza aplicada:** se repararon a mano las 2 filas de `dialogue_sessions.topic` corrompidas (se sabía el texto original exacto, eran pruebas propias) — no fue necesario ningún cambio de código.
+
+**Conclusión: no había nada que arreglar en `orchestrator`.** El pedido original asumía un bug de guardado/lectura que la evidencia real descarta — dejarlo documentado así en vez de inventar un cambio de código innecesario.
+
 ## Notas históricas
 
 Visión fundacional original del EDA (spec escrita por Pablo antes de que existiera código, sigue siendo la intención de fondo del proyecto): *"Construir una aplicación de gestión estratégica de contenidos que funcione mediante la interacción de múltiples Agentes de IA. El sistema debe ser capaz de procesar la identidad de marca localmente, debatir estrategias y ejecutar publicaciones automáticas aprendiendo de los resultados."* — Bóveda → RAG, Mesa de Diálogo → 3 agentes (Estratega/Creativo/Crítico), Bucle de Aprendizaje → `rule-engine`/`success_rules`, son la realización de esa visión original. Un detalle que si cambió: el spec original dejaba el "Modo Supervisión" (aprobación antes de publicar) como opcional — el sistema real fue más allá, no hay ningún gate de aprobación humana desde el overhaul del 2026-08-02.
