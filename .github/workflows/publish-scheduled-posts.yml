@@ -3,11 +3,18 @@
 # (propuestas ya aprobadas y agendadas desde la pantalla "Propuestas" del
 # EDA), no content/inbox/ escaneado directo. Corre acá y no como Supabase
 # Edge Function porque necesita Playwright para renderizar la imagen.
+#
+# ⏸️ PAUSADO 2026-08-05 (pedido de Pablo): el cron automático (*/15 min)
+# está comentado a propósito — no se publican posts/carruseles reales
+# mientras se sigue desarrollando el pipeline. Stories (daily-story.yml)
+# NO está afectado, sigue corriendo normal. workflow_dispatch queda activo
+# para poder probar manualmente si hace falta. Para reactivar el cron: descomentar
+# el bloque `schedule` de abajo — ver CLAUDE.md, sección de este pausado.
 name: Publish Scheduled Posts
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"
+  # schedule:
+  #   - cron: "*/15 * * * *"
   workflow_dispatch: {}
 
 concurrency:

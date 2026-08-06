@@ -638,6 +638,16 @@ También se borraron las **4 filas de `success_rules`** que esos datos de prueba
 - Ronda `"start"` (primera evaluación, debería usar Sonnet): `HTTP 200`, rechazada por el Crítico con motivo coherente (violación de Identidad Visual) — sin riesgo, `startSession` no agenda nada si no aprueba.
 - Ronda `"continue"` sobre la misma sesión (re-evaluación, debería escalar a Opus): `HTTP 200`, aprobada con feedback coherente y detallado citando la regla exacta de Identidad Visual que se corrigió. Confirma que `claude-opus-5` es un model ID real y válido que Anthropic acepta — no se pudo verificar el nombre exacto del modelo en logs (esta versión del CLI no tiene `functions logs` para funciones remotas), pero la llamada exitosa + la lógica de `pickModel()` (determinística, trivial de revisar en el código) son evidencia suficiente. Sin riesgo de autopublicación — `continueSession` nunca inserta en `proposals`, confirmado antes en este mismo documento.
 
+## ⏸️ Pausa de publicación automática de posts/carruseles — 2026-08-05
+
+Pedido directo de Pablo: pausar la publicación real de posts/carruseles de feed mientras se sigue desarrollando el motor, sin tocar Stories (que sigue publicando normal, sin cambios).
+
+**Qué se cambió:** en `.github/workflows/publish-scheduled-posts.yml` se comentó el trigger `schedule: cron: "*/15 * * * *"` — el workflow ya no se dispara solo. `workflow_dispatch` queda activo (se puede seguir corriendo a mano para pruebas puntuales de desarrollo). `daily-story.yml` no se tocó — su cron (`0 13 * * *`) sigue activo, Stories sigue publicando solo como hasta ahora.
+
+**Qué NO se cambió, a propósito — vale la pena que Pablo lo sepa:** `orchestrator` sigue autoagendando posts/carruseles aprobados (`AUTO_PUBLISH_FORMATS` intacto) — una propuesta aprobada durante la pausa va a quedar `status='scheduled'` en la base, esperando. Con el cron pausado, **no se va a publicar sola** mientras dure la pausa, pero si se reactiva el cron más adelante sin revisar antes, se va a publicar de golpe todo lo que se haya acumulado (con `scheduled_at` ya vencido). Si Pablo prefiere evitar ese acumulado, la opción es sacar `post`/`carrusel` de `AUTO_PUBLISH_FORMATS` también (así quedan en `pending` para aprobación manual, como `historia` hoy) — no se hizo porque no fue lo que se pidió explícitamente, solo pausar la publicación.
+
+**Para reactivar:** descomentar el bloque `schedule` en `publish-scheduled-posts.yml` y pushear.
+
 ## Notas históricas
 
 Visión fundacional original del EDA (spec escrita por Pablo antes de que existiera código, sigue siendo la intención de fondo del proyecto): *"Construir una aplicación de gestión estratégica de contenidos que funcione mediante la interacción de múltiples Agentes de IA. El sistema debe ser capaz de procesar la identidad de marca localmente, debatir estrategias y ejecutar publicaciones automáticas aprendiendo de los resultados."* — Bóveda → RAG, Mesa de Diálogo → 3 agentes (Estratega/Creativo/Crítico), Bucle de Aprendizaje → `rule-engine`/`success_rules`, son la realización de esa visión original. Un detalle que si cambió: el spec original dejaba el "Modo Supervisión" (aprobación antes de publicar) como opcional — el sistema real fue más allá, no hay ningún gate de aprobación humana desde el overhaul del 2026-08-02.
