@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-06T13:40:42.884Z",
+  "syncedAt": "2026-08-06T23:49:25.395Z",
   "posts": [
+    {
+      "id": "6a74a41977c1223d27c58bf5",
+      "date": "2026-08-06",
+      "status": "published",
+      "content": "La próxima vez que un conflicto se ponga tenso, preguntate: ¿estoy discutiendo el problema o a la persona? Si te cuesta separarlo, hay una Sesión de Claridad para eso.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-06-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3957821267604526925"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a748af4013927dbb8084d9a",
       "date": "2026-08-06",
