@@ -57,6 +57,17 @@ export function useLatestMetrics() {
   });
 }
 
+export function useAllMetrics() {
+  return useQuery({
+    queryKey: ["metrics", "all"],
+    queryFn: async () => {
+      const { data, error } = await metricsApi.all();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useProposalMetrics(proposalId: string) {
   return useQuery({
     queryKey: ["metrics", "proposal", proposalId],

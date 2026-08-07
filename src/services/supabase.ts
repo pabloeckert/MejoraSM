@@ -171,6 +171,19 @@ export const metricsApi = {
       .order("measured_at", { ascending: false })
       .limit(30),
 
+  // Dashboard (rediseño 2026-08-07): a diferencia de latest() no tiene
+  // límite — el Dashboard necesita el set completo para calcular KPIs
+  // agregados reales (sumas/promedios), no solo una muestra reciente.
+  // Trae los campos de proposals necesarios para el ranking de piezas,
+  // el desglose por red y el filtro de filas [TEST/QA].
+  all: () =>
+    supabase
+      .from("metrics")
+      .select(
+        "*, proposals(id, title, hook, format, status, zernio_post_id, oferta, rendered_image_path)"
+      )
+      .order("measured_at", { ascending: false }),
+
   byProposal: (proposalId: string) =>
     supabase
       .from("metrics")
