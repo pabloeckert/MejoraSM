@@ -42,9 +42,13 @@ jobs:
       - name: Login to Supabase
         run: npx supabase login --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Link project
-        run: npx supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-
+      # No hay paso "Link project" a propósito — `supabase link` pega contra
+      # GET /v1/projects/{ref}/api-keys, que hoy devuelve un inserted_at que
+      # no matchea el regex ISO8601 que espera el CLI (SchemaError real,
+      # reproducido también en local, no un problema de este workflow) y
+      # tira el step abajo. No hace falta: cada comando de `functions
+      # deploy` ya recibe --project-ref directo, así que nunca necesita el
+      # link previo — probado en local sin `link`, deploya bien igual.
       - name: Deploy specific function
         if: ${{ github.event.inputs.function_name != '' }}
         run: |
