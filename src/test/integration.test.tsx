@@ -244,10 +244,17 @@ describe("Calendario Page", () => {
     expect(screen.getByText("Calendario Editorial")).toBeInTheDocument();
   });
 
-  it("renders as read-only, pointing to Propuestas for changes", async () => {
+  it("renders real drag-and-drop rescheduling copy, not the old read-only text", async () => {
     const { default: Calendario } = await import("@/pages/Calendario");
     renderWithProviders(<Calendario />);
-    expect(screen.getByText(/Solo lectura/i)).toBeInTheDocument();
+    expect(screen.getByText(/arrastrala a otro día para reprogramarla/i)).toBeInTheDocument();
+  });
+
+  it("renders month/week view toggle", async () => {
+    const { default: Calendario } = await import("@/pages/Calendario");
+    renderWithProviders(<Calendario />);
+    expect(screen.getByRole("button", { name: "Mensual" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Semanal" })).toBeInTheDocument();
   });
 
   it("renders weekday headers", async () => {
