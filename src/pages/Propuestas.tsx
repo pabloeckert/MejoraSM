@@ -1,68 +1,40 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   CheckCircle,
-  XCircle,
   Clock,
   Loader2,
   Calendar,
   Copy,
   Check,
-  Send,
   FileText,
-  Eye,
+  LayoutTemplate,
+  Plus,
+  Pencil,
+  Trash2,
 } from "lucide-react";
-import {
-  useProposals,
-  usePendingProposals,
-  useApproveProposal,
-  useRejectProposal,
-  useScheduleProposal,
-  useCancelProposal,
-} from "@/hooks/useProposals";
+import { useProposals, usePendingProposals, useTemplates, useCreateTemplate, useUpdateTemplate, useDeleteTemplate } from "@/hooks/useProposals";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "@/components/ui/use-toast";
-
-// Mismas 4 dimensiones + Profesionalización que content/inbox/ (ver
-// scripts/generate-brief.mjs) — de acá sale la foto que usa
-// scripts/render-scheduled-posts.mjs al publicar el post agendado.
-const OFERTAS = [
-  { value: "personal", label: "Personal" },
-  { value: "organizacional", label: "Organizacional" },
-  { value: "comercial", label: "Comercial" },
-  { value: "empresarial", label: "Empresarial" },
-  { value: "profesionalizacion", label: "Profesionalización" },
-];
+import { PipelineBadge } from "@/components/PipelineBadge";
+import { ProposalDetailDialog, type ProposalDetail } from "@/components/ProposalDetailDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 // Filtro por tipo de posteo, sobre el campo proposals.format. "historia" es
 // el valor real que usa el código (extractProposal en orchestrator/index.ts)
 // para lo que acá se etiqueta "Story". "video" todavía no lo genera nada
 // (ni orchestrator ni el pipeline de publicación) — el tab existe igual,
-// a propósito, para no ocultar la categoría aunque hoy esté vacía.
+// a propósito, para no ocultar la categoría aunque hoy esté vacía. No es
+// convertible (proposals_format_check ni siquiera lo permite).
 const FORMATOS: { value: string; label: string }[] = [
   { value: "all", label: "Todos" },
   { value: "post", label: "Post Feed" },
@@ -71,10 +43,22 @@ const FORMATOS: { value: string; label: string }[] = [
   { value: "video", label: "Video" },
 ];
 
+const TEMPLATE_FORMATS = FORMATOS.filter((f) => f.value !== "all" && f.value !== "video");
+
+const STATUS_META: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+  pending: { label: "Pendiente", variant: "secondary" },
+  approved: { label: "Aprobada", variant: "default" },
+  rejected: { label: "Rechazada", variant: "destructive" },
+  scheduled: { label: "Programada", variant: "outline" },
+  published: { label: "Publicada", variant: "default" },
+};
+
 export default function Propuestas() {
   return (
     <ErrorBoundary>
-      <PropuestasContent />
+      <TooltipProvider delayDuration={150}>
+        <PropuestasContent />
+      </TooltipProvider>
     </ErrorBoundary>
   );
 }
@@ -82,96 +66,38 @@ export default function Propuestas() {
 function PropuestasContent() {
   const { data: allProposals, isLoading } = useProposals();
   const { data: pendingProposals } = usePendingProposals();
-  const approveMutation = useApproveProposal();
-  const rejectMutation = useRejectProposal();
-  const scheduleMutation = useScheduleProposal();
-  const cancelMutation = useCancelProposal();
 
-  const [rejectTarget, setRejectTarget] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
-  const [scheduleTarget, setScheduleTarget] = useState<string | null>(null);
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [scheduleOferta, setScheduleOferta] = useState("");
-  const [previewTarget, setPreviewTarget] = useState<any>(null);
+  const [selectedProposal, setSelectedProposal] = useState<ProposalDetail | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [formatFilter, setFormatFilter] = useState<string>("all");
 
-  const handleApprove = (id: string) => {
-    approveMutation.mutate(id, {
-      onSuccess: () => toast({ title: "Propuesta aprobada" }),
-      onError: (err: any) =>
-        toast({ title: "Error", description: err.message, variant: "destructive" }),
-    });
-  };
-
-  const handleReject = () => {
-    if (!rejectTarget) return;
-    rejectMutation.mutate(
-      { id: rejectTarget, reason: rejectReason },
-      {
-        onSuccess: () => {
-          setRejectTarget(null);
-          setRejectReason("");
-          toast({ title: "Propuesta rechazada" });
-        },
-        onError: (err: any) =>
-          toast({ title: "Error", description: err.message, variant: "destructive" }),
-      }
-    );
-  };
-
-  const handleSchedule = () => {
-    if (!scheduleTarget || !scheduleDate || !scheduleOferta) return;
-    scheduleMutation.mutate(
-      { id: scheduleTarget, date: scheduleDate, oferta: scheduleOferta },
-      {
-        onSuccess: () => {
-          setScheduleTarget(null);
-          setScheduleDate("");
-          setScheduleOferta("");
-          toast({ title: "Propuesta programada" });
-        },
-        onError: (err: any) =>
-          toast({ title: "Error", description: err.message, variant: "destructive" }),
-      }
-    );
-  };
-
-  const handleCancel = (id: string) => {
-    cancelMutation.mutate(id, {
-      onSuccess: () => toast({ title: "Publicación cancelada" }),
-      onError: (err: any) =>
-        toast({ title: "Error", description: err.message, variant: "destructive" }),
-    });
-  };
-
-  const handleCopy = (text: string, id: string) => {
+  const handleCopy = (proposal: ProposalDetail) => {
+    const text = [proposal.hook, "", proposal.body, "", proposal.cta, "", ...(proposal.hashtags || [])]
+      .filter((l) => l !== null && l !== undefined)
+      .join("\n");
     navigator.clipboard.writeText(text);
-    setCopiedId(id);
+    setCopiedId(proposal.id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const matchesFormat = (p: any) => formatFilter === "all" || p.format === formatFilter;
-  const filteredProposals = (allProposals || []).filter(matchesFormat);
-  const filteredPending = (pendingProposals || []).filter(matchesFormat);
+  const matchesFormat = (p: ProposalDetail) => formatFilter === "all" || p.format === formatFilter;
+  const filteredProposals: ProposalDetail[] = (allProposals || []).filter(matchesFormat);
+  const filteredPending: ProposalDetail[] = (pendingProposals || []).filter(matchesFormat);
 
-  const approved = filteredProposals.filter((p: any) => p.status === "approved");
-  const rejected = filteredProposals.filter((p: any) => p.status === "rejected");
-  const scheduled = filteredProposals.filter((p: any) => p.status === "scheduled");
-  const published = filteredProposals.filter((p: any) => p.status === "published");
+  const approved = filteredProposals.filter((p) => p.status === "approved");
+  const scheduled = filteredProposals.filter((p) => p.status === "scheduled");
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Propuestas de Contenido</h1>
         <p className="mt-1 text-muted-foreground">
-          Los posts y carruseles de feed se agendan y publican solos. Esta pantalla es el monitor: revisá lo
-          programado y cancelalo si no te convence, o aprobá a mano los formatos que todavía no tienen
-          pipeline autónomo (historia).
+          Los posts y carruseles de feed se agendan y publican solos (mirá el badge "Se publica solo" en cada
+          pieza). Esta pantalla es el monitor: click en cualquier pieza abre el detalle, con todas las acciones
+          reales — aprobar, rechazar, agendar, editar, borrar o convertir formato.
         </p>
       </div>
 
-      {/* Filtro por tipo de posteo */}
       <div className="flex flex-wrap gap-2">
         {FORMATOS.map((f) => (
           <Button
@@ -206,442 +132,361 @@ function PropuestasContent() {
             Programadas
           </TabsTrigger>
           <TabsTrigger value="all">Todas</TabsTrigger>
+          <TabsTrigger value="templates" className="gap-1.5">
+            <LayoutTemplate className="h-3.5 w-3.5" />
+            Plantillas
+          </TabsTrigger>
         </TabsList>
 
-        {/* PENDIENTES */}
         <TabsContent value="pending" className="mt-6">
           {isLoading ? (
             <div className="flex h-48 items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : filteredPending.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center py-16">
-                <CheckCircle className="mb-4 h-12 w-12 text-muted-foreground/50" />
-                <p className="text-lg font-medium text-muted-foreground">
-                  {formatFilter === "all"
-                    ? "No hay propuestas pendientes"
-                    : `No hay propuestas pendientes de tipo "${FORMATOS.find((f) => f.value === formatFilter)?.label}"`}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground/70">
-                  Cuando los agentes generen contenido, aparecerá acá para tu aprobación.
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={CheckCircle}
+              text={
+                formatFilter === "all"
+                  ? "No hay propuestas pendientes"
+                  : `No hay propuestas pendientes de tipo "${FORMATOS.find((f) => f.value === formatFilter)?.label}"`
+              }
+              sub="Cuando los agentes generen contenido, aparecerá acá para tu aprobación."
+            />
           ) : (
-            <div className="space-y-4">
-              {filteredPending.map((p: any) => (
-                <ProposalCard
+            <div className="space-y-3">
+              {filteredPending.map((p) => (
+                <ProposalListItem
                   key={p.id}
                   proposal={p}
-                  onApprove={() => handleApprove(p.id)}
-                  onReject={() => setRejectTarget(p.id)}
-                  onSchedule={() => setScheduleTarget(p.id)}
-                  onPreview={() => setPreviewTarget(p)}
-                  onCopy={handleCopy}
-                  copiedId={copiedId}
-                  isApproving={approveMutation.isPending}
+                  onOpen={() => setSelectedProposal(p)}
+                  onCopy={() => handleCopy(p)}
+                  copied={copiedId === p.id}
                 />
               ))}
             </div>
           )}
         </TabsContent>
 
-        {/* APROBADAS */}
         <TabsContent value="approved" className="mt-6">
           {approved.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center py-12">
-                <FileText className="mb-3 h-8 w-8 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">No hay propuestas aprobadas aún.</p>
-              </CardContent>
-            </Card>
+            <EmptyState icon={FileText} text="No hay propuestas aprobadas aún." />
           ) : (
             <div className="space-y-3">
-              {approved.map((p: any) => (
-                <ProposalRow key={p.id} proposal={p} onCopy={handleCopy} copiedId={copiedId} />
+              {approved.map((p) => (
+                <ProposalListItem
+                  key={p.id}
+                  proposal={p}
+                  onOpen={() => setSelectedProposal(p)}
+                  onCopy={() => handleCopy(p)}
+                  copied={copiedId === p.id}
+                />
               ))}
             </div>
           )}
         </TabsContent>
 
-        {/* PROGRAMADAS */}
         <TabsContent value="scheduled" className="mt-6">
           <p className="mb-4 text-xs text-muted-foreground">
-            Los posts y carruseles se agendan solos apenas los aprueba el Crítico en Mesa de Diálogo —
-            se publican solos cuando llega la fecha. Cancelá acá si alguno no te convence antes de que salga.
+            Los posts y carruseles se agendan solos apenas los aprueba el Crítico en Mesa de Diálogo. Abrí la
+            pieza para reprogramarla o cancelarla antes de que salga.
           </p>
           {scheduled.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center py-12">
-                <Calendar className="mb-3 h-8 w-8 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">No hay propuestas programadas.</p>
-              </CardContent>
-            </Card>
+            <EmptyState icon={Calendar} text="No hay propuestas programadas." />
           ) : (
             <div className="space-y-3">
-              {scheduled.map((p: any) => (
-                <ProposalRow
+              {scheduled.map((p) => (
+                <ProposalListItem
                   key={p.id}
                   proposal={p}
-                  onCopy={handleCopy}
-                  copiedId={copiedId}
-                  onCancel={() => handleCancel(p.id)}
-                  isCanceling={cancelMutation.isPending}
+                  onOpen={() => setSelectedProposal(p)}
+                  onCopy={() => handleCopy(p)}
+                  copied={copiedId === p.id}
                 />
               ))}
             </div>
           )}
         </TabsContent>
 
-        {/* TODAS */}
         <TabsContent value="all" className="mt-6">
           {filteredProposals.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center py-12">
-                <FileText className="mb-3 h-8 w-8 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">
-                  {formatFilter === "all"
-                    ? "No hay propuestas todavía."
-                    : `No hay propuestas de tipo "${FORMATOS.find((f) => f.value === formatFilter)?.label}" todavía.`}
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={FileText}
+              text={
+                formatFilter === "all"
+                  ? "No hay propuestas todavía."
+                  : `No hay propuestas de tipo "${FORMATOS.find((f) => f.value === formatFilter)?.label}" todavía.`
+              }
+            />
           ) : (
             <div className="space-y-3">
-              {filteredProposals.map((p: any) => (
-                <ProposalRow
+              {filteredProposals.map((p) => (
+                <ProposalListItem
                   key={p.id}
                   proposal={p}
-                  onCopy={handleCopy}
-                  copiedId={copiedId}
-                  onCancel={p.status === "scheduled" ? () => handleCancel(p.id) : undefined}
-                  isCanceling={cancelMutation.isPending}
+                  onOpen={() => setSelectedProposal(p)}
+                  onCopy={() => handleCopy(p)}
+                  copied={copiedId === p.id}
                 />
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="templates" className="mt-6">
+          <TemplatesSection />
         </TabsContent>
       </Tabs>
 
-      {/* REJECT DIALOG */}
-      <Dialog open={!!rejectTarget} onOpenChange={(v) => !v && setRejectTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rechazar propuesta</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Razón del rechazo (opcional)</Label>
-              <Textarea
-                placeholder="Ej: No coincide con el tono de la marca, el hook no conecta..."
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                rows={3}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setRejectTarget(null)}>
-                Cancelar
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleReject}
-                disabled={rejectMutation.isPending}
-              >
-                {rejectMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Rechazar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* SCHEDULE DIALOG */}
-      <Dialog
-        open={!!scheduleTarget}
-        onOpenChange={(v) => {
-          if (!v) {
-            setScheduleTarget(null);
-            setScheduleDate("");
-            setScheduleOferta("");
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Programar publicación</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Fecha y hora de publicación</Label>
-              <Input
-                type="datetime-local"
-                value={scheduleDate}
-                onChange={(e) => setScheduleDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Oferta (de dónde sale la foto del post)</Label>
-              <Select value={scheduleOferta} onValueChange={setScheduleOferta}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Elegir dimensión..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {OFERTAS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Se publica sola en la fecha elegida, con una foto de content/inbox/{scheduleOferta || "<oferta>"}/. Si la carpeta está vacía, el post sale en formato solo-texto.
-              </p>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setScheduleTarget(null)}>
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleSchedule}
-                disabled={!scheduleDate || !scheduleOferta || scheduleMutation.isPending}
-              >
-                {scheduleMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Programar
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* PREVIEW DIALOG */}
-      <Dialog open={!!previewTarget} onOpenChange={(v) => !v && setPreviewTarget(null)}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Vista previa</DialogTitle>
-          </DialogHeader>
-          {previewTarget && (
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">HOOK</p>
-                <p className="text-sm font-semibold">{previewTarget.hook}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">COPY</p>
-                <p className="text-sm whitespace-pre-wrap">{previewTarget.body}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">CTA</p>
-                <p className="text-sm">{previewTarget.cta}</p>
-              </div>
-              {previewTarget.hashtags?.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">HASHTAGS</p>
-                  <div className="flex flex-wrap gap-1">
-                    {previewTarget.hashtags.map((tag: string, i: number) => (
-                      <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="flex gap-2 pt-2">
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    handleApprove(previewTarget.id);
-                    setPreviewTarget(null);
-                  }}
-                >
-                  <CheckCircle className="mr-1.5 h-4 w-4" />
-                  Aprobar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const full = `${previewTarget.hook}\n\n${previewTarget.body}\n\n${previewTarget.cta}\n\n${previewTarget.hashtags?.join(" ")}`;
-                    handleCopy(full, previewTarget.id);
-                  }}
-                >
-                  {copiedId === previewTarget.id ? (
-                    <Check className="mr-1.5 h-4 w-4" />
-                  ) : (
-                    <Copy className="mr-1.5 h-4 w-4" />
-                  )}
-                  Copiar
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ProposalDetailDialog
+        proposal={selectedProposal}
+        open={!!selectedProposal}
+        onOpenChange={(open) => !open && setSelectedProposal(null)}
+      />
     </div>
   );
 }
 
-function ProposalCard({
-  proposal,
-  onApprove,
-  onReject,
-  onSchedule,
-  onPreview,
-  onCopy,
-  copiedId,
-  isApproving,
-}: {
-  proposal: any;
-  onApprove: () => void;
-  onReject: () => void;
-  onSchedule: () => void;
-  onPreview: () => void;
-  onCopy: (text: string, id: string) => void;
-  copiedId: string | null;
-  isApproving: boolean;
-}) {
-  const fullCopy = `${proposal.hook || ""}\n\n${proposal.body || ""}\n\n${proposal.cta || ""}`;
-
+function EmptyState({ icon: Icon, text, sub }: { icon: typeof FileText; text: string; sub?: string }) {
   return (
     <Card>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <Badge variant="outline">{proposal.format || "post"}</Badge>
-              <span className="text-xs text-muted-foreground">
-                {new Date(proposal.created_at).toLocaleDateString("es-AR")}
-              </span>
-            </div>
-            <p className="text-sm font-semibold truncate">{proposal.hook || proposal.title || "Sin título"}</p>
-            <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-              {proposal.body?.slice(0, 150)}...
-            </p>
-            {proposal.dialogue_sessions?.topic && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Tema: {proposal.dialogue_sessions.topic}
-              </p>
-            )}
-          </div>
-          <div className="flex flex-col gap-1.5 shrink-0">
-            <Button size="sm" onClick={onApprove} disabled={isApproving}>
-              {isApproving ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              Aprobar
-            </Button>
-            <Button size="sm" variant="outline" onClick={onPreview}>
-              <Eye className="mr-1.5 h-3.5 w-3.5" />
-              Ver
-            </Button>
-            <Button size="sm" variant="outline" onClick={onSchedule}>
-              <Calendar className="mr-1.5 h-3.5 w-3.5" />
-              Agendar
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => onCopy(fullCopy, proposal.id)}
-            >
-              {copiedId === proposal.id ? (
-                <Check className="mr-1.5 h-3.5 w-3.5" />
-              ) : (
-                <Copy className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              Copiar
-            </Button>
-            <Button size="sm" variant="ghost" onClick={onReject}>
-              <XCircle className="mr-1.5 h-3.5 w-3.5 text-destructive" />
-              Rechazar
-            </Button>
-          </div>
-        </div>
+      <CardContent className="flex flex-col items-center py-12">
+        <Icon className="mb-3 h-8 w-8 text-muted-foreground/50" />
+        <p className="text-sm text-muted-foreground">{text}</p>
+        {sub && <p className="mt-1 text-xs text-muted-foreground/70">{sub}</p>}
       </CardContent>
     </Card>
   );
 }
 
-function ProposalRow({
+function ProposalListItem({
   proposal,
+  onOpen,
   onCopy,
-  copiedId,
-  onCancel,
-  isCanceling,
+  copied,
 }: {
-  proposal: any;
-  onCopy: (text: string, id: string) => void;
-  copiedId: string | null;
-  onCancel?: () => void;
-  isCanceling?: boolean;
+  proposal: ProposalDetail;
+  onOpen: () => void;
+  onCopy: () => void;
+  copied: boolean;
 }) {
-  const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
-    pending: { label: "Pendiente", variant: "secondary" },
-    approved: { label: "Aprobada", variant: "default" },
-    rejected: { label: "Rechazada", variant: "destructive" },
-    scheduled: { label: "Programada", variant: "outline" },
-    published: { label: "Publicada", variant: "default" },
-  };
-
-  const status = statusConfig[proposal.status] || statusConfig.pending;
-  const fullCopy = `${proposal.hook || ""}\n\n${proposal.body || ""}\n\n${proposal.cta || ""}`;
+  const status = STATUS_META[proposal.status || "pending"] || STATUS_META.pending;
 
   return (
-    <Card>
-      <CardContent className="flex items-center justify-between p-4">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium truncate">
-              {proposal.hook || proposal.title || "Sin título"}
-            </p>
-            <Badge variant={status.variant} className="text-[10px]">
-              {status.label}
-            </Badge>
+    <Card className="transition-colors hover:bg-muted/40">
+      <CardContent className="flex items-start justify-between gap-3 p-4">
+        <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
+          <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+            <PipelineBadge format={proposal.format} />
             <Badge variant="outline" className="text-[10px]">
               {proposal.format || "post"}
             </Badge>
+            <Badge variant={status.variant} className="text-[10px]">
+              {status.label}
+            </Badge>
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground truncate">
-            {proposal.body?.slice(0, 120)}...
+          <p className="truncate text-sm font-semibold">{proposal.hook || proposal.title || "Sin título"}</p>
+          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{proposal.body}</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {proposal.scheduled_at
+              ? `Programada: ${new Date(proposal.scheduled_at).toLocaleDateString("es-AR")}`
+              : proposal.created_at
+              ? `Creada: ${new Date(proposal.created_at).toLocaleDateString("es-AR")}`
+              : null}
           </p>
-          {proposal.status === "published" && (
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Ya publicada{proposal.zernio_post_id ? ` (Zernio: ${proposal.zernio_post_id})` : ""} — para
-              corregirla o bajarla, correr manualmente el workflow "Manage Post" en GitHub Actions.
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5 ml-4">
-          {proposal.scheduled_at && (
-            <span className="text-xs text-muted-foreground">
-              {new Date(proposal.scheduled_at).toLocaleDateString("es-AR")}
-            </span>
-          )}
-          {onCancel && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-destructive"
-              onClick={onCancel}
-              disabled={isCanceling}
-            >
-              {isCanceling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancelar"}
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => onCopy(fullCopy, proposal.id)}
-          >
-            {copiedId === proposal.id ? (
-              <Check className="h-4 w-4 text-green-500" />
-            ) : (
-              <Copy className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
+        </button>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onCopy}>
+          {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+        </Button>
       </CardContent>
     </Card>
+  );
+}
+
+// ═══════════════════════════════════════
+// PLANTILLAS — solo estructura (listar/crear/editar), sin motor de render
+// (ver migración 010_templates.sql). Se conecta a futuro con
+// templates/post-template.html y templates/story-template.html.
+// ═══════════════════════════════════════
+
+interface TemplateRecord {
+  id: string;
+  name: string;
+  format: string;
+  notes: string | null;
+}
+
+function TemplatesSection() {
+  const { data: templates, isLoading } = useTemplates();
+  const createMutation = useCreateTemplate();
+  const updateMutation = useUpdateTemplate();
+  const deleteMutation = useDeleteTemplate();
+
+  const [editing, setEditing] = useState<TemplateRecord | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<TemplateRecord | null>(null);
+  const [form, setForm] = useState({ name: "", format: "post", notes: "" });
+
+  const openCreate = () => {
+    setForm({ name: "", format: "post", notes: "" });
+    setEditing(null);
+    setIsCreating(true);
+  };
+
+  const openEdit = (t: TemplateRecord) => {
+    setForm({ name: t.name, format: t.format, notes: t.notes || "" });
+    setEditing(t);
+    setIsCreating(true);
+  };
+
+  const handleSave = () => {
+    if (!form.name.trim()) return;
+    if (editing) {
+      updateMutation.mutate(
+        { id: editing.id, fields: form },
+        {
+          onSuccess: () => {
+            setIsCreating(false);
+            toast({ title: "Plantilla actualizada" });
+          },
+          onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+        }
+      );
+    } else {
+      createMutation.mutate(form, {
+        onSuccess: () => {
+          setIsCreating(false);
+          toast({ title: "Plantilla creada" });
+        },
+        onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+      });
+    }
+  };
+
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+    deleteMutation.mutate(deleteTarget.id, {
+      onSuccess: () => {
+        setDeleteTarget(null);
+        toast({ title: "Plantilla borrada" });
+      },
+      onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          Estructura de plantillas reutilizables — todavía sin motor de render (eso viene después). Real, no de
+          mentira: se guardan en Supabase.
+        </p>
+        <Button size="sm" onClick={openCreate}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          Nueva plantilla
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex h-32 items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : !templates || templates.length === 0 ? (
+        <EmptyState icon={LayoutTemplate} text="Sin plantillas todavía." sub="Creá la primera con el botón de arriba." />
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {templates.map((t: TemplateRecord) => (
+            <Card key={t.id}>
+              <CardContent className="flex items-start justify-between gap-3 p-4">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-center gap-1.5">
+                    <Badge variant="outline" className="text-[10px]">
+                      {t.format}
+                    </Badge>
+                  </div>
+                  <p className="truncate text-sm font-semibold">{t.name}</p>
+                  {t.notes && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{t.notes}</p>}
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(t)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive"
+                    onClick={() => setDeleteTarget(t)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={isCreating} onOpenChange={setIsCreating}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editing ? "Editar plantilla" : "Nueva plantilla"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Nombre</Label>
+              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Formato</Label>
+              <Select value={form.format} onValueChange={(v) => setForm((f) => ({ ...f, format: v }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TEMPLATE_FORMATS.map((f) => (
+                    <SelectItem key={f.value} value={f.value}>
+                      {f.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notas</Label>
+              <Textarea
+                rows={3}
+                placeholder="Dirección visual, cuándo usarla, etc."
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsCreating(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={!form.name.trim() || createMutation.isPending || updateMutation.isPending}
+              >
+                {(createMutation.isPending || updateMutation.isPending) && (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                )}
+                {editing ? "Guardar" : "Crear"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="¿Borrar esta plantilla?"
+        description="No se puede deshacer."
+        confirmText="Borrar"
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
+    </div>
   );
 }

@@ -909,14 +909,16 @@ function DashboardContent() {
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13.5px] font-semibold">
-                      {m.proposals?.hook || m.proposals?.title || "Post sin título"}
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate text-[13.5px] font-semibold">
+                        {m.proposals?.hook || m.proposals?.title || "Post sin título"}
+                      </p>
                       {m.isTest && (
-                        <Badge variant="outline" className="ml-1.5 border-[#F7CC13] text-[#c9a30d]">
+                        <Badge variant="outline" className="flex-shrink-0 border-[#F7CC13] text-[#c9a30d]">
                           PRUEBA
                         </Badge>
                       )}
-                    </p>
+                    </div>
                     <p className="text-[11.5px] text-muted-foreground">
                       {m.proposals?.format || "post"} · alcance {fmt(m.reach ?? 0)}
                     </p>

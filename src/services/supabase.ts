@@ -137,6 +137,44 @@ export const proposalsApi = {
       .select("*, dialogue_sessions(topic)")
       .eq("status", "pending")
       .order("created_at", { ascending: false }),
+
+  // Modal de detalle (rediseño 2026-08-07) — acciones reales, solo válidas
+  // mientras la pieza no esté published (se valida también en la UI, esto
+  // es la capa de datos).
+  edit: (
+    id: string,
+    fields: Partial<{ title: string; hook: string; body: string; cta: string; hashtags: string[] }>
+  ) => supabase.from("proposals").update(fields).eq("id", id),
+
+  remove: (id: string) => supabase.from("proposals").delete().eq("id", id),
+
+  reschedule: (id: string, date: string) =>
+    supabase.from("proposals").update({ scheduled_at: date }).eq("id", id),
+
+  // Valores reales que produce el pipeline (post | carrusel | historia) —
+  // no reel/story (legacy del CHECK constraint, sin caller real) ni video
+  // (ni siquiera permitido por proposals_format_check).
+  convertFormat: (id: string, format: string) =>
+    supabase.from("proposals").update({ format }).eq("id", id),
+};
+
+// ═══════════════════════════════════════
+// PLANTILLAS (estructura, sin motor de render — ver migración 010)
+// ═══════════════════════════════════════
+
+export const templatesApi = {
+  list: () => supabase.from("templates").select("*").order("created_at", { ascending: false }),
+
+  create: (fields: { name: string; format: string; notes?: string }) =>
+    supabase.from("templates").insert(fields).select().single(),
+
+  update: (id: string, fields: Partial<{ name: string; format: string; notes: string }>) =>
+    supabase
+      .from("templates")
+      .update({ ...fields, updated_at: new Date().toISOString() })
+      .eq("id", id),
+
+  remove: (id: string) => supabase.from("templates").delete().eq("id", id),
 };
 
 // ═══════════════════════════════════════
