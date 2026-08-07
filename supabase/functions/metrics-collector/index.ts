@@ -54,6 +54,7 @@ interface ZernioMetrics {
   saves: number;
   reach: number;
   impressions: number;
+  clicks: number;
 }
 
 const ZERNIO_ANALYTICS_URL = "https://zernio.com/api/v1/analytics";
@@ -93,6 +94,7 @@ async function getPostAnalytics(postId: string, apiKey: string): Promise<ZernioM
     saves: a.saves ?? 0,
     reach: a.reach ?? 0,
     impressions: a.impressions ?? 0,
+    clicks: a.clicks ?? 0,
   };
 }
 
