@@ -67,9 +67,17 @@ function PropuestasContent() {
   const { data: allProposals, isLoading } = useProposals();
   const { data: pendingProposals } = usePendingProposals();
 
-  const [selectedProposal, setSelectedProposal] = useState<ProposalDetail | null>(null);
+  // Se guarda el id, no el objeto — así el modal siempre muestra el estado
+  // real después de aprobar/reprogramar/convertir sin cerrarlo (antes
+  // quedaba mostrando el snapshot viejo de cuando se abrió, aunque la
+  // mutación ya hubiera pegado en Supabase).
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [formatFilter, setFormatFilter] = useState<string>("all");
+
+  const selectedProposal: ProposalDetail | null = selectedProposalId
+    ? (allProposals || []).find((p: ProposalDetail) => p.id === selectedProposalId) ?? null
+    : null;
 
   const handleCopy = (proposal: ProposalDetail) => {
     const text = [proposal.hook, "", proposal.body, "", proposal.cta, "", ...(proposal.hashtags || [])]
@@ -159,7 +167,7 @@ function PropuestasContent() {
                 <ProposalListItem
                   key={p.id}
                   proposal={p}
-                  onOpen={() => setSelectedProposal(p)}
+                  onOpen={() => setSelectedProposalId(p.id)}
                   onCopy={() => handleCopy(p)}
                   copied={copiedId === p.id}
                 />
@@ -177,7 +185,7 @@ function PropuestasContent() {
                 <ProposalListItem
                   key={p.id}
                   proposal={p}
-                  onOpen={() => setSelectedProposal(p)}
+                  onOpen={() => setSelectedProposalId(p.id)}
                   onCopy={() => handleCopy(p)}
                   copied={copiedId === p.id}
                 />
@@ -199,7 +207,7 @@ function PropuestasContent() {
                 <ProposalListItem
                   key={p.id}
                   proposal={p}
-                  onOpen={() => setSelectedProposal(p)}
+                  onOpen={() => setSelectedProposalId(p.id)}
                   onCopy={() => handleCopy(p)}
                   copied={copiedId === p.id}
                 />
@@ -224,7 +232,7 @@ function PropuestasContent() {
                 <ProposalListItem
                   key={p.id}
                   proposal={p}
-                  onOpen={() => setSelectedProposal(p)}
+                  onOpen={() => setSelectedProposalId(p.id)}
                   onCopy={() => handleCopy(p)}
                   copied={copiedId === p.id}
                 />
@@ -241,7 +249,7 @@ function PropuestasContent() {
       <ProposalDetailDialog
         proposal={selectedProposal}
         open={!!selectedProposal}
-        onOpenChange={(open) => !open && setSelectedProposal(null)}
+        onOpenChange={(open) => !open && setSelectedProposalId(null)}
       />
     </div>
   );

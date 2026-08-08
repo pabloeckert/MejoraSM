@@ -7,7 +7,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { CalendarDays, Loader2, ChevronLeft, ChevronRight, Clock, Zap, Hand } from "lucide-react";
 import { useProposals, useRescheduleProposal } from "@/hooks/useProposals";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
 import { isAutonomousFormat } from "@/components/PipelineBadge";
@@ -62,10 +61,17 @@ function CalendarioContent() {
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
-  const [selectedProposal, setSelectedProposal] = useState<ProposalDetail | null>(null);
+  // Se guarda el id, no el objeto — mismo motivo que en Propuestas.tsx: el
+  // modal tiene que reflejar el estado real después de reprogramar/aprobar/
+  // convertir sin cerrarlo, no el snapshot de cuando se abrió.
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [showTestRows, setShowTestRows] = useState(false);
   const [draggedProposal, setDraggedProposal] = useState<ProposalDetail | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+
+  const selectedProposal: ProposalDetail | null = selectedProposalId
+    ? (proposals || []).find((p: ProposalDetail) => p.id === selectedProposalId) ?? null
+    : null;
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -228,7 +234,7 @@ function CalendarioContent() {
                       onDragEnter={() => setDragOverKey(key)}
                       onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
                       onDrop={() => handleDrop(date)}
-                      onSelect={setSelectedProposal}
+                      onSelect={(p) => setSelectedProposalId(p.id)}
                       onDragStartEvent={setDraggedProposal}
                     />
                   );
@@ -255,7 +261,7 @@ function CalendarioContent() {
                         onDragEnter={() => setDragOverKey(key)}
                         onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
                         onDrop={() => handleDrop(date)}
-                        onSelect={setSelectedProposal}
+                        onSelect={(p) => setSelectedProposalId(p.id)}
                         onDragStartEvent={setDraggedProposal}
                       />
                     </div>
@@ -282,7 +288,7 @@ function CalendarioContent() {
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => setSelectedProposal(p)}
+                    onClick={() => setSelectedProposalId(p.id)}
                     className="flex w-full items-start gap-2 rounded-lg border p-3 text-left transition-colors hover:bg-muted/40"
                   >
                     <Clock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -329,7 +335,7 @@ function CalendarioContent() {
       <ProposalDetailDialog
         proposal={selectedProposal}
         open={!!selectedProposal}
-        onOpenChange={(open) => !open && setSelectedProposal(null)}
+        onOpenChange={(open) => !open && setSelectedProposalId(null)}
       />
     </div>
   );
