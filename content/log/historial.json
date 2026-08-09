@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-09T12:28:12.911Z",
+  "syncedAt": "2026-08-09T18:24:33.960Z",
   "posts": [
+    {
+      "id": "6a788479a37dccd361fdaf67",
+      "date": "2026-08-09",
+      "status": "published",
+      "content": "El feedback que señala hechos cambia conductas. El que señala personas, genera defensas. ¿Cómo das feedback en tu equipo? Contanos en los comentarios.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-09-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3959952391160006990"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a773241e90f5175d7b81678",
       "date": "2026-08-08",
