@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-10T12:43:34.061Z",
+  "syncedAt": "2026-08-10T18:42:08.395Z",
   "posts": [
+    {
+      "id": "6a79ddb6ed4903dd008025e5",
+      "date": "2026-08-10",
+      "status": "published",
+      "content": "Feedback que no genera ningún cambio no es feedback, es una formalidad. Contanos: ¿cómo das feedback en tu equipo?",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-10-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3960693772602234435"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a788479a37dccd361fdaf67",
       "date": "2026-08-09",
