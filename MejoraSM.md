@@ -1,0 +1,3792 @@
+# MejoraSM.md — Transcripción de sesión
+
+Archivo de log, no de documentación de producto (esa sigue siendo `CLAUDE.md`, única fuente de verdad). Se mantiene por dogma explícito de Pablo del 2026-08-08: cada actualización de `CLAUDE.md` va acompañada de una actualización acá con la transcripción de la conversación completa hasta ese punto, de corrido, sin etiquetar quién dice cada parte, con decisiones/hallazgos/explicaciones y el código final completo transcriptos literal. Quedan afuera los comandos de terminal, el JSON crudo de herramientas y los outputs técnicos (curl/git/SQL) — esos no se transcriben.
+
+---
+
+## Parte 1 — Rediseño de Dashboard
+
+Se pidió leer `CLAUDE.md` completo antes de tocar nada y encarar la primera de varias pantallas del rediseño de frontend: el Dashboard, la de mayor uso real. Antes de escribir una línea de UI había que hacer una auditoría de datos: el brief define quince KPIs pero no todos tienen fuente real hoy. Se pidió armar una tabla de tres columnas — KPI, si hay dato real hoy, fuente exacta — revisando la tabla `metrics` y su schema real, qué campos escribe `metrics-collector/index.ts`, y qué devuelve realmente la API de Zernio. Cada KPI debía clasificarse en tres categorías: dato real disponible hoy, calculable a partir de lo que hay, o sin fuente (requeriría otra integración) — sin inventar una fuente para llegar a quince.
+
+Se leyó el archivo `CLAUDE.md` completo (656 líneas). Se exploró la estructura del repo: `Data/brief-frontend-mejorasm.md` (el brief de rediseño con las decisiones estructurales ya tomadas), `Data/analisis-redes-mejora-continua.md` (el análisis real de redes sociales, fuente de los quince KPIs y de los insights), el schema de la tabla `metrics` en `001_initial_schema.sql`, el código de `metrics-collector/index.ts`, y `scripts/lib/zernio.mjs` para entender el desglose por plataforma.
+
+Se encontró que el mismo post se publica en Instagram y Facebook con un solo `zernio_post_id` (un array `platforms` en la llamada a Zernio), y que `GET /v1/analytics?postId=` devuelve un agregado único sin desglose por red — lo único separado por plataforma es el status de publicación y la URL, disponible en `content/log/historial.json` (vía el endpoint `GET /v1/posts` de Zernio), no en Supabase. Esto se identificó como una limitación real a comunicar en la UI, no a inventar.
+
+Se presentó la tabla de auditoría: siete KPIs con dato real disponible hoy (alcance por publicación, impresiones por publicación, engagement sobre impresión, guardados, compartidos, comentarios — clics quedó inicialmente en la categoría "sin fuente" en esta primera pasada), dos calculables (engagement sobre alcance, alcance/engagement promedio por formato), y seis sin fuente (alcance orgánico vs. pago, tasa de finalización de video, tiempo promedio de reproducción, engagement por seguidor, crecimiento neto de seguidores, tasa de finalización de historias) — cada uno con el motivo real documentado, no un placeholder.
+
+La clasificación se confirmó, con dos ajustes antes de construir la UI. El primero: el KPI de clics pasaba de categoría "sin fuente" a categoría "real", porque Zernio ya lo devuelve en su respuesta pero `metrics-collector` lo descartaba al mapear — había que agregar una columna `clicks` a la tabla `metrics` (nullable, sin default, para que las filas existentes quedaran en NULL por no haberse recolectado nunca, no en cero como si se hubiera medido y hubiera dado cero), completar el mapeo en `metrics-collector/index.ts`, aplicar la migración contra la base real con `supabase db query -f` (no inline, porque el comentario `--` de la cabecera rompe el modo inline), y verificar con un SELECT que la columna existiera. El segundo ajuste: el desglose por plataforma debía implementarse exactamente como se había propuesto — total combinado real más badges de status/URL por red por pieza, más un estado explícito de "sin desglose por red disponible en la fuente" — sin inventar un split de métricas ni esconder la limitación.
+
+Con esos dos ajustes, se pasó a construir el Dashboard: ocho KPIs reales (los siete más clics) y dos calculables, los seis sin fuente con estado explícito, filas de prueba excluidas con un toggle, insights semilla hardcodeados marcados internamente como semilla para que una futura capa de IA los pueda reemplazar o contrastar, e interactividad mínima — click en pieza abre detalle, click en KPI lleva a la sección, tooltips explicando cada métrica.
+
+Se creó la migración `009_metrics_clicks.sql` y se editó `metrics-collector/index.ts` para persistir clics. Al aplicar el deploy de la Edge Function corregida, el workflow `deploy-functions.yml` falló en el paso "Link project" con un error real del CLI de Supabase: `supabase link` pega contra `GET /v1/projects/{ref}/api-keys`, que devolvía un `inserted_at` que no matcheaba el regex ISO8601 que espera el CLI — un `SchemaError` reproducido también en local, no un problema del workflow en sí. Se confirmó que ese paso era además innecesario: cada comando `functions deploy` ya recibe `--project-ref` directo, así que nunca necesitó el link previo. Se sacó ese paso del workflow, se re-disparó manualmente, y corrió verde de punta a punta, dejando desplegada la función con el fix de clics.
+
+Se reconstruyó `Dashboard.tsx` completo: header con fecha de última sincronización real; toggle "Mostrar filas de prueba" que excluye por defecto las filas `[TEST/QA]` de `rule-engine` (identificadas por prefijo `TEST-QA-` en `post_id` o `7e57da7a-` en el id de la propuesta) y las marca visualmente si se activan; grilla de ocho tiles de KPIs reales con tooltip y click-a-detalle; tarjeta de KPIs sin fuente conectada, documentando el motivo real de cada uno; sección de resumen por red con el total combinado y los badges de status/URL reales por plataforma (traídos con un fetch directo a `raw.githubusercontent.com/.../historial.json`, degradando con gracia si falla); gráfico de engagement por post ya corregido para no mezclar filas de prueba sin aviso (bug señalado explícitamente en el brief); distribución por formato; tabla de alcance y engagement promedio por formato (el segundo KPI calculable); ranking de piezas más exitosas con miniatura real si existe imagen renderizada; y seis tarjetas de insights semilla, cada una con el título, el cuerpo, la evidencia numérica citada, y un badge "Validado con datos reales" — sin construir ahí la capa de IA que los reemplazaría a futuro. Se mantuvieron los contadores operativos existentes (documentos, diálogos, contenidos, programadas) porque eran reales y no estaban señalados como fuera de alcance.
+
+Se corrió lint, tests y build. El lint bajó de 73 a 70 errores preexistentes (el archivo nuevo tenía menos usos de `any` que el que reemplazó, pese a ser mucho más grande). Los tests se actualizaron y ampliaron (mocks de los hooks nuevos, exclusión de filas de prueba, apertura de detalle, tooltips). El build salió limpio. Se intentó verificar visualmente en el navegador local, pero la pantalla real quedó bloqueada por el login OTP, que requiere el inbox real de Pablo — límite ya documentado en sesiones anteriores. Se confirmó al menos que el servidor de desarrollo levantaba sin errores.
+
+Se hizo commit y push. El `Deploy EDA` (el workflow que efectivamente publica el sitio en GitHub Pages) corrió verde. El `ci.yml` general quedó en rojo, pero solo por el paso de lint — el mismo baseline preexistente ya documentado en `CLAUDE.md`, no empeorado por este cambio.
+
+## Parte 2 — Rediseño de Propuestas y Calendario
+
+Se pidió la siguiente pantalla del rediseño: Propuestas y Calendario juntas, porque comparten el modal de detalle de pieza — el hueco real que había quedado sin resolver en un export de Claude Design que Pablo tenía (un `actions="{{detailActions}}"` en el HTML pero `detailActions: null` en el estado, es decir, cero botones de acción). Ese archivo específico no estaba en el repo (solo existía un prototipo distinto, de una fase anterior, sobre specs de dimensiones de formato) — se tomó como contexto verbal válido de todos modos, sin necesitar el archivo.
+
+Se pidieron tres cosas. Primero, el modal de detalle, lo más importante: botones reales con acciones reales contra Supabase, no placeholders — editar título/hook/body/cta/hashtags de una propuesta todavía no publicada, borrar con confirmación, reprogramar cambiando `scheduled_at`, convertir formato entre los valores permitidos por el constraint de la base, y republicar solo si la pieza ya estaba publicada — pero antes de implementar ese último botón, había que confirmar qué implica realmente republicar en el pipeline actual (si crea una propuesta nueva, si reusa el `zernio_post_id`), y si no había un camino limpio, decirlo en vez de fabricar un botón que rompiera algo. Cada acción tenía que respetar el estado: nada se edita ni se borra sobre algo ya publicado sin aviso explícito. Segundo, la reconstrucción completa de Propuestas: simplificar las cinco acciones que tenía cada tarjeta (aprobar, ver, agendar, copiar, rechazar) a algo menos cargado ahora que el detalle vive en el modal; distinción visual clara entre los formatos con pipeline autónomo (post, carrusel) y los que requieren acción manual (historia, video), porque hoy esa distinción no se veía en ningún lado y daba la sensación de que "no sirve para nada" cuando en realidad una parte ya corría sola; y una sección de plantillas, por ahora solo la estructura de listar/crear/editar, sin motor de render todavía. Tercero, la reconstrucción completa de Calendario: click en pieza abre el mismo modal de detalle; drag and drop real que actualizara `scheduled_at` de verdad en la base, no solo visualmente; vista semanal además de la mensual; y el mismo tratamiento de filas de prueba que el Dashboard. Se aclaró explícitamente que no había que construir preview visual de las piezas en ninguna de las dos pantallas, porque todavía no existe un motor de render real para post o carrusel y sería un placeholder falso — eso se resuelve cuando se construya el motor de render.
+
+Antes de tocar código se investigó qué implica realmente republicar. El único mecanismo real es la acción "reintentar" de `manage-post.mjs`, y tiene tres problemas de fondo que la descartan como botón de un click: es por plataforma, Instagram o Facebook, nunca las dos a la vez, sin ninguna noción de "republicar la pieza" como unidad; crea un post nuevo en Zernio con un `postId` distinto al original, no reutiliza el `zernio_post_id` existente; y nunca actualiza `proposals.zernio_post_id` en Supabase después de un reintento exitoso, así que la fila queda apuntando para siempre al post viejo, lo que rompe en silencio a `metrics-collector` para esa pieza a futuro. Además, ese mecanismo corre solo por `workflow_dispatch` en GitHub Actions, exigiendo tipear literalmente `CONFIRMO` a mano — una fricción deliberada porque publica contenido real sin revisión posterior; meterlo en un botón de la app saltearía exactamente esa fricción. Con esa evidencia, se decidió no construir el botón: el modal, cuando una pieza está publicada, muestra en cambio un aviso de solo lectura que señala ese mismo workflow de GitHub Actions como el camino real para corregir o bajar algo ya publicado.
+
+Se creó la migración `010_templates.sql`, con una tabla `templates` mínima (nombre, formato, notas) restringida a los mismos tres valores de formato que produce el pipeline real (post, carrusel, historia — ni "reel"/"story", legado sin ningún caller real, ni "video", que ni siquiera está permitido por el constraint de `proposals`), con la misma política de RLS de admin que ya usa el resto de las tablas. Se aplicó contra la base real y se verificó que la tabla y la política existieran.
+
+Se amplió `proposalsApi` en `src/services/supabase.ts` con cuatro métodos nuevos — editar, borrar, reprogramar, convertir formato — y se agregó `templatesApi` con el CRUD completo de plantillas. Se agregaron los hooks correspondientes en `src/hooks/useProposals.ts`.
+
+Se construyó un badge compartido, `PipelineBadge`, en un archivo nuevo `src/components/PipelineBadge.tsx`, que distingue con ícono y color los formatos con pipeline autónomo de los manuales, reusado en ambas pantallas.
+
+Se construyó el modal de detalle compartido, `ProposalDetailDialog`, en `src/components/ProposalDetailDialog.tsx`: muestra el contenido de la pieza en modo lectura o edición; expone aprobar y rechazar cuando está pendiente o aprobada; cancelar cuando está programada; editar, copiar y borrar (con confirmación) mientras no esté publicada; una sección de agendar (si todavía no tiene fecha, pidiendo también la oferta de la que sale la foto) o reprogramar (si ya la tiene, solo la fecha); y una sección de convertir formato entre los tres valores reales, aclarando que el cambio de formato no agenda ni desagenda la pieza por su cuenta. Cuando la pieza está publicada, todo lo anterior desaparece y en su lugar aparece el aviso de solo lectura ya descripto.
+
+Se reconstruyó `Propuestas.tsx`: las tarjetas quedaron simplificadas a clickeables (con un ícono de copiar rápido aparte), cada una mostrando el badge de pipeline, el badge de formato y el badge de estado; el detalle completo vive en el modal compartido; se agregó una quinta pestaña, Plantillas, con listado real, creación y edición contra Supabase, sin motor de render.
+
+Se reconstruyó `Calendario.tsx`: se agregó un toggle de vista mensual/semanal; cada celda de día (mensual, compacta, o semanal, con más espacio) muestra las piezas de ese día con un ícono de pipeline autónomo o manual; las piezas con estado programado son arrastrables (`draggable`) y soltarlas sobre otro día llama de verdad a la reprogramación contra Supabase, preservando la hora original y solo cambiando la fecha; las piezas ya publicadas no son arrastrables, porque ya salieron; se agregó el mismo toggle de filas de prueba que el Dashboard, con el mismo criterio de exclusión por defecto y marca visual si se activan; y clickear cualquier pieza, en el calendario o en la lista de próximos siete días, abre el mismo modal compartido.
+
+Se corrió lint (bajó a 55 problemas, 45 errores, sin subir el baseline), tests (con dos archivos de test nuevos, para Propuestas y Calendario, más el ajuste de un test de integración viejo que todavía esperaba el texto "Solo lectura" del Calendario original, ya no aplicable porque el calendario ahora edita de verdad) y build, todo limpio. Se verificó de nuevo que el servidor de desarrollo levantara sin errores, con el mismo límite de no poder pasar el login OTP.
+
+Se hicieron dos commits separados, uno por pantalla, cada uno con su verificación y su `Deploy EDA` en verde.
+
+## Parte 3 — Revisión de punta a punta
+
+Se pidió analizar, revisar y probar de punta a punta el trabajo de las tres pantallas, cerrar, y dar un informe con un veredicto claro de si todo estaba bien.
+
+En la revisión de código se encontró un bug real: tanto `Propuestas.tsx` como `Calendario.tsx` guardaban la propuesta clickeada como un objeto fijo en el estado de React, en vez de derivarlo en cada render de los datos ya cacheados de la query. El efecto concreto era que, si se abría el detalle de una pieza y se apretaba aprobar, reprogramar o convertir formato sin cerrar el modal, la acción sí pegaba bien contra Supabase, pero los badges y botones visibles adentro del modal seguían mostrando el estado viejo hasta cerrarlo y volver a abrirlo — por ejemplo, el botón de aprobar seguía apareciendo después de ya haber aprobado. El arreglo fue guardar solo el id de la pieza seleccionada en el estado y resolverlo en cada render contra los datos frescos de la query — como cualquier mutación ya invalidaba esa query, el modal terminaba actualizándose solo. De paso se sacó un import sin usar que había quedado en `Calendario.tsx`.
+
+Se corrió lint, test y build de nuevo, todos limpios, con el conteo de errores de lint en el mismo nivel que antes del fix. Se hizo commit y push del arreglo, y se confirmó el `Deploy EDA` en verde. Se revisó además el panorama completo de corridas recientes de GitHub Actions: el patrón se repitió en los cuatro commits de la sesión — `Deploy EDA` siempre verde, `ci.yml` siempre rojo solo por el mismo baseline de lint preexistente y ya documentado, nunca por tests ni por build. Se verificó también, contra el sitio real ya desplegado en producción y no contra el entorno local, que la página cargaba bien, sin ningún recurso con error 404 y sirviendo el build más reciente — el único mensaje de consola encontrado fue un warning inofensivo y preexistente sobre una etiqueta `meta` de `X-Frame-Options` en `index.html`, un archivo nunca tocado en esta sesión.
+
+## Parte 4 — Dos preguntas de seguimiento y el pedido de transcripción
+
+Se preguntó qué había pasado con seis bugs específicos del Dashboard que se decían ya reportados — asteriscos crudos en los títulos, un modal vacío, un footer "EDA v1.0 — MejoraOK", un porcentaje de engagement en cero a verificar contra la base, un error en rojo de `historial.json` en la sección de resumen por red, y la pantalla de Configuración mostrando desplegables de Groq que el código ya ignora — pidiendo confirmar el estado real de cada uno sin rehacer los que ya estuvieran resueltos.
+
+La respuesta fue que no había ningún registro de haber recibido esa lista en la conversación real — se la buscó de punta a punta y no aparecía en ningún mensaje anterior. Se señaló que esto es exactamente el caso que la propia documentación del proyecto ya contempla: cualquier insumo de otra sesión o de otro chat en paralelo solo se incorpora cuando se trae de forma expresa a esta conversación, y hasta entonces no aplica. En vez de inventar una respuesta, se verificó de forma independiente lo que sí se pudo comprobar contra el código real: el footer "EDA v1.0 — MejoraOK" seguía existiendo tal cual, en un archivo de layout nunca tocado en ninguno de los commits de esta sesión; la pantalla de Configuración seguía mostrando los desplegables de proveedor y modelo por agente pese a que el código ya no los usa para elegir el modelo, un gap que la propia documentación del proyecto ya registraba desde una sesión anterior, también en un archivo nunca tocado acá; y el aviso en rojo sobre el desglose por red era, en efecto, código propio de esta sesión — se probó el fetch exacto que usa ese aviso contra la URL real y devolvió una respuesta correcta con las cabeceras de acceso cruzado necesarias, así que si ese aviso realmente apareció en pantalla, no fue por un problema de red o de permisos de origen cruzado tal como está el código hoy, y haría falta el texto exacto o una captura para poder reproducirlo. Sobre los otros tres puntos —los asteriscos crudos, el modal vacío, y a qué pieza específica se refería el engagement en cero— no había manera honesta de confirmar ni descartar nada sin el reporte original.
+
+Sobre el botón de republicar, se confirmó con una búsqueda completa sobre el código fuente que no existe ningún rastro de esa palabra ni de esa funcionalidad en ningún archivo — el modal no tiene, hoy, ningún botón de republicar. Se reiteraron los mismos tres motivos ya investigados al construir el modal: es una acción por plataforma, nunca por la pieza completa; crea un post nuevo en vez de reutilizar el existente; y nunca deja sincronizado el identificador real en la base después de usarse, además de estar deliberadamente protegida detrás de una confirmación manual fuera de la aplicación.
+
+Se pidió entonces, primero como pedido puntual y después reformulado como una orden permanente — dogma — que cada vez que se actualice el archivo de documentación del proyecto se actualice en paralelo un archivo de transcripción con el nombre del proyecto, conteniendo toda la conversación transcripta de corrido, sin indicar quién dice cada parte en cada momento, incluyendo el contenido íntegro de cualquier documento abierto durante la sesión y el código final completo de lo entregado, todo transcripto en texto plano — excluyendo explícitamente los comandos de terminal, las respuestas crudas en formato JSON de las herramientas, y los resultados técnicos de comandos como curl, git o consultas SQL, que no debían transcribirse. Este mismo archivo es la respuesta a ese pedido, y la nota correspondiente quedó agregada al archivo de documentación del proyecto para que la práctica se sostenga de ahí en adelante.
+
+---
+
+## Anexo A — Brief definitivo de rediseño (`Data/brief-frontend-mejorasm.md`, texto completo)
+
+# Brief definitivo — Rediseño UX/UI de MejoraSM
+
+Generado a partir de la auditoría interactiva + ronda de preguntas cruzadas para resolver contradicciones. Este documento reemplaza al prompt corto generado automáticamente por el artifact — incorpora las 3 decisiones estructurales que la auditoría por sí sola no podía resolver.
+
+### Contexto
+
+El backend de MejoraSM ya está blindado y probado con evidencia real: Login OTP, Bóveda+RAG (19 docs, 53 chunks), `orchestrator` con Anthropic, autoagendado real (un carrusel ya se publicó solo en Instagram/Facebook), `metrics-collector` vía Zernio. Esta etapa es exclusivamente frontend — rediseño de UX/UI sobre ese motor ya funcional. **No tocar backend/orchestrator**, salvo el punto de ruteo de IA en Configuración (ver más abajo), que es lógica, no diseño.
+
+### Criterio de marca (aplica a todo)
+
+Skill `mejora-continua-brand` sin excepciones: paleta azul (#1A3D84) primario / rojo (#E1061E) y amarillo (#F7CC13) como acento puntual, nunca fondo dominante / blanco siempre de base. Tipografía Bw Modelica (Medium títulos, Regular cuerpo) con League Spartan como heading de apoyo. Isotipo trazo a mano — nunca geometrizado, nunca separado del wordmark para recomponerlo.
+
+### Criterio de producto (aplica a todo)
+
+- **Referencia de "wow":** identidad propia de Mejora Continua — no clonar Notion/Linear ni un dashboard de analytics genérico.
+- **Usuarios:** uso individual, solo Pablo (no diseñar para equipo por ahora).
+- **Dispositivo:** tiene que andar igual de bien en desktop y en mobile, no es "mobile-first con desktop de agregado" ni al revés.
+- **Pantalla de mayor uso real:** Dashboard — es donde más se justifica invertir el mayor cuidado de diseño.
+
+### Decisiones estructurales (resueltas en conversación, no asumidas)
+
+1. **Mesa de Diálogo y Laboratorio se fusionan en una sola herramienta.** Pablo describió el mismo propósito para las dos ("cuando tengo una idea puntual o me piden comunicar algo, ayudame a prepararlo y mostrame cómo va a quedar antes de decidir si vale la pena"). Sugerencia de nombre: mantener "Mesa de Diálogo" y absorber ahí la función de brief puntual de Laboratorio, discontinuando Laboratorio como pantalla separada — nombre es sugerencia, cambiable.
+2. **Propuestas está mal diseñada de punta a punta**, no es solo un problema de falta de preview — confirmado explícitamente. Tratar como reconstrucción completa, no como "agregar una vista previa arriba de lo que ya hay".
+3. **El motor de insights de IA para el Dashboard va incluido en este mismo prompt**, no en una fase separada — Pablo lo pidió explícitamente junto, no después.
+
+### 1. Dashboard (máxima prioridad — es la pantalla de uso diario)
+
+Reconstrucción completa. Tiene que ser una síntesis real de lo que pasa en Instagram y Facebook, no solo 4 números sueltos. Alcance pedido explícitamente:
+
+- Resumen de actividad real de ambas redes, con capturas/miniaturas de lo publicado y de lo que está por publicarse.
+- Ranking de piezas y tipos de contenido más exitosos.
+- Motor de insights con IA, no solo gráficos: análisis y recomendaciones basadas en cómo responde el público real de Pablo, aprendizaje sobre el público objetivo y buyer personas, mejores prácticas de redes sociales, tips y guías activas — no un reporte estático, algo que se pueda discutir.
+- Todo interactivo: click en cualquier elemento lleva al detalle o a la sección correspondiente; tooltips al pasar el mouse explicando qué es cada cosa.
+- Botón para generar un informe estilo infografía a partir de lo que se está viendo, con capacidad de parametrizar qué datos incluir.
+- Bug a arreglar de paso: el gráfico de engagement mezcla hoy datos reales con las 10 filas de prueba [TEST/QA] de rule-engine, sin distinguirlas visualmente. Limpiar de la fuente de datos o marcarlas como prueba, no ambas cosas mezcladas sin aviso.
+- Números separados por red (Instagram / Facebook) + un total combinado — no solo el agregado.
+
+Los KPIs confirmados, de análisis real cruzando Meta Business Suite, IconSquare y base interna, no inventados: alcance por publicación, impresiones, alcance orgánico vs. pago, engagement sobre alcance, engagement sobre impresión, guardados, compartidos, comentarios, clics al enlace, tasa de finalización de video, tiempo promedio de reproducción, engagement por seguidor, crecimiento neto de seguidores, alcance/engagement promedio por formato, tasa de finalización de historias.
+
+Los insights ya confirmados con datos reales, que el motor de IA arranca con esta base y no de cero: Facebook e Instagram van al mismo nivel de detalle en el Dashboard, porque el bajo rendimiento de Facebook es por falta de trabajo puesto ahí, no por el canal en sí, y con el sistema funcionando se espera que se mueva (roadmap futuro, fuera de este brief: sumar LinkedIn y TikTok si esto funciona). Reel gana en alcance pero pierde en retención: mejor reach medio (461) y mejor ER medio (3.26%) de los tres formatos, pero tiempo promedio de reproducción de solo ~6.9 segundos y casi nadie lo termina (0.81 full views promedio) — el motor de insights tiene que poder señalar esto como alerta, no solo mostrar el número de reach. El post estático o carousel con gancho directo en primera persona sobre liderazgo o decisiones da los ER más altos del período (ej. 27.9% y 22%), el mejor conversor de audiencia ya instalada, aunque llegue a menos gente nueva que el reel. Testimonios con nombre y apellido más series "Parte 1/2/3" concentran los saves y shares más altos del año, la señal de intención más fuerte en una cuenta B2B. Audiencia geográficamente concentrada en Posadas/Misiones (30-46% según red) más NEA y Paraguay, no dispersa a nivel nacional; base de seguidores pico en 35-44 años, pero el alcance reciente skewea a 25-34. No hay un horario único mágico: la audiencia está online de forma pareja de 11h a 23h todos los días; recomendación con datos: testear franja de mediodía (lunes a miércoles) contra tarde-noche en vez de fijarse en un solo bloque.
+
+### 2. Manual de Identidad de Marca (rename de "Bóveda")
+
+El nombre "Bóveda" queda descartado — se llama Manual de Identidad de Marca. Es la médula del sistema, no un simple listado de archivos: permitir subir un .zip completo con toda la información de marca de una vez, no solo archivo por archivo; el sistema tiene que leer, clasificar y guardar automáticamente el contenido del zip (mismo pipeline de embeddings que ya existe, pero con clasificación de tipo de documento); soportar carga de documentos específicos cuando la identidad evoluciona, cada uno clasificado, no solo apilado en una lista plana; mantener ver contenido sin tener que descargar el archivo y organización por categoría.
+
+### 3. Mesa de Diálogo (fusión con Laboratorio)
+
+Una sola herramienta con dos entradas posibles al mismo flujo: modo libre, donde el sistema propone un tema, y modo dirigido, donde Pablo tiene una idea puntual o le pidieron comunicar algo específico, la escribe y el sistema la desarrolla. En los dos casos, el resultado tiene que incluir preview visual real de cómo quedaría la pieza, no solo texto, usando el spec de formatos ya definido en `docs/prototipo-studio-v0.1/` como restricción de diseño; y sugerencia de cuándo conviene publicarlo y una valoración de si vale la pena la pieza antes de mandarla a Propuestas. Bug a arreglar de paso: encoding roto en tildes/ñ en los títulos de sesión, mismatch de UTF-8 entre generación y guardado/render.
+
+### 4. Propuestas — reconstrucción completa
+
+Confirmado: mal diseñada de punta a punta, no es un ajuste. El motor de fondo sí funciona (el autoagendado real ya publicó un carrusel en producción); el problema es exclusivamente de diseño/UX, no hay que tocar la lógica de publicación. Preview visual real de cada pieza, no lista de texto; simplificar las cinco acciones actuales a algo menos cargado visualmente; sección nueva para crear y gestionar plantillas o diseños de muestra reutilizables; dejar claro en la propia interfaz qué formatos tienen pipeline autónomo (post, carrusel) y cuáles requieren acción manual (historia, video) — hoy esa distinción no se ve, genera la sensación de que "no sirve para nada" cuando en realidad una parte ya corre sola.
+
+### 5. Calendario — reconstrucción completa
+
+Hoy es de solo lectura y sin ninguna interactividad real. Necesita: click en una pieza para ver el detalle completo, no solo el título; editar, borrar, republicar o convertir de formato directo desde ahí; drag and drop para mover fechas; preview visual de cada pieza en el propio calendario, no solo texto; información en tiempo real, no una vista estática; vista semanal además de la mensual actual.
+
+### 6. Configuración — ruteo de IA automático
+
+No es solo una pantalla de elegir modelo por agente a mano. Pablo quiere que Anthropic actúe como orquestador de criterio: qué modelo, qué skill y cuándo usar cada una, aplicando el mismo criterio que ya rige el resto del proyecto. Traducción técnica: `orchestrator` debe aplicar las reglas de `/optimo-de-uso` como lógica de ruteo automático entre modelos y proveedores, en vez de depender de que Pablo configure cada agente a mano. La pantalla de Configuración pasa a ser de supervisión, ver qué decidió el sistema y por qué, más que de asignación manual. Decisión ya tomada: Estratega y Creativo pasan a usar Anthropic por default, no Groq, consistente con que la única corrida real publicada usó Anthropic.
+
+### Fuera de alcance de este brief
+
+No tocar `orchestrator`, `publish-scheduled-posts`, `metrics-collector` ni ningún Edge Function existente, salvo la lógica de ruteo de modelo descrita en el punto 6. No es necesario diseñar para más de un usuario. La lista larga de KPIs específicos de Pablo queda pendiente de que él la reenvíe, no inventarla.
+
+### Siguiente paso
+
+Con este brief, arrancar en Claude Design una maqueta por pantalla, empezando por Dashboard y siguiendo por Propuestas y Calendario, los dos con veredicto más negativo. Mesa de Diálogo y Manual de Identidad de Marca después. Configuración es mayormente trabajo de Claude Code, no de maqueta visual, puede ir en paralelo.
+
+---
+
+## Anexo B — Análisis de redes sociales (`Data/analisis-redes-mejora-continua.md`, texto completo)
+
+# Análisis de redes sociales — Mejora Continua (Instagram + Facebook)
+
+Cuenta: mejoraok / Mejora Continua, consultora B2B de claridad estratégica, Posadas, Misiones. Documento generado en agosto de 2026 a partir de tres exports crudos combinados.
+
+### Fuentes usadas
+
+Un CSV de Meta Business Suite con rendimiento por publicación (289 publicaciones entre Instagram y Facebook, post a post, con alcance, impresiones, engagement y video, ventana del 26 de enero de 2025 al 3 de febrero de 2026). Un export interno de IconSquare con métricas ya estructuradas por post de Instagram (likes, saves, shares, reach, reach rate, engagement on reach, ventana corta del 13 de abril al 4 de mayo de 2026, usada para cruzar y confirmar, no como base principal). Un CSV de audiencia y demografía de Meta, tanto nativo de Facebook como de IconSquare para Instagram, cruzando ambas plataformas. Como complementarios: series diarias a nivel cuenta de Instagram Business Profiles y Facebook Pages en el mismo rango que la fuente principal, y los exports nativos de Meta Business Suite en UTF-16 de la cuenta de Facebook para confirmar actividad reciente.
+
+Nota de calidad de datos: dos de los CSV de público mostraban un panel prácticamente 100% Argentina con ciudades tipo Capital Federal, Córdoba y Rosario, y afinidad con páginas masivas no relacionadas con la marca — no coincidía con ninguna otra fuente ni con el foco geográfico real de la cuenta, así que se descartó para las conclusiones de audiencia por parecer un panel de intereses genérico de Meta.
+
+### KPIs para el dashboard
+
+Ordenados por relevancia para una consultora B2B, donde el objetivo no es venta directa desde el post sino generar autoridad, confianza y conversación con potenciales clientes: alcance por publicación (base de todo, cuánta gente única vio el contenido); impresiones por publicación (frecuencia de exposición, distinto de alcance único); alcance orgánico vs. pago (separa lo que funciona por contenido de lo que funciona por presupuesto); tasa de engagement sobre alcance (más representativa que sobre impresión para medir si el que vio, reaccionó); tasa de engagement sobre impresión (métrica estándar de la plataforma); guardados (en B2B es la señal más fuerte de intención real, más que el like); compartidos (validación social activa); comentarios (proxy de conversación, más valioso que el like en una cuenta de servicios); clics al enlace (la métrica más cercana a intención de conversión en un negocio de servicios); tasa de finalización de video (si el mensaje se termina de consumir, no solo si arrancó); tiempo promedio de reproducción (calidad del gancho inicial); engagement por seguidor (detecta si el crecimiento es vanidad o audiencia activa); crecimiento neto de seguidores (tendencia real de la comunidad); alcance y engagement promedio por formato (para decidir el mix con evidencia, no con intuición); tasa de finalización de historias (mide retención de comunidad activa, no alcance nuevo).
+
+### Qué contenido rindió mejor en los últimos 60 a 90 días
+
+Instagram y Facebook no son una decisión pareja. En los últimos 90 días sin stories, Instagram tuvo un ER medio de 6.44% y un alcance medio de 294, contra un ER medio de 0.19% y un alcance medio de 33 en Facebook. En todo el año, con una muestra más grande, Instagram tuvo un ER medio de 2.44% y alcance medio de 401, contra 1.28% y 39 en Facebook. En el export más reciente de la página de Facebook, con una ventana de treinta días entre julio y agosto de 2026, hubo cero visitas, cero interacciones y cero clics en enlace en prácticamente todos los días — no es una racha mala, es una página sin pulso.
+
+Sobre formato, con la muestra grande del año completo en Instagram sin stories: el video o reel, con 44 casos, tuvo un ER medio de 3.26%, ER mediana de 1.81%, reach medio de 461, engagements medio de 14.9 y saves medio de 0.43. El carousel, con 22 casos, tuvo ER medio de 2.15%, mediana de 0.92%, reach medio de 445, engagements medio de 13.2 y saves medio de 0.50. La foto, con 32 casos, tuvo ER medio de 1.51%, mediana de 0.68%, reach medio de 288, engagements medio de 9.4 y saves medio de 0.31. El reel es el formato más sólido en la muestra grande, aunque en la ventana corta de 90 días el carousel pareciera ganar, mostrando solo dos posteos, insuficiente para sacar una conclusión de formato, aunque sí confirma que un carousel bien escrito puede picar más alto que cualquier reel puntual.
+
+El problema del reel es que entra pero no se termina de ver: el tiempo promedio de reproducción es de apenas 6.9 segundos, y el promedio de full video views por posteo es de 0.81 — básicamente nadie lo termina. El reel funciona como generador de alcance, no como vehículo del mensaje completo.
+
+Lo que más picó, con datos concretos, en los últimos 90 días sin stories, por engagement rate: un reel titulado "En serio... hacer TEAM es trampa???" con ER de 51.5%, reach de 31 y 17 engagements, el 28 de noviembre. Un post/carousel titulado "WhatsApp no es decoración. Si vas a estar, respondé." con ER de 27.9%, reach de 30 y 17 engagements, el 3 de febrero. Un post/foto titulado "Equivocarse no te resta liderazgo. Negarse a aprender, sí." con ER de 22.0%, reach de 148 y 70 engagements, el 22 de diciembre. Un reel recap de "12 especialistas asociados... 2025" con ER de 12.4%, reach de 146 y 27 engagements, el 26 de enero. Por alcance, en la misma ventana: un reel titulado "Familia, desarrollo, profesionalización... la fórmula del éxito" con reach de 1372, 87 engagements y ER de 3.97%, el 2 de diciembre; un reel invitación a un evento en vivo con reach de 1000 y ER de 0.75%, el 6 de noviembre; y un reel con reach de 721, el 15 de diciembre.
+
+Los patrones de tema que se repiten en lo que mejor anda: liderazgo con gancho en primera persona o confrontativo, con los ER más altos del período, en formato estático o carousel, no reel; contenido de evento en vivo, que genera los picos de alcance más grandes aunque el ER sea bajo; series "Parte 1/Parte 2/Parte 3", como la serie sobre negociación, que sostuvo un reach de 520, 436 y 237 en publicaciones consecutivas, señal de audiencia que vuelve a buscar la continuación; y testimonios con nombre y apellido, que no son los de mayor reach pero concentran los saves y shares más altos de todo el año, la señal de intención más fuerte en B2B. Esto coincide con el export nativo de Meta para Facebook, donde las interacciones por formato dan 56 para reels, 40 para historias, 14 para varias fotos y 14 para foto, el mismo orden que se ve en el análisis de rendimiento por publicación.
+
+Sobre horario y día: el análisis de 90 días marca el bloque de las 18 horas como el más consistente, con siete casos y ER medio de 12.8%; por día, martes y lunes son los más robustos. El heatmap más reciente de IconSquare, de abril y mayo de 2026, marca un pico en miércoles a las 13 horas, con picos secundarios lunes temprano y a mediodía, y martes a las 19 horas. Cuándo está la audiencia efectivamente online, independiente del historial de posteos, muestra una meseta amplia de 11 a 23 horas todos los días, con un pico puntual el lunes a las 21 horas. La cadencia real de publicación ya se concentra de lunes a jueves, coincidiendo con los días de mejor rendimiento.
+
+### Perfil de audiencia real
+
+Cruzando demografía nativa de Facebook con demografía de Instagram de IconSquare: la base de seguidores en ambas plataformas tiene su pico claro en 35 a 44 años, con mujeres levemente por encima de hombres en casi todos los tramos. La gente alcanzada recientemente en Instagram, no solo los seguidores ya instalados, skewea un poco más joven, con 25 a 34 años como el grupo de mayor alcance actual, casi empatado con 35 a 44 — el contenido reciente está entrando a una audiencia algo más joven que la base histórica.
+
+Sobre geografía, coincidiendo ambas fuentes: Argentina entre 57.6% y 61.2%, Paraguay entre 19.7% y 20.2%, México alrededor de 10.4% a 11%, Perú alrededor de 4.5% a 4.7%, España alrededor de 1.3%. La ciudad top es Posadas, Misiones, con 30.9% en Facebook y 45.7% en Instagram; la segunda es Encarnación, Paraguay. El resto del top diez de ciudades es NEA argentino y Paraguay — la cuenta tiene una audiencia geográficamente concentrada en la región, no dispersa a nivel nacional.
+
+### Recomendaciones concretas
+
+Cortar Facebook como canal activo de estrategia y dejarlo solo en cross-post automático, dado el ER del año de 1.28% contra 2.44% de Instagram, reach de 39 contra 401, y una ventana reciente con cero actividad casi todos los días. Seguir apostando a reels para alcance, pero acortarlos y reforzar el gancho de los primeros segundos, porque el problema no es el alcance sino la retención. Repetir el formato de testimonio con nombre y apellido y las series multi-parte, porque son los que más guardan y comparten en todo el año, la señal de intención más fuerte que hay en una cuenta B2B. No abandonar el post estático o carousel por perseguir solo reel, porque los picos de engagement rate más altos del período fueron post fijo o carousel, con gancho directo en primera persona sobre liderazgo o decisiones. Testear franja de mediodía entre semana, de lunes a miércoles, además de la tarde-noche, porque no hay un horario único obligado.
+
+---
+
+## Anexo C — Código final completo
+
+### `supabase/migrations/009_metrics_clicks.sql`
+
+```sql
+-- Migration: persistir clicks de Zernio Analytics en metrics
+--
+-- GET /v1/analytics de Zernio ya devuelve "clicks" en el objeto analytics
+-- (confirmado contra el spec real, ver CLAUDE.md "Métricas vía Zernio
+-- Analytics") pero supabase/functions/metrics-collector/index.ts lo
+-- descartaba al mapear la respuesta (interface ZernioMetrics no lo incluía)
+-- y metrics no tenía columna para guardarlo. Este cambio solo agrega la
+-- columna — el mapeo se corrige aparte en el código de la función.
+--
+-- Nullable, sin DEFAULT a propósito: las filas ya existentes en metrics
+-- quedan en NULL (nunca se recolectó ese dato para ellas), no en 0 (que
+-- significaría "se midió y dio cero clics").
+--
+-- Ejecutar vía `supabase db query --linked -f supabase/migrations/009_metrics_clicks.sql`
+-- (con -f, no `"$(cat ...)"` inline — el comentario -- de esta cabecera
+-- rompe el modo inline) o el SQL Editor del dashboard — NO con
+-- `supabase db push` (roto, ver CLAUDE.md "Bug conocido del CLI").
+
+ALTER TABLE metrics
+  ADD COLUMN IF NOT EXISTS clicks INTEGER;
+
+COMMENT ON COLUMN metrics.clicks IS
+  'Clics al link, desde el campo "clicks" de GET /v1/analytics (Zernio). NULL = nunca recolectado para este post (no confundir con 0 clics reales, que sí es un valor medido). Agregado 2026-08-07 — antes la API ya lo devolvía pero metrics-collector lo descartaba al mapear.';
+```
+
+### `supabase/migrations/010_templates.sql`
+
+```sql
+-- Migration: estructura de plantillas de contenido (sin motor de render)
+--
+-- Solo el CRUD estructural pedido en el rediseño de Propuestas
+-- (listar/crear/editar) — el motor de render que efectivamente use estas
+-- plantillas para generar piezas viene después, no en esta migración. El
+-- concepto se conecta a futuro con templates/post-template.html y
+-- templates/story-template.html (los templates HTML reales que ya usa
+-- Playwright para renderizar) — hoy son dos cosas separadas a propósito.
+--
+-- format usa el mismo universo real de valores que orchestrator produce
+-- (post | carrusel | historia) — no reel/story (legacy del constraint de
+-- proposals, sin ningún caller real) ni video (ni siquiera está permitido
+-- por proposals_format_check).
+--
+-- Ejecutar vía `supabase db query --linked -f supabase/migrations/010_templates.sql`
+-- (con -f, no `"$(cat ...)"` inline) o el SQL Editor del dashboard — NO con
+-- `supabase db push` (ver CLAUDE.md "Bug conocido del CLI").
+
+CREATE TABLE IF NOT EXISTS templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  format TEXT NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE templates DROP CONSTRAINT IF EXISTS templates_format_check;
+ALTER TABLE templates ADD CONSTRAINT templates_format_check
+  CHECK (format IN ('post', 'carrusel', 'historia'));
+
+ALTER TABLE templates ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admin full access" ON templates;
+CREATE POLICY "Admin full access" ON templates
+  FOR ALL USING (is_app_admin()) WITH CHECK (is_app_admin());
+
+COMMENT ON TABLE templates IS
+  'Plantillas de pieza reutilizables, solo estructura (nombre/formato/notas) — sin motor de render todavía. CRUD real desde /propuestas.';
+```
+
+### `supabase/functions/metrics-collector/index.ts`
+
+```typescript
+// supabase/functions/metrics-collector/index.ts
+// Recolecta métricas desde la API de analíticas de Zernio y las guarda en la DB
+// Uso: POST /metrics-collector { action: "collect", proposalId, postId }
+// Cron: ejecutar cada 6 horas
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAuth, unauthorizedResponse } from "../_shared/auth.ts";
+
+const ALLOWED_ORIGINS = [
+  "https://pabloeckert.github.io",
+  "https://mejorasm-*.vercel.app",
+  "http://localhost:8080",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".vercel.app") ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+  };
+}
+
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+);
+
+function validateBody(body: any, required: string[]) {
+  const missing = required.filter((k) => body[k] === undefined || body[k] === null);
+  if (missing.length > 0) {
+    throw new Error(`Campos requeridos faltantes: ${missing.join(", ")}`);
+  }
+}
+
+// ═══════════════════════════════════════
+// ZERNIO ANALYTICS API
+// ═══════════════════════════════════════
+// docs.zernio.com — GET /v1/analytics?postId={id}
+// Acepta tanto Zernio Post IDs como External Post IDs (auto-resuelve) — el
+// zernio_post_id que ya guarda `proposals` sirve directo como postId, sin
+// necesidad de resolverlo al media ID real de la plataforma (esa incógnita
+// quedaba documentada como pendiente en la versión anterior de este archivo,
+// que pegaba directo a graph.facebook.com/{postId}/insights).
+
+interface ZernioMetrics {
+  likes: number;
+  comments: number;
+  shares: number;
+  saves: number;
+  reach: number;
+  impressions: number;
+  clicks: number;
+}
+
+const ZERNIO_ANALYTICS_URL = "https://zernio.com/api/v1/analytics";
+
+async function getPostAnalytics(postId: string, apiKey: string): Promise<ZernioMetrics> {
+  const url = `${ZERNIO_ANALYTICS_URL}?postId=${encodeURIComponent(postId)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+
+  if (res.status === 402) {
+    throw new Error(
+      "Zernio Analytics error 402: el plan actual no incluye el add-on de Analytics (planes legacy lo necesitan aparte; viene incluido en los planes usage-based)."
+    );
+  }
+  if (res.status === 424) {
+    throw new Error(
+      "Zernio Analytics error 424: el post falló en publicar en todas las plataformas — no hay analíticas disponibles para este postId."
+    );
+  }
+  if (res.status === 202) {
+    throw new Error(
+      "Zernio Analytics: sync pendiente (202) — todavía no terminó de sincronizar las métricas desde la plataforma, reintentar en la próxima corrida."
+    );
+  }
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Zernio Analytics error ${res.status}: ${err.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const a = data.analytics || {};
+  return {
+    likes: a.likes ?? 0,
+    comments: a.comments ?? 0,
+    shares: a.shares ?? 0,
+    saves: a.saves ?? 0,
+    reach: a.reach ?? 0,
+    impressions: a.impressions ?? 0,
+    clicks: a.clicks ?? 0,
+  };
+}
+
+// ═══════════════════════════════════════
+// PROCESAMIENTO
+// ═══════════════════════════════════════
+
+async function collectMetrics(proposalId: string, postId: string) {
+  const apiKey = Deno.env.get("ZERNIO_API_KEY");
+  if (!apiKey) {
+    throw new Error("ZERNIO_API_KEY no configurado. Configurar en Supabase Secrets.");
+  }
+
+  // 1. Get analytics from Zernio
+  const metrics = await getPostAnalytics(postId, apiKey);
+
+  // 2. Save to DB
+  const { data: existing } = await supabase
+    .from("metrics")
+    .select("id")
+    .eq("proposal_id", proposalId)
+    .eq("post_id", postId)
+    .single();
+
+  if (existing) {
+    // Update existing
+    await supabase
+      .from("metrics")
+      .update({
+        ...metrics,
+        measured_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id);
+  } else {
+    // Insert new
+    await supabase.from("metrics").insert({
+      proposal_id: proposalId,
+      post_id: postId,
+      ...metrics,
+    });
+  }
+
+  return { postId, metrics, updated: !!existing };
+}
+
+async function collectAllPending() {
+  const apiKey = Deno.env.get("ZERNIO_API_KEY");
+  if (!apiKey) {
+    // ZERNIO_API_KEY ya existe como secret de GitHub Actions (lo usan
+    // scripts/lib/zernio.mjs para publicar), pero acá corre como Supabase
+    // Edge Function — es un secret de Supabase aparte, todavía no
+    // configurado ahí. No cortar el cron con un error: mientras no exista,
+    // esto es un no-op esperado, no una falla. Apenas se configure
+    // ZERNIO_API_KEY como secret de Supabase, esta misma corrida empieza a
+    // servir sin tocar nada más.
+    return {
+      message: "ZERNIO_API_KEY no configurado en Supabase Secrets todavía — nada para recolectar.",
+      count: 0,
+      skipped: true,
+    };
+  }
+
+  // zernio_post_id es lo que efectivamente llena el pipeline actual
+  // (scripts/publish-scheduled-posts.mjs, vía Zernio) — instagram_post_id es
+  // legacy del publisher viejo (Graph API directa) y ya no lo escribe nadie.
+  const { data: proposals } = await supabase
+    .from("proposals")
+    .select("id, zernio_post_id, title")
+    .eq("status", "published")
+    .not("zernio_post_id", "is", null);
+
+  if (!proposals?.length) {
+    return { message: "No hay posts publicados para recolectar métricas", count: 0 };
+  }
+
+  const results = [];
+  for (const proposal of proposals) {
+    try {
+      const result = await collectMetrics(proposal.id, proposal.zernio_post_id);
+      results.push({ ...result, title: proposal.title });
+    } catch (e: any) {
+      results.push({
+        postId: proposal.zernio_post_id,
+        title: proposal.title,
+        error: e.message,
+      });
+    }
+  }
+
+  return { count: results.length, results };
+}
+
+async function generateInsights() {
+  // Analyze metrics and generate insights
+  const { data: metrics } = await supabase
+    .from("metrics")
+    .select("*, proposals(title, format, hook, hashtags)")
+    .order("measured_at", { ascending: false })
+    .limit(50);
+
+  if (!metrics?.length) {
+    return { insights: [], message: "No hay suficientes métricas para generar insights" };
+  }
+
+  // Calculate averages
+  const avgEngagement =
+    metrics.reduce((sum, m) => sum + (m.engagement_rate || 0), 0) / metrics.length;
+
+  const topPost = metrics.reduce((best, m) =>
+    (m.engagement_rate || 0) > (best.engagement_rate || 0) ? m : best
+  );
+
+  // Group by format
+  const byFormat: Record<string, typeof metrics> = {};
+  for (const m of metrics) {
+    const format = m.proposals?.format || "post";
+    if (!byFormat[format]) byFormat[format] = [];
+    byFormat[format].push(m);
+  }
+
+  const formatStats = Object.entries(byFormat).map(([format, items]) => ({
+    format,
+    count: items.length,
+    avgEngagement:
+      items.reduce((sum, m) => sum + (m.engagement_rate || 0), 0) / items.length,
+  }));
+
+  return {
+    totalPosts: metrics.length,
+    avgEngagement: Math.round(avgEngagement * 100) / 100,
+    topPost: {
+      title: topPost.proposals?.title,
+      engagement: topPost.engagement_rate,
+      likes: topPost.likes,
+      reach: topPost.reach,
+    },
+    formatStats,
+    insights: [
+      avgEngagement > 3
+        ? "✅ Engagement rate por encima del promedio (3%). Seguir con la misma estrategia."
+        : "⚠️ Engagement rate bajo el promedio. Probar hooks más emocionales o cambiar horario.",
+      formatStats.length > 1
+        ? `📊 El formato "${formatStats.sort((a, b) => b.avgEngagement - a.avgEngagement)[0]?.format}" tiene mejor rendimiento.`
+        : "📊 Necesitás más variedad de formatos para comparar rendimiento.",
+    ],
+  };
+}
+
+// ═══════════════════════════════════════
+// HANDLER
+// ═══════════════════════════════════════
+
+Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  const auth = await requireAuth(req);
+  if (!auth.ok) return unauthorizedResponse(auth, corsHeaders);
+
+  try {
+    const body = await req.json();
+    const { action } = body;
+
+    let result;
+
+    switch (action) {
+      case "collect":
+        validateBody(body, ["proposalId", "postId"]);
+        result = await collectMetrics(body.proposalId, body.postId);
+        break;
+
+      case "collect-all":
+        result = await collectAllPending();
+        break;
+
+      case "insights":
+        result = await generateInsights();
+        break;
+
+      default:
+        throw new Error("Acción no válida. Usa 'collect', 'collect-all' o 'insights'");
+    }
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e: any) {
+    const status = e.message?.includes("Campos requeridos") ? 400 : 500;
+    return new Response(JSON.stringify({ error: e.message }), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
+```
+
+### `.github/workflows/deploy-functions.yml`
+
+```yaml
+# Deploy Edge Functions to Supabase
+# Trigger: manual (workflow_dispatch) or after CI passes on main
+name: Deploy Edge Functions
+
+on:
+  workflow_dispatch:
+    inputs:
+      function_name:
+        description: 'Function to deploy (leave empty for all)'
+        required: false
+        default: ''
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy Edge Functions
+    runs-on: ubuntu-latest
+    # Only deploy after CI passes (if triggered by push)
+    # For manual dispatch, always run
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Supabase CLI
+        run: npm install -g supabase
+
+      - name: Login to Supabase
+        run: npx supabase login --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # No hay paso "Link project" a propósito — `supabase link` pega contra
+      # GET /v1/projects/{ref}/api-keys, que hoy devuelve un inserted_at que
+      # no matchea el regex ISO8601 que espera el CLI (SchemaError real,
+      # reproducido también en local, no un problema de este workflow) y
+      # tira el step abajo. No hace falta: cada comando de `functions
+      # deploy` ya recibe --project-ref directo, así que nunca necesita el
+      # link previo — probado en local sin `link`, deploya bien igual.
+      - name: Deploy specific function
+        if: ${{ github.event.inputs.function_name != '' }}
+        run: |
+          echo "🚀 Deploying function: ${{ github.event.inputs.function_name }}"
+          npx supabase functions deploy ${{ github.event.inputs.function_name }} \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      - name: Deploy all functions
+        if: ${{ github.event.inputs.function_name == '' }}
+        run: |
+          echo "🚀 Deploying all Edge Functions..."
+          FUNCTIONS=("orchestrator" "vault-process" "metrics-collector" "rule-engine")
+          
+          FAILED=0
+          for fn in "${FUNCTIONS[@]}"; do
+            echo ""
+            echo "━━━ Deploying: $fn ━━━"
+            if npx supabase functions deploy "$fn" \
+              --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}; then
+              echo "✅ $fn — OK"
+            else
+              echo "❌ $fn — FAILED"
+              ((FAILED++))
+            fi
+          done
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━"
+          if [ "$FAILED" -gt 0 ]; then
+            echo "⚠️ $FAILED function(s) failed to deploy"
+            exit 1
+          else
+            echo "✅ All functions deployed successfully!"
+          fi
+
+      - name: Verify endpoints
+        if: success()
+        run: |
+          SUPABASE_URL="https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co"
+          ANON_KEY="${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}"
+          
+          echo ""
+          echo "🏥 Verifying endpoints..."
+          
+          for fn in orchestrator vault-process metrics-collector rule-engine; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" \
+              "$SUPABASE_URL/functions/v1/$fn" \
+              -H "apikey: $ANON_KEY" 2>/dev/null)
+            case "$code" in
+              401|405|400) echo "  ✅ $fn — active (HTTP $code)" ;;
+              404)         echo "  ❌ $fn — NOT FOUND (HTTP 404)" ;;
+              *)           echo "  ⚠️  $fn — HTTP $code" ;;
+            esac
+          done
+```
+
+### `src/services/supabase.ts`
+
+```typescript
+// src/services/supabase.ts
+// Cliente de Supabase para queries directas (CRUD)
+
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error(
+    "[supabase] Variables de entorno no configuradas.\n" +
+    "Creá un archivo .env con:\n" +
+    "  VITE_SUPABASE_URL=https://tu-proyecto.supabase.co\n" +
+    "  VITE_SUPABASE_PUBLISHABLE_KEY=tu-anon-key\n" +
+    "En Vercel: Settings → Environment Variables"
+  );
+}
+
+export const supabase = createClient(supabaseUrl ?? "", supabaseKey ?? "");
+
+// ═══════════════════════════════════════
+// DOCUMENTOS (Bóveda)
+// ═══════════════════════════════════════
+
+export const documentsApi = {
+  list: () =>
+    supabase.from("documents").select("*").order("created_at", { ascending: false }),
+
+  get: (id: string) =>
+    supabase.from("documents").select("*").eq("id", id).single(),
+
+  upload: async (file: File) => {
+    const filePath = `${Date.now()}-${file.name}`;
+
+    // Subir a storage
+    const { error: uploadError } = await supabase.storage
+      .from("vault")
+      .upload(filePath, file);
+    if (uploadError) throw uploadError;
+
+    // Crear registro
+    const { data: doc, error: dbError } = await supabase
+      .from("documents")
+      .insert({
+        title: file.name,
+        file_path: filePath,
+        file_type: file.type,
+      })
+      .select()
+      .single();
+    if (dbError) throw dbError;
+
+    return doc;
+  },
+
+  delete: async (id: string) => {
+    // Obtener path
+    const { data: doc } = await supabase
+      .from("documents")
+      .select("file_path")
+      .eq("id", id)
+      .single();
+
+    if (doc) {
+      await supabase.storage.from("vault").remove([doc.file_path]);
+    }
+
+    return supabase.from("documents").delete().eq("id", id);
+  },
+};
+
+// ═══════════════════════════════════════
+// SESIONES DE DIÁLOGO
+// ═══════════════════════════════════════
+
+export const dialogueApi = {
+  listSessions: () =>
+    supabase
+      .from("dialogue_sessions")
+      .select("*")
+      .order("created_at", { ascending: false }),
+
+  getSession: (id: string) =>
+    supabase
+      .from("dialogue_sessions")
+      .select("*, dialogue_messages(*)")
+      .eq("id", id)
+      .single(),
+
+  getMessages: (sessionId: string) =>
+    supabase
+      .from("dialogue_messages")
+      .select("*")
+      .eq("session_id", sessionId)
+      .order("turn", { ascending: true }),
+};
+
+// ═══════════════════════════════════════
+// PROPUESTAS
+// ═══════════════════════════════════════
+
+export const proposalsApi = {
+  list: () =>
+    supabase
+      .from("proposals")
+      .select("*, dialogue_sessions(topic)")
+      .order("created_at", { ascending: false }),
+
+  approve: (id: string) =>
+    supabase.from("proposals").update({ status: "approved" }).eq("id", id),
+
+  reject: (id: string, reason: string) =>
+    supabase
+      .from("proposals")
+      .update({ status: "rejected", rejection_reason: reason })
+      .eq("id", id),
+
+  schedule: (id: string, date: string, oferta: string) =>
+    supabase
+      .from("proposals")
+      .update({ status: "scheduled", scheduled_at: date, oferta })
+      .eq("id", id),
+
+  // Monitor de reversión (PLAN_AUTONOMIA.md Fase 2): cancela una propuesta
+  // todavía no publicada (autoagendada o programada a mano) antes de que el
+  // cron de publish-scheduled-posts.yml la levante. Para una ya publicada,
+  // la reversión es scripts/manage-post.mjs (workflow_dispatch), no esto.
+  cancel: (id: string) =>
+    supabase
+      .from("proposals")
+      .update({ status: "rejected", rejection_reason: "Cancelada antes de publicar" })
+      .eq("id", id),
+
+  pending: () =>
+    supabase
+      .from("proposals")
+      .select("*, dialogue_sessions(topic)")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false }),
+
+  // Modal de detalle (rediseño 2026-08-07) — acciones reales, solo válidas
+  // mientras la pieza no esté published (se valida también en la UI, esto
+  // es la capa de datos).
+  edit: (
+    id: string,
+    fields: Partial<{ title: string; hook: string; body: string; cta: string; hashtags: string[] }>
+  ) => supabase.from("proposals").update(fields).eq("id", id),
+
+  remove: (id: string) => supabase.from("proposals").delete().eq("id", id),
+
+  reschedule: (id: string, date: string) =>
+    supabase.from("proposals").update({ scheduled_at: date }).eq("id", id),
+
+  // Valores reales que produce el pipeline (post | carrusel | historia) —
+  // no reel/story (legacy del CHECK constraint, sin caller real) ni video
+  // (ni siquiera permitido por proposals_format_check).
+  convertFormat: (id: string, format: string) =>
+    supabase.from("proposals").update({ format }).eq("id", id),
+};
+
+// ═══════════════════════════════════════
+// PLANTILLAS (estructura, sin motor de render — ver migración 010)
+// ═══════════════════════════════════════
+
+export const templatesApi = {
+  list: () => supabase.from("templates").select("*").order("created_at", { ascending: false }),
+
+  create: (fields: { name: string; format: string; notes?: string }) =>
+    supabase.from("templates").insert(fields).select().single(),
+
+  update: (id: string, fields: Partial<{ name: string; format: string; notes: string }>) =>
+    supabase
+      .from("templates")
+      .update({ ...fields, updated_at: new Date().toISOString() })
+      .eq("id", id),
+
+  remove: (id: string) => supabase.from("templates").delete().eq("id", id),
+};
+
+// ═══════════════════════════════════════
+// CALENDARIO
+// ═══════════════════════════════════════
+
+export const calendarApi = {
+  list: () =>
+    supabase
+      .from("calendar_events")
+      .select("*, proposals(title, format)")
+      .order("date", { ascending: true }),
+
+  create: (event: {
+    title: string;
+    description?: string;
+    date: string;
+    format: string;
+    proposal_id?: string;
+  }) => supabase.from("calendar_events").insert(event),
+};
+
+// ═══════════════════════════════════════
+// MÉTRICAS
+// ═══════════════════════════════════════
+
+export const metricsApi = {
+  latest: () =>
+    supabase
+      .from("metrics")
+      .select("*, proposals(title, format)")
+      .order("measured_at", { ascending: false })
+      .limit(30),
+
+  // Dashboard (rediseño 2026-08-07): a diferencia de latest() no tiene
+  // límite — el Dashboard necesita el set completo para calcular KPIs
+  // agregados reales (sumas/promedios), no solo una muestra reciente.
+  // Trae los campos de proposals necesarios para el ranking de piezas,
+  // el desglose por red y el filtro de filas [TEST/QA].
+  all: () =>
+    supabase
+      .from("metrics")
+      .select(
+        "*, proposals(id, title, hook, format, status, zernio_post_id, oferta, rendered_image_path)"
+      )
+      .order("measured_at", { ascending: false }),
+
+  byProposal: (proposalId: string) =>
+    supabase
+      .from("metrics")
+      .select("*")
+      .eq("proposal_id", proposalId)
+      .order("measured_at", { ascending: false }),
+
+  successRules: () =>
+    supabase
+      .from("success_rules")
+      .select("*")
+      .order("confidence", { ascending: false }),
+};
+```
+
+### `src/hooks/useMetrics.ts`
+
+```typescript
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { calendarApi, metricsApi } from "@/services/supabase";
+import { supabase } from "@/services/supabase";
+
+// ═══════════════════════════════════════
+// CALENDARIO
+// ═══════════════════════════════════════
+
+export function useCalendarEvents() {
+  return useQuery({
+    queryKey: ["calendar-events"],
+    queryFn: async () => {
+      const { data, error } = await calendarApi.list();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useCreateCalendarEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (event: {
+      title: string;
+      description?: string;
+      date: string;
+      format: string;
+      proposal_id?: string;
+    }) => calendarApi.create(event),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["calendar-events"] }),
+  });
+}
+
+export function useDeleteCalendarEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("calendar_events").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["calendar-events"] }),
+  });
+}
+
+// ═══════════════════════════════════════
+// MÉTRICAS
+// ═══════════════════════════════════════
+
+export function useLatestMetrics() {
+  return useQuery({
+    queryKey: ["metrics", "latest"],
+    queryFn: async () => {
+      const { data, error } = await metricsApi.latest();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useAllMetrics() {
+  return useQuery({
+    queryKey: ["metrics", "all"],
+    queryFn: async () => {
+      const { data, error } = await metricsApi.all();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useProposalMetrics(proposalId: string) {
+  return useQuery({
+    queryKey: ["metrics", "proposal", proposalId],
+    queryFn: async () => {
+      const { data, error } = await metricsApi.byProposal(proposalId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!proposalId,
+  });
+}
+
+export function useSuccessRules() {
+  return useQuery({
+    queryKey: ["success-rules"],
+    queryFn: async () => {
+      const { data, error } = await metricsApi.successRules();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+```
+
+### `src/hooks/useProposals.ts`
+
+```typescript
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { proposalsApi, templatesApi } from "@/services/supabase";
+
+export function useProposals() {
+  return useQuery({
+    queryKey: ["proposals"],
+    queryFn: async () => {
+      const { data, error } = await proposalsApi.list();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function usePendingProposals() {
+  return useQuery({
+    queryKey: ["proposals", "pending"],
+    queryFn: async () => {
+      const { data, error } = await proposalsApi.pending();
+      if (error) throw error;
+      return data;
+    },
+    refetchInterval: 10000,
+  });
+}
+
+export function useApproveProposal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => proposalsApi.approve(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
+  });
+}
+
+export function useRejectProposal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      proposalsApi.reject(id, reason),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
+  });
+}
+
+export function useScheduleProposal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, date, oferta }: { id: string; date: string; oferta: string }) =>
+      proposalsApi.schedule(id, date, oferta),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
+  });
+}
+
+export function useCancelProposal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => proposalsApi.cancel(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
+  });
+}
+
+// ═══════════════════════════════════════
+// MODAL DE DETALLE — acciones reales (rediseño 2026-08-07)
+// ═══════════════════════════════════════
+
+export function useEditProposal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      fields,
+    }: {
+      id: string;
+      fields: Partial<{ title: string; hook: string; body: string; cta: string; hashtags: string[] }>;
+    }) => proposalsApi.edit(id, fields),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
+  });
+}
+
+export function useDeleteProposal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => proposalsApi.remove(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
+  });
+}
+
+export function useRescheduleProposal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, date }: { id: string; date: string }) => proposalsApi.reschedule(id, date),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
+  });
+}
+
+export function useConvertProposalFormat() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, format }: { id: string; format: string }) => proposalsApi.convertFormat(id, format),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
+  });
+}
+
+// ═══════════════════════════════════════
+// PLANTILLAS
+// ═══════════════════════════════════════
+
+export function useTemplates() {
+  return useQuery({
+    queryKey: ["templates"],
+    queryFn: async () => {
+      const { data, error } = await templatesApi.list();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useCreateTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (fields: { name: string; format: string; notes?: string }) => templatesApi.create(fields),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["templates"] }),
+  });
+}
+
+export function useUpdateTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      fields,
+    }: {
+      id: string;
+      fields: Partial<{ name: string; format: string; notes: string }>;
+    }) => templatesApi.update(id, fields),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["templates"] }),
+  });
+}
+
+export function useDeleteTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => templatesApi.remove(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["templates"] }),
+  });
+}
+```
+
+### `src/components/PipelineBadge.tsx`
+
+```typescript
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Zap, Hand } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// Mismo universo real que usa orchestrator (AUTO_PUBLISH_FORMATS) — post y
+// carrusel se agendan y publican solos; el resto (historia, y "video" que
+// ni siquiera está permitido por proposals_format_check) requiere acción
+// manual. Ver CLAUDE.md, "Arquitectura: publicación autónoma de posts de
+// feed" — no confundir con AUTO_PUBLISH_FORMATS del backend, que es la
+// misma lista pero no se puede importar directo del Edge Function.
+export const AUTONOMOUS_FORMATS = ["post", "carrusel"];
+
+export function isAutonomousFormat(format?: string | null): boolean {
+  return AUTONOMOUS_FORMATS.includes(format || "");
+}
+
+// Badge compartido entre Propuestas y Calendario — antes esta distinción no
+// se veía en ningún lado, lo que daba la sensación de que "no sirve para
+// nada" cuando en realidad post/carrusel ya corren solos.
+export function PipelineBadge({ format, className }: { format?: string | null; className?: string }) {
+  const autonomous = isAutonomousFormat(format);
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge
+          variant="outline"
+          className={cn(
+            "gap-1",
+            autonomous ? "border-primary/40 text-primary" : "border-[#F7CC13] text-[#c9a30d]",
+            className
+          )}
+        >
+          {autonomous ? <Zap className="h-3 w-3" /> : <Hand className="h-3 w-3" />}
+          {autonomous ? "Se publica solo" : "Acción manual"}
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[220px] text-xs">
+        {autonomous
+          ? "Este formato se agenda y publica solo apenas el Crítico lo aprueba — nadie tiene que apretar nada."
+          : "Este formato no tiene pipeline autónomo todavía — necesita aprobación y gestión manual."}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+```
+
+### `src/components/ProposalDetailDialog.tsx`
+
+```typescript
+import { useEffect, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { PipelineBadge } from "@/components/PipelineBadge";
+import { toast } from "@/components/ui/use-toast";
+import {
+  CheckCircle,
+  XCircle,
+  Trash2,
+  Pencil,
+  Calendar,
+  Repeat,
+  Copy,
+  Check,
+  Loader2,
+  Info,
+} from "lucide-react";
+import {
+  useApproveProposal,
+  useRejectProposal,
+  useCancelProposal,
+  useScheduleProposal,
+  useEditProposal,
+  useDeleteProposal,
+  useRescheduleProposal,
+  useConvertProposalFormat,
+} from "@/hooks/useProposals";
+
+// Mismas 5 dimensiones que content/inbox/ (ver scripts/generate-brief.mjs) —
+// de acá sale la foto que usa render-scheduled-posts.mjs al publicar.
+const OFERTAS = [
+  { value: "personal", label: "Personal" },
+  { value: "organizacional", label: "Organizacional" },
+  { value: "comercial", label: "Comercial" },
+  { value: "empresarial", label: "Empresarial" },
+  { value: "profesionalizacion", label: "Profesionalización" },
+];
+
+// Universo real de proposals.format que el pipeline efectivamente produce y
+// consume — no reel/story (legacy del CHECK constraint) ni video (ni
+// siquiera permitido por proposals_format_check).
+const CONVERTIBLE_FORMATS = [
+  { value: "post", label: "Post Feed" },
+  { value: "carrusel", label: "Carrusel" },
+  { value: "historia", label: "Story" },
+];
+
+export interface ProposalDetail {
+  id: string;
+  title: string | null;
+  hook: string | null;
+  body: string | null;
+  cta: string | null;
+  hashtags: string[] | null;
+  format: string | null;
+  status: string | null;
+  rejection_reason: string | null;
+  scheduled_at: string | null;
+  published_at: string | null;
+  created_at: string | null;
+  oferta: string | null;
+  zernio_post_id: string | null;
+  dialogue_sessions?: { topic: string | null } | null;
+}
+
+function fmtDate(d: string | null) {
+  if (!d) return null;
+  return new Date(d).toLocaleDateString("es-AR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// Formato datetime-local (sin segundos, hora local) a partir de un ISO real.
+function toDatetimeLocal(iso: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function ProposalDetailDialog({
+  proposal,
+  open,
+  onOpenChange,
+}: {
+  proposal: ProposalDetail | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const approveMutation = useApproveProposal();
+  const rejectMutation = useRejectProposal();
+  const cancelMutation = useCancelProposal();
+  const scheduleMutation = useScheduleProposal();
+  const editMutation = useEditProposal();
+  const deleteMutation = useDeleteProposal();
+  const rescheduleMutation = useRescheduleProposal();
+  const convertMutation = useConvertProposalFormat();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFields, setEditFields] = useState({ title: "", hook: "", body: "", cta: "", hashtags: "" });
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [showReject, setShowReject] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleOferta, setScheduleOferta] = useState("");
+  const [convertTo, setConvertTo] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!proposal) return;
+    setIsEditing(false);
+    setShowReject(false);
+    setRejectReason("");
+    setEditFields({
+      title: proposal.title || "",
+      hook: proposal.hook || "",
+      body: proposal.body || "",
+      cta: proposal.cta || "",
+      hashtags: (proposal.hashtags || []).join(" "),
+    });
+    setScheduleDate(toDatetimeLocal(proposal.scheduled_at));
+    setScheduleOferta(proposal.oferta || "");
+    setConvertTo("");
+  }, [proposal?.id]);
+
+  if (!proposal) return null;
+
+  const isPublished = proposal.status === "published";
+  const isScheduled = proposal.status === "scheduled";
+  const isPending = proposal.status === "pending";
+  const isApproved = proposal.status === "approved";
+  const isRejected = proposal.status === "rejected";
+
+  const fullCopy = [proposal.hook, "", proposal.body, "", proposal.cta, "", ...(proposal.hashtags || [])]
+    .filter((l) => l !== null && l !== undefined)
+    .join("\n");
+
+  function handleCopy() {
+    navigator.clipboard.writeText(fullCopy);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleSaveEdit() {
+    editMutation.mutate(
+      {
+        id: proposal.id,
+        fields: {
+          title: editFields.title,
+          hook: editFields.hook,
+          body: editFields.body,
+          cta: editFields.cta,
+          hashtags: editFields.hashtags.split(/\s+/).filter(Boolean),
+        },
+      },
+      {
+        onSuccess: () => {
+          setIsEditing(false);
+          toast({ title: "Propuesta actualizada" });
+        },
+        onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleDelete() {
+    deleteMutation.mutate(proposal.id, {
+      onSuccess: () => {
+        setConfirmDelete(false);
+        onOpenChange(false);
+        toast({ title: "Propuesta borrada" });
+      },
+      onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    });
+  }
+
+  function handleReschedule() {
+    if (!scheduleDate) return;
+    rescheduleMutation.mutate(
+      { id: proposal.id, date: new Date(scheduleDate).toISOString() },
+      {
+        onSuccess: () => toast({ title: "Fecha actualizada" }),
+        onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleSchedule() {
+    if (!scheduleDate || !scheduleOferta) return;
+    scheduleMutation.mutate(
+      { id: proposal.id, date: new Date(scheduleDate).toISOString(), oferta: scheduleOferta },
+      {
+        onSuccess: () => toast({ title: "Propuesta programada" }),
+        onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleConvert() {
+    if (!convertTo || convertTo === proposal.format) return;
+    convertMutation.mutate(
+      { id: proposal.id, format: convertTo },
+      {
+        onSuccess: () => {
+          toast({ title: `Formato cambiado a ${convertTo}` });
+          setConvertTo("");
+        },
+        onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleApprove() {
+    approveMutation.mutate(proposal.id, {
+      onSuccess: () => toast({ title: "Propuesta aprobada" }),
+      onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    });
+  }
+
+  function handleReject() {
+    rejectMutation.mutate(
+      { id: proposal.id, reason: rejectReason },
+      {
+        onSuccess: () => {
+          setShowReject(false);
+          setRejectReason("");
+          toast({ title: "Propuesta rechazada" });
+        },
+        onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+      }
+    );
+  }
+
+  function handleCancelScheduled() {
+    cancelMutation.mutate(proposal.id, {
+      onSuccess: () => toast({ title: "Publicación cancelada" }),
+      onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    });
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{proposal.hook || proposal.title || "Sin título"}</DialogTitle>
+            <DialogDescription>{proposal.dialogue_sessions?.topic || "Sin tema asociado"}</DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <PipelineBadge format={proposal.format} />
+            <Badge variant="outline">{proposal.format || "post"}</Badge>
+            <Badge variant={isPublished ? "default" : isRejected ? "destructive" : "secondary"}>
+              {{
+                pending: "Pendiente",
+                approved: "Aprobada",
+                rejected: "Rechazada",
+                scheduled: "Programada",
+                published: "Publicada",
+              }[proposal.status || "pending"] || proposal.status}
+            </Badge>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            {isPublished && proposal.published_at
+              ? `Publicada: ${fmtDate(proposal.published_at)}`
+              : proposal.scheduled_at
+              ? `Programada para: ${fmtDate(proposal.scheduled_at)}`
+              : "Sin fecha de publicación ni programación"}
+          </p>
+
+          {isRejected && proposal.rejection_reason && (
+            <p className="rounded-md border border-destructive/30 bg-destructive/5 p-2.5 text-xs text-destructive">
+              Motivo de rechazo: {proposal.rejection_reason}
+            </p>
+          )}
+
+          {isPublished && (
+            <div className="flex items-start gap-2 rounded-md border border-dashed border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+              <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+              <span>
+                Ya está publicada{proposal.zernio_post_id ? ` (Zernio: ${proposal.zernio_post_id})` : ""} — no se
+                edita ni se borra desde acá para no desincronizar lo que ya salió en Instagram/Facebook. Para
+                corregirla o bajarla, correr manualmente el workflow "Manage Post" en GitHub Actions (reintenta o
+                despublica según la plataforma).
+              </span>
+            </div>
+          )}
+
+          {/* CONTENIDO — lectura o edición */}
+          {isEditing ? (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Título</Label>
+                <Input value={editFields.title} onChange={(e) => setEditFields((f) => ({ ...f, title: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Hook</Label>
+                <Input value={editFields.hook} onChange={(e) => setEditFields((f) => ({ ...f, hook: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Body</Label>
+                <Textarea
+                  rows={5}
+                  value={editFields.body}
+                  onChange={(e) => setEditFields((f) => ({ ...f, body: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>CTA</Label>
+                <Input value={editFields.cta} onChange={(e) => setEditFields((f) => ({ ...f, cta: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Hashtags (separados por espacio)</Label>
+                <Input
+                  value={editFields.hashtags}
+                  onChange={(e) => setEditFields((f) => ({ ...f, hashtags: e.target.value }))}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={handleSaveEdit} disabled={editMutation.isPending}>
+                  {editMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                  Guardar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3 text-sm">
+              {proposal.hook && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">HOOK</p>
+                  <p>{proposal.hook}</p>
+                </div>
+              )}
+              {proposal.body && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">BODY</p>
+                  <p className="whitespace-pre-wrap">{proposal.body}</p>
+                </div>
+              )}
+              {proposal.cta && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">CTA</p>
+                  <p>{proposal.cta}</p>
+                </div>
+              )}
+              {proposal.hashtags && proposal.hashtags.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">HASHTAGS</p>
+                  <p className="text-muted-foreground">{proposal.hashtags.join(" ")}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ACCIONES DE ESTADO */}
+          {!isPublished && !isEditing && (
+            <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+              {isPending && (
+                <Button size="sm" onClick={handleApprove} disabled={approveMutation.isPending}>
+                  {approveMutation.isPending ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Aprobar
+                </Button>
+              )}
+              {(isPending || isApproved) && (
+                <Button size="sm" variant="outline" onClick={() => setShowReject((v) => !v)}>
+                  <XCircle className="mr-1.5 h-3.5 w-3.5 text-destructive" />
+                  Rechazar
+                </Button>
+              )}
+              {isScheduled && (
+                <Button size="sm" variant="outline" onClick={handleCancelScheduled} disabled={cancelMutation.isPending}>
+                  {cancelMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                  Cancelar publicación
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
+                <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                Editar
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleCopy}>
+                {copied ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
+                Copiar
+              </Button>
+              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                Borrar
+              </Button>
+            </div>
+          )}
+
+          {showReject && !isPublished && (
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <Label>Razón del rechazo (opcional)</Label>
+              <Textarea
+                rows={2}
+                placeholder="Ej: No coincide con el tono de la marca..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="outline" onClick={() => setShowReject(false)}>
+                  Cancelar
+                </Button>
+                <Button size="sm" variant="destructive" onClick={handleReject} disabled={rejectMutation.isPending}>
+                  {rejectMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                  Confirmar rechazo
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* AGENDAR (todavía sin fecha) / REPROGRAMAR (ya programada) */}
+          {!isPublished && !isEditing && (isScheduled || isPending || isApproved) && (
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <Label className="flex items-center gap-1.5">
+                {isScheduled ? <Repeat className="h-3.5 w-3.5" /> : <Calendar className="h-3.5 w-3.5" />}
+                {isScheduled ? "Reprogramar" : "Agendar"}
+              </Label>
+              <Input type="datetime-local" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} />
+              {!isScheduled && (
+                <Select value={scheduleOferta} onValueChange={setScheduleOferta}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Oferta (de dónde sale la foto)..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {OFERTAS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <div className="flex justify-end">
+                {isScheduled ? (
+                  <Button
+                    size="sm"
+                    onClick={handleReschedule}
+                    disabled={!scheduleDate || rescheduleMutation.isPending}
+                  >
+                    {rescheduleMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                    Guardar nueva fecha
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={handleSchedule}
+                    disabled={!scheduleDate || !scheduleOferta || scheduleMutation.isPending}
+                  >
+                    {scheduleMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                    Programar
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* CONVERTIR FORMATO */}
+          {!isPublished && !isEditing && (
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <Label>Convertir formato</Label>
+              <p className="text-[11px] text-muted-foreground">
+                Solo cambia el campo format — no agenda ni desagenda la pieza por su cuenta.
+              </p>
+              <div className="flex gap-2">
+                <Select value={convertTo} onValueChange={setConvertTo}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Elegir formato..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CONVERTIBLE_FORMATS.filter((f) => f.value !== proposal.format).map((f) => (
+                      <SelectItem key={f.value} value={f.value}>
+                        {f.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button size="sm" onClick={handleConvert} disabled={!convertTo || convertMutation.isPending}>
+                  {convertMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                  Convertir
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="¿Borrar esta propuesta?"
+        description="No se puede deshacer. La propuesta se elimina por completo de Supabase."
+        confirmText="Borrar"
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
+    </>
+  );
+}
+```
+
+### `src/pages/Dashboard.tsx`
+
+```typescript
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  FileText,
+  MessageSquare,
+  Sparkles,
+  CalendarDays,
+  Clock,
+  Zap,
+  ArrowRight,
+  History,
+  Info,
+  ExternalLink,
+  HelpCircle,
+  Trophy,
+} from "lucide-react";
+import { useDocuments } from "@/hooks/useVault";
+import { useDialogueSessions } from "@/hooks/useDialogue";
+import { usePendingProposals, useProposals } from "@/hooks/useProposals";
+import { useCalendarEvents, useAllMetrics } from "@/hooks/useMetrics";
+import { Link } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+
+// Paleta de marca: Azul, Rojo, Amarillo (Manual de Marca Mejora Continua) +
+// el 4to tono derivado de Azul (#6f93cf) del design system para el pie chart.
+const COLORS = ["#1A3D84", "#E1061E", "#F7CC13", "#6f93cf"];
+
+const RAW_BASE_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main";
+const HISTORIAL_URL = `${RAW_BASE_URL}/content/log/historial.json`;
+
+// Metadata de status para la sección de últimas publicaciones — mismos 3
+// status reales del pipeline autónomo (ver CLAUDE.md, overhaul de
+// autonomía): published (Zernio ya lo publicó), scheduled (autoagendado,
+// esperando el cron), pending (formato "historia", sin pipeline autónomo).
+const STATUS_META: Record<string, { label: string; variant: "default" | "secondary" | "outline"; dateLabel: string }> = {
+  published: { label: "Publicada", variant: "default", dateLabel: "Publicada" },
+  scheduled: { label: "Programada", variant: "secondary", dateLabel: "Programada para" },
+  pending: { label: "Pendiente", variant: "outline", dateLabel: "Creada" },
+};
+
+// Filas [TEST/QA] sembradas para probar rule-engine (ver CLAUDE.md, "rule-
+// engine — corrida real con datos de prueba"): las reales ya se limpiaron
+// de la base el 2026-08-05, pero el filtro queda acá por si vuelven a
+// aparecer — nunca se mezclan sin aviso en gráficos/KPIs.
+const TEST_POST_PREFIX = "TEST-QA-";
+const TEST_PROPOSAL_PREFIX = "7e57da7a-";
+
+function isTestRow(m: MetricRow): boolean {
+  return Boolean(
+    m.post_id?.startsWith(TEST_POST_PREFIX) || m.proposals?.id?.startsWith(TEST_PROPOSAL_PREFIX)
+  );
+}
+
+const nf = new Intl.NumberFormat("es-AR");
+const fmt = (n: number) => nf.format(Math.round(n || 0));
+const fmtPct = (n: number) => `${(Math.round((n || 0) * 100) / 100).toLocaleString("es-AR")}%`;
+const sum = (nums: number[]) => nums.reduce((a, b) => a + b, 0);
+const avg = (nums: number[]) => (nums.length ? sum(nums) / nums.length : 0);
+
+// KPIs del brief sin fuente de datos real hoy (Fase A de auditoría,
+// 2026-08-07) — nunca se muestran en cero ni vacíos: se documenta acá por
+// qué no hay dato, en vez de inventar uno.
+const NO_SOURCE_KPIS = [
+  {
+    label: "Alcance orgánico vs. pago",
+    reason: "Zernio Analytics devuelve un solo \"reach\" agregado — no distingue orgánico de pago.",
+  },
+  {
+    label: "Tasa de finalización de video",
+    reason: "El spec de Zernio Analytics no separa video views de full video views, solo un \"views\" genérico.",
+  },
+  {
+    label: "Tiempo promedio de reproducción",
+    reason: "No está en la respuesta de Zernio Analytics.",
+  },
+  {
+    label: "Engagement por seguidor",
+    reason: "No hay conteo de seguidores guardado en ningún lado — ni tabla propia ni en el endpoint de Zernio.",
+  },
+  {
+    label: "Crecimiento neto de seguidores",
+    reason: "Requeriría un snapshot histórico de seguidores que hoy no se persiste.",
+  },
+  {
+    label: "Tasa de finalización de historias",
+    reason: "Las Stories corren por un pipeline totalmente aparte que nunca escribe en esta base.",
+  },
+];
+
+// Insights validados con datos reales (Data/analisis-redes-mejora-continua.md,
+// agosto 2026) — semilla de arranque para el motor de insights con IA que
+// viene en un commit futuro (no se construye acá). La capa de IA puede
+// reemplazar o contrastar cada uno de estos; no se generan dinámicamente.
+const SEED_INSIGHTS: { id: string; title: string; body: string; evidence: string }[] = [
+  {
+    id: "reel-retencion",
+    title: "El Reel gana alcance, pero se pierde el mensaje",
+    body: "Reel es el formato con mejor alcance (461 promedio) y mejor engagement (3.26% ER) de los tres, pero el tiempo promedio de reproducción es de apenas ~6.9 segundos y casi nadie lo mira completo.",
+    evidence: "44 Reels analizados en el año — reach medio 461, ER medio 3.26%, ~6.9s de reproducción promedio, 0.81 full views promedio.",
+  },
+  {
+    id: "hook-primera-persona",
+    title: "El gancho directo en primera persona convierte mejor que cualquier Reel",
+    body: "Los posts estáticos o carousel con gancho directo en primera persona sobre liderazgo y decisiones dieron el engagement más alto del período — el mejor conversor de audiencia ya instalada, aunque lleguen a menos gente nueva.",
+    evidence: '"WhatsApp no es decoración..." ER 27.9% · "Equivocarse no te resta liderazgo..." ER 22.0%.',
+  },
+  {
+    id: "testimonios-series",
+    title: 'Testimonios con nombre y series "Parte 1/2/3" generan la señal más fuerte',
+    body: "Concentran los guardados y compartidos más altos del año — en una cuenta B2B esa es la señal de intención más fuerte, más que el like.",
+    evidence: "Serie sobre negociación: reach 520 / 436 / 237 en publicaciones consecutivas.",
+  },
+  {
+    id: "geo-nea-paraguay",
+    title: "La audiencia está concentrada en NEA + Paraguay, no dispersa a nivel nacional",
+    body: "Posadas es la ciudad top en ambas redes, seguida de Encarnación y el resto del NEA argentino y Paraguay.",
+    evidence: "Posadas 30.9% (Facebook) / 45.7% (Instagram) · Paraguay 19.7-20.2% del total.",
+  },
+  {
+    id: "meseta-horaria",
+    title: "No hay un horario mágico único — la audiencia está online de 11h a 23h todos los días",
+    body: "Conviene testear franja de mediodía (lunes a miércoles) contra tarde-noche en vez de fijarse en un solo bloque horario.",
+    evidence: "Meseta amplia 11h-23h todos los días, con pico puntual lunes 21h (IconSquare).",
+  },
+  {
+    id: "facebook-sin-pulso",
+    title: "Facebook va al mismo nivel de detalle que Instagram, pero hoy no tiene pulso propio",
+    body: "El bajo rendimiento de Facebook es por falta de trabajo puesto ahí, no por el canal en sí — con el sistema funcionando se espera que se mueva.",
+    evidence: "Ventana jul-ago 2026: 0 visitas, 0 interacciones y 0 clics en enlace en casi todos los días. ER del año 1.28% vs. 2.44% de Instagram.",
+  },
+];
+
+type DetailContent = { title: string; description?: string; content: React.ReactNode };
+
+interface ProposalJoin {
+  id: string;
+  title: string | null;
+  hook: string | null;
+  format: string | null;
+  status: string | null;
+  zernio_post_id: string | null;
+  oferta: string | null;
+  rendered_image_path: string | null;
+}
+
+interface MetricRow {
+  id: string;
+  proposal_id: string | null;
+  post_id: string | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  saves: number | null;
+  reach: number | null;
+  impressions: number | null;
+  clicks: number | null;
+  engagement_rate: number | null;
+  measured_at: string;
+  proposals: ProposalJoin | null;
+}
+
+interface FlaggedMetricRow extends MetricRow {
+  isTest: boolean;
+}
+
+// lucide-react no incluye íconos de marca (Instagram/Facebook) desde hace
+// varias versiones — el badge distingue la red por texto + color, no por
+// logo, para no depender de un ícono que no existe en el paquete.
+function PlatformBadge({
+  platform,
+  status,
+  url,
+}: {
+  platform: string;
+  status: string;
+  url: string | null;
+}) {
+  const ok = status === "published";
+  const label = platform === "instagram" ? "Instagram" : platform === "facebook" ? "Facebook" : platform;
+  const badge = (
+    <Badge variant={ok ? "default" : "outline"} className="gap-1">
+      {label} · {ok ? "publicado" : status}
+    </Badge>
+  );
+  if (!url) return badge;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 hover:opacity-80"
+    >
+      {badge}
+      <ExternalLink className="h-3 w-3 text-muted-foreground" />
+    </a>
+  );
+}
+
+function KpiTile({
+  label,
+  value,
+  sub,
+  tooltip,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  tooltip: string;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          className="flex h-full w-full flex-col gap-2.5 rounded-xl border border-border bg-card p-5 text-left transition-colors hover:bg-muted/40"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[12px] font-semibold text-muted-foreground">{label}</span>
+            <Info className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/50" />
+          </div>
+          <p className="text-[26px] font-medium leading-none text-primary [font-family:var(--font-display)]">
+            {value}
+          </p>
+          <p className="text-xs text-muted-foreground">{sub}</p>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs text-xs">{tooltip}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <ErrorBoundary>
+      <TooltipProvider delayDuration={150}>
+        <DashboardContent />
+      </TooltipProvider>
+    </ErrorBoundary>
+  );
+}
+
+function DashboardContent() {
+  const { data: documents } = useDocuments();
+  const { data: sessions } = useDialogueSessions();
+  const { data: proposals } = useProposals();
+  const { data: pendingProposals } = usePendingProposals();
+  const { data: calendarEvents } = useCalendarEvents();
+  const { data: allMetrics } = useAllMetrics();
+
+  const [showTestRows, setShowTestRows] = useState(false);
+  const [detail, setDetail] = useState<DetailContent | null>(null);
+
+  // Desglose por red: solo dato real disponible es status/URL por
+  // plataforma, que vive en content/log/historial.json (no en Supabase) —
+  // se trae vía raw.githubusercontent.com, mismo host que ya sirve las
+  // imágenes publicadas. Si falla, el resto del Dashboard sigue funcionando.
+  const { data: platformsByProposal, isError: platformsError } = useQuery({
+    queryKey: ["historial-platforms"],
+    queryFn: async () => {
+      const res = await fetch(HISTORIAL_URL);
+      if (!res.ok) throw new Error(`historial.json respondió ${res.status}`);
+      const json = await res.json();
+      const map = new Map<string, { platform: string; status: string; url: string | null }[]>();
+      for (const post of json.posts ?? []) {
+        if (post.proposalId) map.set(post.proposalId, post.platforms ?? []);
+      }
+      return map;
+    },
+    retry: 1,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const metricsFlagged: FlaggedMetricRow[] = useMemo(
+    () => (allMetrics ?? []).map((m: MetricRow) => ({ ...m, isTest: isTestRow(m) })),
+    [allMetrics]
+  );
+  const testCount = metricsFlagged.filter((m) => m.isTest).length;
+  const visibleMetrics = useMemo(
+    () => (showTestRows ? metricsFlagged : metricsFlagged.filter((m) => !m.isTest)),
+    [metricsFlagged, showTestRows]
+  );
+
+  const hasData = (documents?.length ?? 0) > 0 || (sessions?.length ?? 0) > 0;
+
+  // ═══════════════════════════════════════
+  // KPIs reales / calculables (Fase A de auditoría, 2026-08-07)
+  // ═══════════════════════════════════════
+  const reaches = visibleMetrics.map((m) => m.reach ?? 0);
+  const impressions = visibleMetrics.map((m) => m.impressions ?? 0);
+  const likes = visibleMetrics.map((m) => m.likes ?? 0);
+  const comments = visibleMetrics.map((m) => m.comments ?? 0);
+  const shares = visibleMetrics.map((m) => m.shares ?? 0);
+  const saves = visibleMetrics.map((m) => m.saves ?? 0);
+  const engagementTotal = sum(likes) + sum(comments) + sum(shares) + sum(saves);
+  const withClicks = visibleMetrics.filter((m) => m.clicks !== null && m.clicks !== undefined);
+  const clicksTotal = sum(withClicks.map((m) => m.clicks ?? 0));
+
+  const engagementPerImpression = sum(impressions) > 0 ? (engagementTotal / sum(impressions)) * 100 : 0;
+  const engagementPerReach = sum(reaches) > 0 ? (engagementTotal / sum(reaches)) * 100 : 0;
+
+  function openKpiDetail(
+    label: string,
+    description: string,
+    valueOf: (m: FlaggedMetricRow) => number,
+    unit = ""
+  ) {
+    const rows = [...visibleMetrics].sort((a, b) => (valueOf(b) ?? 0) - (valueOf(a) ?? 0));
+    setDetail({
+      title: label,
+      description,
+      content: (
+        <div className="max-h-80 overflow-y-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Pieza</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={2} className="text-center text-muted-foreground">
+                    Sin publicaciones con datos todavía.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                rows.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="max-w-[280px] truncate">
+                      {r.proposals?.hook || r.proposals?.title || "Post sin título"}
+                      {r.isTest && (
+                        <Badge variant="outline" className="ml-1.5 border-[#F7CC13] text-[#c9a30d]">
+                          PRUEBA
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {valueOf(r) === null || valueOf(r) === undefined ? "—" : `${fmt(valueOf(r))}${unit}`}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      ),
+    });
+  }
+
+  function openPieceDetail(m: FlaggedMetricRow) {
+    const platforms = platformsByProposal?.get(m.proposals?.id) ?? [];
+    setDetail({
+      title: m.proposals?.hook || m.proposals?.title || "Pieza",
+      description: m.proposals?.format ? `Formato: ${m.proposals.format}` : undefined,
+      content: (
+        <div className="space-y-3 text-sm">
+          {m.proposals?.rendered_image_path && (
+            <img
+              src={`${RAW_BASE_URL}/${m.proposals.rendered_image_path}`}
+              alt=""
+              className="max-h-64 w-full rounded-md border border-border object-cover"
+            />
+          )}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Alcance</p>
+              <p className="font-semibold">{fmt(m.reach ?? 0)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Impresiones</p>
+              <p className="font-semibold">{fmt(m.impressions ?? 0)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Engagement</p>
+              <p className="font-semibold">{fmtPct(m.engagement_rate ?? 0)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Guardados</p>
+              <p className="font-semibold">{fmt(m.saves ?? 0)}</p>
+            </div>
+          </div>
+          {platforms.length > 0 ? (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {platforms.map((p, i) => (
+                <PlatformBadge key={i} platform={p.platform} status={p.status} url={p.url} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Sin desglose por red disponible para esta pieza.</p>
+          )}
+        </div>
+      ),
+    });
+  }
+
+  const kpiTiles = [
+    {
+      key: "reach",
+      label: "Alcance por publicación",
+      value: fmt(avg(reaches)),
+      sub: `Total ${fmt(sum(reaches))} en ${visibleMetrics.length} publicaciones`,
+      tooltip: "Reach real de Zernio Analytics: cuánta gente única vio cada pieza. Se muestra el promedio por publicación.",
+      onClick: () =>
+        openKpiDetail("Alcance por publicación", "Reach real por pieza (Zernio Analytics), de mayor a menor.", (m) => m.reach ?? 0),
+    },
+    {
+      key: "impressions",
+      label: "Impresiones por publicación",
+      value: fmt(avg(impressions)),
+      sub: `Total ${fmt(sum(impressions))} en ${visibleMetrics.length} publicaciones`,
+      tooltip: "Frecuencia de exposición real (Zernio Analytics), distinta del alcance único. Promedio por publicación.",
+      onClick: () =>
+        openKpiDetail("Impresiones por publicación", "Impresiones reales por pieza, de mayor a menor.", (m) => m.impressions ?? 0),
+    },
+    {
+      key: "eng-impression",
+      label: "Engagement sobre impresión",
+      value: fmtPct(engagementPerImpression),
+      sub: "(likes+comentarios+shares+guardados) / impresiones",
+      tooltip: "Columna generada en Postgres a partir de datos reales de Zernio — estándar de la plataforma para comparar histórico.",
+      onClick: () =>
+        openKpiDetail("Engagement sobre impresión", "Engagement rate real por pieza, de mayor a menor.", (m) => m.engagement_rate ?? 0, "%"),
+    },
+    {
+      key: "eng-reach",
+      label: "Engagement sobre alcance",
+      value: fmtPct(engagementPerReach),
+      sub: "Calculado sobre datos reales — más representativo de si el que vio, reaccionó",
+      tooltip: "Calculable a partir de metrics: (likes+comentarios+shares+guardados) / reach. No viene precalculado en la base.",
+      onClick: () =>
+        openKpiDetail(
+          "Engagement sobre alcance",
+          "Por pieza: (likes+comentarios+shares+guardados) / reach, de mayor a menor.",
+          (m) => (m.reach ? ((m.likes + m.comments + m.shares + m.saves) / m.reach) * 100 : 0),
+          "%"
+        ),
+    },
+    {
+      key: "saves",
+      label: "Guardados (saves)",
+      value: fmt(sum(saves)),
+      sub: "La señal de intención más fuerte en B2B, más que el like",
+      tooltip: "Total real de guardados (Zernio Analytics) en las publicaciones visibles.",
+      onClick: () => openKpiDetail("Guardados (saves)", "Guardados reales por pieza, de mayor a menor.", (m) => m.saves ?? 0),
+    },
+    {
+      key: "shares",
+      label: "Compartidos (shares)",
+      value: fmt(sum(shares)),
+      sub: "Validación social activa — alguien lo recomienda a un tercero",
+      tooltip: "Total real de compartidos (Zernio Analytics) en las publicaciones visibles.",
+      onClick: () => openKpiDetail("Compartidos (shares)", "Compartidos reales por pieza, de mayor a menor.", (m) => m.shares ?? 0),
+    },
+    {
+      key: "comments",
+      label: "Comentarios",
+      value: fmt(sum(comments)),
+      sub: "Proxy de conversación/consulta, más valioso que el like en servicios",
+      tooltip: "Total real de comentarios (Zernio Analytics) en las publicaciones visibles.",
+      onClick: () => openKpiDetail("Comentarios", "Comentarios reales por pieza, de mayor a menor.", (m) => m.comments ?? 0),
+    },
+    {
+      key: "clicks",
+      label: "Clics al enlace",
+      value: withClicks.length > 0 ? fmt(clicksTotal) : "—",
+      sub:
+        withClicks.length > 0
+          ? `${withClicks.length}/${visibleMetrics.length} publicaciones con datos de clics`
+          : "Columna agregada el 2026-08-07 — esperando que el collector corra sobre estas piezas",
+      tooltip:
+        "Zernio Analytics ya lo devolvía; metrics-collector lo descartaba al mapear hasta el 2026-08-07. Filas previas a esa fecha quedan sin dato (no en cero) hasta la próxima recolección.",
+      onClick: () =>
+        openKpiDetail(
+          "Clics al enlace",
+          "Clics reales por pieza (solo las que ya tienen dato recolectado), de mayor a menor.",
+          (m) => m.clicks,
+          ""
+        ),
+    },
+  ];
+
+  // Rendimiento por formato (2do KPI calculable: alcance/engagement
+  // promedio por formato) — se muestra como tabla, no como tile único,
+  // porque es inherentemente una comparación entre formatos.
+  const formatPerf = useMemo(() => {
+    const groups: Record<string, FlaggedMetricRow[]> = {};
+    for (const m of visibleMetrics) {
+      const f = m.proposals?.format || "post";
+      (groups[f] ??= []).push(m);
+    }
+    return Object.entries(groups)
+      .map(([format, items]) => ({
+        format,
+        count: items.length,
+        avgReach: avg(items.map((m) => m.reach ?? 0)),
+        avgEngagement: avg(items.map((m) => m.engagement_rate ?? 0)),
+      }))
+      .sort((a, b) => b.avgEngagement - a.avgEngagement);
+  }, [visibleMetrics]);
+
+  const ranking = useMemo(
+    () => [...visibleMetrics].sort((a, b) => (b.engagement_rate ?? 0) - (a.engagement_rate ?? 0)).slice(0, 5),
+    [visibleMetrics]
+  );
+
+  const publishedWithPlatforms = visibleMetrics.filter((m) => m.proposals?.status === "published");
+
+  // Chart de engagement por post (real, no mock) — antes mezclaba filas
+  // [TEST/QA] sin avisar (bug señalado en el brief); ahora sale de
+  // visibleMetrics (ya respeta el toggle) y marca visualmente las de prueba.
+  const engagementData = [...visibleMetrics]
+    .sort((a, b) => new Date(a.measured_at).getTime() - new Date(b.measured_at).getTime())
+    .slice(-7)
+    .map((m) => ({
+      name: (m.proposals?.hook || m.proposals?.title || "Post").slice(0, 15),
+      engagement: Math.round((m.engagement_rate || 0) * 100) / 100,
+      isTest: m.isTest,
+    }));
+
+  const metricCards = [
+    {
+      label: "Documentos en Bóveda",
+      value: String(documents?.length ?? 0),
+      sub: "Subí fotos para empezar a nutrir Stories.",
+      href: "/boveda",
+      icon: FileText,
+      accentClassName: "text-primary",
+    },
+    {
+      label: "Diálogos creados",
+      value: String(sessions?.length ?? 0),
+      sub: "Se cuentan cuando abrís una conversación en Mesa de Diálogo.",
+      href: "/mesa",
+      icon: MessageSquare,
+      accentClassName: "text-secondary",
+    },
+    {
+      label: "Contenidos generados",
+      value: String(proposals?.length ?? 0),
+      sub: "Últimos 30 días",
+      href: "/laboratorio",
+      icon: Sparkles,
+      accentClassName: "text-[#c9a30d]",
+    },
+    {
+      label: "Publicaciones programadas",
+      value: String(calendarEvents?.length ?? 0),
+      sub: "Vía Zernio, próximos 7 días",
+      href: "/calendario",
+      icon: Clock,
+      accentClassName: "text-primary",
+    },
+  ];
+
+  const formatCounts: Record<string, number> = {};
+  proposals?.forEach((p: any) => {
+    const format = p.format || "post";
+    formatCounts[format] = (formatCounts[format] || 0) + 1;
+  });
+  const formatData = Object.entries(formatCounts).map(([name, value]) => ({ name, value }));
+
+  const recentActivity = (proposals || [])
+    .filter((p: any) => p.status === "published" || p.status === "scheduled" || p.status === "pending")
+    .map((p: any) => ({
+      ...p,
+      displayDate: p.published_at || p.scheduled_at || p.created_at,
+    }))
+    .sort((a: any, b: any) => new Date(b.displayDate).getTime() - new Date(a.displayDate).getTime())
+    .slice(0, 5);
+
+  const lastSync = visibleMetrics.reduce<string | null>((latest, m) => {
+    if (!m.measured_at) return latest;
+    return !latest || new Date(m.measured_at) > new Date(latest) ? m.measured_at : latest;
+  }, null);
+
+  return (
+    <div className="space-y-7">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[32px] font-medium leading-tight text-primary">Dashboard</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Centro de control del Estratega Digital Autónomo
+            {lastSync && (
+              <>
+                {" "}
+                · última métrica sincronizada:{" "}
+                {new Date(lastSync).toLocaleString("es-AR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+              </>
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3.5 py-2">
+          <Switch id="show-test-rows" checked={showTestRows} onCheckedChange={setShowTestRows} />
+          <label htmlFor="show-test-rows" className="cursor-pointer text-xs font-medium">
+            Mostrar filas de prueba
+            {testCount > 0 && (
+              <span className="ml-1.5 text-muted-foreground">
+                ({testCount} excluida{testCount === 1 ? "" : "s"} por defecto)
+              </span>
+            )}
+          </label>
+        </div>
+      </div>
+
+      {/* Quick start banner for new users */}
+      {!hasData && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="flex items-center gap-4 p-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+              <Zap className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium">Empezá subiendo documentos de marca</p>
+              <p className="text-sm text-muted-foreground">
+                Los agentes necesitan contexto sobre tu marca para generar contenido estratégico.
+              </p>
+            </div>
+            <Link to="/boveda">
+              <Button>
+                Subir documentos
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Resumen operativo del sistema */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {metricCards.map((m) => (
+          <Link key={m.label} to={m.href}>
+            <Card className="h-full transition-colors hover:bg-muted/40">
+              <CardContent className="flex flex-col gap-2.5 p-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12.5px] font-semibold text-muted-foreground">{m.label}</span>
+                  <m.icon className={cn("h-4 w-4 flex-shrink-0", m.accentClassName)} />
+                </div>
+                <p className="text-[34px] font-medium leading-none text-primary [font-family:var(--font-display)]">
+                  {m.value}
+                </p>
+                <p className="text-xs text-muted-foreground">{m.sub}</p>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
+
+      {/* KPIs reales de rendimiento social (Fase A, 2026-08-07) */}
+      <div>
+        <h2 className="mb-3 text-[17px] font-medium">Rendimiento real (Instagram + Facebook)</h2>
+        <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          {kpiTiles.map((t) => (
+            <KpiTile key={t.key} label={t.label} value={t.value} sub={t.sub} tooltip={t.tooltip} onClick={t.onClick} />
+          ))}
+        </div>
+      </div>
+
+      {/* KPIs sin fuente conectada */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-[17px] font-medium">KPIs sin fuente de datos conectada</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Definidos en el brief de rediseño, pero ninguna fuente real los provee hoy — no se inventan, se documentan.
+          </p>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {NO_SOURCE_KPIS.map((k) => (
+              <div key={k.label} className="flex items-start gap-2.5 text-[13px]">
+                <HelpCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                <div>
+                  <span className="font-medium">{k.label}</span>
+                  <span className="text-muted-foreground"> — {k.reason}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Resumen por red */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-[17px] font-medium">Resumen por red</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground">Total combinado (Instagram + Facebook)</p>
+            <p className="text-2xl font-medium text-primary [font-family:var(--font-display)]">
+              {visibleMetrics.length} pieza{visibleMetrics.length === 1 ? "" : "s"} con métricas reales
+            </p>
+          </div>
+          <div className="flex items-start gap-2 rounded-md border border-dashed border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+            <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+            <span>
+              Zernio Analytics devuelve un agregado único por post — no hay desglose de alcance/likes/etc. entre
+              Instagram y Facebook cuando la misma pieza sale en ambas redes. Lo que sí es real por red es el status
+              de publicación y el link (abajo).
+            </span>
+          </div>
+          {platformsError && (
+            <p className="text-xs text-destructive">
+              No se pudo traer el desglose por red ahora mismo (historial.json). El resto del Dashboard sigue funcionando normal.
+            </p>
+          )}
+          {publishedWithPlatforms.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Todavía no hay piezas publicadas con métricas.</p>
+          ) : (
+            <div className="flex flex-col">
+              {publishedWithPlatforms.slice(0, 6).map((m) => {
+                const platforms = platformsByProposal?.get(m.proposals?.id) ?? [];
+                return (
+                  <button
+                    type="button"
+                    key={m.id}
+                    onClick={() => openPieceDetail(m)}
+                    className="flex flex-wrap items-center gap-2 border-b border-border py-2.5 text-left last:border-0 hover:bg-muted/40"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+                      {m.proposals?.hook || m.proposals?.title}
+                    </span>
+                    {platforms.length > 0 ? (
+                      platforms.map((p, i) => <PlatformBadge key={i} platform={p.platform} status={p.status} url={p.url} />)
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Sin desglose por red</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Charts row */}
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-[17px] font-medium">Engagement por post</CardTitle>
+            {engagementData.length > 0 && (
+              <span className="text-xs text-muted-foreground">Últimos {engagementData.length} posts</span>
+            )}
+          </CardHeader>
+          <CardContent>
+            {engagementData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={engagementData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="name" className="text-xs" />
+                  <YAxis className="text-xs" />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Bar dataKey="engagement" radius={[4, 4, 0, 0]} name="Engagement %">
+                    {engagementData.map((d, i) => (
+                      <Cell key={i} fill={d.isTest ? "#F7CC13" : "#1A3D84"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-[220px] flex-col items-center justify-center px-6 text-center">
+                <p className="text-[13.5px] font-semibold">
+                  Todavía no hay publicaciones con datos de engagement.
+                </p>
+                <p className="mt-1 text-[12.5px] text-muted-foreground">
+                  Se completa solo cuando Zernio confirma la primera publicación en Instagram o Facebook — no hay nada más que hacer acá.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-[17px] font-medium">Distribución por formato</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {formatData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={formatData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={72}
+                    fill="#1A3D84"
+                    dataKey="value"
+                  >
+                    {formatData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-[220px] flex-col items-center justify-center px-6 text-center">
+                <p className="text-[13.5px] font-semibold">Sin piezas generadas todavía.</p>
+                <p className="mt-1 text-[12.5px] text-muted-foreground">
+                  Subí material a la Bóveda o armá una pieza para empezar a ver la mezcla de formatos.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Rendimiento por formato (2do KPI calculable) */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-[17px] font-medium">Alcance y engagement promedio por formato</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {formatPerf.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin métricas todavía para comparar formatos.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Formato</TableHead>
+                  <TableHead className="text-right">Piezas</TableHead>
+                  <TableHead className="text-right">Alcance promedio</TableHead>
+                  <TableHead className="text-right">Engagement promedio</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {formatPerf.map((f) => (
+                  <TableRow key={f.format}>
+                    <TableCell className="font-medium capitalize">{f.format}</TableCell>
+                    <TableCell className="text-right">{f.count}</TableCell>
+                    <TableCell className="text-right">{fmt(f.avgReach)}</TableCell>
+                    <TableCell className="text-right">{fmtPct(f.avgEngagement)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Ranking de piezas más exitosas */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
+          <Trophy className="h-4 w-4 text-[#c9a30d]" />
+          <CardTitle className="text-[17px] font-medium">Ranking de piezas más exitosas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {ranking.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin piezas con métricas todavía.</p>
+          ) : (
+            <div className="flex flex-col">
+              {ranking.map((m, i) => (
+                <button
+                  type="button"
+                  key={m.id}
+                  onClick={() => openPieceDetail(m)}
+                  className="flex items-center gap-3.5 border-b border-border py-3 text-left last:border-0 hover:bg-muted/40"
+                >
+                  <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                    {i + 1}
+                  </span>
+                  {m.proposals?.rendered_image_path ? (
+                    <img
+                      src={`${RAW_BASE_URL}/${m.proposals.rendered_image_path}`}
+                      alt=""
+                      className="h-10 w-10 flex-shrink-0 rounded-md border border-border object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-muted">
+                      <Sparkles className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate text-[13.5px] font-semibold">
+                        {m.proposals?.hook || m.proposals?.title || "Post sin título"}
+                      </p>
+                      {m.isTest && (
+                        <Badge variant="outline" className="flex-shrink-0 border-[#F7CC13] text-[#c9a30d]">
+                          PRUEBA
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-[11.5px] text-muted-foreground">
+                      {m.proposals?.format || "post"} · alcance {fmt(m.reach ?? 0)}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="flex-shrink-0">
+                    {fmtPct(m.engagement_rate ?? 0)}
+                  </Badge>
+                </button>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Insights semilla */}
+      <div>
+        <h2 className="mb-1 text-[17px] font-medium">Insights</h2>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Análisis validado con datos reales (Meta Business Suite + IconSquare, agosto 2026) — semilla de arranque
+          hasta que el motor de insights con IA se conecte.
+        </p>
+        <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+          {SEED_INSIGHTS.map((insight) => (
+            <Card key={insight.id}>
+              <CardContent className="flex h-full flex-col gap-2 p-4">
+                <Badge variant="secondary" className="w-fit text-[10px]">
+                  Validado con datos reales
+                </Badge>
+                <p className="text-[13.5px] font-semibold leading-snug">{insight.title}</p>
+                <p className="flex-1 text-[12.5px] text-muted-foreground">{insight.body}</p>
+                <p className="border-t border-border pt-2 text-[11px] text-muted-foreground/80">{insight.evidence}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Pending approvals */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-[17px] font-medium">Aprobaciones pendientes</CardTitle>
+          {pendingProposals && pendingProposals.length > 0 && (
+            <Badge variant="secondary">{pendingProposals.length}</Badge>
+          )}
+        </CardHeader>
+        <CardContent>
+          {!pendingProposals || pendingProposals.length === 0 ? (
+            <div className="flex flex-col items-center py-8 text-center">
+              <Clock className="mb-3 h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">
+                No hay contenido pendiente de aprobación.
+              </p>
+              {hasData && (
+                <Link to="/mesa" className="mt-3">
+                  <Button variant="outline" size="sm">
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Crear nueva sesión
+                  </Button>
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {pendingProposals.slice(0, 5).map((p: any) => (
+                <Link
+                  key={p.id}
+                  to="/laboratorio"
+                  className="-mx-1 flex items-center gap-3.5 rounded-md border-b border-border px-1 py-3 transition-colors last:border-0 hover:bg-muted/40"
+                >
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-muted">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13.5px] font-semibold">{p.title || "Sin título"}</p>
+                    <p className="truncate text-[11.5px] text-muted-foreground">
+                      {p.dialogue_sessions?.topic || "Sin tema"}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="flex-shrink-0">{p.format || "post"}</Badge>
+                </Link>
+              ))}
+              {pendingProposals.length > 5 && (
+                <Link to="/laboratorio" className="mt-2 text-center text-sm font-medium text-primary hover:underline">
+                  Ver todas ({pendingProposals.length})
+                </Link>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Últimas publicaciones */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-[17px] font-medium">Últimas publicaciones</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recentActivity.length === 0 ? (
+            <div className="flex h-32 flex-col items-center justify-center text-center">
+              <History className="mb-3 h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">
+                Todavía no hay propuestas publicadas, programadas ni pendientes.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {recentActivity.map((p: any) => {
+                const statusMeta = STATUS_META[p.status] ?? STATUS_META.pending;
+                return (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-3.5 border-b border-border py-3 last:border-0"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13.5px] font-semibold">
+                        {p.hook || p.title || p.dialogue_sessions?.topic || "Sin título"}
+                      </p>
+                      <p className="text-[11.5px] text-muted-foreground">
+                        {statusMeta.dateLabel}:{" "}
+                        {new Date(p.displayDate).toLocaleDateString("es-AR", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="flex-shrink-0">
+                      {p.format || "post"}
+                    </Badge>
+                    <Badge variant={statusMeta.variant} className="flex-shrink-0">
+                      {statusMeta.label}
+                    </Badge>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Calendar */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-[17px] font-medium">Calendario de contenido</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!calendarEvents || calendarEvents.length === 0 ? (
+            <div className="flex h-40 flex-col items-center justify-center text-center">
+              <CalendarDays className="mb-3 h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">
+                No hay publicaciones programadas.
+              </p>
+              <Link to="/calendario" className="mt-3">
+                <Button variant="outline" size="sm">
+                  <CalendarDays className="mr-2 h-3 w-3" />
+                  Ir al calendario
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {calendarEvents.slice(0, 7).map((e: any) => (
+                <div
+                  key={e.id}
+                  className="flex items-center gap-3.5 border-b border-border py-3 last:border-0"
+                >
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-muted">
+                    <CalendarDays className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13.5px] font-semibold">{e.title}</p>
+                    <p className="text-[11.5px] text-muted-foreground">
+                      {new Date(e.date).toLocaleDateString("es-AR")}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="flex-shrink-0">{e.format}</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{detail?.title}</DialogTitle>
+            {detail?.description && <DialogDescription>{detail.description}</DialogDescription>}
+          </DialogHeader>
+          {detail?.content}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+```
+
+### `src/pages/Propuestas.tsx`
+
+```typescript
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+  CheckCircle,
+  Clock,
+  Loader2,
+  Calendar,
+  Copy,
+  Check,
+  FileText,
+  LayoutTemplate,
+  Plus,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import { useProposals, usePendingProposals, useTemplates, useCreateTemplate, useUpdateTemplate, useDeleteTemplate } from "@/hooks/useProposals";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { toast } from "@/components/ui/use-toast";
+import { PipelineBadge } from "@/components/PipelineBadge";
+import { ProposalDetailDialog, type ProposalDetail } from "@/components/ProposalDetailDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+
+// Filtro por tipo de posteo, sobre el campo proposals.format. "historia" es
+// el valor real que usa el código (extractProposal en orchestrator/index.ts)
+// para lo que acá se etiqueta "Story". "video" todavía no lo genera nada
+// (ni orchestrator ni el pipeline de publicación) — el tab existe igual,
+// a propósito, para no ocultar la categoría aunque hoy esté vacía. No es
+// convertible (proposals_format_check ni siquiera lo permite).
+const FORMATOS: { value: string; label: string }[] = [
+  { value: "all", label: "Todos" },
+  { value: "post", label: "Post Feed" },
+  { value: "carrusel", label: "Carrusel" },
+  { value: "historia", label: "Story" },
+  { value: "video", label: "Video" },
+];
+
+const TEMPLATE_FORMATS = FORMATOS.filter((f) => f.value !== "all" && f.value !== "video");
+
+const STATUS_META: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
+  pending: { label: "Pendiente", variant: "secondary" },
+  approved: { label: "Aprobada", variant: "default" },
+  rejected: { label: "Rechazada", variant: "destructive" },
+  scheduled: { label: "Programada", variant: "outline" },
+  published: { label: "Publicada", variant: "default" },
+};
+
+export default function Propuestas() {
+  return (
+    <ErrorBoundary>
+      <TooltipProvider delayDuration={150}>
+        <PropuestasContent />
+      </TooltipProvider>
+    </ErrorBoundary>
+  );
+}
+
+function PropuestasContent() {
+  const { data: allProposals, isLoading } = useProposals();
+  const { data: pendingProposals } = usePendingProposals();
+
+  // Se guarda el id, no el objeto — así el modal siempre muestra el estado
+  // real después de aprobar/reprogramar/convertir sin cerrarlo (antes
+  // quedaba mostrando el snapshot viejo de cuando se abrió, aunque la
+  // mutación ya hubiera pegado en Supabase).
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [formatFilter, setFormatFilter] = useState<string>("all");
+
+  const selectedProposal: ProposalDetail | null = selectedProposalId
+    ? (allProposals || []).find((p: ProposalDetail) => p.id === selectedProposalId) ?? null
+    : null;
+
+  const handleCopy = (proposal: ProposalDetail) => {
+    const text = [proposal.hook, "", proposal.body, "", proposal.cta, "", ...(proposal.hashtags || [])]
+      .filter((l) => l !== null && l !== undefined)
+      .join("\n");
+    navigator.clipboard.writeText(text);
+    setCopiedId(proposal.id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const matchesFormat = (p: ProposalDetail) => formatFilter === "all" || p.format === formatFilter;
+  const filteredProposals: ProposalDetail[] = (allProposals || []).filter(matchesFormat);
+  const filteredPending: ProposalDetail[] = (pendingProposals || []).filter(matchesFormat);
+
+  const approved = filteredProposals.filter((p) => p.status === "approved");
+  const scheduled = filteredProposals.filter((p) => p.status === "scheduled");
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Propuestas de Contenido</h1>
+        <p className="mt-1 text-muted-foreground">
+          Los posts y carruseles de feed se agendan y publican solos (mirá el badge "Se publica solo" en cada
+          pieza). Esta pantalla es el monitor: click en cualquier pieza abre el detalle, con todas las acciones
+          reales — aprobar, rechazar, agendar, editar, borrar o convertir formato.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {FORMATOS.map((f) => (
+          <Button
+            key={f.value}
+            type="button"
+            size="sm"
+            variant={formatFilter === f.value ? "default" : "outline"}
+            onClick={() => setFormatFilter(f.value)}
+          >
+            {f.label}
+          </Button>
+        ))}
+      </div>
+
+      <Tabs defaultValue="pending">
+        <TabsList>
+          <TabsTrigger value="pending" className="gap-1.5">
+            <Clock className="h-3.5 w-3.5" />
+            Pendientes
+            {filteredPending.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+                {filteredPending.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="approved">
+            <CheckCircle className="h-3.5 w-3.5" />
+            Aprobadas
+          </TabsTrigger>
+          <TabsTrigger value="scheduled">
+            <Calendar className="h-3.5 w-3.5" />
+            Programadas
+          </TabsTrigger>
+          <TabsTrigger value="all">Todas</TabsTrigger>
+          <TabsTrigger value="templates" className="gap-1.5">
+            <LayoutTemplate className="h-3.5 w-3.5" />
+            Plantillas
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pending" className="mt-6">
+          {isLoading ? (
+            <div className="flex h-48 items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredPending.length === 0 ? (
+            <EmptyState
+              icon={CheckCircle}
+              text={
+                formatFilter === "all"
+                  ? "No hay propuestas pendientes"
+                  : `No hay propuestas pendientes de tipo "${FORMATOS.find((f) => f.value === formatFilter)?.label}"`
+              }
+              sub="Cuando los agentes generen contenido, aparecerá acá para tu aprobación."
+            />
+          ) : (
+            <div className="space-y-3">
+              {filteredPending.map((p) => (
+                <ProposalListItem
+                  key={p.id}
+                  proposal={p}
+                  onOpen={() => setSelectedProposalId(p.id)}
+                  onCopy={() => handleCopy(p)}
+                  copied={copiedId === p.id}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="approved" className="mt-6">
+          {approved.length === 0 ? (
+            <EmptyState icon={FileText} text="No hay propuestas aprobadas aún." />
+          ) : (
+            <div className="space-y-3">
+              {approved.map((p) => (
+                <ProposalListItem
+                  key={p.id}
+                  proposal={p}
+                  onOpen={() => setSelectedProposalId(p.id)}
+                  onCopy={() => handleCopy(p)}
+                  copied={copiedId === p.id}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="scheduled" className="mt-6">
+          <p className="mb-4 text-xs text-muted-foreground">
+            Los posts y carruseles se agendan solos apenas los aprueba el Crítico en Mesa de Diálogo. Abrí la
+            pieza para reprogramarla o cancelarla antes de que salga.
+          </p>
+          {scheduled.length === 0 ? (
+            <EmptyState icon={Calendar} text="No hay propuestas programadas." />
+          ) : (
+            <div className="space-y-3">
+              {scheduled.map((p) => (
+                <ProposalListItem
+                  key={p.id}
+                  proposal={p}
+                  onOpen={() => setSelectedProposalId(p.id)}
+                  onCopy={() => handleCopy(p)}
+                  copied={copiedId === p.id}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="all" className="mt-6">
+          {filteredProposals.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              text={
+                formatFilter === "all"
+                  ? "No hay propuestas todavía."
+                  : `No hay propuestas de tipo "${FORMATOS.find((f) => f.value === formatFilter)?.label}" todavía.`
+              }
+            />
+          ) : (
+            <div className="space-y-3">
+              {filteredProposals.map((p) => (
+                <ProposalListItem
+                  key={p.id}
+                  proposal={p}
+                  onOpen={() => setSelectedProposalId(p.id)}
+                  onCopy={() => handleCopy(p)}
+                  copied={copiedId === p.id}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="templates" className="mt-6">
+          <TemplatesSection />
+        </TabsContent>
+      </Tabs>
+
+      <ProposalDetailDialog
+        proposal={selectedProposal}
+        open={!!selectedProposal}
+        onOpenChange={(open) => !open && setSelectedProposalId(null)}
+      />
+    </div>
+  );
+}
+
+function EmptyState({ icon: Icon, text, sub }: { icon: typeof FileText; text: string; sub?: string }) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col items-center py-12">
+        <Icon className="mb-3 h-8 w-8 text-muted-foreground/50" />
+        <p className="text-sm text-muted-foreground">{text}</p>
+        {sub && <p className="mt-1 text-xs text-muted-foreground/70">{sub}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProposalListItem({
+  proposal,
+  onOpen,
+  onCopy,
+  copied,
+}: {
+  proposal: ProposalDetail;
+  onOpen: () => void;
+  onCopy: () => void;
+  copied: boolean;
+}) {
+  const status = STATUS_META[proposal.status || "pending"] || STATUS_META.pending;
+
+  return (
+    <Card className="transition-colors hover:bg-muted/40">
+      <CardContent className="flex items-start justify-between gap-3 p-4">
+        <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
+          <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+            <PipelineBadge format={proposal.format} />
+            <Badge variant="outline" className="text-[10px]">
+              {proposal.format || "post"}
+            </Badge>
+            <Badge variant={status.variant} className="text-[10px]">
+              {status.label}
+            </Badge>
+          </div>
+          <p className="truncate text-sm font-semibold">{proposal.hook || proposal.title || "Sin título"}</p>
+          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{proposal.body}</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {proposal.scheduled_at
+              ? `Programada: ${new Date(proposal.scheduled_at).toLocaleDateString("es-AR")}`
+              : proposal.created_at
+              ? `Creada: ${new Date(proposal.created_at).toLocaleDateString("es-AR")}`
+              : null}
+          </p>
+        </button>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onCopy}>
+          {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════
+// PLANTILLAS — solo estructura (listar/crear/editar), sin motor de render
+// (ver migración 010_templates.sql). Se conecta a futuro con
+// templates/post-template.html y templates/story-template.html.
+// ═══════════════════════════════════════
+
+interface TemplateRecord {
+  id: string;
+  name: string;
+  format: string;
+  notes: string | null;
+}
+
+function TemplatesSection() {
+  const { data: templates, isLoading } = useTemplates();
+  const createMutation = useCreateTemplate();
+  const updateMutation = useUpdateTemplate();
+  const deleteMutation = useDeleteTemplate();
+
+  const [editing, setEditing] = useState<TemplateRecord | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<TemplateRecord | null>(null);
+  const [form, setForm] = useState({ name: "", format: "post", notes: "" });
+
+  const openCreate = () => {
+    setForm({ name: "", format: "post", notes: "" });
+    setEditing(null);
+    setIsCreating(true);
+  };
+
+  const openEdit = (t: TemplateRecord) => {
+    setForm({ name: t.name, format: t.format, notes: t.notes || "" });
+    setEditing(t);
+    setIsCreating(true);
+  };
+
+  const handleSave = () => {
+    if (!form.name.trim()) return;
+    if (editing) {
+      updateMutation.mutate(
+        { id: editing.id, fields: form },
+        {
+          onSuccess: () => {
+            setIsCreating(false);
+            toast({ title: "Plantilla actualizada" });
+          },
+          onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+        }
+      );
+    } else {
+      createMutation.mutate(form, {
+        onSuccess: () => {
+          setIsCreating(false);
+          toast({ title: "Plantilla creada" });
+        },
+        onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+      });
+    }
+  };
+
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+    deleteMutation.mutate(deleteTarget.id, {
+      onSuccess: () => {
+        setDeleteTarget(null);
+        toast({ title: "Plantilla borrada" });
+      },
+      onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          Estructura de plantillas reutilizables — todavía sin motor de render (eso viene después). Real, no de
+          mentira: se guardan en Supabase.
+        </p>
+        <Button size="sm" onClick={openCreate}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          Nueva plantilla
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex h-32 items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : !templates || templates.length === 0 ? (
+        <EmptyState icon={LayoutTemplate} text="Sin plantillas todavía." sub="Creá la primera con el botón de arriba." />
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {templates.map((t: TemplateRecord) => (
+            <Card key={t.id}>
+              <CardContent className="flex items-start justify-between gap-3 p-4">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-center gap-1.5">
+                    <Badge variant="outline" className="text-[10px]">
+                      {t.format}
+                    </Badge>
+                  </div>
+                  <p className="truncate text-sm font-semibold">{t.name}</p>
+                  {t.notes && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{t.notes}</p>}
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(t)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive"
+                    onClick={() => setDeleteTarget(t)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={isCreating} onOpenChange={setIsCreating}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editing ? "Editar plantilla" : "Nueva plantilla"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Nombre</Label>
+              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Formato</Label>
+              <Select value={form.format} onValueChange={(v) => setForm((f) => ({ ...f, format: v }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TEMPLATE_FORMATS.map((f) => (
+                    <SelectItem key={f.value} value={f.value}>
+                      {f.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notas</Label>
+              <Textarea
+                rows={3}
+                placeholder="Dirección visual, cuándo usarla, etc."
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsCreating(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={!form.name.trim() || createMutation.isPending || updateMutation.isPending}
+              >
+                {(createMutation.isPending || updateMutation.isPending) && (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                )}
+                {editing ? "Guardar" : "Crear"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="¿Borrar esta plantilla?"
+        description="No se puede deshacer."
+        confirmText="Borrar"
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
+    </div>
+  );
+}
+```
+
+### `src/pages/Calendario.tsx`
+
+```typescript
+import { useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { CalendarDays, Loader2, ChevronLeft, ChevronRight, Clock, Zap, Hand } from "lucide-react";
+import { useProposals, useRescheduleProposal } from "@/hooks/useProposals";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { cn } from "@/lib/utils";
+import { toast } from "@/components/ui/use-toast";
+import { isAutonomousFormat } from "@/components/PipelineBadge";
+import { ProposalDetailDialog, type ProposalDetail } from "@/components/ProposalDetailDialog";
+
+const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+// Mismo tratamiento que el Dashboard (rediseño 2026-08-07): las filas
+// [TEST/QA] sembradas para probar rule-engine ya se limpiaron de la base
+// (2026-08-05), pero el filtro queda por si vuelven a aparecer — nunca
+// mezcladas sin aviso.
+const TEST_PROPOSAL_PREFIX = "7e57da7a-";
+function isTestProposal(p: ProposalDetail): boolean {
+  return Boolean(p.id?.startsWith(TEST_PROPOSAL_PREFIX));
+}
+
+function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function getFirstDayOfMonth(year: number, month: number) {
+  const day = new Date(year, month, 1).getDay();
+  return day === 0 ? 6 : day - 1; // Monday = 0
+}
+
+function getWeekStart(d: Date) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function dayKey(d: Date) {
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+export default function Calendario() {
+  return (
+    <ErrorBoundary>
+      <TooltipProvider delayDuration={150}>
+        <CalendarioContent />
+      </TooltipProvider>
+    </ErrorBoundary>
+  );
+}
+
+function CalendarioContent() {
+  const { data: proposals, isLoading } = useProposals();
+  const rescheduleMutation = useRescheduleProposal();
+
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<"month" | "week">("month");
+  // Se guarda el id, no el objeto — mismo motivo que en Propuestas.tsx: el
+  // modal tiene que reflejar el estado real después de reprogramar/aprobar/
+  // convertir sin cerrarlo, no el snapshot de cuando se abrió.
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
+  const [showTestRows, setShowTestRows] = useState(false);
+  const [draggedProposal, setDraggedProposal] = useState<ProposalDetail | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+
+  const selectedProposal: ProposalDetail | null = selectedProposalId
+    ? (proposals || []).find((p: ProposalDetail) => p.id === selectedProposalId) ?? null
+    : null;
+
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const daysInMonth = getDaysInMonth(year, month);
+  const firstDay = getFirstDayOfMonth(year, month);
+  const weekStart = getWeekStart(currentDate);
+
+  const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+  const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+  const prevWeek = () => setCurrentDate(new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000));
+  const nextWeek = () => setCurrentDate(new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000));
+
+  const monthName = currentDate.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+  const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000);
+  const weekLabel = `${weekStart.toLocaleDateString("es-AR", { day: "numeric", month: "short" })} – ${weekEnd.toLocaleDateString("es-AR", { day: "numeric", month: "short" })}`;
+
+  // Este calendario sigue siendo la fuente real: proposals.scheduled_at.
+  // Antes existía un "Nuevo evento" que escribía en calendar_events sin
+  // relación con lo que se publicaba de verdad — se saca esa promesa falsa
+  // en vez de mantenerla. Agendar/cancelar/editar de verdad vive acá mismo
+  // ahora (modal compartido con Propuestas), en vez de en otra pantalla.
+  const allEvents: (ProposalDetail & { isTest: boolean })[] = useMemo(
+    () =>
+      (proposals || [])
+        .filter((p: ProposalDetail) => (p.status === "scheduled" || p.status === "published") && p.scheduled_at)
+        .map((p: ProposalDetail) => ({ ...p, isTest: isTestProposal(p) })),
+    [proposals]
+  );
+  const testCount = allEvents.filter((e) => e.isTest).length;
+  const events = showTestRows ? allEvents : allEvents.filter((e) => !e.isTest);
+
+  const eventsByDay: Record<string, (ProposalDetail & { isTest: boolean })[]> = {};
+  events.forEach((p) => {
+    const d = new Date(p.scheduled_at!);
+    const key = dayKey(d);
+    if (!eventsByDay[key]) eventsByDay[key] = [];
+    eventsByDay[key].push(p);
+  });
+
+  const now = new Date();
+  const nextWeekLimit = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const upcoming = events
+    .filter((p) => {
+      const d = new Date(p.scheduled_at!);
+      return d >= now && d <= nextWeekLimit;
+    })
+    .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime());
+
+  function handleDrop(targetDate: Date) {
+    setDragOverKey(null);
+    if (!draggedProposal || !draggedProposal.scheduled_at) return;
+    if (draggedProposal.status !== "scheduled") return; // solo lo programado se puede reprogramar arrastrando
+    const original = new Date(draggedProposal.scheduled_at);
+    const newDate = new Date(
+      targetDate.getFullYear(),
+      targetDate.getMonth(),
+      targetDate.getDate(),
+      original.getHours(),
+      original.getMinutes()
+    );
+    if (dayKey(newDate) === dayKey(original)) {
+      setDraggedProposal(null);
+      return;
+    }
+    const proposalId = draggedProposal.id;
+    rescheduleMutation.mutate(
+      { id: proposalId, date: newDate.toISOString() },
+      {
+        onSuccess: () =>
+          toast({
+            title: "Fecha actualizada",
+            description: `Movida al ${newDate.toLocaleDateString("es-AR", { day: "numeric", month: "short" })}`,
+          }),
+        onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+      }
+    );
+    setDraggedProposal(null);
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Calendario Editorial</h1>
+          <p className="mt-1 text-muted-foreground">
+            Fuente real: lo que se agenda y publica solo. Click en una pieza para ver el detalle completo o
+            arrastrala a otro día para reprogramarla. Para cancelar algo antes de que salga, también se hace
+            acá mismo, desde el detalle.
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3.5 py-2">
+          <Switch id="show-test-rows-cal" checked={showTestRows} onCheckedChange={setShowTestRows} />
+          <label htmlFor="show-test-rows-cal" className="cursor-pointer text-xs font-medium">
+            Mostrar filas de prueba
+            {testCount > 0 && <span className="ml-1.5 text-muted-foreground">({testCount} excluidas)</span>}
+          </label>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant={viewMode === "month" ? "default" : "outline"}
+          onClick={() => setViewMode("month")}
+        >
+          Mensual
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={viewMode === "week" ? "default" : "outline"}
+          onClick={() => setViewMode("week")}
+        >
+          Semanal
+        </Button>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <Button variant="ghost" size="icon" onClick={viewMode === "month" ? prevMonth : prevWeek}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <CardTitle className="text-base capitalize">{viewMode === "month" ? monthName : weekLabel}</CardTitle>
+            <Button variant="ghost" size="icon" onClick={viewMode === "month" ? nextMonth : nextWeek}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex h-64 items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : viewMode === "month" ? (
+              <div className="grid grid-cols-7 gap-1">
+                {WEEKDAYS.map((d) => (
+                  <div key={d} className="p-2 text-center text-xs font-medium text-muted-foreground">
+                    {d}
+                  </div>
+                ))}
+                {Array.from({ length: firstDay }).map((_, i) => (
+                  <div key={`empty-${i}`} className="p-2" />
+                ))}
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const day = i + 1;
+                  const date = new Date(year, month, day);
+                  const key = dayKey(date);
+                  const isToday =
+                    day === now.getDate() && month === now.getMonth() && year === now.getFullYear();
+                  return (
+                    <DayCell
+                      key={day}
+                      date={date}
+                      label={String(day)}
+                      compact
+                      events={eventsByDay[key] || []}
+                      isToday={isToday}
+                      isDragOver={dragOverKey === key}
+                      onDragEnter={() => setDragOverKey(key)}
+                      onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
+                      onDrop={() => handleDrop(date)}
+                      onSelect={(p) => setSelectedProposalId(p.id)}
+                      onDragStartEvent={setDraggedProposal}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-7 gap-2">
+                {Array.from({ length: 7 }).map((_, i) => {
+                  const date = new Date(weekStart.getTime() + i * 24 * 60 * 60 * 1000);
+                  const key = dayKey(date);
+                  const isToday = dayKey(date) === dayKey(now);
+                  return (
+                    <div key={key}>
+                      <p className="mb-1.5 text-center text-xs font-medium text-muted-foreground">
+                        {WEEKDAYS[i]} <span className={isToday ? "text-primary" : ""}>{date.getDate()}</span>
+                      </p>
+                      <DayCell
+                        date={date}
+                        label=""
+                        compact={false}
+                        events={eventsByDay[key] || []}
+                        isToday={isToday}
+                        isDragOver={dragOverKey === key}
+                        onDragEnter={() => setDragOverKey(key)}
+                        onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
+                        onDrop={() => handleDrop(date)}
+                        onSelect={(p) => setSelectedProposalId(p.id)}
+                        onDragStartEvent={setDraggedProposal}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Próximos 7 días</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {upcoming.length === 0 ? (
+              <div className="flex flex-col items-center py-8">
+                <CalendarDays className="mb-3 h-8 w-8 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">Sin publicaciones agendadas</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {upcoming.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSelectedProposalId(p.id)}
+                    className="flex w-full items-start gap-2 rounded-lg border p-3 text-left transition-colors hover:bg-muted/40"
+                  >
+                    <Clock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-sm font-medium">{p.hook || p.title || "Sin título"}</p>
+                        {p.isTest && (
+                          <Badge variant="outline" className="shrink-0 border-[#F7CC13] text-[10px] text-[#c9a30d]">
+                            PRUEBA
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(p.scheduled_at!).toLocaleDateString("es-AR", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                      <div className="mt-1 flex items-center gap-1">
+                        <Badge variant="outline" className="text-[10px]">
+                          {p.format || "post"}
+                        </Badge>
+                        {isAutonomousFormat(p.format) ? (
+                          <Zap className="h-3 w-3 text-primary" />
+                        ) : (
+                          <Hand className="h-3 w-3 text-[#c9a30d]" />
+                        )}
+                        <Badge variant={p.status === "published" ? "default" : "secondary"} className="text-[10px]">
+                          {p.status === "published" ? "Publicada" : "Programada"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <ProposalDetailDialog
+        proposal={selectedProposal}
+        open={!!selectedProposal}
+        onOpenChange={(open) => !open && setSelectedProposalId(null)}
+      />
+    </div>
+  );
+}
+
+function DayCell({
+  date,
+  label,
+  compact,
+  events,
+  isToday,
+  isDragOver,
+  onDragEnter,
+  onDragLeave,
+  onDrop,
+  onSelect,
+  onDragStartEvent,
+}: {
+  date: Date;
+  label: string;
+  compact: boolean;
+  events: (ProposalDetail & { isTest: boolean })[];
+  isToday: boolean;
+  isDragOver: boolean;
+  onDragEnter: () => void;
+  onDragLeave: () => void;
+  onDrop: () => void;
+  onSelect: (p: ProposalDetail) => void;
+  onDragStartEvent: (p: ProposalDetail) => void;
+}) {
+  const maxVisible = compact ? 2 : 6;
+  return (
+    <div
+      onDragOver={(e) => e.preventDefault()}
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop();
+      }}
+      className={cn(
+        "rounded-lg border p-1.5 transition-colors",
+        compact ? "min-h-[80px]" : "min-h-[220px]",
+        isToday ? "border-primary bg-primary/5" : "border-transparent",
+        isDragOver && "border-primary bg-primary/10"
+      )}
+    >
+      {label && (
+        <p className={cn("mb-1 text-xs font-medium", isToday ? "text-primary" : "text-muted-foreground")}>{label}</p>
+      )}
+      {events.slice(0, maxVisible).map((p) => {
+        const draggable = p.status === "scheduled";
+        return (
+          <button
+            key={p.id}
+            type="button"
+            draggable={draggable}
+            onDragStart={() => draggable && onDragStartEvent(p)}
+            onClick={() => onSelect(p)}
+            title={p.hook || p.title || undefined}
+            className={cn(
+              "mb-0.5 flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[10px] font-medium transition-colors hover:opacity-80",
+              draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
+              p.status === "published" ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary",
+              p.isTest && "outline outline-1 outline-[#F7CC13]"
+            )}
+          >
+            {isAutonomousFormat(p.format) ? (
+              <Zap className="h-2.5 w-2.5 flex-shrink-0" />
+            ) : (
+              <Hand className="h-2.5 w-2.5 flex-shrink-0" />
+            )}
+            <span className="truncate">{p.hook || p.title || "Sin título"}</span>
+          </button>
+        );
+      })}
+      {events.length > maxVisible && (
+        <p className="text-[10px] text-muted-foreground">+{events.length - maxVisible} más</p>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+*Fin de la transcripción hasta este punto. Se actualiza en paralelo cada vez que se actualiza `CLAUDE.md`, por dogma explícito de Pablo del 2026-08-08.*

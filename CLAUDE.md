@@ -4,11 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Este es el **único archivo de documentación del repo**. El 2026-08-02 Pablo pidió unificar acá todo lo que antes estaba repartido en `EDA.md`, `MEJORASM.md`, `PLAN_AUTONOMIA.md`, `README.md`, `SECURITY.md`, los READMEs de cada carpeta (`biblioteca/`, `content/`, `dashboard/`, `backend/`, `templates/fonts/`), y las carpetas históricas `Documents/` y `docs/` — todos esos archivos se leyeron, se rescató lo que seguía siendo cierto y útil, y se borraron. No busques esa información en otro lado del repo: si no está acá, no existe o quedó afuera a propósito por estar contradicha por el estado real (ver "Notas históricas" al final).
 
-Excepciones que siguen siendo archivos aparte porque no son documentación, son funcionales: `public/robots.txt` y `dist/robots.txt` (los lee el crawler web, tienen que existir en esa ruta exacta) y `biblioteca/fonts/LICENCIA.txt` (licencia legal de la tipografía, tiene que viajar junto a los archivos de fuente).
+Excepciones que siguen siendo archivos aparte porque no son documentación, son funcionales: `public/robots.txt` y `dist/robots.txt` (los lee el crawler web, tienen que existir en esa ruta exacta), `biblioteca/fonts/LICENCIA.txt` (licencia legal de la tipografía, tiene que viajar junto a los archivos de fuente), y `MejoraSM.md` (transcripción cruda de sesión, ver "Transcripción de sesión" más abajo — no es documentación del producto, es un log).
 
 ## Fuente de verdad
 
 Este archivo (y la conversación de Claude Code donde se decide algo con Pablo) es la única fuente de verdad para MejoraSM. Cualquier otro insumo — otra sesión de IA, otra persona, otro chat en paralelo — se incorpora **solo cuando Pablo lo trae acá de forma expresa**; hasta entonces no aplica y no se vuelve a discutir. Esto se confirmó de forma directa el 2026-08-02 después de que surgiera una duda legítima sobre si un objetivo de diseño (autonomía total sin gate de aprobación humana, ver más abajo) venía de esta conversación o se había cruzado con una decisión distinta tomada en otro lado — Pablo cortó la ambigüedad: lo que se decide acá, vale; lo demás, no, hasta que él lo traiga expresamente.
+
+## Transcripción de sesión (dogma, 2026-08-08)
+
+Pablo pidió, en tono explícito de orden permanente ("tomá como dogma"): cada vez que se actualiza este archivo, actualizar también `MejoraSM.md` (raíz del repo) con la transcripción de la conversación completa hasta ese punto — de corrido, sin etiquetar quién dice cada parte, con decisiones/hallazgos/explicaciones y el código final completo (HTML/MD) transcriptos literal, sin filtrar. Quedan afuera de esa transcripción los comandos de terminal, el JSON crudo de herramientas y los outputs técnicos (curl/git/SQL) — esos no se transcriben, se resumen en prosa si hace falta el hallazgo que arrojaron.
+
+`MejoraSM.md` no reemplaza a este archivo ni se le aplica el mismo criterio de "única fuente de verdad" — es un log histórico de sesión, este archivo (`CLAUDE.md`) sigue siendo la única fuente de verdad operativa del producto.
 
 ## Qué es este repo
 
