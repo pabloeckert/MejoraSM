@@ -36,6 +36,9 @@ jobs:
           node-version: 20
 
       - name: Registrar acción manual
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/mark-manual.mjs "${{ inputs.post_id }}" "${{ inputs.platform }}"
 
       - name: Commitear registro

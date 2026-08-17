@@ -234,3 +234,18 @@ export const runLogApi = {
       .order("created_at", { ascending: false })
       .limit(limit),
 };
+
+// ═══════════════════════════════════════
+// HISTORIAL (caché real, Fase 5+ fix 2026-08-17) — reemplaza el fetch
+// directo a raw.githubusercontent.com del Monitor, que tiene caídas reales
+// y documentadas. Escrito por sync-history.mjs/mark-manual.mjs.
+// ═══════════════════════════════════════
+
+export const historialApi = {
+  get: () =>
+    supabase
+      .from("historial_cache")
+      .select("synced_at, posts, acciones_manuales")
+      .eq("id", 1)
+      .maybeSingle(),
+};

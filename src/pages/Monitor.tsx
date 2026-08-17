@@ -1,21 +1,24 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Check, X, Clock, Copy, ExternalLink } from "lucide-react";
+import { Check, X, Clock, Copy, ExternalLink, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { historialApi } from "@/services/supabase";
 
 // Fase 5 del plan estratégico 2026-08-16 (Un solo panel) — port fiel de
-// dashboard/index.html: mismo historial real (content/log/historial.json,
-// sincronizado por sync-history.mjs vía Zernio), mismas acciones de
-// reversión (manage-story.yml/manage-post.yml/mark-manual.yml, siempre por
-// link a GitHub Actions — acá tampoco se ejecuta nada directo, solo se
-// arma el link y se copia el ID, el "Run workflow" con CONFIRMO lo hace
-// Pablo en GitHub). dashboard/index.html original sigue existiendo tal
-// cual en paralelo, sin tocar.
-const HISTORIAL_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/log/historial.json";
-const ACCIONES_MANUALES_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/log/acciones-manuales.json";
+// dashboard/index.html: mismas acciones de reversión (manage-story.yml/
+// manage-post.yml/mark-manual.yml, siempre por link a GitHub Actions — acá
+// tampoco se ejecuta nada directo, solo se arma el link y se copia el ID,
+// el "Run workflow" con CONFIRMO lo hace Pablo en GitHub).
+// dashboard/index.html original sigue existiendo tal cual en paralelo.
+//
+// Fix de raíz 2026-08-17 (Pablo reportó "Failed to fetch"): el historial
+// ya NO se trae de raw.githubusercontent.com — ese CDN tiene caídas reales
+// y documentadas (confirmado en vivo contra githubstatus.com, y contra
+// investigación de mercado: 257 incidentes de GitHub en 12 meses). Ahora
+// se lee de historial_cache en Supabase, mucho más confiable, cacheado por
+// sync-history.mjs/mark-manual.mjs — ver migración 016_historial_cache.sql.
 const MANAGE_STORY_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/manage-story.yml";
 const MANAGE_POST_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/manage-post.yml";
 const MARK_MANUAL_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/mark-manual.yml";
@@ -48,21 +51,15 @@ interface AccionManual {
   marcadoManualEn: string;
 }
 
-async function fetchHistorial(): Promise<{ syncedAt: string; posts: HistorialPost[] }> {
-  const res = await fetch(HISTORIAL_URL, { cache: "no-store" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
-async function fetchAccionesManuales(): Promise<Map<string, AccionManual>> {
-  try {
-    const res = await fetch(ACCIONES_MANUALES_URL, { cache: "no-store" });
-    if (!res.ok) return new Map();
-    const data: AccionManual[] = await res.json();
-    return new Map((data || []).map((a) => [`${a.postId}:${a.platform}`, a]));
-  } catch {
-    return new Map();
-  }
+async function fetchHistorial(): Promise<{ syncedAt: string | null; posts: HistorialPost[]; accionesManuales: Map<string, AccionManual> }> {
+  const { data, error } = await historialApi.get();
+  if (error) throw error;
+  const accionesRaw = (data?.acciones_manuales as AccionManual[] | null) || [];
+  return {
+    syncedAt: data?.synced_at ?? null,
+    posts: (data?.posts as HistorialPost[] | null) || [],
+    accionesManuales: new Map(accionesRaw.map((a) => [`${a.postId}:${a.platform}`, a])),
+  };
 }
 
 function badgeMeta(status: string) {
@@ -253,10 +250,13 @@ function PostCard({ post, accionesManuales }: { post: HistorialPost; accionesMan
 }
 
 export default function Monitor() {
-  const { data: accionesManuales } = useQuery({ queryKey: ["monitor-acciones-manuales"], queryFn: fetchAccionesManuales });
-  const { data, isLoading, isError, error } = useQuery({ queryKey: ["monitor-historial"], queryFn: fetchHistorial });
+  const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
+    queryKey: ["monitor-historial"],
+    queryFn: fetchHistorial,
+  });
 
   const posts = data?.posts || [];
+  const accionesManuales = data?.accionesManuales || new Map<string, AccionManual>();
 
   return (
     <div className="space-y-7">
@@ -268,21 +268,34 @@ export default function Monitor() {
         </p>
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        {isLoading && "Cargando historial…"}
-        {isError && `No se pudo cargar el historial (${error instanceof Error ? error.message : "error"}). Puede que todavía no haya corrido la primera sincronización.`}
-        {!isLoading && !isError && posts.length === 0 && "Todavía no hay historial sincronizado."}
-        {!isLoading && !isError && posts.length > 0 && data && (
-          <>
-            {posts.length} story(s) — última sincronización:{" "}
-            {new Date(data.syncedAt).toLocaleString("es-AR")}
-          </>
-        )}
-      </p>
+      {isError ? (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <p className="text-sm text-foreground">
+              No se pudo cargar el historial ({error instanceof Error ? error.message : "error"}).
+            </p>
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isRefetching}>
+              <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", isRefetching && "animate-spin")} />
+              Reintentar
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {isLoading && "Cargando historial…"}
+          {!isLoading && posts.length === 0 && "Todavía no hay historial sincronizado."}
+          {!isLoading && posts.length > 0 && data?.syncedAt && (
+            <>
+              {posts.length} story(s) — última sincronización:{" "}
+              {new Date(data.syncedAt).toLocaleString("es-AR")}
+            </>
+          )}
+        </p>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} accionesManuales={accionesManuales || new Map()} />
+          <PostCard key={post.id} post={post} accionesManuales={accionesManuales} />
         ))}
       </div>
 

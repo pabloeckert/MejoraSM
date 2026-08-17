@@ -16,7 +16,34 @@ const ROOT = process.cwd();
 const LOG_DIR = path.join(ROOT, "content/log");
 const ACCIONES_PATH = path.join(LOG_DIR, "acciones-manuales.json");
 
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
 const [, , postId, platform] = process.argv;
+
+// Fix de raíz del "Failed to fetch" del Monitor (2026-08-17): cachea las
+// acciones manuales en historial_cache también, sin pisar posts (que solo
+// escribe sync-history.mjs). Nunca rompe el registro real si falla.
+async function syncToSupabase(acciones) {
+  if (!SUPABASE_URL || !SERVICE_KEY) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/historial_cache?on_conflict=id`, {
+      method: "POST",
+      headers: {
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify({ id: 1, acciones_manuales: acciones, updated_at: new Date().toISOString() }),
+    });
+    if (!res.ok) {
+      console.warn(`Aviso: no se pudo cachear la acción manual en Supabase (${res.status} ${await res.text()}).`);
+    }
+  } catch (e) {
+    console.warn(`Aviso: no se pudo cachear la acción manual en Supabase (${e.message}).`);
+  }
+}
 
 async function main() {
   if (!postId || !platform) {
@@ -37,6 +64,7 @@ async function main() {
   });
 
   await writeFile(ACCIONES_PATH, JSON.stringify(acciones, null, 2));
+  await syncToSupabase(acciones);
   console.log(`Marcado como gestionado a mano: ${postId} (${platform}).`);
 }
 

@@ -31,6 +31,7 @@ import { useDocuments } from "@/hooks/useVault";
 import { useDialogueSessions } from "@/hooks/useDialogue";
 import { usePendingProposals, useProposals } from "@/hooks/useProposals";
 import { useAllMetrics } from "@/hooks/useMetrics";
+import { historialApi } from "@/services/supabase";
 import { CopilotCard } from "@/components/CopilotCard";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -53,7 +54,6 @@ import {
 const COLORS = ["#1A3D84", "#E1061E", "#F7CC13", "#6f93cf"];
 
 const RAW_BASE_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main";
-const HISTORIAL_URL = `${RAW_BASE_URL}/content/log/historial.json`;
 
 // Metadata de status para la sección de últimas publicaciones — mismos 3
 // status reales del pipeline autónomo (ver CLAUDE.md, overhaul de
@@ -286,17 +286,20 @@ function DashboardContent() {
   const [detail, setDetail] = useState<DetailContent | null>(null);
 
   // Desglose por red: solo dato real disponible es status/URL por
-  // plataforma, que vive en content/log/historial.json (no en Supabase) —
-  // se trae vía raw.githubusercontent.com, mismo host que ya sirve las
-  // imágenes publicadas. Si falla, el resto del Dashboard sigue funcionando.
+  // plataforma. Hasta el 2026-08-17 se traía directo de
+  // content/log/historial.json vía raw.githubusercontent.com — ese CDN
+  // tiene caídas reales y documentadas (Pablo reportó "Failed to fetch" en
+  // el Monitor con el mismo origen). Ahora lee de historial_cache en
+  // Supabase (ver migración 016_historial_cache.sql), escrito por
+  // sync-history.mjs. Si falla, el resto del Dashboard sigue funcionando.
   const { data: platformsByProposal, isError: platformsError } = useQuery({
     queryKey: ["historial-platforms"],
     queryFn: async () => {
-      const res = await fetch(HISTORIAL_URL);
-      if (!res.ok) throw new Error(`historial.json respondió ${res.status}`);
-      const json = await res.json();
+      const { data, error } = await historialApi.get();
+      if (error) throw error;
       const map = new Map<string, { platform: string; status: string; url: string | null }[]>();
-      for (const post of json.posts ?? []) {
+      const posts = (data?.posts as { proposalId?: string; platforms?: { platform: string; status: string; url: string | null }[] }[] | null) || [];
+      for (const post of posts) {
         if (post.proposalId) map.set(post.proposalId, post.platforms ?? []);
       }
       return map;

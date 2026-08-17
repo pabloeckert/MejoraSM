@@ -164,11 +164,39 @@ async function main() {
 
   entries.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
+  const syncedAt = new Date().toISOString();
+
   await mkdir(LOG_DIR, { recursive: true });
   await writeFile(
     path.join(LOG_DIR, "historial.json"),
-    JSON.stringify({ syncedAt: new Date().toISOString(), posts: entries }, null, 2)
+    JSON.stringify({ syncedAt, posts: entries }, null, 2)
   );
+
+  // Fix de raíz del "Failed to fetch" del Monitor (2026-08-17): además del
+  // JSON en el repo (que sigue sirviendo a dashboard/index.html, estático,
+  // sin sesión de Supabase), cachea acá — el Monitor del EDA lee esto en
+  // vez de raw.githubusercontent.com, que tiene caídas reales y
+  // documentadas. Nunca rompe la corrida si falla (mismo criterio que
+  // logRun): un fallo acá no debe tirar abajo la sincronización real.
+  if (SUPABASE_URL && SERVICE_KEY) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/historial_cache?on_conflict=id`, {
+        method: "POST",
+        headers: {
+          apikey: SERVICE_KEY,
+          Authorization: `Bearer ${SERVICE_KEY}`,
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates,return=minimal",
+        },
+        body: JSON.stringify({ id: 1, synced_at: syncedAt, posts: entries, updated_at: syncedAt }),
+      });
+      if (!res.ok) {
+        console.warn(`Aviso: no se pudo cachear el historial en Supabase (${res.status} ${await res.text()}).`);
+      }
+    } catch (e) {
+      console.warn(`Aviso: no se pudo cachear el historial en Supabase (${e.message}).`);
+    }
+  }
 
   console.log(`Historial sincronizado: ${entries.length} post(s).`);
 
