@@ -33,7 +33,7 @@ Verificado contra el repo/base real el 2026-08-16 antes de creer los números de
 | **Fase 0 — Higiene** | Borrar Edge Function `publisher` remota, dropear `calendar_events`, ampliar el regex de emoji de `rule-engine` a Dingbats/Misc Symbols, reemplazar el filtro de filas de prueba por prefijo de UUID por una columna real `is_test boolean`. | 🟢 hecho |
 | **Fase 1 — Idempotencia dura** | Constraint parcial único sobre `proposals` para que no se pueda agendar dos veces la misma pieza en la misma fecha/formato/oferta, reforzando el fix mínimo que ya existe en `publish-scheduled-posts.mjs` (ver "Duplicado real de autoagendado" más abajo). | 🟢 hecho |
 | **Fase 2 — Cerrar el loop de aprendizaje** | `orchestrator` lee `success_rules` con `confidence >= 0.6` y las inyecta en el prompt del Estratega/Creativo — hoy `rule-engine` genera reglas que nadie lee al generar contenido nuevo. | 🟢 hecho |
-| **Fase 3 — Observabilidad** | Tabla `run_log` (paso, pieza, estado, duración, error) escrita por cada script/función. | ⚪ pendiente |
+| **Fase 3 — Observabilidad** | Tabla `run_log` (paso, pieza, estado, duración, error) escrita por cada script/función. | 🟢 hecho |
 | **Fase 4 — Copiloto reflexivo** | Consejo diario + chat sobre datos propios en el Dashboard, con la voz de marca. | ⚪ roadmap, no en este ciclo |
 | **Fase 5 — Un solo panel** | Absorber `hub/`, `biblioteca/`, `dashboard/` como rutas del EDA React. | ⚪ roadmap, no en este ciclo |
 | **Fase 6 — Vendible a terceros** | Multi-tenant mínimo, Criterio Medular como onboarding, auditoría exportable. | ⚪ roadmap, no en este ciclo |
@@ -61,6 +61,28 @@ Migración `012_idempotencia_scheduling.sql`: índice único parcial `idx_propos
 **Bug real encontrado y corregido de paso, no anticipado:** al verificar la query antes de dar por buena la Fase 2, `success_rules` no tenía columna `evidence` — `rule-engine/index.ts` siempre calculó ese campo (ej. "4 posts con engagement promedio de 16.8%") y lo devolvía en la respuesta de la API, pero `saveRules()` nunca lo escribía en la base. Si se dejaba así, la query nueva de `orchestrator` (`SELECT ..., evidence FROM success_rules ...`) iba a fallar con `42703: column "evidence" does not exist` apenas hubiera una fila real que leer — un bug que yo mismo habría introducido en producción. Migración `013_success_rules_evidence.sql` agrega la columna real; `rule-engine/index.ts::saveRules()` corregido para persistirla tanto en el insert como en el update por confianza ponderada.
 
 **Probado de verdad:** se insertó una regla de prueba marcada `[TEST]` (`rule_type: hook`, `confidence: 0.75`, con `action.reason` y `evidence` reales) y se corrió contra la base la query exacta que usa `getLearnedRulesBlock()` — devolvió la fila completa con `action.reason` y `evidence` poblados, confirmando que el bloque de contexto se arma bien. No se pudo disparar una sesión real de Mesa de Diálogo de punta a punta para ver el comportamiento de los agentes con esto: haría falta `SUPABASE_SERVICE_ROLE_KEY` para autenticar la llamada server-to-server, que no está disponible en esta máquina (y no se intentó leer `secrets/keys.local.txt`, ya documentado como bloqueado a propósito en una sesión anterior). La verificación quedó a nivel de la query real, no del comportamiento de los agentes en vivo — pendiente real si Pablo quiere cerrarlo del todo. Fila de prueba borrada después de confirmar; `success_rules` sigue en 0 filas reales (datos genuinos todavía insuficientes, sin cambios respecto a lo ya documentado).
+
+#### Fase 3 — Observabilidad (2026-08-17, completa)
+
+Hasta ahora, "¿corrió tal paso hoy?" se respondía mirando por separado los logs de GitHub Actions (para los scripts) o nada en absoluto (las Edge Functions no dejaban rastro propio salvo lo que Supabase loguea internamente, no consultable desde acá). Migración `014_run_log.sql`: tabla `run_log` (`source`, `step`, `status` con `CHECK IN ('success','error','skipped')`, `proposal_id` nullable sin FK dura, `duration_ms`, `error`, `metadata jsonb`, `created_at`), RLS con el mismo criterio `is_app_admin()` que el resto del schema, índice `(source, created_at DESC)` para consultar "últimas corridas de X".
+
+Dos helpers compartidos, mismo contrato en los dos runtimes — nunca rompen el flujo real si el logging falla (try/catch propio, solo un `console.warn`):
+- `supabase/functions/_shared/runLog.ts` (Deno) — `logRun({ source, step, status, proposalId?, durationMs?, error?, metadata? })`.
+- `scripts/lib/run-log.mjs` (Node) — misma firma vía `fetch` directo a PostgREST (`SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`), más un `startTimer()` para medir `duration_ms` sin repetir `Date.now()` en cada script.
+
+**Instrumentado, sin excepción:**
+- Las 4 Edge Functions (`orchestrator`, `rule-engine`, `metrics-collector`, `vault-process`): el handler HTTP registra una fila por `action` recibida, éxito o error, con `duration_ms` real. `orchestrator` además captura el `id` de la propuesta recién creada (antes el `insert` no pedía `.select()`, así que no había forma de citarlo — se agregó `.select("id").single()` y se devuelve como `proposalId` en la respuesta, útil más allá del logging) y lo escribe en `proposal_id` cuando `startSession` autoagenda un post/carrusel.
+- Los 6 scripts del pipeline autónomo (`generate-brief.mjs`, `render-story.mjs`, `publish-story.mjs` → `source: "daily-story"`; `render-scheduled-posts.mjs`, `publish-scheduled-posts.mjs` → `source: "publish-scheduled-posts"`; `sync-history.mjs` → `source: "sync-history"`): cada uno loguea `success` al final del `main()`, `error` en el `catch` (reemplazando el `main().catch(...)` desnudo de siempre por una versión que además llama a `logRun` antes de `process.exit(1)`), y `skipped` en los frenos legítimos que ya existían (`generate-brief.mjs` cuando ya se generó hoy, `render-scheduled-posts.mjs`/`publish-scheduled-posts.mjs` cuando no hay nada pendiente). `publish-scheduled-posts.mjs` además loguea una fila por propuesta dentro del manifiesto (no solo un resumen general), con `proposal_id` real — es el único de los seis con esa granularidad, porque es el único paso que procesa varias piezas independientes en la misma corrida donde cada una puede fallar por separado.
+- `daily-story.yml` no tenía `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` en ninguno de sus pasos (a diferencia de `publish-scheduled-posts.yml` y `sync-history.yml`, que ya las tenían) — se agregaron a los 3 pasos que corren `generate-brief.mjs`/`render-story.mjs`/`publish-story.mjs`, si no el helper de Node no tenía con qué escribir desde ese workflow.
+
+**Probado real en producción, no solo desplegado:** se dispararon `rule-engine-cron.yml` y `sync-history.yml` por `workflow_dispatch` (ambos ya corren en cron, disparo manual no es una acción nueva) después de deployar las Edge Functions y pushear los scripts. Confirmado contra la base real (`supabase db query --linked`):
+```
+{"source":"rule-engine","step":"analyze","status":"success","duration_ms":1071,"metadata":{"rulesFound":0,"rulesSaved":0}}
+{"source":"sync-history","step":"sync-history","status":"success","duration_ms":5925,"metadata":{"count":28}}
+```
+Confirma que las dos mitades del sistema (Deno vía Edge Function real, Node vía GitHub Actions real) escriben en `run_log` con datos reales, no simulados — `rulesFound: 0` es coherente con que solo hay 2 métricas reales hoy (ver "Limpieza de datos de prueba de rule-engine"), `count: 28` es el número real de posts que devolvió Zernio. **No se disparó manualmente `daily-story.yml` ni `publish-scheduled-posts.yml`** para no generar una publicación real solo para probar el logging (mismo criterio de cautela que en fases anteriores) — la instrumentación ahí sigue el mismo patrón exacto ya probado en `sync-history.mjs`/`rule-engine`, verificado por revisión de código, no por ejecución en vivo; queda confirmado de forma indirecta la próxima vez que corra alguno de esos dos por su cron normal.
+
+Verificado: lint se mantuvo en 44 errores preexistentes (los primeros intentos de instrumentación subieron a 51 por usar `(result as any)` para leer campos del resultado dentro del handler — se corrigió tipando `result` con una forma concreta en vez de castear a `any`, bajó de vuelta a 44), 61/61 tests verdes, build limpio. CI (`ci.yml`) sigue en rojo por esos mismos 44 errores preexistentes — no es una regresión de esta fase, ya documentado como no bloqueante (sin branch protection en `main`).
 
 Detalle de cada fase, decisiones tomadas y evidencia real se va agregando como subsecciones acá mismo a medida que se ejecuta cada una — no en otro archivo.
 
@@ -298,24 +320,24 @@ Confirmado que quedó escrito de verdad en `metrics` (`supabase db query --linke
 
 ### Modelo de datos
 
-10 tablas en el schema `public`, todas con RLS habilitado:
+Tablas en el schema `public`, todas con RLS habilitado (`calendar_events` se dropeó en Fase 0 del plan estratégico 2026-08-16, ver arriba — ya no existe):
 
 | Tabla | Para qué |
 |---|---|
 | `documents` | Metadata de cada documento subido a la Bóveda |
 | `doc_chunks` | Chunks de texto + embedding (`vector(384)`) de cada documento, para RAG |
-| `agent_config` | Config (proveedor/modelo/temperatura/`system_prompt`) de los 3 agentes — editable desde `/configuracion` (prompts reales, ver más abajo) |
+| `agent_config` | Config (proveedor/modelo/temperatura/`system_prompt`) de los 3 agentes — editable desde `/configuracion` (prompts reales, ver más abajo). `provider`/`model` viven en la tabla pero el código los ignora desde el ruteo automático del 2026-08-05 (ver "Ruteo automático de modelo de IA") |
 | `dialogue_sessions` | Cada sesión de Mesa de Diálogo (tema, estado, propuesta final) |
 | `dialogue_messages` | Mensajes de cada agente dentro de una sesión, por turno |
-| `proposals` | Propuestas de contenido (hook, body, cta, hashtags, formato, estado, `oferta`/`rendered_image_path`/`zernio_post_id` agregadas en `007_feed_posts_render.sql` para el pipeline autónomo) |
-| `calendar_events` | Legacy — ya no lo usa `Calendario.tsx` (que lee `proposals.scheduled_at` directo desde el overhaul), pero la tabla sigue existiendo |
-| `metrics` | Métricas de posts publicados (likes, comments, reach, `engagement_rate` calculado) |
-| `success_rules` | Reglas aprendidas por `rule-engine` |
+| `proposals` | Propuestas de contenido (hook, body, cta, hashtags, formato, estado, `oferta`/`rendered_image_path`/`zernio_post_id` de `007_feed_posts_render.sql`, `is_test boolean` de `011_higiene_fase0.sql`) |
+| `metrics` | Métricas de posts publicados (likes, comments, reach, `clicks`, `engagement_rate` calculado) |
+| `success_rules` | Reglas aprendidas por `rule-engine`, con `evidence text` (`013_success_rules_evidence.sql`) — leídas por `orchestrator` desde Fase 2 del plan estratégico 2026-08-16 |
+| `run_log` | Observabilidad real (Fase 3 del plan estratégico 2026-08-16): una fila por corrida de cada script/Edge Function del pipeline, éxito o error — ver sección propia más abajo |
 | `app_admins` | Allowlist de emails con acceso (ver sección de auth) |
 
 Función RAG: `match_documents(query_embedding, match_count, similarity_threshold)` — búsqueda por similitud coseno sobre `doc_chunks` vía índice `ivfflat`, con cast `::REAL` (ver bug corregido arriba). Bucket de Storage: `vault` (privado).
 
-`supabase/migrations/`: schema SQL + pgvector, en orden `001` a `007` (nombres renumerados para que el orden alfabético coincida con el de ejecución real): `001_initial_schema.sql` → `002_policies_fix.sql` → `003_fix_postgrest.sql` → `004_indexes_constraints.sql` → `005_reconcile_status_constraints.sql` → `006_real_rls_and_auth.sql` → `007_feed_posts_render.sql`. Ya aplicadas contra la base real.
+`supabase/migrations/`: schema SQL + pgvector, `001` a `014` en orden correlativo con el de ejecución real, todas ya aplicadas contra la base real vía `supabase db query --linked -f <archivo>` (no `db push`, ver "Bug conocido del CLI"). Las primeras siete (`001_initial_schema.sql` a `007_feed_posts_render.sql`) arman el schema base + auth/RLS real; de `008` en adelante cada una es un cambio puntual documentado en su propio comentario de cabecera y, cuando corresponde, en la sección de fase del plan estratégico que la motivó (`011`/`012`/`013`/`014` → Fases 0/1/2/3 del plan 2026-08-16, ver arriba).
 
 ### System prompts reales de los 3 agentes (tabla `agent_config`, verificado en vivo)
 

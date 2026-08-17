@@ -4106,4 +4106,192 @@ async function saveRules(rules: RuleCandidate[]) {
 
 ---
 
+## Parte 6 — Fase 3 del plan estratégico: observabilidad real (2026-08-17)
+
+La sesión anterior había quedado cortada a mitad de la Fase 2 por una suspensión de la máquina; se retomó y se cerró esa fase (el bug real de `success_rules.evidence` nunca persistido quedó documentado y corregido). El pedido siguiente fue simple y directo: "Sigué con la Fase 3" — sin más contexto, bajo el mismo régimen de autonomía ya establecido ("Lovable propone, Claude Code dispone, Pablo decide", sin consultar decisiones de alcance entre fases).
+
+La Fase 3 del plan — Observabilidad — buscaba resolver un problema concreto: no había ningún lugar único donde ver qué había pasado con cada corrida del pipeline. Los seis scripts de Node (la story diaria y los posts de feed) dejaban rastro en los logs de GitHub Actions, pero mirar eso paso por paso significaba entrar a cada corrida por separado; las cuatro Edge Functions de Supabase no dejaban ningún rastro propio consultable desde afuera. "¿Corrió el rule-engine hoy? ¿Con qué resultado? ¿Cuánto tardó?" eran preguntas sin una respuesta directa.
+
+La solución fue una tabla nueva, `run_log`, con columnas `source` (qué componente corrió: `daily-story`, `publish-scheduled-posts`, `sync-history`, `orchestrator`, `rule-engine`, `metrics-collector`, `vault-process`), `step` (el paso puntual dentro de ese componente), `status` (`success`, `error` o `skipped`, con un `CHECK` real en la base, no solo una convención de código), `proposal_id` (nullable y sin foreign key dura a propósito — el pipeline de Stories nunca usa `proposals`, así que una FK obligatoria no tendría sentido para esa mitad del sistema), `duration_ms`, `error` y un `metadata jsonb` para lo que cada paso quisiera agregar de específico. Misma política de RLS que el resto del schema (`is_app_admin()`), y un índice sobre `(source, created_at DESC)` pensado para la consulta más obvia: "las últimas corridas de tal cosa".
+
+La migración se escribió con el mismo criterio que las anteriores de esta fase del proyecto — comentario de cabecera explicando el porqué, no solo el qué — y se aplicó contra la base real con `supabase db query --linked -f`, no con `db push` (el bug documentado del CLI de Supabase sigue siendo la razón para evitarlo). Se verificó con una consulta directa a `information_schema.columns` que las nueve columnas quedaron creadas con los tipos esperados.
+
+Con la tabla lista, hacía falta una forma de escribir en ella desde los dos runtimes distintos que tiene el proyecto — Deno en las Edge Functions, Node en los scripts de GitHub Actions — sin duplicar lógica ni, más importante, sin que un fallo al loguear rompiera nunca el flujo real de publicación o de generación de contenido. Se escribieron dos helpers con la misma firma conceptual: `supabase/functions/_shared/runLog.ts` para el lado Deno, con un cliente de Supabase propio (mismas variables de entorno `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` que ya usa cada función), y `scripts/lib/run-log.mjs` para el lado Node, que en vez de traer una dependencia nueva simplemente pega contra el endpoint REST de PostgREST con `fetch` directo — exactamente el mismo patrón que ya usaban `render-scheduled-posts.mjs` y `publish-scheduled-posts.mjs` para hablar con Supabase sin el SDK de JS. Los dos envuelven la escritura en un `try/catch` que, si falla, imprime un `console.warn` y sigue — nunca un `throw`.
+
+Instrumentar las cuatro Edge Functions fue directo: cada una ya tenía un único `Deno.serve` con un `switch` sobre la acción pedida (`start`/`continue` en `orchestrator`, `analyze`/`suggest` en `rule-engine`, `collect`/`collect-all`/`insights` en `metrics-collector`, `process`/`search` en `vault-process`) envuelto en un `try/catch` que ya devolvía el error como respuesta HTTP. Se agregó un `logRun` justo antes de cada `return` de éxito y otro en cada bloque `catch`, con el nombre de la acción como `step` y la duración real medida desde el arranque del handler. En el camino se encontró un detalle real que valía la pena resolver aparte de la instrumentación: `orchestrator` insertaba una propuesta nueva en la tabla `proposals` sin pedir de vuelta el `id` generado (`.insert(insert)` sin `.select()`), así que no había ninguna forma de citar esa propuesta en el log — se agregó `.select("id").single()` y ese `id` ahora viaja tanto en el `run_log` como en la respuesta HTTP de la función, como campo `proposalId` nuevo (backward compatible, nadie en el frontend lo leía todavía, así que no rompe nada existente).
+
+Los seis scripts del pipeline autónomo se instrumentaron con el mismo criterio en todos: un `startTimer()` al principio, un `logRun` de éxito justo antes de que termine el `main()`, y el `main().catch((e) => { ... })` de siempre reemplazado por una versión que además llama a `logRun` con `status: "error"` antes de hacer `process.exit(1)`. Los frenos legítimos que ya existían — `generate-brief.mjs` cuando ya se generó contenido hoy, `render-scheduled-posts.mjs` y `publish-scheduled-posts.mjs` cuando no hay nada pendiente de publicar — pasaron a loguear `status: "skipped"` con el motivo en el `metadata`, en vez de simplemente no dejar rastro. `publish-scheduled-posts.mjs` recibió además una granularidad extra que los otros cinco no necesitan: como procesa varias propuestas independientes en una sola corrida (el manifiesto generado por el paso anterior), cada publicación individual —éxito o error— queda como su propia fila en `run_log`, con el `proposal_id` real de esa pieza, además de que el fallo de una no corta el procesamiento de las demás (eso ya era así antes, la instrumentación solo lo hizo visible).
+
+Un detalle de infraestructura salió a la luz al revisar los tres workflows relevantes de GitHub Actions: `publish-scheduled-posts.yml` y `sync-history.yml` ya tenían `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` pasadas como variables de entorno en sus pasos (las necesitaban desde antes, para hablar con `proposals`), pero `daily-story.yml` —el workflow de la story diaria— nunca las había necesitado hasta ahora y no las tenía en ninguno de sus tres pasos relevantes (generar brief, renderizar, publicar). Sin agregarlas ahí, el helper de Node del lado de Stories se hubiera quedado sin credenciales para escribir, con un `console.warn` silencioso en cada corrida real. Se agregaron a los tres pasos.
+
+La primera pasada de la instrumentación introdujo un efecto colateral que se detectó antes de dar la fase por cerrada: para leer campos específicos del resultado de cada acción (por ejemplo `rulesFound`/`rulesSaved` de `rule-engine`, o el `proposalId` recién agregado de `orchestrator`) dentro del bloque de logging, el código usaba `(result as any).campo` — una forma rápida pero que dispara la regla de lint `@typescript-eslint/no-explicit-any`, ya con 44 errores preexistentes documentados en el proyecto y una política explícita de no aumentarlos. La primera corrida de lint tras los cambios subió a 51. Se corrigió tipando la variable `result` de cada handler con una forma concreta y parcial (por ejemplo `{ rulesFound?: number; rulesSaved?: number }` en `rule-engine`, `{ chunksCreated?: number }` en `vault-process`) en vez de castear a `any` — TypeScript permite asignar los objetos reales devueltos por cada rama del `switch` a ese tipo más angosto sin quejarse (las propiedades de más no importan, solo hace falta que las que se leen después estén tipadas). El lint volvió a 44 errores exactos, mismos que antes de tocar nada. Los 61 tests siguieron pasando y el build quedó limpio.
+
+Antes de dar la fase por probada de verdad, no solo desplegada, se dispararon dos workflows reales por `workflow_dispatch` — `rule-engine-cron.yml` y `sync-history.yml`, ambos ya corren por cron de forma rutinaria, así que dispararlos a mano no es una acción nueva ni riesgosa. El primer intento de `sync-history.yml` corrió con el código todavía sin pushear a `main` (GitHub Actions siempre hace checkout de la rama, no del working directory local), así que no escribió nada en `run_log` — comportamiento esperado, no un bug. Después de commitear y pushear los catorce archivos de esta fase (y de resolver un rebase trivial contra un commit automático de `sync-history.yml` que se había generado mientras tanto, producto del primer disparo), se volvió a correr `sync-history.yml` ya con el código real en la rama. Los dos disparos —el de `rule-engine-cron` contra la Edge Function recién deployada, y el segundo de `sync-history` contra el script recién pusheado— confirmaron filas reales en `run_log`: una con `source: rule-engine`, `step: analyze`, `status: success`, `duration_ms: 1071` y `metadata: {rulesFound: 0, rulesSaved: 0}` (coherente con que solo hay dos métricas reales genuinas hoy, muy por debajo del mínimo de cinco que `rule-engine` necesita para producir algo); otra con `source: sync-history`, `status: success`, `duration_ms: 5925` y `metadata: {count: 28}` (el número real de posts que devolvió la API de Zernio). No se disparó manualmente `daily-story.yml` ni `publish-scheduled-posts.yml` para no generar una publicación real solo para probar el logging — la instrumentación ahí sigue exactamente el mismo patrón ya probado en los otros dos, así que queda verificada por revisión de código y se confirmará de forma indirecta la próxima vez que corra alguno de esos dos por su cron normal.
+
+Con eso, tres de las siete fases del plan estratégico (Higiene, Idempotencia dura, Cerrar el loop de aprendizaje, y ahora Observabilidad) quedaron cerradas de punta a punta —código, migración aplicada, deploy real, verificación contra producción, commit, push y documentación— bajo el mismo régimen de autonomía sin gate de aprobación entre fases. Las tres restantes documentadas en la tabla del plan (Copiloto reflexivo, Un solo panel, Vendible a terceros) siguen marcadas explícitamente como roadmap fuera de este ciclo, no descartadas ni tampoco comprometidas para arranque inmediato.
+
+### Anexo G — código completo de la Fase 3
+
+**`supabase/migrations/014_run_log.sql`** (íntegro):
+
+```sql
+-- Migration: Fase 3 del plan estratégico 2026-08-16 — observabilidad real
+--
+-- Hoy "¿corrió la story de hoy?" se responde mirando commits o los logs de
+-- GitHub Actions por separado de los de Supabase — no hay un solo lugar
+-- donde ver qué pasó con una pieza en cualquier paso del pipeline (Edge
+-- Functions o scripts de Actions). run_log es esa fuente única: cada
+-- script y cada Edge Function real del pipeline escribe una fila por
+-- corrida, éxito o error, sin excepción.
+--
+-- source = qué componente corrió (daily-story | publish-scheduled-posts |
+-- sync-history | orchestrator | vault-process | metrics-collector |
+-- rule-engine). step = el paso puntual dentro de ese componente (varios
+-- scripts ya son un paso completo del pipeline por sí mismos — ej.
+-- generate-brief.mjs ES el paso "generate-brief" — así que una fila por
+-- corrida de script ya da granularidad real de paso).
+--
+-- proposal_id sin FK dura a propósito: el pipeline de Stories nunca usa
+-- proposals (va directo por content/inbox → Zernio → historial.json), así
+-- que una FK NOT NULL o con ON DELETE forzado no tendría sentido para esa
+-- mitad del sistema. Se deja como UUID libre, NULL cuando no aplica.
+--
+-- Ejecutar vía `supabase db query --linked -f supabase/migrations/014_run_log.sql`
+-- (con -f, no `"$(cat ...)"` inline) o el SQL Editor del dashboard — NO con
+-- `supabase db push` (ver CLAUDE.md "Bug conocido del CLI").
+
+CREATE TABLE IF NOT EXISTS run_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  source TEXT NOT NULL,
+  step TEXT NOT NULL,
+  status TEXT NOT NULL,
+  proposal_id UUID,
+  duration_ms INTEGER,
+  error TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE run_log DROP CONSTRAINT IF EXISTS run_log_status_check;
+ALTER TABLE run_log ADD CONSTRAINT run_log_status_check
+  CHECK (status IN ('success', 'error', 'skipped'));
+
+CREATE INDEX IF NOT EXISTS idx_run_log_source_created ON run_log (source, created_at DESC);
+
+ALTER TABLE run_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admin full access" ON run_log;
+CREATE POLICY "Admin full access" ON run_log
+  FOR ALL USING (is_app_admin()) WITH CHECK (is_app_admin());
+
+COMMENT ON TABLE run_log IS
+  'Observabilidad real (Fase 3 del plan estratégico 2026-08-16): una fila por corrida de cada script/Edge Function del pipeline, éxito o error. Escrita por scripts/lib/run-log.mjs (Node/Actions) y supabase/functions/_shared/runLog.ts (Deno/Edge Functions).';
+```
+
+**`supabase/functions/_shared/runLog.ts`** (íntegro):
+
+```typescript
+// supabase/functions/_shared/runLog.ts
+// Observabilidad real (Fase 3, plan estratégico 2026-08-16): cada Edge
+// Function del pipeline escribe una fila en run_log por corrida, éxito o
+// error. El logging nunca debe romper el flujo real de la función que lo
+// usa — cualquier fallo al escribir se trata como warning, no como error.
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+);
+
+export interface RunLogEntry {
+  source: string;
+  step: string;
+  status: "success" | "error" | "skipped";
+  proposalId?: string | null;
+  durationMs?: number;
+  error?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export async function logRun(entry: RunLogEntry): Promise<void> {
+  try {
+    await supabase.from("run_log").insert({
+      source: entry.source,
+      step: entry.step,
+      status: entry.status,
+      proposal_id: entry.proposalId ?? null,
+      duration_ms: entry.durationMs ?? null,
+      error: entry.error ?? null,
+      metadata: entry.metadata ?? {},
+    });
+  } catch (e) {
+    console.warn(`[runLog] no se pudo escribir "${entry.source}/${entry.step}": ${(e as Error).message}`);
+  }
+}
+```
+
+**`scripts/lib/run-log.mjs`** (íntegro):
+
+```javascript
+// scripts/lib/run-log.mjs
+// Observabilidad real (Fase 3, plan estratégico 2026-08-16): cada script
+// del pipeline autónomo escribe una fila en run_log por corrida, éxito o
+// error. El logging nunca debe romper el flujo real del script que lo usa
+// — cualquier fallo al escribir se trata como warning, no como error, y si
+// faltan las credenciales de Supabase en el entorno se avisa y se sigue.
+
+export async function logRun({
+  source,
+  step,
+  status,
+  proposalId = null,
+  durationMs = null,
+  error = null,
+  metadata = {},
+}) {
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!SUPABASE_URL || !SERVICE_KEY) {
+    console.warn(
+      `[run-log] SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY no configurados — no se registra "${source}/${step}".`
+    );
+    return;
+  }
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/run_log`, {
+      method: "POST",
+      headers: {
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        source,
+        step,
+        status,
+        proposal_id: proposalId,
+        duration_ms: durationMs,
+        error,
+        metadata,
+      }),
+    });
+    if (!res.ok) {
+      console.warn(`[run-log] fallo al registrar "${source}/${step}": ${res.status} ${await res.text()}`);
+    }
+  } catch (e) {
+    console.warn(`[run-log] fallo al registrar "${source}/${step}": ${e.message}`);
+  }
+}
+
+export function startTimer() {
+  const start = Date.now();
+  return () => Date.now() - start;
+}
+```
+
+---
+
 *Fin de la transcripción hasta este punto. Se actualiza en paralelo cada vez que se actualiza `CLAUDE.md`, por dogma explícito de Pablo del 2026-08-08.*
