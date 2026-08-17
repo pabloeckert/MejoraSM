@@ -322,9 +322,9 @@ Páginas (`src/pages/`):
 | **Laboratorio de Contenido** | `/laboratorio` | Versión directa: describís qué querés comunicar y te devuelve una propuesta ya armada (estrategia + copy + evaluación + hook/CTA/hashtags) lista para copiar o aprobar. |
 | **Calendario Editorial** | `/calendario` | De solo lectura desde el overhaul del 2026-08-02: refleja `proposals.scheduled_at`, no agenda nada (eso vive en Propuestas). |
 | **Propuestas** | `/propuestas` | Desde el overhaul del 2026-08-02, monitor de lo que se agenda/publica solo (cancelar antes de publicar, reintentar/despublicar después); solo `format='historia'` sigue con aprobación manual real. |
-| **Subir material** | `/hub` | Fase 5: port React de `hub/index.html` — 5 cards a la UI de upload de GitHub, una por oferta. La página estática original (`hub/`, sin login) sigue existiendo en paralelo. |
-| **Monitor** | `/monitor` | Fase 5: port React de `dashboard/index.html` — historial real vía Zernio, badges por plataforma, acciones de reversión (siempre por link a GitHub Actions). La página estática original (`dashboard/`) sigue existiendo en paralelo. |
-| **Biblioteca** | `/biblioteca` | Fase 5: embebe `biblioteca/index.html` sin tocar su código (decisión de diseño, ver Fase 5 más arriba) — SPA de carga/etiquetado que sigue viviendo tal cual, ahora alcanzable sin salir del EDA. |
+| **Subir material** | `/hub` | Rediseñado 2026-08-17 (a pedido de Pablo): ya no redirige a la UI cruda de GitHub — selector de oferta, drag-and-drop real (vía `src/services/github.ts`), grillas de pendientes/ya usadas por oferta, link a Monitor. La página estática original (`hub/`, sin login) sigue existiendo en paralelo. |
+| **Monitor** | `/monitor` | Fase 5: port React de `dashboard/index.html` — historial real vía `historial_cache` en Supabase (no más `raw.githubusercontent.com`, fix 2026-08-17), badges por plataforma, acciones de reversión, link a la propuesta de cada pieza. La página estática original (`dashboard/`) sigue existiendo en paralelo. |
+| **Biblioteca** | `/biblioteca` | Fase 5: embebe `biblioteca/index.html` sin tocar su código (decisión de diseño, ver Fase 5 más arriba). Ajustado 2026-08-17: botón "Abrir Biblioteca" como acceso primario confiable, el embed queda como opción secundaria con detección de timeout. |
 | **Auditoría** | `/auditoria` | Fase 6 (parcial): exporta CSV/JSON real de propuestas, métricas, reglas aprendidas y `run_log` — client-side, sin Edge Function nueva. |
 | **Configuración** | `/configuracion` | Por cada uno de los 3 agentes: proveedor de IA, modelo exacto y temperatura, persistido en `agent_config`. |
 
@@ -391,11 +391,12 @@ Tablas en el schema `public`, todas con RLS habilitado (`calendar_events` se dro
 | `success_rules` | Reglas aprendidas por `rule-engine`, con `evidence text` (`013_success_rules_evidence.sql`) — leídas por `orchestrator` desde Fase 2 del plan estratégico 2026-08-16 |
 | `run_log` | Observabilidad real (Fase 3 del plan estratégico 2026-08-16): una fila por corrida de cada script/Edge Function del pipeline, éxito o error — ver sección propia más abajo |
 | `copilot_advice` | Copiloto Reflexivo (Fase 4 del plan estratégico 2026-08-16): "consejo del día" cacheado por fecha (`advice_date UNIQUE`) — ver sección propia más abajo |
+| `historial_cache` | Fix de raíz del "Failed to fetch" del Monitor (2026-08-17): fila única con el historial real sincronizado desde Zernio, para no depender de `raw.githubusercontent.com` — ver "Ronda de revisión post-Fase 6" más abajo |
 | `app_admins` | Allowlist de emails con acceso (ver sección de auth) |
 
 Función RAG: `match_documents(query_embedding, match_count, similarity_threshold)` — búsqueda por similitud coseno sobre `doc_chunks` vía índice `ivfflat`, con cast `::REAL` (ver bug corregido arriba). Bucket de Storage: `vault` (privado).
 
-`supabase/migrations/`: schema SQL + pgvector, `001` a `015` en orden correlativo con el de ejecución real, todas ya aplicadas contra la base real vía `supabase db query --linked -f <archivo>` (no `db push`, ver "Bug conocido del CLI"). Las primeras siete (`001_initial_schema.sql` a `007_feed_posts_render.sql`) arman el schema base + auth/RLS real; de `008` en adelante cada una es un cambio puntual documentado en su propio comentario de cabecera y, cuando corresponde, en la sección de fase del plan estratégico que la motivó (`011`/`012`/`013`/`014`/`015` → Fases 0/1/2/3/4 del plan 2026-08-16, ver arriba).
+`supabase/migrations/`: schema SQL + pgvector, `001` a `016` en orden correlativo con el de ejecución real, todas ya aplicadas contra la base real vía `supabase db query --linked -f <archivo>` (no `db push`, ver "Bug conocido del CLI"). Las primeras siete (`001_initial_schema.sql` a `007_feed_posts_render.sql`) arman el schema base + auth/RLS real; de `008` en adelante cada una es un cambio puntual documentado en su propio comentario de cabecera y, cuando corresponde, en la sección de fase del plan estratégico que la motivó (`011`/`012`/`013`/`014`/`015` → Fases 0/1/2/3/4 del plan 2026-08-16; `016` → fix del Monitor, ver "Ronda de revisión post-Fase 6" más abajo).
 
 ### System prompts reales de los 3 agentes (tabla `agent_config`, verificado en vivo)
 
@@ -781,6 +782,47 @@ Pedido directo de Pablo: pausar la publicación real de posts/carruseles de feed
 **Qué NO se cambió, a propósito — vale la pena que Pablo lo sepa:** `orchestrator` sigue autoagendando posts/carruseles aprobados (`AUTO_PUBLISH_FORMATS` intacto) — una propuesta aprobada durante la pausa va a quedar `status='scheduled'` en la base, esperando. Con el cron pausado, **no se va a publicar sola** mientras dure la pausa, pero si se reactiva el cron más adelante sin revisar antes, se va a publicar de golpe todo lo que se haya acumulado (con `scheduled_at` ya vencido). Si Pablo prefiere evitar ese acumulado, la opción es sacar `post`/`carrusel` de `AUTO_PUBLISH_FORMATS` también (así quedan en `pending` para aprobación manual, como `historia` hoy) — no se hizo porque no fue lo que se pidió explícitamente, solo pausar la publicación.
 
 **Para reactivar:** descomentar el bloque `schedule` en `publish-scheduled-posts.yml` y pushear.
+
+## Ronda de revisión post-Fase 6 — 2026-08-17
+
+Con las 6 fases del plan estratégico cerradas (0-5 completas, 6 parcial), Pablo revisó el resultado en producción y volvió con 7 puntos concretos más un pedido de investigación de mercado — todo bajo el mismo régimen de autonomía ya establecido ("TODAS LAS FASES SIN PREGUNTARME, CLAUDE ES QUE MANDA"). Cada punto se investigó antes de tocar código — varios no eran lo que parecían a primera vista.
+
+### 1. Datos de prueba reales — investigado, resuelto sin fabricar nada
+
+El pedido era ver el sistema "funcionando de verdad" con contenido real. Antes de sembrar datos sintéticos, se verificó el estado real de la base: **ya había 5 posts de feed reales publicados** (carruseles generados por Mesa de Diálogo, con imágenes reales renderizadas) y **28 Stories reales** en el historial — el sistema no estaba vacío, tenía contenido real desde el 2026-08-03/06. El hueco real era más chico: 2 de esos 5 posts nunca tuvieron una fila en `metrics`. Se disparó `metrics-collector-cron.yml` real (no fabricado) para completarlas — y se encontró un hallazgo real: **los 2 posts faltantes siguen en "sync pendiente (202)" de Zernio Analytics más de 11 días después de publicados**, cuando el comportamiento documentado es que eso se resuelve en 1-2 horas (ver "Corrida real de punta a punta" en este archivo). Esto es una anomalía real de Zernio para esos 2 posts puntuales, no un bug de acá — queda anotado, no resuelto (no hay nada del lado de MejoraSM que arreglar).
+
+De paso se encontró que `Data/analisis-redes-mejora-continua.md` (análisis real de Instagram/Facebook con datos de Meta Business Suite/IconSquare, sesión del 2026-08-05) ya estaba siendo usado en el Dashboard como `SEED_INSIGHTS` — 6 insights reales con evidencia citada, no inventados. No hizo falta scrapear Instagram (que además violaría sus términos de servicio) — el material real ya estaba en el repo, solo no se sabía que ya se había integrado. Decisión explícita: no se fabricaron propuestas/métricas sintéticas — el proyecto tiene una disciplina fuerte de no confundir datos reales con datos de prueba (ver `is_test`, limpieza de datos de prueba de `rule-engine`), inventar "contenido de demo" que parezca real sería romper esa disciplina.
+
+### 2. Hosting — investigación real, decisión: quedarse en GitHub Pages/Actions
+
+Investigación completa (agente en background, con fuentes) comparando GitHub Pages/Actions vs. Vercel vs. Hostinger vs. mover más a Supabase. Conclusión con evidencia:
+- **GitHub Pages/Actions**: sin riesgo real de límites mientras el repo sea público (Actions con minutos ilimitados; Pages con 100GB/mes de banda). Quedarse acá.
+- **Vercel**: el plan gratis (Hobby) es explícitamente no-comercial — cualquier proyecto que genere ingresos reales (como este) necesita Pro, US$20/mes mínimo. No es gratis como se asumía. No migrar.
+- **El pipeline de Playwright (render de imágenes) no tiene a dónde migrar mejor**: ni Supabase Edge Functions ni Deno Deploy soportan spawnear Chromium — GitHub Actions es la única opción viable sin costo extra.
+- **Hostinger**: no aporta nada nuevo, no migrar.
+- **Hallazgo que sí generó una acción real**: `raw.githubusercontent.com` tiene caídas documentadas y recurrentes (257 incidentes de GitHub en 12 meses, 48 outages mayores) — confirmado en vivo el mismo día contra githubstatus.com mientras Pablo reportaba el error del Monitor (ver punto 6). Eso sí se corrigió — no moviendo hosting, sino sacando esa dependencia puntual (ver punto 6).
+
+### 3 y 4. "Subir material" — repensado con Pablo antes de tocar código
+
+Antes de rediseñar, se hizo explícito lo que el sistema asumía sobre el concepto de "oferta" (las 5 dimensiones del Manual de Marca) y se armó un artifact — **"Taller de la Oferta"** — para que Pablo y Sindy lo discutan juntos y corrijan lo que no responda a lo que quieren, en vez de que yo decidiera solo un concepto de negocio. El artifact muestra el mapeo actual (oferta → carpeta → cómo lo usa la IA), plantea 5 preguntas abiertas concretas, y dos caminos de diseño según cómo respondan (oferta = dimensión de marca fija, vs. oferta = servicio real editable). Pendiente real: las respuestas de esa conversación van a ajustar el diseño final.
+
+En paralelo, "Subir material" se reconstruyó igual — a Pablo no le gustaba que lo mandara a `github.com/.../upload/main/...`, la UI cruda de GitHub. Ahora es una pantalla propia del EDA (`/hub`): selector de oferta, drag-and-drop, y dos grillas reales (pendiente en `content/inbox/<oferta>`, ya usado en `content/used/<oferta>`) para poder ver lo subido sin salir de la pantalla — más un link directo a Monitor para seguir la pieza hasta que se publica. `src/services/github.ts` porta el cliente de GitHub de `biblioteca/github.js` a TypeScript, usando la **misma clave de localStorage** (`mc_biblioteca_gh_token`) — conectar en un lado deja conectado el otro, misma sesión, mismo origen.
+
+### 5. Interconexión entre secciones
+
+Alcance concreto, no exhaustivo: `/propuestas?id=<uuid>` ahora abre el detalle de una propuesta directo (antes solo se podía llegar clickeando en la lista) — Monitor enlaza "Ver propuesta" en cada post con `proposalId` real, y Hub enlaza a Monitor. Se puede seguir una pieza: subida → propuesta → publicada, cruzando pantallas, sin tener que buscarla a mano en cada una.
+
+### 6. Monitor "Failed to fetch" — causa de raíz real, no un parche
+
+Diagnosticado con evidencia, no supuesto: `raw.githubusercontent.com` tenía un incidente real en curso (confirmado contra `githubstatus.com`: "Partially Degraded Service", y contra un archivo cualquiera de un repo ajeno, que también fallaba) justo cuando Pablo vio el error. Pero en vez de solo agregar reintentos (parche), se atacó la causa: el historial ahora se cachea en una tabla nueva de Supabase (`historial_cache`, migración `016_historial_cache.sql`), escrita por `sync-history.mjs` (posts) y `mark-manual.mjs` (acciones manuales) — Monitor y el desglose por red del Dashboard leen de ahí, no de GitHub. `content/log/historial.json` en el repo sigue existiendo en paralelo, para `dashboard/index.html` estático (que no tiene sesión de Supabase). Probado real: se disparó `sync-history.yml` con el código nuevo, la tabla quedó poblada con las 28 filas reales.
+
+### 7. Biblioteca "carita triste" — no reproducible sin sesión real, mitigado igual
+
+No se pudo reproducir el fallo exacto (headers de GitHub Pages confirmados sin `X-Frame-Options`/CSP bloqueando el iframe — no es eso). En vez de asumir que el embed va a funcionar siempre, `/biblioteca` ahora tiene un botón grande y primario "Abrir Biblioteca" (abre la herramienta real en su pestaña, funciona siempre — confirmado) y el embed queda como opción secundaria, opt-in, con detección de timeout (8s) y botón de recarga en vez de quedarse en blanco sin explicación.
+
+### Investigación de mercado (2026-08-17)
+
+Además del hosting, se investigó qué hacen sistemas similares hoy. Hallazgo principal: **la publicación 100% autónoma sin aprobación humana por pieza (lo que hace MejoraSM desde el overhaul del 2026-08-02) es genuinamente atípica en el mercado 2026** — el consenso de la industria es "human-in-the-loop", con cadenas de aprobación de ~4 personas en promedio antes de publicar; ninguna herramienta comercial relevada (Buffer, Predis.ai, Ocoya, Sprout Social, Hootsuite) publica sin ese gate. El debate multi-agente (Estratega/Creativo/Crítico con RAG contra un Criterio Medular propio) tampoco tiene equivalente comercial directo — existe como patrón de arquitectura en la industria de IA, no como feature vendible de ninguna herramienta de marketing relevada. Lo que sí es estándar en el mercado y falta acá: más plataformas (LinkedIn, dado el perfil B2B, antes que TikTok/X), bandeja unificada de comentarios/DMs, reglas condicionales activas (no solo pasivas, ver `rule-engine`), benchmarking competitivo. Ideas priorizadas por impacto/esfuerzo quedan como roadmap futuro, no ejecutadas en esta ronda — son features nuevas, no correcciones de lo reportado por Pablo.
 
 ## Notas históricas
 
