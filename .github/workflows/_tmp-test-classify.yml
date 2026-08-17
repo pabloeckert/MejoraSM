@@ -1,0 +1,24 @@
+# Workflow temporal para verificar en vivo classify-photo con una imagen
+# real ya committeada. Se borra apenas se confirma que funciona.
+name: TEMP Test Classify Photo
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Invocar classify-photo con una foto real
+        run: |
+          IMG_B64=$(base64 -w0 content/published/story-2026-08-12-1.jpg)
+          code=$(curl -s -o /tmp/response.json -w "%{http_code}" -X POST \
+            "${{ secrets.VITE_SUPABASE_URL }}/functions/v1/classify-photo" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"suggest\",\"imageBase64\":\"$IMG_B64\",\"mimeType\":\"image/jpeg\"}")
+          echo "HTTP $code"
+          cat /tmp/response.json
