@@ -72,6 +72,7 @@ export interface ProposalDetail {
   created_at: string | null;
   oferta: string | null;
   zernio_post_id: string | null;
+  is_test?: boolean | null;
   dialogue_sessions?: { topic: string | null } | null;
 }
 

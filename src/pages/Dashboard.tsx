@@ -30,7 +30,7 @@ import {
 import { useDocuments } from "@/hooks/useVault";
 import { useDialogueSessions } from "@/hooks/useDialogue";
 import { usePendingProposals, useProposals } from "@/hooks/useProposals";
-import { useCalendarEvents, useAllMetrics } from "@/hooks/useMetrics";
+import { useAllMetrics } from "@/hooks/useMetrics";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -64,17 +64,13 @@ const STATUS_META: Record<string, { label: string; variant: "default" | "seconda
   pending: { label: "Pendiente", variant: "outline", dateLabel: "Creada" },
 };
 
-// Filas [TEST/QA] sembradas para probar rule-engine (ver CLAUDE.md, "rule-
-// engine — corrida real con datos de prueba"): las reales ya se limpiaron
-// de la base el 2026-08-05, pero el filtro queda acá por si vuelven a
-// aparecer — nunca se mezclan sin aviso en gráficos/KPIs.
-const TEST_POST_PREFIX = "TEST-QA-";
-const TEST_PROPOSAL_PREFIX = "7e57da7a-";
-
+// Filas de prueba (ej. seeds de rule-engine, ver CLAUDE.md "rule-engine —
+// corrida real con datos de prueba"): hasta la Fase 0 del plan estratégico
+// 2026-08-16 esto se inferia de un prefijo de UUID (heurística de string);
+// ahora lee la columna real proposals.is_test — nunca se mezclan sin aviso
+// en gráficos/KPIs.
 function isTestRow(m: MetricRow): boolean {
-  return Boolean(
-    m.post_id?.startsWith(TEST_POST_PREFIX) || m.proposals?.id?.startsWith(TEST_PROPOSAL_PREFIX)
-  );
+  return Boolean(m.proposals?.is_test);
 }
 
 const nf = new Intl.NumberFormat("es-AR");
@@ -167,6 +163,7 @@ interface ProposalJoin {
   zernio_post_id: string | null;
   oferta: string | null;
   rendered_image_path: string | null;
+  is_test: boolean | null;
 }
 
 interface MetricRow {
@@ -187,6 +184,15 @@ interface MetricRow {
 
 interface FlaggedMetricRow extends MetricRow {
   isTest: boolean;
+}
+
+interface ScheduledProposal {
+  id: string;
+  title: string | null;
+  hook: string | null;
+  format: string | null;
+  status: string | null;
+  scheduled_at: string | null;
 }
 
 // lucide-react no incluye íconos de marca (Instagram/Facebook) desde hace
@@ -273,7 +279,6 @@ function DashboardContent() {
   const { data: sessions } = useDialogueSessions();
   const { data: proposals } = useProposals();
   const { data: pendingProposals } = usePendingProposals();
-  const { data: calendarEvents } = useCalendarEvents();
   const { data: allMetrics } = useAllMetrics();
 
   const [showTestRows, setShowTestRows] = useState(false);
@@ -547,6 +552,22 @@ function DashboardContent() {
       isTest: m.isTest,
     }));
 
+  // Reemplaza calendar_events (tabla legacy dropeada en la Fase 0 del plan
+  // estratégico 2026-08-16, confirmada vacía y sin caller real) — la fuente
+  // real siempre fue proposals.scheduled_at, igual que en Calendario.tsx.
+  const nowTs = Date.now();
+  const in7Days = nowTs + 7 * 24 * 60 * 60 * 1000;
+  const scheduledUpcoming: ScheduledProposal[] = (proposals || [])
+    .filter((p: ScheduledProposal) => p.status === "scheduled" && p.scheduled_at)
+    .filter((p: ScheduledProposal) => {
+      const t = new Date(p.scheduled_at as string).getTime();
+      return t >= nowTs && t <= in7Days;
+    })
+    .sort(
+      (a: ScheduledProposal, b: ScheduledProposal) =>
+        new Date(a.scheduled_at as string).getTime() - new Date(b.scheduled_at as string).getTime()
+    );
+
   const metricCards = [
     {
       label: "Documentos en Bóveda",
@@ -574,7 +595,7 @@ function DashboardContent() {
     },
     {
       label: "Publicaciones programadas",
-      value: String(calendarEvents?.length ?? 0),
+      value: String(scheduledUpcoming.length),
       sub: "Vía Zernio, próximos 7 días",
       href: "/calendario",
       icon: Clock,
@@ -1066,7 +1087,7 @@ function DashboardContent() {
           <CardTitle className="text-[17px] font-medium">Calendario de contenido</CardTitle>
         </CardHeader>
         <CardContent>
-          {!calendarEvents || calendarEvents.length === 0 ? (
+          {scheduledUpcoming.length === 0 ? (
             <div className="flex h-40 flex-col items-center justify-center text-center">
               <CalendarDays className="mb-3 h-8 w-8 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">
@@ -1081,7 +1102,7 @@ function DashboardContent() {
             </div>
           ) : (
             <div className="flex flex-col">
-              {calendarEvents.slice(0, 7).map((e: any) => (
+              {scheduledUpcoming.slice(0, 7).map((e) => (
                 <div
                   key={e.id}
                   className="flex items-center gap-3.5 border-b border-border py-3 last:border-0"
@@ -1090,12 +1111,12 @@ function DashboardContent() {
                     <CalendarDays className="h-4 w-4 text-primary" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13.5px] font-semibold">{e.title}</p>
+                    <p className="truncate text-[13.5px] font-semibold">{e.hook || e.title || "Sin título"}</p>
                     <p className="text-[11.5px] text-muted-foreground">
-                      {new Date(e.date).toLocaleDateString("es-AR")}
+                      {new Date(e.scheduled_at).toLocaleDateString("es-AR")}
                     </p>
                   </div>
-                  <Badge variant="outline" className="flex-shrink-0">{e.format}</Badge>
+                  <Badge variant="outline" className="flex-shrink-0">{e.format || "post"}</Badge>
                 </div>
               ))}
             </div>

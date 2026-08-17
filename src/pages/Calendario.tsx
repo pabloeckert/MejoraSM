@@ -14,13 +14,11 @@ import { ProposalDetailDialog, type ProposalDetail } from "@/components/Proposal
 
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
-// Mismo tratamiento que el Dashboard (rediseño 2026-08-07): las filas
-// [TEST/QA] sembradas para probar rule-engine ya se limpiaron de la base
-// (2026-08-05), pero el filtro queda por si vuelven a aparecer — nunca
-// mezcladas sin aviso.
-const TEST_PROPOSAL_PREFIX = "7e57da7a-";
+// Mismo tratamiento que el Dashboard: filas de prueba nunca se mezclan sin
+// aviso. Desde la Fase 0 del plan estratégico 2026-08-16 lee la columna
+// real proposals.is_test en vez de inferirlo de un prefijo de UUID.
 function isTestProposal(p: ProposalDetail): boolean {
-  return Boolean(p.id?.startsWith(TEST_PROPOSAL_PREFIX));
+  return Boolean(p.is_test);
 }
 
 function getDaysInMonth(year: number, month: number) {

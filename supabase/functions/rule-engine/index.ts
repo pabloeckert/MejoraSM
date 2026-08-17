@@ -99,8 +99,12 @@ async function analyzeMetrics(): Promise<RuleCandidate[]> {
       });
     }
 
-    // Check for emoji usage
-    const emojiPattern = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}]/u;
+    // Check for emoji usage — antes no cubría Dingbats (✨✅❤️ quedaban sin
+    // detectar, solo emojis del plano suplementario como 🚀). Fase 0 del
+    // plan estratégico 2026-08-16, hallazgo ya documentado desde la
+    // corrida real de rule-engine del 2026-08-05.
+    const emojiPattern =
+      /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/u;
     const emojiHooks = highPerformers.filter((m) => emojiPattern.test(m.proposals?.hook || ""));
     if (emojiHooks.length >= 2) {
       rules.push({

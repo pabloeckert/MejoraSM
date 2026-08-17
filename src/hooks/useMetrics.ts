@@ -1,46 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { calendarApi, metricsApi } from "@/services/supabase";
-import { supabase } from "@/services/supabase";
+import { metricsApi } from "@/services/supabase";
 
-// ═══════════════════════════════════════
-// CALENDARIO
-// ═══════════════════════════════════════
-
-export function useCalendarEvents() {
-  return useQuery({
-    queryKey: ["calendar-events"],
-    queryFn: async () => {
-      const { data, error } = await calendarApi.list();
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
-export function useCreateCalendarEvent() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (event: {
-      title: string;
-      description?: string;
-      date: string;
-      format: string;
-      proposal_id?: string;
-    }) => calendarApi.create(event),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["calendar-events"] }),
-  });
-}
-
-export function useDeleteCalendarEvent() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("calendar_events").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["calendar-events"] }),
-  });
-}
+// calendar_events (y sus hooks useCalendarEvents/useCreateCalendarEvent/
+// useDeleteCalendarEvent) se retiraron en la Fase 0 del plan estratégico
+// 2026-08-16 — tabla legacy confirmada vacía, sin ningún caller real desde
+// el rediseño de Calendario del 2026-08-07 (lee proposals.scheduled_at
+// directo). Dashboard.tsx ahora deriva "próximos 7 días" de useProposals().
 
 // ═══════════════════════════════════════
 // MÉTRICAS

@@ -13,7 +13,19 @@ vi.mock("@/hooks/useDialogue", () => ({
 }));
 
 vi.mock("@/hooks/useProposals", () => ({
-  useProposals: () => ({ data: [{ id: "1", title: "Test Proposal" }] }),
+  useProposals: () => ({
+    data: [
+      { id: "1", title: "Test Proposal" },
+      {
+        id: "2",
+        title: "Scheduled Post",
+        hook: "Scheduled Post",
+        format: "post",
+        status: "scheduled",
+        scheduled_at: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    ],
+  }),
   usePendingProposals: () => ({
     data: [
       {
@@ -73,11 +85,11 @@ const testMetric = {
     zernio_post_id: null,
     oferta: "comercial",
     rendered_image_path: null,
+    is_test: true,
   },
 };
 
 vi.mock("@/hooks/useMetrics", () => ({
-  useCalendarEvents: () => ({ data: [{ id: "1", title: "Scheduled Post", date: "2026-05-01", format: "post" }] }),
   useAllMetrics: () => ({ data: [realMetric, testMetric] }),
 }));
 
@@ -206,7 +218,9 @@ describe("Dashboard Page", () => {
     const { default: Dashboard } = await import("@/pages/Dashboard");
     renderWithProviders(<Dashboard />);
     expect(screen.getByText("Calendario de contenido")).toBeInTheDocument();
-    expect(screen.getByText("Scheduled Post")).toBeInTheDocument();
+    // La pieza programada aparece dos veces (Últimas publicaciones +
+    // Calendario de contenido) — alcanza con confirmar que existe.
+    expect(screen.getAllByText("Scheduled Post").length).toBeGreaterThan(0);
   });
 
   it("renders stat values as links", async () => {

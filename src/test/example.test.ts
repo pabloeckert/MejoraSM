@@ -115,15 +115,6 @@ describe("Supabase Service", () => {
     expect(mockFrom).toHaveBeenCalledWith("metrics");
   });
 
-  it("calendarApi.create calls from('calendar_events')", async () => {
-    const { calendarApi } = await import("@/services/supabase");
-    calendarApi.create({
-      title: "Test Post",
-      date: "2026-05-01",
-      format: "post",
-    });
-    expect(mockFrom).toHaveBeenCalledWith("calendar_events");
-  });
 });
 
 // ═══════════════════════════════════════
@@ -162,9 +153,8 @@ describe("Hook exports", () => {
 
   it("useMetrics exports correct functions", async () => {
     const mod = await import("@/hooks/useMetrics");
-    expect(mod.useCalendarEvents).toBeDefined();
-    expect(mod.useCreateCalendarEvent).toBeDefined();
     expect(mod.useLatestMetrics).toBeDefined();
+    expect(mod.useAllMetrics).toBeDefined();
     expect(mod.useProposalMetrics).toBeDefined();
     expect(mod.useSuccessRules).toBeDefined();
   });

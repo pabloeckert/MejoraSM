@@ -3789,4 +3789,131 @@ function DayCell({
 
 ---
 
+## Parte 5 — Plan estratégico 2026, gobierno del proyecto y Fase 0
+
+Se pidió un resumen del proyecto entero en lenguaje simple, en un párrafo, terminando con una definición sencilla. La respuesta describió MejoraSM como una máquina que le hace a Mejora Continua el trabajo diario de generar y publicar contenido en Instagram y Facebook sin que nadie tenga que sentarse todos los días a escribir un posteo: se suben fotos a una carpeta, tres agentes de inteligencia artificial se ponen de acuerdo sobre qué decir, el sistema arma la pieza con la identidad de marca, la publica sola en el horario que corresponde, y después mide cómo le fue de verdad para aprender qué funciona mejor — el control humano queda para después, no para antes de cada publicación. La definición simple: un empleado de redes sociales robot que piensa, escribe, publica y aprende solo. Se agregó, a pedido, que ese empleado además tiene un panel de control donde se mira en tiempo real tanto el detalle de cada pieza como el resumen general de cómo le está yendo a la marca, y desde donde se puede meter mano y corregir cuando se quiera — aclarando que esto último no es una promesa a futuro, ya está construido: el Dashboard muestra alcance, engagement, ranking de piezas y comparación entre formatos en tiempo real, con detalle de cada pieza a un click, y en Propuestas y Calendario ya existe la posibilidad real de editar el texto, cambiar la fecha, cambiar el formato o borrar una pieza antes de que salga publicada.
+
+Se compartieron después, como adjuntos, dos versiones de un plan estratégico para MejoraSM generado por una herramienta externa (Lovable) — un documento largo con diagnóstico, seis ejes de mejora, un plan de ejecución de un día dividido en bloques, ideas disruptivas y una nota aclarando que el proyecto de Lovable estaba vacío y todo el código real vivía en el repositorio de GitHub. El pedido fue revisar ese plan con criterio propio y aprovechando el conocimiento actualizado a esa fecha, y proponer un plan estratégico propio para mejorar, actualizar y optimizar el proyecto, además de ideas disruptivas para llevarlo al siguiente nivel — dejando explícito que quien manda en la ejecución es Claude Code, no Lovable, que el plan de Lovable era solo un insumo, y que el proyecto tenía que seguir viviendo de forma independiente de Lovable. Se pidió una respuesta de una sola frase confirmando que se había entendido esto antes de avanzar, y que cualquier duda real se preguntara antes, no después.
+
+La respuesta confirmó el entendimiento: el plan de Lovable era un insumo de referencia, no la autoridad; correspondía revisarlo con criterio propio y armar una propuesta estratégica propia — mejoras, actualización, optimización e ideas disruptivas — ejecutada sobre el mismo repositorio, sin que el proyecto pasara a depender de Lovable, y dejando grabada como regla permanente, tanto en memoria como dentro de una skill, la jerarquía "Lovable propone, Claude Code dispone, Pablo decide".
+
+Se insistió con una instrucción más fuerte: no volver a consultar salvo que fuera estrictamente necesario, decidir directamente, y que cada paso ejecutado quedara deployado en producción de forma automática, en el repositorio de GitHub, en el repositorio local, y en la memoria — documentando cada paso al detalle para que, si una sesión se quedaba con muy poco crédito, ese último tramo se usara para dejar todo listo y poder retomar exactamente donde había quedado apenas se escribiera la palabra "continuemos" al inicio de una sesión nueva, en las mismas condiciones, hasta terminar. Se volvió a pedir una confirmación de una sola frase.
+
+La respuesta confirmó: de ahí en más, decisión y ejecución directa sin consultar salvo bloqueo físico real; cada paso deployado, commiteado en GitHub, reflejado en el repositorio local, y documentado en memoria y en una skill: tanto la regla de gobierno como el detalle de cada paso dado, de forma que ante un corte de sesión se pudiera dejar un punto de retorno claro.
+
+Se reforzó una vez más la instrucción de no preguntar, aclarando que solo se debía molestar para decisiones que excedieran físicamente la capacidad de actuar, y se preguntó si la descripción del proyecto seguía en pie y si algo de lo compartido por Lovable servía realmente, pidiendo again una respuesta en una sola frase.
+
+La respuesta confirmó que la descripción seguía en pie tal cual, y que sí, una parte real del plan de Lovable servía y se iba a aprovechar — el diagnóstico de las grietas concretas, cerrar el loop de aprendizaje inyectando las reglas aprendidas en los prompts de los agentes, unificar las cinco pantallas sueltas en un solo panel, y la idea de un copiloto reflexivo — aclarando que cada afirmación del plan externo se iba a verificar contra el código y la base real antes de darla por buena, porque ya se había detectado que algunos números citados estaban desactualizados.
+
+Antes de creer cualquier cifra del plan externo, se verificó el estado real: el conteo de errores de lint dio 45, no 70 como decía el plan; la base de datos real tenía cero filas de prueba contaminando métricas (ya se habían limpiado en una sesión anterior, el 2026-08-05), no diez como decía el plan; la tabla `calendar_events` estaba vacía y sin uso real; y la Edge Function `publisher`, retirada del código desde hacía semanas, seguía activa en el proyecto real de Supabase — esta última sí coincidía con lo ya documentado como pendiente.
+
+Se dejó asentada la infraestructura de gobierno y continuidad antes de ejecutar: en la memoria persistente, un registro explicando la jerarquía de decisión y el modo de ejecución autónoma pedido, y otro registro sobre el plan estratégico como proyecto vivo. En `CLAUDE.md` se agregó una sección nueva documentando el mismo dogma de gobierno, el modo de ejecución sin consultas salvo bloqueo físico real, el protocolo de continuidad entre sesiones con la palabra "continuemos", y una tabla de estado con las fases del plan: Fase 0 de higiene, Fase 1 de idempotencia dura, Fase 2 de cerrar el loop de aprendizaje, Fase 3 de observabilidad, y como roadmap fuera de este ciclo el copiloto reflexivo, la unificación de las cinco pantallas en un solo panel, y la posibilidad de vender el producto a terceros.
+
+Se ejecutó la Fase 0 completa, de punta a punta. Se borró de verdad, contra el proyecto real de Supabase, la Edge Function `publisher` — confirmada activa pese a estar retirada del código, y ya sin el bloqueo que la había dejado pendiente en sesiones anteriores. Se aplicó una migración nueva que dropea la tabla `calendar_events` (confirmada vacía y sin ningún uso real desde el rediseño de Calendario) y agrega una columna real `is_test` a la tabla de propuestas, con relleno automático para cualquier fila vieja que todavía tuviera el prefijo histórico de pruebas. Se corrigió el regex de detección de emoji del motor de reglas, que hasta ahora no reconocía el bloque de símbolos donde viven emojis comunes como los tildes y corazones, ampliándolo para cubrirlos. Y se reemplazó en el Dashboard y en el Calendario la forma de detectar filas de prueba: antes se inferían adivinando un prefijo de identificador, ahora se lee directamente la columna real de la base — lo que obligó, como consecuencia directa de haber borrado la tabla de eventos de calendario, a sacar del código todo lo que todavía dependía de ella (los ganchos y el servicio que la consultaban, ya sin ningún uso real) y a que el contador de publicaciones programadas y la sección de calendario del Dashboard pasaran a leer directamente de las propuestas programadas, exactamente como ya lo hacía la pantalla de Calendario.
+
+Se verificó cada cambio contra la base real antes de darlo por bueno: la tabla de eventos de calendario efectivamente desapareció, la columna nueva de filas de prueba efectivamente existe con su valor por defecto correcto. Se corrió el control de calidad completo — la cantidad de errores de estilo de código bajó, no subió, pese al código nuevo; las pruebas automáticas completas pasaron todas, con dos pruebas ajustadas para reflejar la nueva fuente de datos; y la compilación de producción salió limpia.
+
+---
+
+## Anexo D — Código final de la Fase 0
+
+### `supabase/migrations/011_higiene_fase0.sql`
+
+```sql
+-- Migration: Fase 0 del plan estratégico 2026-08-16 — higiene real
+--
+-- 1. calendar_events: tabla legacy confirmada vacía (0 filas, verificado
+--    2026-08-16) y sin ningún caller real — Calendario.tsx lee
+--    proposals.scheduled_at directo desde el rediseño del 2026-08-07.
+--    Se dropea en vez de dejarla como deuda muerta.
+--
+-- 2. proposals.is_test: reemplaza el filtro por prefijo de UUID
+--    (id::text LIKE '7e57da7a-%') que usaban Dashboard.tsx y
+--    Calendario.tsx — una heurística de string, no una columna real.
+--    Default false, backfill explícito por si quedara alguna fila vieja
+--    con el prefijo histórico de pruebas de rule-engine (no debería haber
+--    ninguna, ya se limpiaron el 2026-08-05, pero el UPDATE es inocuo si
+--    no matchea nada).
+--
+-- Ejecutar vía `supabase db query --linked -f supabase/migrations/011_higiene_fase0.sql`
+-- (con -f, no `"$(cat ...)"` inline) o el SQL Editor del dashboard — NO con
+-- `supabase db push` (ver CLAUDE.md "Bug conocido del CLI").
+
+DROP TABLE IF EXISTS calendar_events;
+
+ALTER TABLE proposals
+  ADD COLUMN IF NOT EXISTS is_test BOOLEAN NOT NULL DEFAULT false;
+
+UPDATE proposals SET is_test = true WHERE id::text LIKE '7e57da7a-%' AND is_test = false;
+
+COMMENT ON COLUMN proposals.is_test IS
+  'Marca real de fila de prueba (ej. seeds de rule-engine) — reemplaza el filtro por prefijo de UUID que usaba el frontend. Default false. Fase 0 del plan estratégico 2026-08-16.';
+```
+
+### `src/hooks/useMetrics.ts` (completo, tras la Fase 0)
+
+```typescript
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { metricsApi } from "@/services/supabase";
+
+// calendar_events (y sus hooks useCalendarEvents/useCreateCalendarEvent/
+// useDeleteCalendarEvent) se retiraron en la Fase 0 del plan estratégico
+// 2026-08-16 — tabla legacy confirmada vacía, sin ningún caller real desde
+// el rediseño de Calendario del 2026-08-07 (lee proposals.scheduled_at
+// directo). Dashboard.tsx ahora deriva "próximos 7 días" de useProposals().
+
+// ═══════════════════════════════════════
+// MÉTRICAS
+// ═══════════════════════════════════════
+
+export function useLatestMetrics() {
+  return useQuery({
+    queryKey: ["metrics", "latest"],
+    queryFn: async () => {
+      const { data, error } = await metricsApi.latest();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useAllMetrics() {
+  return useQuery({
+    queryKey: ["metrics", "all"],
+    queryFn: async () => {
+      const { data, error } = await metricsApi.all();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useProposalMetrics(proposalId: string) {
+  return useQuery({
+    queryKey: ["metrics", "proposal", proposalId],
+    queryFn: async () => {
+      const { data, error } = await metricsApi.byProposal(proposalId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!proposalId,
+  });
+}
+
+export function useSuccessRules() {
+  return useQuery({
+    queryKey: ["success-rules"],
+    queryFn: async () => {
+      const { data, error } = await metricsApi.successRules();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+```
+
+**Nota sobre esta transcripción:** `Dashboard.tsx` y `Calendario.tsx` tuvieron cambios acotados en esta fase (reemplazo de la fuente de datos de calendario, lectura de `is_test` real) sobre el código completo ya transcripto en el Anexo C — no se vuelve a pegar el archivo entero acá para no duplicar miles de líneas sin cambios; los cambios reales están descriptos en prosa arriba y en el detalle de la Fase 0 dentro de `CLAUDE.md`. Si Pablo quiere el archivo completo actualizado transcripto igual, pedirlo expresamente.
+
+---
+
 *Fin de la transcripción hasta este punto. Se actualiza en paralelo cada vez que se actualiza `CLAUDE.md`, por dogma explícito de Pablo del 2026-08-08.*

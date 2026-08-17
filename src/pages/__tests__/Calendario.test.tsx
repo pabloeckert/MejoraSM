@@ -27,6 +27,7 @@ const testProposal = {
   hook: "Hook de prueba QA",
   format: "historia",
   scheduled_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+  is_test: true,
 };
 
 vi.mock("@/hooks/useProposals", () => ({

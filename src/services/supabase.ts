@@ -177,25 +177,9 @@ export const templatesApi = {
   remove: (id: string) => supabase.from("templates").delete().eq("id", id),
 };
 
-// ═══════════════════════════════════════
-// CALENDARIO
-// ═══════════════════════════════════════
-
-export const calendarApi = {
-  list: () =>
-    supabase
-      .from("calendar_events")
-      .select("*, proposals(title, format)")
-      .order("date", { ascending: true }),
-
-  create: (event: {
-    title: string;
-    description?: string;
-    date: string;
-    format: string;
-    proposal_id?: string;
-  }) => supabase.from("calendar_events").insert(event),
-};
+// calendarApi (tabla calendar_events) se retiró en la Fase 0 del plan
+// estratégico 2026-08-16 — legacy confirmada vacía y sin caller real desde
+// el rediseño de Calendario del 2026-08-07 (lee proposals.scheduled_at).
 
 // ═══════════════════════════════════════
 // MÉTRICAS
@@ -213,12 +197,14 @@ export const metricsApi = {
   // límite — el Dashboard necesita el set completo para calcular KPIs
   // agregados reales (sumas/promedios), no solo una muestra reciente.
   // Trae los campos de proposals necesarios para el ranking de piezas,
-  // el desglose por red y el filtro de filas [TEST/QA].
+  // el desglose por red y el filtro de filas de prueba (is_test real,
+  // Fase 0 del plan estratégico 2026-08-16 — antes se inferían del prefijo
+  // de UUID de la propuesta).
   all: () =>
     supabase
       .from("metrics")
       .select(
-        "*, proposals(id, title, hook, format, status, zernio_post_id, oferta, rendered_image_path)"
+        "*, proposals(id, title, hook, format, status, zernio_post_id, oferta, rendered_image_path, is_test)"
       )
       .order("measured_at", { ascending: false }),
 

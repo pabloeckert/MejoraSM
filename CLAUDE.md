@@ -16,6 +16,38 @@ Pablo pidió, en tono explícito de orden permanente ("tomá como dogma"): cada 
 
 `MejoraSM.md` no reemplaza a este archivo ni se le aplica el mismo criterio de "única fuente de verdad" — es un log histórico de sesión, este archivo (`CLAUDE.md`) sigue siendo la única fuente de verdad operativa del producto.
 
+## Gobierno del proyecto: "Lovable propone, Claude Code dispone, Pablo decide" (dogma, 2026-08-16)
+
+El 2026-08-16 Pablo compartió un plan estratégico generado por Lovable para MejoraSM y pidió una propuesta propia de Claude Code — mejoras, actualización, optimización e ideas disruptivas — con una jerarquía explícita: cualquier plan o diagnóstico externo (Lovable u otra IA) es solo insumo de referencia, nunca autoridad; Claude Code lo revisa, verifica cada afirmación contra el estado real del repo/base (no confiar un número ajeno sin comprobarlo) y decide qué se incorpora; Pablo tiene la decisión final pero delega la ejecución completa. El proyecto vive y se ejecuta en este repo de GitHub vía Claude Code — no pasa a depender de Lovable.
+
+**Modo de ejecución pedido, explícito:** autonomía real, no consultiva — no preguntar por decisiones de alcance/prioridad/diseño entre fases, solo consultar ante un bloqueo físico/técnico real (ej. algo que requiere el inbox de Pablo, o que el clasificador de seguridad del entorno bloquea de verdad). Cada unidad de trabajo terminada queda: deployada en producción, commiteada y pusheada a GitHub, reflejada en el repo local, y documentada acá abajo — las cuatro cosas, no algunas.
+
+**Protocolo de continuidad entre sesiones:** si el crédito de una sesión se agota a mitad de una fase, el último tramo disponible se usa para dejar esta sección (abajo) al día — qué está hecho, qué está en curso, qué sigue exactamente. Al escribir "continuemos" al inicio de una sesión nueva, se retoma desde acá, en las mismas condiciones, sin volver a explicar el contexto.
+
+### Plan estratégico 2026 — estado de ejecución
+
+Verificado contra el repo/base real el 2026-08-16 antes de creer los números del plan de Lovable: varios estaban desactualizados (citaba "70 errores de lint" cuando el real era 45; citaba "10 filas de prueba contaminando métricas" cuando ya estaban limpias desde el 2026-08-05 — ver "Limpieza de datos de prueba de rule-engine" más abajo). El plan real de Claude Code parte de ese estado verificado, no del diagnóstico de Lovable tal cual.
+
+| Fase | Qué incluye | Estado |
+|---|---|---|
+| **Fase 0 — Higiene** | Borrar Edge Function `publisher` remota, dropear `calendar_events`, ampliar el regex de emoji de `rule-engine` a Dingbats/Misc Symbols, reemplazar el filtro de filas de prueba por prefijo de UUID por una columna real `is_test boolean`. | 🟢 hecho |
+| **Fase 1 — Idempotencia dura** | Constraint parcial único sobre `proposals` para que no se pueda agendar dos veces la misma pieza en la misma fecha/formato/oferta, reforzando el fix mínimo que ya existe en `publish-scheduled-posts.mjs` (ver "Duplicado real de autoagendado" más abajo). | ⚪ pendiente |
+| **Fase 2 — Cerrar el loop de aprendizaje** | `orchestrator` lee `success_rules` con `confidence >= 0.6` y las inyecta en el prompt del Estratega/Creativo — hoy `rule-engine` genera reglas que nadie lee al generar contenido nuevo. | ⚪ pendiente |
+| **Fase 3 — Observabilidad** | Tabla `run_log` (paso, pieza, estado, duración, error) escrita por cada script/función. | ⚪ pendiente |
+| **Fase 4 — Copiloto reflexivo** | Consejo diario + chat sobre datos propios en el Dashboard, con la voz de marca. | ⚪ roadmap, no en este ciclo |
+| **Fase 5 — Un solo panel** | Absorber `hub/`, `biblioteca/`, `dashboard/` como rutas del EDA React. | ⚪ roadmap, no en este ciclo |
+| **Fase 6 — Vendible a terceros** | Multi-tenant mínimo, Criterio Medular como onboarding, auditoría exportable. | ⚪ roadmap, no en este ciclo |
+
+#### Fase 0 — Higiene (2026-08-16, completa)
+
+- `supabase functions delete publisher --project-ref hsglmdarztrshihmzfph` → `{"function_slug":"publisher","message":"Deleted Edge Function."}`. Confirmado antes con `supabase functions list` que seguía `ACTIVE` pese a estar retirada del código desde el 2026-07-30 — quedaba pendiente por el clasificador de seguridad del entorno, ya no.
+- Migración `011_higiene_fase0.sql`: dropea `calendar_events` (confirmado antes `SELECT count(*) FROM calendar_events` = 0, sin caller real desde el rediseño de Calendario del 2026-08-07) y agrega `proposals.is_test boolean NOT NULL DEFAULT false` con backfill por el prefijo histórico. Aplicada y verificada contra la base real.
+- `rule-engine/index.ts`: el regex de detección de emoji para hooks (usado para la regla `type: "hook", condition: {pattern: "emoji"}`) no cubría el bloque Unicode Dingbats (`2600`–`27BF}`, donde viven ✨✅❤️) — hallazgo ya documentado desde la corrida real del 2026-08-05, sin arreglar hasta ahora. Se amplió a Dingbats + Arrows + Misc Symbols and Arrows.
+- Frontend: `Dashboard.tsx` y `Calendario.tsx` dejaron de inferir filas de prueba por prefijo de UUID (`id.startsWith('7e57da7a-')`) y leen `proposals.is_test` real (agregado al `select` de `metricsApi.all()` en `src/services/supabase.ts`). `useCalendarEvents`/`useCreateCalendarEvent`/`useDeleteCalendarEvent` (hooks) y `calendarApi` (servicio) se borraron por completo — código muerto tras dropear la tabla, dogma ya establecido ("lo que no se usa se borra"). El contador "Publicaciones programadas" y la sección "Calendario de contenido" del Dashboard ahora derivan de `proposals.scheduled_at` directo (mismo criterio que ya usaba `Calendario.tsx`), no de la tabla legacy.
+- Verificado: lint bajó de 45 a 44 errores preexistentes (no subió pese al código nuevo), 61/61 tests verdes (con 2 tests ajustados a la nueva fuente de datos), build limpio.
+
+Detalle de cada fase, decisiones tomadas y evidencia real se va agregando como subsecciones acá mismo a medida que se ejecuta cada una — no en otro archivo.
+
 ## Qué es este repo
 
 Un solo producto: **MejoraSM**, para la marca [MejoraOK](https://mejoraok.com). Cinco piezas; solo la primera usa Supabase, las demás son estáticas o corren por GitHub Actions:
