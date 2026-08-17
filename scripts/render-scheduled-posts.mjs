@@ -46,6 +46,7 @@ const OFERTA_LABELS = {
   comercial: "Comercial",
   empresarial: "Empresarial",
   profesionalizacion: "Profesionalización",
+  sociales: "Sociales",
 };
 
 const SUPABASE_URL = process.env.SUPABASE_URL;

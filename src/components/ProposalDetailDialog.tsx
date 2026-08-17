@@ -38,14 +38,16 @@ import {
   useConvertProposalFormat,
 } from "@/hooks/useProposals";
 
-// Mismas 5 dimensiones que content/inbox/ (ver scripts/generate-brief.mjs) —
+// Mismas 6 dimensiones que content/inbox/ (ver scripts/generate-brief.mjs) —
 // de acá sale la foto que usa render-scheduled-posts.mjs al publicar.
+// "Sociales" agregada 2026-08-17 (Taller de la Oferta).
 const OFERTAS = [
   { value: "personal", label: "Personal" },
   { value: "organizacional", label: "Organizacional" },
   { value: "comercial", label: "Comercial" },
   { value: "empresarial", label: "Empresarial" },
   { value: "profesionalizacion", label: "Profesionalización" },
+  { value: "sociales", label: "Sociales" },
 ];
 
 // Universo real de proposals.format que el pipeline efectivamente produce y
@@ -445,7 +447,7 @@ export function ProposalDetailDialog({
               {!isScheduled && (
                 <Select value={scheduleOferta} onValueChange={setScheduleOferta}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Oferta (de dónde sale la foto)..." />
+                    <SelectValue placeholder="Dimensión del servicio (de dónde sale la foto)..." />
                   </SelectTrigger>
                   <SelectContent>
                     {OFERTAS.map((o) => (

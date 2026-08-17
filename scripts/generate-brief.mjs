@@ -38,8 +38,16 @@ const EXT_TO_MIME = {
 };
 const VIDEO_EXTS = [".mp4", ".mov", ".avi", ".webm"];
 
-// Las 4 dimensiones + Profesionalización, tal cual el Manual de Marca (sección
-// "Servicios"). Cada carpeta de content/inbox/ corresponde a una de estas.
+// Las 4 dimensiones de servicio + Profesionalización, tal cual el Manual de
+// Marca (sección "Servicios"), más "Sociales" — agregada el 2026-08-17 a
+// pedido explícito de Pablo y Sindy (Taller de la Oferta): contenido de
+// equipo/alianzas/vida social de la marca (After Office, celebraciones,
+// invitaciones, nuevos proyectos) que no encajaba a la fuerza en ninguna de
+// las 5 dimensiones de servicio — Sociales es la única que NO es una
+// dimensión de servicio, es la cara humana de la marca. Lista estática a
+// propósito ("los Servicios deberían ser estático hoy, veremos cómo
+// evoluciona en el futuro" — respuesta real de Pablo). Cada carpeta de
+// content/inbox/ corresponde a una de estas.
 const OFERTAS = {
   personal: {
     nombre: "Personal",
@@ -71,6 +79,13 @@ const OFERTAS = {
       "Nivel integrador, no una quinta área: el resultado de trabajar las " +
       "cuatro dimensiones de forma conjunta y sostenida — líderes formados, " +
       "métricas claras, procesos replicables.",
+  },
+  sociales: {
+    nombre: "Sociales",
+    contexto:
+      "La cara humana y social de la marca, no una dimensión de servicio: " +
+      "encuentros de equipo, nuevas alianzas, invitaciones, After Office, " +
+      "celebraciones. Tono cercano y festejador, sin vender nada puntual.",
   },
 };
 

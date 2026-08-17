@@ -154,3 +154,21 @@ export async function sendCopilotMessage(
   });
   return handleResponse(res, "Error consultando al copiloto");
 }
+
+// ═══════════════════════════════════════
+// CLASSIFY PHOTO (sugerencia de dimensión — Taller de la Oferta, 2026-08-17)
+// ═══════════════════════════════════════
+
+export interface DimensionSuggestion {
+  dimension: string;
+  reason: string;
+}
+
+export async function suggestPhotoDimension(imageBase64: string, mimeType: string): Promise<DimensionSuggestion> {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/classify-photo`, {
+    method: "POST",
+    headers: await buildHeaders(),
+    body: JSON.stringify({ action: "suggest", imageBase64, mimeType }),
+  });
+  return handleResponse(res, "Error sugiriendo la dimensión de la foto");
+}

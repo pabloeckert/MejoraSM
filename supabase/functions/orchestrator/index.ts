@@ -362,6 +362,13 @@ async function saveMessage(
 // ═══════════════════════════════════════
 
 const AUTO_PUBLISH_FORMATS = ["post", "carrusel"];
+// "Sociales" (agregada 2026-08-17, Taller de la Oferta) NO participa de esta
+// rotación a propósito: es contenido anclado a eventos reales de equipo (After
+// Office, alianzas, celebraciones), no un tema de estrategia que el Estratega
+// deba poder elegir en automático — dejarla afuera evita que Mesa de Diálogo
+// invente un "somos un gran equipo" genérico sin ningún evento real detrás.
+// Sí participa del pipeline de Stories (generate-brief.mjs), que arma el copy
+// a partir de la foto real, con contexto real.
 const OFERTAS = ["personal", "organizacional", "comercial", "empresarial", "profesionalizacion"];
 // Espaciado entre posts de feed autogenerados, para no saturar el feed con
 // varias corridas seguidas de Mesa de Diálogo el mismo día. Ajustable acá

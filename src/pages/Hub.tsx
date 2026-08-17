@@ -20,10 +20,13 @@ import {
   ImageOff,
   MonitorPlay,
   ExternalLink,
+  Sparkles,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { github } from "@/services/github";
 import { useGithubConnection, useDirListing, usePhotoUpload } from "@/hooks/useGithubUpload";
+import { suggestPhotoDimension, type DimensionSuggestion } from "@/services/ai";
 
 // Rediseño 2026-08-17, a pedido directo de Pablo: "Subir material" dejó de
 // ser 5 links a la UI cruda de upload de GitHub — ahora es una interfaz
@@ -32,12 +35,20 @@ import { useGithubConnection, useDirListing, usePhotoUpload } from "@/hooks/useG
 // historial real (Monitor). Usa el mismo cliente de GitHub y la MISMA
 // clave de localStorage que la Biblioteca (src/services/github.ts) — una
 // sola sesión de GitHub para todo el sitio.
+//
+// Ajustado el mismo día tras el Taller de la Oferta (artifact respondido
+// por Pablo y Sindy juntos): "Oferta" confundía — se renombró a "Dimensión
+// del servicio" en toda la UI. Se agregó "Sociales" como 6ta dimensión, la
+// única que NO es de servicio (es la vida social/de equipo de la marca —
+// After Office, alianzas, celebraciones). La lista queda estática a
+// propósito ("los Servicios deberían ser estático hoy" — respuesta real).
 const OFERTAS = [
   { key: "personal", kicker: "Personal", title: "Liderazgo y foco" },
   { key: "organizacional", kicker: "Organizacional", title: "Equipo y cultura" },
   { key: "comercial", kicker: "Comercial", title: "Ventas y negociación" },
   { key: "empresarial", kicker: "Empresarial", title: "Modelo de negocio" },
   { key: "profesionalizacion", kicker: "Profesionalización", title: "Nivel integrador" },
+  { key: "sociales", kicker: "Sociales", title: "Equipo, alianzas y celebraciones" },
 ];
 
 function ConnectGithubDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
@@ -140,6 +151,15 @@ function PhotoGrid({ dimension, folder, emptyLabel }: { dimension: string; folde
   );
 }
 
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function Hub() {
   const [connectOpen, setConnectOpen] = useState(false);
   const [selectedDim, setSelectedDim] = useState("personal");
@@ -147,13 +167,55 @@ export default function Hub() {
   const { uploads, uploadFiles, clearUploads } = usePhotoUpload(selectedDim, () => setTimeout(clearUploads, 2500));
   const [dragActive, setDragActive] = useState(false);
 
+  // "El sistema propone" — respuesta real de Pablo y Sindy al Taller de la
+  // Oferta (2026-08-17): antes de commitear, se sugiere la dimensión
+  // mirando la foto real (classify-photo, Claude con visión), pre-seleccionando
+  // la pestaña — el humano confirma o corrige antes de que se guarde, nunca
+  // se decide sola.
+  const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
+  const [suggestion, setSuggestion] = useState<DimensionSuggestion | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+
+  async function handleFilesSelected(fileList: FileList | File[]) {
+    const files = Array.from(fileList).filter((f) => f.type.startsWith("image/"));
+    if (!files.length) return;
+    setPendingFiles(files);
+    setSuggestion(null);
+    setSuggesting(true);
+    try {
+      const dataUrl = await readAsDataUrl(files[0]);
+      const mimeType = files[0].type || "image/jpeg";
+      const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+      const result = await suggestPhotoDimension(base64, mimeType);
+      setSuggestion(result);
+      setSelectedDim(result.dimension);
+    } catch {
+      // Si la sugerencia falla (red, IA no disponible, etc.) no bloquea el
+      // flujo — el humano sigue pudiendo elegir la dimensión a mano y confirmar.
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  function confirmUpload() {
+    if (!pendingFiles) return;
+    uploadFiles(pendingFiles);
+    setPendingFiles(null);
+    setSuggestion(null);
+  }
+
+  function cancelUpload() {
+    setPendingFiles(null);
+    setSuggestion(null);
+  }
+
   return (
     <div className="space-y-7">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-[32px] font-medium leading-tight text-primary">Subir material</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Elegí la oferta, subí la foto y quedá guardada de verdad en el repo — sin salir del panel.
+            Elegí la dimensión del servicio, subí la foto y quedá guardada de verdad en el repo — sin salir del panel.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -211,12 +273,46 @@ export default function Hub() {
                 Conectar GitHub
               </Button>
             </div>
+          ) : pendingFiles ? (
+            <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-5">
+              <p className="text-sm font-medium">
+                {pendingFiles.length} foto{pendingFiles.length > 1 ? "s" : ""} lista{pendingFiles.length > 1 ? "s" : ""} para subir a{" "}
+                <span className="text-primary">{OFERTAS.find((o) => o.key === selectedDim)?.kicker}</span>
+              </p>
+
+              <div className="flex items-start gap-2 rounded-md bg-background p-3 text-sm">
+                <Sparkles className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                {suggesting ? (
+                  <span className="text-muted-foreground">Mirando la primera foto para sugerir la dimensión…</span>
+                ) : suggestion ? (
+                  <span>
+                    El sistema sugiere <strong>{OFERTAS.find((o) => o.key === suggestion.dimension)?.kicker}</strong> — {suggestion.reason}
+                    {" "}
+                    <span className="text-muted-foreground">Elegí otra pestaña arriba si no es correcto.</span>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    No se pudo sugerir la dimensión automáticamente — elegí la correcta arriba antes de confirmar.
+                  </span>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <Button onClick={confirmUpload} disabled={suggesting}>
+                  Confirmar y subir a {OFERTAS.find((o) => o.key === selectedDim)?.kicker}
+                </Button>
+                <Button variant="outline" onClick={cancelUpload}>
+                  <X className="mr-1.5 h-3.5 w-3.5" />
+                  Cancelar
+                </Button>
+              </div>
+            </div>
           ) : (
             <label
               onDrop={(e) => {
                 e.preventDefault();
                 setDragActive(false);
-                uploadFiles(e.dataTransfer.files);
+                handleFilesSelected(e.dataTransfer.files);
               }}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -236,7 +332,7 @@ export default function Hub() {
                 multiple
                 accept="image/*"
                 className="hidden"
-                onChange={(e) => e.target.files && uploadFiles(e.target.files)}
+                onChange={(e) => e.target.files && handleFilesSelected(e.target.files)}
               />
             </label>
           )}
@@ -269,7 +365,7 @@ export default function Hub() {
               <ImageOff className="h-3.5 w-3.5" />
               Ya usadas en {OFERTAS.find((o) => o.key === selectedDim)?.kicker}
             </p>
-            <PhotoGrid dimension={selectedDim} folder="used" emptyLabel="Todavía no se usó ninguna foto de esta oferta." />
+            <PhotoGrid dimension={selectedDim} folder="used" emptyLabel="Todavía no se usó ninguna foto de esta dimensión." />
           </CardContent>
         </Card>
       </div>

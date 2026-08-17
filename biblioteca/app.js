@@ -74,12 +74,16 @@ const SCREEN_TITLES = { library: "Línea de tiempo", calendar: "Calendario", qui
 // Las 5 dimensiones del Manual de Marca — mapean 1:1 a las carpetas de
 // content/inbox/<oferta>/ que consume el motor de story. Distinto de las
 // categorías editoriales (que son etiquetas libres).
+// "Sociales" agregada 2026-08-17 (Taller de la Oferta, respuesta real de
+// Pablo y Sindy) — edición puntual de esta lista, no una reescritura de la
+// app (ver CLAUDE.md, Fase 5, decisión de no reescribir la Biblioteca).
 const DIMENSIONS = [
   { key: "personal", label: "Personal" },
   { key: "organizacional", label: "Organizacional" },
   { key: "comercial", label: "Comercial" },
   { key: "empresarial", label: "Empresarial" },
   { key: "profesionalizacion", label: "Profesionalización" },
+  { key: "sociales", label: "Sociales" },
 ];
 
 const MONTH_NAMES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
