@@ -31,6 +31,7 @@ import { useDocuments } from "@/hooks/useVault";
 import { useDialogueSessions } from "@/hooks/useDialogue";
 import { usePendingProposals, useProposals } from "@/hooks/useProposals";
 import { useAllMetrics } from "@/hooks/useMetrics";
+import { CopilotCard } from "@/components/CopilotCard";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -695,6 +696,9 @@ function DashboardContent() {
           </Link>
         ))}
       </div>
+
+      {/* Copiloto Reflexivo (Fase 4 del plan estratégico 2026-08-16) */}
+      <CopilotCard />
 
       {/* KPIs reales de rendimiento social (Fase A, 2026-08-07) */}
       <div>

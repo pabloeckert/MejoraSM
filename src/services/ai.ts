@@ -117,3 +117,40 @@ export async function processDocument(documentId: string): Promise<ProcessResult
   });
   return handleResponse(res, "Error procesando el documento");
 }
+
+// ═══════════════════════════════════════
+// COPILOT (Copiloto Reflexivo — Fase 4 del plan estratégico 2026-08-16)
+// ═══════════════════════════════════════
+
+export interface CopilotAdvice {
+  advice_date: string;
+  content: string;
+  evidence: Record<string, unknown>;
+  cached: boolean;
+}
+
+export interface CopilotChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export async function getCopilotAdvice(): Promise<CopilotAdvice> {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/copilot`, {
+    method: "POST",
+    headers: await buildHeaders(),
+    body: JSON.stringify({ action: "advice" }),
+  });
+  return handleResponse(res, "Error generando el consejo del día");
+}
+
+export async function sendCopilotMessage(
+  question: string,
+  history: CopilotChatMessage[]
+): Promise<{ answer: string }> {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/copilot`, {
+    method: "POST",
+    headers: await buildHeaders(),
+    body: JSON.stringify({ action: "chat", question, history }),
+  });
+  return handleResponse(res, "Error consultando al copiloto");
+}
