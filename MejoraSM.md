@@ -3914,6 +3914,74 @@ export function useSuccessRules() {
 
 **Nota sobre esta transcripción:** `Dashboard.tsx` y `Calendario.tsx` tuvieron cambios acotados en esta fase (reemplazo de la fuente de datos de calendario, lectura de `is_test` real) sobre el código completo ya transcripto en el Anexo C — no se vuelve a pegar el archivo entero acá para no duplicar miles de líneas sin cambios; los cambios reales están descriptos en prosa arriba y en el detalle de la Fase 0 dentro de `CLAUDE.md`. Si Pablo quiere el archivo completo actualizado transcripto igual, pedirlo expresamente.
 
+Se continuó sin pausa a la Fase 1, idempotencia dura, siguiendo la instrucción explícita de no consultar entre fases. El objetivo era agregar una segunda capa de protección real, a nivel de base de datos, contra que dos propuestas terminaran agendadas para la misma oferta, el mismo día y el mismo formato — un problema relacionado pero distinto del duplicado de publicación ya investigado y corregido en una sesión anterior. Antes de tocar nada se verificó que no hubiera ninguna propuesta programada en ese momento en la base real, así que no había riesgo de que la restricción nueva chocara con datos existentes.
+
+Al aplicar la migración apareció un problema técnico real, no anticipado: Postgres no permite convertir directamente una fecha con hora y zona horaria a solo fecha dentro de la definición de un índice, porque ese cálculo depende de en qué zona horaria esté la sesión que lo ejecuta, y un índice necesita una función cuyo resultado sea siempre el mismo para los mismos datos de entrada. Se resolvió creando una función propia que fija la zona horaria a UTC de forma explícita antes de calcular la fecha — con la zona fija, el resultado deja de depender de la sesión y se vuelve genuinamente estable, no un truco declarado a la fuerza.
+
+La restricción se probó de verdad, no solo se aplicó y se dio por buena: se insertó una propuesta de prueba agendada para una oferta, fecha y formato determinados, y después se intentó insertar una segunda con la misma oferta, la misma fecha, el mismo formato pero una hora distinta — Postgres la rechazó exactamente como se esperaba, con un error real de clave duplicada. Las filas usadas para la prueba se borraron enseguida.
+
+---
+
+## Anexo E — Código final de la Fase 1
+
+### `supabase/migrations/012_idempotencia_scheduling.sql`
+
+```sql
+-- Migration: Fase 1 del plan estratégico 2026-08-16 — idempotencia dura
+-- contra el duplicado de autoagendado
+--
+-- Contexto real (ver CLAUDE.md "Duplicado real de autoagendado —
+-- investigación 2026-08-05"): la causa más probable identificada fue un
+-- gap de idempotencia en publish-scheduled-posts.mjs (markPublished() no
+-- chequeaba éxito del PATCH) — ya corregido en esa fecha con un chequeo de
+-- res.ok + una función isStillScheduled() que re-consulta el status antes
+-- de publicar cada entrada del manifiesto. Esta migración agrega una
+-- segunda capa, a nivel de base, contra un problema relacionado pero
+-- distinto: que dos propuestas terminen agendadas para la misma oferta,
+-- misma fecha (día) y mismo formato — algo que el rotador de oferta y el
+-- espaciado de 24h de orchestrator ya evita en el camino feliz, pero sin
+-- ninguna garantía dura si dos sesiones de Mesa de Diálogo corrieran cerca
+-- en el tiempo o si un agendado manual colisionara con uno automático.
+--
+-- Índice único parcial (solo aplica a status='scheduled' — una propuesta
+-- puede pasar por rejected/published sin chocar con este constraint, y
+-- claramente formatos sin pipeline autónomo como historia no agendan por
+-- oferta+fecha de la misma forma). NULLs en oferta no colisionan entre sí
+-- (comportamiento estándar de Postgres en índices únicos), consistente con
+-- que oferta es nullable hasta que se agenda de verdad.
+--
+-- Verificado antes de aplicar: SELECT * FROM proposals WHERE
+-- status='scheduled' devolvió 0 filas el 2026-08-16 — no hay riesgo de que
+-- el índice falle por datos existentes.
+--
+-- Nota técnica real (encontrada al aplicar, no anticipada): Postgres NO
+-- deja usar scheduled_at::date directo en un índice porque el cast
+-- timestamptz→date depende del timezone de la sesión, así que no es
+-- IMMUTABLE (error real: "42P17: functions in index expression must be
+-- marked IMMUTABLE"). Se resuelve con una función wrapper que fija UTC
+-- explícito — ahí el resultado ya no depende de ninguna sesión, es
+-- genuinamente inmutable, no una mentira de volatilidad.
+--
+-- Ejecutar vía `supabase db query --linked -f supabase/migrations/012_idempotencia_scheduling.sql`
+-- (con -f, no `"$(cat ...)"` inline) o el SQL Editor del dashboard — NO con
+-- `supabase db push` (ver CLAUDE.md "Bug conocido del CLI").
+
+CREATE OR REPLACE FUNCTION scheduled_day_utc(ts TIMESTAMPTZ)
+RETURNS DATE
+LANGUAGE sql
+IMMUTABLE
+AS $$ SELECT (ts AT TIME ZONE 'UTC')::date $$;
+
+DROP INDEX IF EXISTS idx_proposals_no_duplicate_schedule;
+
+CREATE UNIQUE INDEX idx_proposals_no_duplicate_schedule
+  ON proposals (oferta, scheduled_day_utc(scheduled_at), format)
+  WHERE status = 'scheduled';
+
+COMMENT ON INDEX idx_proposals_no_duplicate_schedule IS
+  'Fase 1 del plan estratégico 2026-08-16: impide dos propuestas scheduled para la misma oferta+día+formato. Defensa a nivel de base, complementa el fix de idempotencia ya aplicado en publish-scheduled-posts.mjs el 2026-08-05.';
+```
+
 ---
 
 *Fin de la transcripción hasta este punto. Se actualiza en paralelo cada vez que se actualiza `CLAUDE.md`, por dogma explícito de Pablo del 2026-08-08.*

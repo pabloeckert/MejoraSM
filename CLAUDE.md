@@ -31,7 +31,7 @@ Verificado contra el repo/base real el 2026-08-16 antes de creer los números de
 | Fase | Qué incluye | Estado |
 |---|---|---|
 | **Fase 0 — Higiene** | Borrar Edge Function `publisher` remota, dropear `calendar_events`, ampliar el regex de emoji de `rule-engine` a Dingbats/Misc Symbols, reemplazar el filtro de filas de prueba por prefijo de UUID por una columna real `is_test boolean`. | 🟢 hecho |
-| **Fase 1 — Idempotencia dura** | Constraint parcial único sobre `proposals` para que no se pueda agendar dos veces la misma pieza en la misma fecha/formato/oferta, reforzando el fix mínimo que ya existe en `publish-scheduled-posts.mjs` (ver "Duplicado real de autoagendado" más abajo). | ⚪ pendiente |
+| **Fase 1 — Idempotencia dura** | Constraint parcial único sobre `proposals` para que no se pueda agendar dos veces la misma pieza en la misma fecha/formato/oferta, reforzando el fix mínimo que ya existe en `publish-scheduled-posts.mjs` (ver "Duplicado real de autoagendado" más abajo). | 🟢 hecho |
 | **Fase 2 — Cerrar el loop de aprendizaje** | `orchestrator` lee `success_rules` con `confidence >= 0.6` y las inyecta en el prompt del Estratega/Creativo — hoy `rule-engine` genera reglas que nadie lee al generar contenido nuevo. | ⚪ pendiente |
 | **Fase 3 — Observabilidad** | Tabla `run_log` (paso, pieza, estado, duración, error) escrita por cada script/función. | ⚪ pendiente |
 | **Fase 4 — Copiloto reflexivo** | Consejo diario + chat sobre datos propios en el Dashboard, con la voz de marca. | ⚪ roadmap, no en este ciclo |
@@ -45,6 +45,14 @@ Verificado contra el repo/base real el 2026-08-16 antes de creer los números de
 - `rule-engine/index.ts`: el regex de detección de emoji para hooks (usado para la regla `type: "hook", condition: {pattern: "emoji"}`) no cubría el bloque Unicode Dingbats (`2600`–`27BF}`, donde viven ✨✅❤️) — hallazgo ya documentado desde la corrida real del 2026-08-05, sin arreglar hasta ahora. Se amplió a Dingbats + Arrows + Misc Symbols and Arrows.
 - Frontend: `Dashboard.tsx` y `Calendario.tsx` dejaron de inferir filas de prueba por prefijo de UUID (`id.startsWith('7e57da7a-')`) y leen `proposals.is_test` real (agregado al `select` de `metricsApi.all()` en `src/services/supabase.ts`). `useCalendarEvents`/`useCreateCalendarEvent`/`useDeleteCalendarEvent` (hooks) y `calendarApi` (servicio) se borraron por completo — código muerto tras dropear la tabla, dogma ya establecido ("lo que no se usa se borra"). El contador "Publicaciones programadas" y la sección "Calendario de contenido" del Dashboard ahora derivan de `proposals.scheduled_at` directo (mismo criterio que ya usaba `Calendario.tsx`), no de la tabla legacy.
 - Verificado: lint bajó de 45 a 44 errores preexistentes (no subió pese al código nuevo), 61/61 tests verdes (con 2 tests ajustados a la nueva fuente de datos), build limpio.
+
+#### Fase 1 — Idempotencia dura (2026-08-16, completa)
+
+Migración `012_idempotencia_scheduling.sql`: índice único parcial `idx_proposals_no_duplicate_schedule` sobre `(oferta, scheduled_day_utc(scheduled_at), format) WHERE status = 'scheduled'` — impide que dos propuestas queden agendadas para la misma oferta, mismo día y mismo formato. Complementa (no reemplaza) el fix de idempotencia ya aplicado el 2026-08-05 en `publish-scheduled-posts.mjs` (`markPublished()` chequea `res.ok`, `isStillScheduled()` re-consulta antes de publicar) — ese fix ataca la publicación duplicada de la misma fila; este constraint ataca que existan dos filas agendadas para el mismo slot.
+
+**Nota técnica real encontrada al aplicar:** `scheduled_at::date` directo no sirve como expresión de índice en Postgres porque el cast de `timestamptz` a `date` depende del timezone de la sesión, así que no está marcado `IMMUTABLE` (error real: `42P17: functions in index expression must be marked IMMUTABLE`). Se resolvió con una función wrapper `scheduled_day_utc(ts timestamptz)` que fija `AT TIME ZONE 'UTC'` explícito antes de castear — con timezone fijo el resultado ya no depende de ninguna sesión, es genuinamente inmutable.
+
+**Probado de verdad, no solo aplicado:** se insertó una propuesta de prueba (`is_test = true`) agendada para `comercial`/2026-09-01/`post`, y un segundo intento con la misma oferta/día/formato pero hora distinta fue rechazado por Postgres con `23505: duplicate key value violates unique constraint "idx_proposals_no_duplicate_schedule"`. Filas de prueba borradas después de confirmar.
 
 Detalle de cada fase, decisiones tomadas y evidencia real se va agregando como subsecciones acá mismo a medida que se ejecuta cada una — no en otro archivo.
 
