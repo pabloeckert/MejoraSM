@@ -330,7 +330,7 @@ Páginas (`src/pages/`):
 
 Hooks custom en `src/hooks/` (`useVault`, `useDialogue`, `useProposals`, `useMetrics`) llaman a `src/services/ai.ts` (invoca Edge Functions) y `src/services/supabase.ts` (CRUD directo). El cliente Supabase vive en `src/integrations/supabase/client.ts` y usa `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` (ver `.env.example`). `src/components/ui/` es el set estándar de shadcn sin modificar; la UI propia está en `src/components/layout/` (AppSidebar, AppLayout).
 
-### Backend — 5 Edge Functions
+### Backend — 6 Edge Functions
 
 Todas en `supabase/functions/` (Deno), cada una con su propia allowlist de CORS (`util.mejoraok.com`, `mejorasm.vercel.app`, localhost) y con el guard de `_shared/auth.ts`:
 
@@ -341,6 +341,7 @@ Todas en `supabase/functions/` (Deno), cada una con su propia allowlist de CORS 
 | `rule-engine` | Analiza métricas de posts pasados y genera reglas de éxito (qué formato/hora/tono funciona mejor). Cron diario real desde 2026-08-02 (`rule-engine-cron.yml`). |
 | `metrics-collector` | Trae métricas reales desde la API de analíticas de Zernio (`GET /v1/analytics?postId=`, no Instagram Graph API — cambio 2026-08-04/05, ver "Métricas vía Zernio Analytics" más abajo). Cron real cada 6h desde 2026-08-02 (`metrics-collector-cron.yml`). |
 | `copilot` | Copiloto Reflexivo (Fase 4 del plan estratégico 2026-08-16): consejo del día cacheado (`advice`) + chat stateless sobre datos propios reales (`chat`). Cron diario real desde 2026-08-17 (`copilot-advice-cron.yml`) pre-genera el consejo del día. |
+| `classify-photo` | Taller de la Oferta (2026-08-17): sugiere la dimensión de una foto real (Claude con visión) antes de subirla desde `/hub` — el humano confirma o corrige. Sin cron, se llama en vivo desde el frontend. Bloqueada por el límite de uso de Anthropic hasta 2026-09-01, ver sección propia arriba. |
 
 Deploy: `.github/workflows/deploy-functions.yml` (push a `supabase/functions/**`, o manual con función específica) — usa `SUPABASE_ACCESS_TOKEN` y `SUPABASE_PROJECT_REF` como secrets del repo.
 
@@ -823,6 +824,28 @@ No se pudo reproducir el fallo exacto (headers de GitHub Pages confirmados sin `
 ### Investigación de mercado (2026-08-17)
 
 Además del hosting, se investigó qué hacen sistemas similares hoy. Hallazgo principal: **la publicación 100% autónoma sin aprobación humana por pieza (lo que hace MejoraSM desde el overhaul del 2026-08-02) es genuinamente atípica en el mercado 2026** — el consenso de la industria es "human-in-the-loop", con cadenas de aprobación de ~4 personas en promedio antes de publicar; ninguna herramienta comercial relevada (Buffer, Predis.ai, Ocoya, Sprout Social, Hootsuite) publica sin ese gate. El debate multi-agente (Estratega/Creativo/Crítico con RAG contra un Criterio Medular propio) tampoco tiene equivalente comercial directo — existe como patrón de arquitectura en la industria de IA, no como feature vendible de ninguna herramienta de marketing relevada. Lo que sí es estándar en el mercado y falta acá: más plataformas (LinkedIn, dado el perfil B2B, antes que TikTok/X), bandeja unificada de comentarios/DMs, reglas condicionales activas (no solo pasivas, ver `rule-engine`), benchmarking competitivo. Ideas priorizadas por impacto/esfuerzo quedan como roadmap futuro, no ejecutadas en esta ronda — son features nuevas, no correcciones de lo reportado por Pablo.
+
+## Taller de la Oferta — respuestas reales de Pablo y Sindy (2026-08-17)
+
+El artifact del punto 3 de la ronda de revisión (ver arriba) lo respondieron Pablo y Sindy juntos, en el momento, directo en el chat. Cinco decisiones reales, ya aplicadas:
+
+1. **"Oferta" confundía** — se renombra a **"Dimensión del servicio"** en toda la UI visible (selector de Subir material, selector de reprogramar en el detalle de propuesta). El nombre técnico interno (columna `proposals.oferta`, carpetas `content/inbox/<oferta>/`) no cambió — cambiar eso hubiera sido una migración de datos innecesaria para un problema que era de vocabulario, no de estructura.
+2. **Sindy piensa en "servicio", Pablo piensa en "dimensión"** — quedó anotado, sin resolver con una sola regla: son dos formas de pensar la misma etiqueta, coexisten.
+3. **Falta una 6ª categoría: "Sociales"** — contenido de equipo/alianzas/celebraciones (After Office, "nuevos proyectos", invitaciones) que no encajaba a la fuerza en las 5 dimensiones de servicio. Agregada como la única categoría que **no** es una dimensión de servicio — se dejó explícito en el código y en la UI. Actualizada en las 6 listas reales del repo: `src/pages/Hub.tsx`, `scripts/generate-brief.mjs`, `scripts/render-scheduled-posts.mjs`, `src/components/ProposalDetailDialog.tsx`, `biblioteca/app.js` (edición puntual de un array, no una reescritura — sigue vigente la decisión de Fase 5 de no tocar el resto de esa app). Deliberadamente **no** se agregó a la rotación `AUTO_PUBLISH_FORMATS` de `orchestrator/index.ts`: Sociales depende de que haya pasado un evento real, no es un tema que el Estratega deba poder elegir en automático para un carrusel — evita que Mesa de Diálogo invente un "somos un gran equipo" genérico sin ningún evento real detrás. Sí participa del pipeline de Stories (`generate-brief.mjs`), que arma el copy a partir de la foto real.
+4. **La lista queda estática** — "los Servicios deberían ser estático hoy, veremos cómo evoluciona en el futuro" (respuesta real). No se construyó una UI de alta de categorías nuevas — habría sido trabajo para un problema que todavía no existe.
+5. **"El sistema propone"** — Edge Function nueva, `classify-photo` (Claude con visión), sugiere la dimensión mirando la foto real antes de subir. `Hub.tsx` ahora pausa el commit hasta que el humano confirma o corrige la dimensión pre-seleccionada (nunca se decide sola). Ver hallazgo real abajo sobre por qué esto no está devolviendo sugerencias reales todavía.
+
+### ⚠️ Hallazgo urgente: la cuenta de Anthropic pegó su límite de uso — afecta la story diaria HOY
+
+Al probar `classify-photo` en producción, la función devolvió un error real de Anthropic: *"You have reached your specified API usage limits. You will regain access on 2026-09-01 at 00:00 UTC."* No es un bug de código — se confirmó contra `run_log` que **la corrida real del cron de `daily-story.yml` del 2026-08-17 (10:36 ART) falló exactamente por lo mismo** — la story de hoy no se generó. Esto es un incidente activo, no algo hipotético.
+
+**Qué se hizo:** `scripts/lib/claude.mjs` ahora cae a Groq (`llama-3.3-70b-versatile`) cuando Anthropic falla — mismo patrón ya usado en `orchestrator/index.ts` y `copilot/index.ts` — pero **solo para el caso sin foto**: no hay un modelo de visión de Groq verificado como confiable acá, así que con foto sigue fallando igual que antes en vez de arriesgar un resultado de visión sin probar y sin poder revisar.
+
+**Lo que queda pendiente de verdad, no resuelto por código:**
+- `GROQ_API_KEY` todavía no existe como secret de **GitHub Actions** (solo como secret de Supabase, para las Edge Functions) — el fallback de `daily-story.yml` ya está armado (`.github/workflows/daily-story.yml` ya lo referencia) pero queda **inactivo** hasta que Pablo lo agregue como secret del repo (`gh secret set GROQ_API_KEY` o desde la UI de GitHub — ya tiene el valor, es el mismo que usa Supabase).
+- Para las stories **con foto** (la mayoría, dado que Hub ya tiene fotos reales pendientes), no hay fallback — van a seguir sin generarse hasta que se resuelva el límite de Anthropic de un lado o del otro.
+- La solución de fondo es del lado de la cuenta de Anthropic, no del código: subir el plan, agregar créditos, o esperar al 2026-09-01. Es una decisión de cuenta/facturación que le corresponde a Pablo — no algo que "Claude Code disponga" solo.
+- `classify-photo` (sugerencia de dimensión) tampoco va a devolver sugerencias reales mientras dure esto — el flujo de Subir material está diseñado para degradar bien (si la sugerencia falla, el humano elige la dimensión a mano y confirma igual, no bloquea el upload), así que **subir fotos sigue funcionando**, solo sin la ayuda de la IA por ahora.
 
 ## Notas históricas
 
