@@ -11,6 +11,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { publishPost } from "./lib/zernio.mjs";
+import { logRun, startTimer } from "./lib/run-log.mjs";
 
 const ROOT = process.cwd();
 const MANIFEST_PATH = path.join(ROOT, "content/work/scheduled-posts.json");
@@ -93,6 +94,7 @@ async function main() {
   const manifest = JSON.parse(await readFile(MANIFEST_PATH, "utf8"));
   if (manifest.length === 0) {
     console.log("Nada para publicar (manifiesto vacío).");
+    await logRun({ source: "publish-scheduled-posts", step: "publish-scheduled-posts", status: "skipped", durationMs: elapsed(), metadata: { reason: "empty-manifest" } });
     return;
   }
 
@@ -108,27 +110,33 @@ async function main() {
     // (PLAN_AUTONOMIA.md Fase 7) — publishPost/createPostAndPoll ya aceptan
     // un array de URLs.
     const imageUrls = entry.outputPaths.map((p) => `${rawBaseUrl}/${p}`);
+    const entryElapsed = startTimer();
     try {
       const result = await publishPost(imageUrls.length === 1 ? imageUrls[0] : imageUrls, entry.caption);
       if (!result.success) {
         failures++;
         await markError(entry.proposalId, result.error || "Fallo desconocido publicando en Zernio");
         console.error(`Propuesta ${entry.proposalId}: error publicando — ${result.error}`);
+        await logRun({ source: "publish-scheduled-posts", step: "publish-scheduled-posts", status: "error", proposalId: entry.proposalId, durationMs: entryElapsed(), error: result.error || "Fallo desconocido publicando en Zernio" });
         continue;
       }
       await markPublished(entry.proposalId, result.postId);
       console.log(`Propuesta ${entry.proposalId}: publicada (Zernio post ${result.postId}).`);
+      await logRun({ source: "publish-scheduled-posts", step: "publish-scheduled-posts", status: "success", proposalId: entry.proposalId, durationMs: entryElapsed(), metadata: { zernioPostId: result.postId } });
     } catch (e) {
       failures++;
       await markError(entry.proposalId, e.message);
       console.error(`Propuesta ${entry.proposalId}: excepción — ${e.message}`);
+      await logRun({ source: "publish-scheduled-posts", step: "publish-scheduled-posts", status: "error", proposalId: entry.proposalId, durationMs: entryElapsed(), error: e.message });
     }
   }
 
   if (failures > 0) process.exit(1);
 }
 
-main().catch((e) => {
+const elapsed = startTimer();
+main().catch(async (e) => {
   console.error(e);
+  await logRun({ source: "publish-scheduled-posts", step: "publish-scheduled-posts", status: "error", durationMs: elapsed(), error: String(e?.message || e) });
   process.exit(1);
 });

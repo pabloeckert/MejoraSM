@@ -5,6 +5,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth, unauthorizedResponse } from "../_shared/auth.ts";
+import { logRun } from "../_shared/runLog.ts";
 
 const ALLOWED_ORIGINS = [
   "https://pabloeckert.github.io",
@@ -292,10 +293,15 @@ Deno.serve(async (req) => {
   const auth = await requireAuth(req);
   if (!auth.ok) return unauthorizedResponse(auth, corsHeaders);
 
-  try {
-    const { action, documentId, query, limit } = await req.json();
+  const startedAt = Date.now();
+  let action: string | undefined;
 
-    let result;
+  try {
+    const body = await req.json();
+    ({ action } = body);
+    const { documentId, query, limit } = body;
+
+    let result: { chunksCreated?: number } | undefined;
 
     switch (action) {
       case "process":
@@ -314,10 +320,25 @@ Deno.serve(async (req) => {
         throw new ValidationError("Acción no válida. Usa 'process' o 'search'");
     }
 
+    await logRun({
+      source: "vault-process",
+      step: action,
+      status: "success",
+      durationMs: Date.now() - startedAt,
+      metadata: action === "process" ? { documentId, chunksCreated: result?.chunksCreated } : {},
+    });
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    await logRun({
+      source: "vault-process",
+      step: action || "unknown",
+      status: "error",
+      durationMs: Date.now() - startedAt,
+      error: e.message,
+    });
     const status = e instanceof ValidationError ? 400 : 500;
     return new Response(JSON.stringify({ error: e.message, type: e.name }), {
       status,

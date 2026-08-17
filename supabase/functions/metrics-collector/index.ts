@@ -6,6 +6,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth, unauthorizedResponse } from "../_shared/auth.ts";
+import { logRun } from "../_shared/runLog.ts";
 
 const ALLOWED_ORIGINS = [
   "https://pabloeckert.github.io",
@@ -257,11 +258,14 @@ Deno.serve(async (req) => {
   const auth = await requireAuth(req);
   if (!auth.ok) return unauthorizedResponse(auth, corsHeaders);
 
+  const startedAt = Date.now();
+  let action: string | undefined;
+
   try {
     const body = await req.json();
-    const { action } = body;
+    ({ action } = body);
 
-    let result;
+    let result: { count?: number } | undefined;
 
     switch (action) {
       case "collect":
@@ -281,10 +285,26 @@ Deno.serve(async (req) => {
         throw new Error("Acción no válida. Usa 'collect', 'collect-all' o 'insights'");
     }
 
+    await logRun({
+      source: "metrics-collector",
+      step: action,
+      status: "success",
+      proposalId: action === "collect" ? body.proposalId : null,
+      durationMs: Date.now() - startedAt,
+      metadata: action === "collect-all" ? { count: result?.count } : {},
+    });
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    await logRun({
+      source: "metrics-collector",
+      step: action || "unknown",
+      status: "error",
+      durationMs: Date.now() - startedAt,
+      error: e.message,
+    });
     const status = e.message?.includes("Campos requeridos") ? 400 : 500;
     return new Response(JSON.stringify({ error: e.message }), {
       status,

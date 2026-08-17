@@ -5,6 +5,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth, unauthorizedResponse } from "../_shared/auth.ts";
+import { logRun } from "../_shared/runLog.ts";
 
 const ALLOWED_ORIGINS = [
   "https://pabloeckert.github.io",
@@ -550,6 +551,7 @@ async function startSession(topic: string) {
 
   // 6. Crear propuesta si fue aprobada — autoagendada si es un formato con
   // pipeline autónomo (ver AUTO-AGENDA arriba), pending si no.
+  let proposalId: string | null = null;
   if (evaluacion.aprobado) {
     const format = proposal.format || "post";
     const insert: Record<string, unknown> = {
@@ -570,7 +572,8 @@ async function startSession(topic: string) {
       insert.status = "pending";
     }
 
-    await supabase.from("proposals").insert(insert);
+    const { data: insertedProposal } = await supabase.from("proposals").insert(insert).select("id").single();
+    proposalId = insertedProposal?.id ?? null;
   }
 
   return {
@@ -580,6 +583,7 @@ async function startSession(topic: string) {
     evaluacion,
     proposal,
     aprobado: evaluacion.aprobado,
+    proposalId,
   };
 }
 
@@ -670,11 +674,15 @@ Deno.serve(async (req) => {
   const auth = await requireAuth(req);
   if (!auth.ok) return unauthorizedResponse(auth, corsHeaders);
 
+  const startedAt = Date.now();
+  let action: string | undefined;
+
   try {
     const body = await req.json();
-    const { action, topic, sessionId, feedback } = body;
+    ({ action } = body);
+    const { topic, sessionId, feedback } = body;
 
-    let result;
+    let result: { sessionId?: string; proposalId?: string | null; aprobado?: boolean } | undefined;
 
     switch (action) {
       case "start":
@@ -691,10 +699,26 @@ Deno.serve(async (req) => {
         throw new Error("Acción no válida. Usa 'start' o 'continue'");
     }
 
+    await logRun({
+      source: "orchestrator",
+      step: action,
+      status: "success",
+      proposalId: result?.proposalId ?? null,
+      durationMs: Date.now() - startedAt,
+      metadata: { sessionId: result?.sessionId ?? sessionId, aprobado: result?.aprobado },
+    });
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    await logRun({
+      source: "orchestrator",
+      step: action || "unknown",
+      status: "error",
+      durationMs: Date.now() - startedAt,
+      error: e.message,
+    });
     const status = e.message?.includes("Campos requeridos") ? 400 : 500;
     return new Response(JSON.stringify({ error: e.message }), {
       status,

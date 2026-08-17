@@ -20,6 +20,7 @@ import { readdir, readFile, rename, mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { askClaude } from "./lib/claude.mjs";
+import { logRun, startTimer } from "./lib/run-log.mjs";
 
 const ROOT = process.cwd();
 const INBOX_DIR = path.join(ROOT, "content/inbox");
@@ -204,12 +205,13 @@ async function alreadyGeneratedToday(today) {
   return files.some((f) => f.startsWith(`story-${today}-`));
 }
 
-async function main() {
+async function main(elapsed) {
   const today = new Date().toISOString().slice(0, 10);
   if (await alreadyGeneratedToday(today)) {
     console.log(
       `Ya se generó contenido para hoy (${today}) — no genero de nuevo para evitar publicaciones duplicadas. Si necesitás reintentar una plataforma que falló parcialmente, hacelo manualmente contra el post existente, no re-corriendo este workflow completo.`
     );
+    await logRun({ source: "daily-story", step: "generate-brief", status: "skipped", durationMs: elapsed(), metadata: { reason: "already-generated-today", today } });
     process.exit(0);
   }
 
@@ -254,9 +256,13 @@ async function main() {
   for (const item of photos) {
     await rename(item.path, path.join(USED_DIR, item.oferta, item.name));
   }
+
+  await logRun({ source: "daily-story", step: "generate-brief", status: "success", durationMs: elapsed(), metadata: { briefsCount: briefs.length, videosSkipped: videosSkipped.length } });
 }
 
-main().catch((e) => {
+const elapsed = startTimer();
+main(elapsed).catch(async (e) => {
   console.error(e);
+  await logRun({ source: "daily-story", step: "generate-brief", status: "error", durationMs: elapsed(), error: String(e?.message || e) });
   process.exit(1);
 });

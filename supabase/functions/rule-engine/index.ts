@@ -6,6 +6,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuth, unauthorizedResponse } from "../_shared/auth.ts";
+import { logRun } from "../_shared/runLog.ts";
 
 const ALLOWED_ORIGINS = [
   "https://pabloeckert.github.io",
@@ -251,11 +252,14 @@ Deno.serve(async (req) => {
   const auth = await requireAuth(req);
   if (!auth.ok) return unauthorizedResponse(auth, corsHeaders);
 
+  const startedAt = Date.now();
+  let action: string | undefined;
+
   try {
     const body = await req.json().catch(() => ({}));
-    const { action } = body;
+    ({ action } = body);
 
-    let result;
+    let result: { rulesFound?: number; rulesSaved?: number } | undefined;
 
     switch (action) {
       case "analyze": {
@@ -284,10 +288,25 @@ Deno.serve(async (req) => {
         throw new Error("Acción no válida. Usa 'analyze' o 'suggest'");
     }
 
+    await logRun({
+      source: "rule-engine",
+      step: action,
+      status: "success",
+      durationMs: Date.now() - startedAt,
+      metadata: action === "analyze" ? { rulesFound: result?.rulesFound, rulesSaved: result?.rulesSaved } : {},
+    });
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    await logRun({
+      source: "rule-engine",
+      step: action || "unknown",
+      status: "error",
+      durationMs: Date.now() - startedAt,
+      error: e.message,
+    });
     return new Response(JSON.stringify({ error: e.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

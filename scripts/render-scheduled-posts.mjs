@@ -20,6 +20,7 @@ import { readdir, readFile, rename, mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
+import { logRun, startTimer } from "./lib/run-log.mjs";
 
 const ROOT = process.cwd();
 const INBOX_DIR = path.join(ROOT, "content/inbox");
@@ -165,6 +166,7 @@ async function main() {
   if (proposals.length === 0) {
     console.log("No hay propuestas de feed pendientes de publicación.");
     await writeFile(MANIFEST_PATH, "[]");
+    await logRun({ source: "publish-scheduled-posts", step: "render-scheduled-posts", status: "skipped", durationMs: elapsed(), metadata: { reason: "no-due-proposals" } });
     return;
   }
 
@@ -262,9 +264,13 @@ async function main() {
 
   await browser.close();
   await writeFile(MANIFEST_PATH, JSON.stringify(manifest, null, 2));
+
+  await logRun({ source: "publish-scheduled-posts", step: "render-scheduled-posts", status: "success", durationMs: elapsed(), metadata: { count: manifest.length } });
 }
 
-main().catch((e) => {
+const elapsed = startTimer();
+main().catch(async (e) => {
   console.error(e);
+  await logRun({ source: "publish-scheduled-posts", step: "render-scheduled-posts", status: "error", durationMs: elapsed(), error: String(e?.message || e) });
   process.exit(1);
 });

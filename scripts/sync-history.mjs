@@ -15,6 +15,7 @@
 import { writeFile, mkdir, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { logRun, startTimer } from "./lib/run-log.mjs";
 
 const ROOT = process.cwd();
 const LOG_DIR = path.join(ROOT, "content/log");
@@ -170,9 +171,13 @@ async function main() {
   );
 
   console.log(`Historial sincronizado: ${entries.length} post(s).`);
+
+  await logRun({ source: "sync-history", step: "sync-history", status: "success", durationMs: elapsed(), metadata: { count: entries.length } });
 }
 
-main().catch((e) => {
+const elapsed = startTimer();
+main().catch(async (e) => {
   console.error(e);
+  await logRun({ source: "sync-history", step: "sync-history", status: "error", durationMs: elapsed(), error: String(e?.message || e) });
   process.exit(1);
 });

@@ -9,6 +9,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
+import { logRun, startTimer } from "./lib/run-log.mjs";
 
 const ROOT = process.cwd();
 const WORK_DIR = path.join(ROOT, "content/work");
@@ -99,9 +100,13 @@ async function main() {
     }))
   );
   await writeFile(LOCAL_BRIEFS_PATH, JSON.stringify(localBriefs, null, 2));
+
+  await logRun({ source: "daily-story", step: "render-story", status: "success", durationMs: elapsed(), metadata: { count: outputs.length } });
 }
 
-main().catch((e) => {
+const elapsed = startTimer();
+main().catch(async (e) => {
   console.error(e);
+  await logRun({ source: "daily-story", step: "render-story", status: "error", durationMs: elapsed(), error: String(e?.message || e) });
   process.exit(1);
 });

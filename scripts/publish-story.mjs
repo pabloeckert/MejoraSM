@@ -8,6 +8,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { publishStory } from "./lib/zernio.mjs";
+import { logRun, startTimer } from "./lib/run-log.mjs";
 
 const ROOT = process.cwd();
 const WORK_DIR = path.join(ROOT, "content/work");
@@ -40,12 +41,16 @@ async function main() {
 
   if (failures > 0) {
     console.error(`\n${failures} publicación(es) fallaron — revisar arriba. Recordá: Instagram falla solo ~10% de las veces por su cuenta, no siempre es un bug nuestro.`);
+    await logRun({ source: "daily-story", step: "publish-story", status: "error", durationMs: elapsed(), error: `${failures} publicación(es) fallaron`, metadata: { total: renders.length, failures } });
     process.exit(1);
   }
   console.log("\nTodas las stories publicadas en Instagram y Facebook.");
+  await logRun({ source: "daily-story", step: "publish-story", status: "success", durationMs: elapsed(), metadata: { total: renders.length } });
 }
 
-main().catch((e) => {
+const elapsed = startTimer();
+main().catch(async (e) => {
   console.error(e);
+  await logRun({ source: "daily-story", step: "publish-story", status: "error", durationMs: elapsed(), error: String(e?.message || e) });
   process.exit(1);
 });
