@@ -1,0 +1,28 @@
+# Genera y cachea el "consejo del día" del Copiloto Reflexivo (Fase 4 del
+# plan estratégico 2026-08-16) una vez por día, antes de que Pablo abra el
+# Dashboard — copilot_advice.advice_date es UNIQUE, así que si este cron
+# corre más de una vez el mismo día (reintento manual, etc.) simplemente
+# devuelve la fila ya cacheada sin volver a llamar al LLM.
+name: Copilot Advice Cron
+
+on:
+  schedule:
+    - cron: "0 11 * * *" # 11:00 UTC = 08:00 ART, antes del horario habitual de trabajo
+  workflow_dispatch: {}
+
+jobs:
+  advice:
+    name: Generar consejo del día
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invocar copilot (advice)
+        run: |
+          code=$(curl -s -o /tmp/response.json -w "%{http_code}" -X POST \
+            "${{ secrets.VITE_SUPABASE_URL }}/functions/v1/copilot" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"advice"}')
+          echo "HTTP $code"
+          cat /tmp/response.json
+          if [ "$code" -ge 300 ]; then exit 1; fi
