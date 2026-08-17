@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -206,7 +207,18 @@ function PostCard({ post, accionesManuales }: { post: HistorialPost; accionesMan
         <img src={post.imageUrl} alt={`Story del ${post.date}`} loading="lazy" className="aspect-[9/16] w-full bg-muted object-cover" />
       )}
       <CardContent className="flex flex-1 flex-col gap-2.5 p-4">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-secondary">{post.date}</span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-secondary">{post.date}</span>
+          {post.proposalId && (
+            <Link
+              to={`/propuestas?id=${post.proposalId}`}
+              className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+            >
+              Ver propuesta
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+          )}
+        </div>
         {post.oferta && <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{post.oferta}</span>}
         {post.headline && <span className="text-sm font-medium leading-tight text-primary">{post.headline}</span>}
         <p className="text-sm leading-snug text-foreground">{post.content.slice(0, 180)}</p>

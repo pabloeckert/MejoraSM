@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +75,16 @@ function PropuestasContent() {
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [formatFilter, setFormatFilter] = useState<string>("all");
+
+  // Interconexión entre secciones: /propuestas?id=<uuid> abre el detalle
+  // directo — lo usa Monitor (y cualquier otro lado que enlace a una pieza
+  // puntual) para poder seguirla de punta a punta sin tener que buscarla a
+  // mano en la lista.
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const id = searchParams.get("id");
+    if (id) setSelectedProposalId(id);
+  }, [searchParams]);
 
   const selectedProposal: ProposalDetail | null = selectedProposalId
     ? (allProposals || []).find((p: ProposalDetail) => p.id === selectedProposalId) ?? null
