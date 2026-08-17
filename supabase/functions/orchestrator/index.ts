@@ -302,6 +302,38 @@ async function getContextDocs(query: string): Promise<string> {
   return docs.map((d) => `### ${d.title}\n${d.content?.slice(0, 1000)}`).join("\n\n");
 }
 
+// ═══════════════════════════════════════
+// LOOP DE APRENDIZAJE — Fase 2 del plan estratégico 2026-08-16
+//
+// rule-engine ya generaba success_rules desde el 2026-08-02 (cron diario),
+// pero nada las leía al generar contenido nuevo — el sistema medía y
+// concluía, pero no cambiaba su comportamiento. Esto cierra ese loop: el
+// Estratega y el Creativo reciben las reglas aprendidas (confidence >= 0.6)
+// como contexto adicional, con la evidencia numérica real, no como una
+// orden ciega — el Crítico sigue siendo la autoridad final sobre marca.
+// ═══════════════════════════════════════
+
+const LEARNED_RULES_MIN_CONFIDENCE = 0.6;
+
+async function getLearnedRulesBlock(): Promise<string> {
+  const { data: rules } = await supabase
+    .from("success_rules")
+    .select("rule_type, condition, action, confidence, evidence")
+    .gte("confidence", LEARNED_RULES_MIN_CONFIDENCE)
+    .order("confidence", { ascending: false })
+    .limit(10);
+
+  if (!rules?.length) return "";
+
+  const lines = rules.map((r) => {
+    const reason = r.action?.reason || JSON.stringify(r.action);
+    const pct = Math.round((r.confidence ?? 0) * 100);
+    return `- [${r.rule_type}] ${reason} (confianza ${pct}%, evidencia real: ${r.evidence})`;
+  });
+
+  return `\n\nLO QUE YA APRENDIMOS DE NUESTROS PROPIOS DATOS (rule-engine, confianza >= ${Math.round(LEARNED_RULES_MIN_CONFIDENCE * 100)}%):\n${lines.join("\n")}\nUsá esto como contexto real de qué funcionó antes con este público — no es una orden ciega, el criterio de marca sigue siendo lo primero.`;
+}
+
 async function saveMessage(
   sessionId: string,
   agent: string,
@@ -372,13 +404,15 @@ async function pickNextSlot(): Promise<string> {
 async function runEstratega(
   topic: string,
   contextDocs: string,
-  history: string
+  history: string,
+  learnedRules: string
 ): Promise<string> {
   const config = await getAgentConfig("estratega");
   const system = `${config.system_prompt}
 
 DOCUMENTOS DE MARCA:
 ${contextDocs}
+${learnedRules}
 
 ${history ? `HISTORIAL DEL DEBATE:\n${history}` : ""}
 
@@ -400,13 +434,15 @@ async function runCreativo(
   estrategia: string,
   contextDocs: string,
   history: string,
-  isReevaluation = false
+  isReevaluation = false,
+  learnedRules = ""
 ): Promise<string> {
   const config = await getAgentConfig("creativo");
   const system = `${config.system_prompt}
 
 DOCUMENTOS DE MARCA:
 ${contextDocs}
+${learnedRules}
 
 ${history ? `HISTORIAL DEL DEBATE:\n${history}` : ""}
 
@@ -471,19 +507,22 @@ async function startSession(topic: string) {
   if (sessionError) throw new Error(`Error creando sesión: ${sessionError.message}`);
   if (!session) throw new Error("No se pudo crear la sesión");
 
-  // 2. Obtener contexto de la bóveda
+  // 2. Obtener contexto de la bóveda + lo que ya aprendimos de datos reales
+  // (Fase 2 del plan estratégico 2026-08-16 — cierra el loop de
+  // aprendizaje: rule-engine generaba reglas que nadie leía al generar).
   const contextDocs = await getContextDocs(topic);
+  const learnedRules = await getLearnedRulesBlock();
 
   // 3. Ejecutar los 3 agentes secuencialmente
   const history: string[] = [];
 
   // Estratega propone (Sonnet, fallback a Groq — ver pickModel/callAgent)
-  const estrategia = await runEstratega(topic, contextDocs, "");
+  const estrategia = await runEstratega(topic, contextDocs, "", learnedRules);
   history.push(`## Agente Estratega:\n${estrategia}`);
   await saveMessage(session.id, "estratega", estrategia, 1);
 
   // Creativo redacta (Sonnet, primera pasada)
-  const contenido = await runCreativo(estrategia, contextDocs, history.join("\n"), false);
+  const contenido = await runCreativo(estrategia, contextDocs, history.join("\n"), false, learnedRules);
   history.push(`## Agente Creativo:\n${contenido}`);
   await saveMessage(session.id, "creativo", contenido, 2);
 
@@ -582,6 +621,7 @@ async function continueSession(sessionId: string, feedback: string) {
     .join("\n") || "";
 
   const contextDocs = await getContextDocs(session.topic);
+  const learnedRules = await getLearnedRulesBlock();
   const nextTurn = (messages?.length || 0) + 1;
 
   // El feedback del usuario se agrega al historial
@@ -593,7 +633,8 @@ async function continueSession(sessionId: string, feedback: string) {
     feedback,
     contextDocs,
     fullHistory,
-    true
+    true,
+    learnedRules
   );
   await saveMessage(sessionId, "creativo", contenido, nextTurn);
 

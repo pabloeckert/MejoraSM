@@ -3984,4 +3984,126 @@ COMMENT ON INDEX idx_proposals_no_duplicate_schedule IS
 
 ---
 
+Se continuó, sin pausa, a la Fase 2: cerrar el loop de aprendizaje. El motor de reglas venía generando conclusiones sobre qué funcionaba mejor desde hacía semanas, pero nada dentro del sistema las leía en el momento de generar contenido nuevo — el sistema medía y sacaba conclusiones, pero no cambiaba su comportamiento real. Se agregó una función que trae hasta diez reglas aprendidas con confianza suficiente, ordenadas de mayor a menor, y las inyecta como contexto adicional en las instrucciones que reciben el agente que propone el tema y el agente que redacta el copy — incluyendo la evidencia numérica real detrás de cada regla, y aclarando explícitamente que no es una orden ciega, que el criterio de marca sigue siendo lo primero. El agente crítico, a propósito, no recibe este contexto — su trabajo es juzgar contra el criterio de marca, no contra métricas de rendimiento, y mezclar los dos criterios lo debilitaría.
+
+Antes de dar la fase por terminada se verificó la consulta real contra la base, y ahí apareció un problema genuino, no anticipado: la tabla de reglas aprendidas nunca había tenido una columna para guardar la evidencia numérica de cada regla — el motor de reglas la calculaba y la devolvía en sus respuestas, pero nunca la había guardado de verdad en la base. Si eso se dejaba así, la consulta nueva agregada a `orchestrator` iba a fallar apenas existiera una sola regla real que leer, porque le pediría a la base una columna que no existe — un error que se habría introducido en producción con este mismo cambio. Se agregó la columna real que faltaba y se corrigió el motor de reglas para que la guarde de verdad, tanto la primera vez que aparece una regla como cuando se actualiza una ya existente.
+
+Se verificó de punta a punta a nivel de base de datos: se insertó una regla de prueba, marcada como tal, con su motivo y su evidencia reales, y se corrió exactamente la misma consulta que usa la función nueva — devolvió la fila completa, con el motivo y la evidencia bien poblados, confirmando que el bloque de contexto se arma correctamente. No se pudo disparar una sesión real completa de Mesa de Diálogo para observar el comportamiento en vivo de los agentes con este cambio, porque hacía falta una credencial de servidor a servidor que no está disponible en esta máquina — y se optó, a propósito, por no intentar leerla de un archivo local ya marcado en una sesión anterior como bloqueado para ese uso. Queda como pendiente real, no resuelto, si se quiere cerrar esa verificación del todo. La fila de prueba se borró después de confirmar; la tabla de reglas reales sigue en cero filas, porque los datos genuinos siguen siendo insuficientes, sin cambios respecto a lo ya sabido.
+
+---
+
+## Anexo F — Código final de la Fase 2
+
+### `supabase/migrations/013_success_rules_evidence.sql`
+
+```sql
+-- Migration: Fase 2 del plan estratégico 2026-08-16 — evidence real en
+-- success_rules
+--
+-- Bug encontrado al implementar la inyección de reglas aprendidas en los
+-- prompts de orchestrator (cerrar el loop de aprendizaje): RuleCandidate
+-- en rule-engine/index.ts siempre calculó un campo "evidence" (ej. "4
+-- posts con engagement promedio de 16.8%") y lo devolvía en la respuesta
+-- de la API, pero saveRules() nunca lo escribía en la base — la columna
+-- ni siquiera existía en success_rules (solo rule_type, condition,
+-- action, confidence, times_applied, success_rate). orchestrator no podía
+-- citar evidencia real al inyectar una regla en el prompt del Estratega/
+-- Creativo sin esto.
+--
+-- Ejecutar vía `supabase db query --linked -f supabase/migrations/013_success_rules_evidence.sql`
+-- (con -f, no `"$(cat ...)"` inline) o el SQL Editor del dashboard — NO con
+-- `supabase db push` (ver CLAUDE.md "Bug conocido del CLI").
+
+ALTER TABLE success_rules
+  ADD COLUMN IF NOT EXISTS evidence TEXT;
+
+COMMENT ON COLUMN success_rules.evidence IS
+  'Evidencia numérica textual de la regla (ej. "4 posts con engagement promedio de 16.8%") — rule-engine ya la calculaba pero nunca la persistía. Fase 2 del plan estratégico 2026-08-16.';
+```
+
+### `supabase/functions/orchestrator/index.ts` — bloque nuevo (loop de aprendizaje)
+
+```typescript
+// ═══════════════════════════════════════
+// LOOP DE APRENDIZAJE — Fase 2 del plan estratégico 2026-08-16
+//
+// rule-engine ya generaba success_rules desde el 2026-08-02 (cron diario),
+// pero nada las leía al generar contenido nuevo — el sistema medía y
+// concluía, pero no cambiaba su comportamiento. Esto cierra ese loop: el
+// Estratega y el Creativo reciben las reglas aprendidas (confidence >= 0.6)
+// como contexto adicional, con la evidencia numérica real, no como una
+// orden ciega — el Crítico sigue siendo la autoridad final sobre marca.
+// ═══════════════════════════════════════
+
+const LEARNED_RULES_MIN_CONFIDENCE = 0.6;
+
+async function getLearnedRulesBlock(): Promise<string> {
+  const { data: rules } = await supabase
+    .from("success_rules")
+    .select("rule_type, condition, action, confidence, evidence")
+    .gte("confidence", LEARNED_RULES_MIN_CONFIDENCE)
+    .order("confidence", { ascending: false })
+    .limit(10);
+
+  if (!rules?.length) return "";
+
+  const lines = rules.map((r) => {
+    const reason = r.action?.reason || JSON.stringify(r.action);
+    const pct = Math.round((r.confidence ?? 0) * 100);
+    return `- [${r.rule_type}] ${reason} (confianza ${pct}%, evidencia real: ${r.evidence})`;
+  });
+
+  return `\n\nLO QUE YA APRENDIMOS DE NUESTROS PROPIOS DATOS (rule-engine, confianza >= ${Math.round(LEARNED_RULES_MIN_CONFIDENCE * 100)}%):\n${lines.join("\n")}\nUsá esto como contexto real de qué funcionó antes con este público — no es una orden ciega, el criterio de marca sigue siendo lo primero.`;
+}
+```
+
+`runEstratega`/`runCreativo` reciben ahora un parámetro `learnedRules: string` que se concatena en el `system` prompt inmediatamente después de `DOCUMENTOS DE MARCA`; `startSession`/`continueSession` llaman `getLearnedRulesBlock()` una vez y lo pasan a ambos. El Crítico (`runCritico`) no lo recibe a propósito.
+
+### `supabase/functions/rule-engine/index.ts` — `saveRules()` corregido
+
+```typescript
+async function saveRules(rules: RuleCandidate[]) {
+  let saved = 0;
+  for (const rule of rules) {
+    // Check if similar rule exists
+    const { data: existing } = await supabase
+      .from("success_rules")
+      .select("id, confidence, times_applied")
+      .eq("rule_type", rule.rule_type)
+      .eq("condition", JSON.stringify(rule.condition))
+      .single();
+
+    if (existing) {
+      // Update confidence (weighted average)
+      const newConfidence =
+        (existing.confidence * existing.times_applied + rule.confidence) /
+        (existing.times_applied + 1);
+      await supabase
+        .from("success_rules")
+        .update({
+          confidence: Math.min(0.95, newConfidence),
+          action: rule.action,
+          evidence: rule.evidence,
+          times_applied: (existing.times_applied || 0) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id);
+    } else {
+      await supabase.from("success_rules").insert({
+        rule_type: rule.rule_type,
+        condition: rule.condition,
+        action: rule.action,
+        confidence: rule.confidence,
+        evidence: rule.evidence,
+        times_applied: 1,
+      });
+    }
+    saved++;
+  }
+  return saved;
+}
+```
+
+---
+
 *Fin de la transcripción hasta este punto. Se actualiza en paralelo cada vez que se actualiza `CLAUDE.md`, por dogma explícito de Pablo del 2026-08-08.*

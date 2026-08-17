@@ -187,6 +187,7 @@ async function saveRules(rules: RuleCandidate[]) {
         .update({
           confidence: Math.min(0.95, newConfidence),
           action: rule.action,
+          evidence: rule.evidence,
           times_applied: (existing.times_applied || 0) + 1,
           updated_at: new Date().toISOString(),
         })
@@ -197,6 +198,7 @@ async function saveRules(rules: RuleCandidate[]) {
         condition: rule.condition,
         action: rule.action,
         confidence: rule.confidence,
+        evidence: rule.evidence,
         times_applied: 1,
       });
     }
