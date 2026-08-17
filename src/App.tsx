@@ -14,6 +14,9 @@ import Laboratorio from "./pages/Laboratorio";
 import Configuracion from "./pages/Configuracion";
 import Calendario from "./pages/Calendario";
 import Propuestas from "./pages/Propuestas";
+import Hub from "./pages/Hub";
+import Monitor from "./pages/Monitor";
+import Biblioteca from "./pages/Biblioteca";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -47,6 +50,9 @@ const App = () => (
                 <Route path="/configuracion" element={<Configuracion />} />
                 <Route path="/calendario" element={<Calendario />} />
                 <Route path="/propuestas" element={<Propuestas />} />
+                <Route path="/hub" element={<Hub />} />
+                <Route path="/monitor" element={<Monitor />} />
+                <Route path="/biblioteca" element={<Biblioteca />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

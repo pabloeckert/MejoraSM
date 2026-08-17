@@ -8,6 +8,9 @@ import {
   CalendarDays,
   FileCheck,
   LogOut,
+  Upload,
+  MonitorPlay,
+  Images,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +23,9 @@ const navItems = [
   { label: "Laboratorio", icon: FlaskConical, path: "/laboratorio" },
   { label: "Propuestas", icon: FileCheck, path: "/propuestas" },
   { label: "Calendario", icon: CalendarDays, path: "/calendario" },
+  { label: "Subir material", icon: Upload, path: "/hub" },
+  { label: "Monitor", icon: MonitorPlay, path: "/monitor" },
+  { label: "Biblioteca", icon: Images, path: "/biblioteca" },
   { label: "Configuración", icon: Settings, path: "/configuracion" },
 ];
 
