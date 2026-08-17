@@ -17,6 +17,7 @@ import Propuestas from "./pages/Propuestas";
 import Hub from "./pages/Hub";
 import Monitor from "./pages/Monitor";
 import Biblioteca from "./pages/Biblioteca";
+import Auditoria from "./pages/Auditoria";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -53,6 +54,7 @@ const App = () => (
                 <Route path="/hub" element={<Hub />} />
                 <Route path="/monitor" element={<Monitor />} />
                 <Route path="/biblioteca" element={<Biblioteca />} />
+                <Route path="/auditoria" element={<Auditoria />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

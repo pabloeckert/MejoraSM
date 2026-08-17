@@ -11,6 +11,7 @@ import {
   Upload,
   MonitorPlay,
   Images,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +27,7 @@ const navItems = [
   { label: "Subir material", icon: Upload, path: "/hub" },
   { label: "Monitor", icon: MonitorPlay, path: "/monitor" },
   { label: "Biblioteca", icon: Images, path: "/biblioteca" },
+  { label: "Auditoría", icon: ShieldCheck, path: "/auditoria" },
   { label: "Configuración", icon: Settings, path: "/configuracion" },
 ];
 

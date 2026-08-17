@@ -221,3 +221,16 @@ export const metricsApi = {
       .select("*")
       .order("confidence", { ascending: false }),
 };
+
+// ═══════════════════════════════════════
+// OBSERVABILIDAD (run_log, Fase 3) — usada por Auditoría (Fase 6)
+// ═══════════════════════════════════════
+
+export const runLogApi = {
+  all: (limit = 500) =>
+    supabase
+      .from("run_log")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit),
+};
