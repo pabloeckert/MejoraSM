@@ -24,6 +24,8 @@ El 2026-08-16 Pablo compartió un plan estratégico generado por Lovable para Me
 
 **Protocolo de continuidad entre sesiones:** si el crédito de una sesión se agota a mitad de una fase, el último tramo disponible se usa para dejar esta sección (abajo) al día — qué está hecho, qué está en curso, qué sigue exactamente. Al escribir "continuemos" al inicio de una sesión nueva, se retoma desde acá, en las mismas condiciones, sin volver a explicar el contexto.
 
+**Ampliación explícita del alcance (2026-08-17):** las Fases 4-6 se habían documentado como "roadmap, no en este ciclo" porque, a diferencia de 0-3, no tenían diseño concreto todavía. Al cerrar la Fase 3, se le presentó la disyuntiva a Pablo (arrancar Fase 4 ahora / cerrar el ciclo en Fase 3 / atender otra prioridad) y la respuesta fue explícita: **"continuar fase 4 hasta la ultima de manera autonoma me voy dormir vos quedas con la compu encendida trabajando"** — autoriza avanzar sin más check-ins por 4, 5 y 6, incluyendo diseñar el detalle concreto de cada una (no solo ejecutar un plan ya cerrado), bajo el mismo régimen de autonomía y el mismo estándar de verificación real que 0-3.
+
 ### Plan estratégico 2026 — estado de ejecución
 
 Verificado contra el repo/base real el 2026-08-16 antes de creer los números del plan de Lovable: varios estaban desactualizados (citaba "70 errores de lint" cuando el real era 45; citaba "10 filas de prueba contaminando métricas" cuando ya estaban limpias desde el 2026-08-05 — ver "Limpieza de datos de prueba de rule-engine" más abajo). El plan real de Claude Code parte de ese estado verificado, no del diagnóstico de Lovable tal cual.
@@ -34,7 +36,7 @@ Verificado contra el repo/base real el 2026-08-16 antes de creer los números de
 | **Fase 1 — Idempotencia dura** | Constraint parcial único sobre `proposals` para que no se pueda agendar dos veces la misma pieza en la misma fecha/formato/oferta, reforzando el fix mínimo que ya existe en `publish-scheduled-posts.mjs` (ver "Duplicado real de autoagendado" más abajo). | 🟢 hecho |
 | **Fase 2 — Cerrar el loop de aprendizaje** | `orchestrator` lee `success_rules` con `confidence >= 0.6` y las inyecta en el prompt del Estratega/Creativo — hoy `rule-engine` genera reglas que nadie lee al generar contenido nuevo. | 🟢 hecho |
 | **Fase 3 — Observabilidad** | Tabla `run_log` (paso, pieza, estado, duración, error) escrita por cada script/función. | 🟢 hecho |
-| **Fase 4 — Copiloto reflexivo** | Consejo diario + chat sobre datos propios en el Dashboard, con la voz de marca. | ⚪ roadmap, no en este ciclo |
+| **Fase 4 — Copiloto reflexivo** | Consejo diario + chat sobre datos propios en el Dashboard, con la voz de marca. | 🟢 hecho |
 | **Fase 5 — Un solo panel** | Absorber `hub/`, `biblioteca/`, `dashboard/` como rutas del EDA React. | ⚪ roadmap, no en este ciclo |
 | **Fase 6 — Vendible a terceros** | Multi-tenant mínimo, Criterio Medular como onboarding, auditoría exportable. | ⚪ roadmap, no en este ciclo |
 
@@ -83,6 +85,23 @@ Dos helpers compartidos, mismo contrato en los dos runtimes — nunca rompen el 
 Confirma que las dos mitades del sistema (Deno vía Edge Function real, Node vía GitHub Actions real) escriben en `run_log` con datos reales, no simulados — `rulesFound: 0` es coherente con que solo hay 2 métricas reales hoy (ver "Limpieza de datos de prueba de rule-engine"), `count: 28` es el número real de posts que devolvió Zernio. **No se disparó manualmente `daily-story.yml` ni `publish-scheduled-posts.yml`** para no generar una publicación real solo para probar el logging (mismo criterio de cautela que en fases anteriores) — la instrumentación ahí sigue el mismo patrón exacto ya probado en `sync-history.mjs`/`rule-engine`, verificado por revisión de código, no por ejecución en vivo; queda confirmado de forma indirecta la próxima vez que corra alguno de esos dos por su cron normal.
 
 Verificado: lint se mantuvo en 44 errores preexistentes (los primeros intentos de instrumentación subieron a 51 por usar `(result as any)` para leer campos del resultado dentro del handler — se corrigió tipando `result` con una forma concreta en vez de castear a `any`, bajó de vuelta a 44), 61/61 tests verdes, build limpio. CI (`ci.yml`) sigue en rojo por esos mismos 44 errores preexistentes — no es una regresión de esta fase, ya documentado como no bloqueante (sin branch protection en `main`).
+
+#### Fase 4 — Copiloto reflexivo (2026-08-17, completa)
+
+Hasta ahora el sistema medía y aprendía (`rule-engine`/`success_rules`) pero nadie traducía eso a lenguaje humano para Pablo — había que leer números sueltos en el Dashboard o preguntarle directo a la base. El Copiloto Reflexivo cierra eso con dos modos, los dos basados **únicamente** en datos propios reales, nunca en cifras inventadas:
+
+- **Consejo del día**: una Edge Function nueva, `copilot` (acción `advice`), genera un párrafo breve en la voz de MejoraOK a partir de `metrics` (filtrando `is_test`), `success_rules` (`confidence >= 0.6`), `run_log` (errores reales de las últimas 48hs) y `proposals` (agendado/publicado reciente) — con RAG contra la Bóveda para tono/criterio de marca, igual que el resto del EDA. Se cachea por día en la tabla nueva `copilot_advice` (`advice_date UNIQUE`), así no se regenera (ni se le vuelve a cobrar una llamada al LLM) en cada carga del Dashboard. Migración `015_copilot_advice.sql`. Cron nuevo `copilot-advice-cron.yml` (11:00 UTC, antes del horario habitual de trabajo) lo pre-genera solo.
+- **Chat sobre datos propios** (acción `chat`): stateless a propósito — sin tabla de sesiones/mensajes propia, el frontend manda el historial completo (acotado a los últimos 10 turnos) en cada request. Misma fuente de datos reales que el consejo del día (`gatherDataSummary()` compartida) más RAG sobre la pregunta puntual.
+
+**Decisiones de diseño explícitas:**
+- El copiloto usa Anthropic (`claude-sonnet-5`) con fallback a Groq — mismo par que `orchestrator`, sin necesidad de los 4 proveedores de Mesa de Diálogo.
+- No se agregó como 4to agente en `agent_config` — esa tabla es específicamente para los 3 agentes del debate (Estratega/Creativo/Crítico); el copiloto tiene su propio system prompt hardcodeado en `copilot/index.ts`, con una regla innegociable explícita: nunca inventar una cifra que no venga en el contexto real que se le arma.
+- Búsqueda RAG (`getContextDocs`) copiada del mismo patrón que ya usan `orchestrator`/`vault-process`, no factorizada a `_shared/` — mismo criterio ya establecido en el repo de que `_shared/` es solo infraestructura (auth, logging), no lógica de negocio.
+- Instrumentado con `run_log` (Fase 3) desde el primer commit — el copiloto es, literalmente, la primera pieza que *usa* `run_log` como fuente de datos (para el resumen de salud del pipeline que le da al consejo del día), además de escribir en ella.
+
+**Probado real en producción, no solo desplegado:** se disparó `copilot-advice-cron.yml` por `workflow_dispatch` después de deployar la función — generó y cacheó un consejo real y honesto ("Hoy no hay mucho que analizar, Pablo. Con solo 3 métricas reales disponibles y un engagement promedio del 0%, es difícil sacar conclusiones sólidas... no hay suficiente información para dar un consejo con sustancia" — el guardrail de "no inventes" funcionando de verdad, no solo escrito en el prompt), con `evidence` real (`realMetricsCount: 3, avgEngagement: 0, learnedRulesCount: 0, ...`) y una fila en `run_log` (`duration_ms: 5979`, incluye la llamada real al LLM). Para probar `chat` (que comparte casi todo el código con `advice` salvo el manejo de historial) se armó un workflow temporal (`_tmp-test-copilot-chat.yml`), se disparó una vez con una pregunta real, devolvió `HTTP 200` con una respuesta grounded en los datos reales, y se borró el workflow apenas confirmado — no quedó como infraestructura permanente.
+
+**Frontend**: `CopilotCard` nueva en el Dashboard (debajo del resumen operativo, arriba de los KPIs de rendimiento social) — card de "Consejo del día" con skeleton de carga, más un chat mínimo (textarea + burbujas, historial en memoria del componente vía `useCopilotChat`, sin persistencia). `useCopilotAdvice` usa React Query con `staleTime` largo (una hora) porque el backend ya cachea por fecha, no hace falta refetch agresivo. Verificado: lint se mantuvo en 44 errores preexistentes (el primer borrador de `copilot/index.ts` metía 11 `any` nuevos — se corrigió tipando las respuestas de Anthropic/Groq/RPC/tablas en vez de castear, igual que el fix de Fase 3), 61/61 tests verdes, build limpio. `deploy-eda.yml` y `deploy-functions.yml` verdes tras el push. No se pudo verificar `CopilotCard` en una sesión de browser autenticada real (login OTP necesita el inbox de Pablo, límite ya documentado varias veces en este archivo) — la verificación quedó a nivel de tests de componente (11/11 verdes con `CopilotCard` montada) y build limpio, no de captura visual en producción.
 
 Detalle de cada fase, decisiones tomadas y evidencia real se va agregando como subsecciones acá mismo a medida que se ejecuta cada una — no en otro archivo.
 
@@ -264,7 +283,7 @@ Páginas (`src/pages/`):
 | Pantalla | Ruta | Qué hace |
 |---|---|---|
 | **Login** | `/login` | Email/contraseña contra Supabase Auth, con alta de cuenta. Gatea todo lo demás vía `AuthGate.tsx`. |
-| **Dashboard** | `/` | 4 métricas clicables (documentos, diálogos, contenidos, publicaciones programadas), gráfico de engagement por post, distribución por formato, aprobaciones pendientes, próximos eventos del calendario. |
+| **Dashboard** | `/` | 4 métricas clicables (documentos, diálogos, contenidos, publicaciones programadas), Copiloto Reflexivo (consejo del día + chat sobre datos propios, Fase 4), KPIs reales de rendimiento social, gráfico de engagement por post, distribución por formato. |
 | **Bóveda de Conocimiento** | `/boveda` | Subís documentos (PDF/doc/txt/md) de marca. Dispara `vault-process`: extrae texto, lo trocea en chunks, genera embeddings. Buscador y borrado de documentos. |
 | **Mesa de Diálogo** | `/mesa` | Le das un tema (elección manual, ver "decisiones explícitas de no automatizar" arriba) y dispara `orchestrator`: Estratega propone → Creativo redacta → Crítico evalúa contra los documentos de la Bóveda (RAG). Si aprueba y el formato tiene pipeline autónomo (`post`/`carrusel`), la propuesta se autoagenda sola — ver overhaul de autonomía arriba. |
 | **Laboratorio de Contenido** | `/laboratorio` | Versión directa: describís qué querés comunicar y te devuelve una propuesta ya armada (estrategia + copy + evaluación + hook/CTA/hashtags) lista para copiar o aprobar. |
@@ -274,7 +293,7 @@ Páginas (`src/pages/`):
 
 Hooks custom en `src/hooks/` (`useVault`, `useDialogue`, `useProposals`, `useMetrics`) llaman a `src/services/ai.ts` (invoca Edge Functions) y `src/services/supabase.ts` (CRUD directo). El cliente Supabase vive en `src/integrations/supabase/client.ts` y usa `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` (ver `.env.example`). `src/components/ui/` es el set estándar de shadcn sin modificar; la UI propia está en `src/components/layout/` (AppSidebar, AppLayout).
 
-### Backend — 4 Edge Functions
+### Backend — 5 Edge Functions
 
 Todas en `supabase/functions/` (Deno), cada una con su propia allowlist de CORS (`util.mejoraok.com`, `mejorasm.vercel.app`, localhost) y con el guard de `_shared/auth.ts`:
 
@@ -284,6 +303,7 @@ Todas en `supabase/functions/` (Deno), cada una con su propia allowlist de CORS 
 | `vault-process` | Procesa documentos subidos (extracción, chunking, embeddings) y expone la búsqueda semántica. |
 | `rule-engine` | Analiza métricas de posts pasados y genera reglas de éxito (qué formato/hora/tono funciona mejor). Cron diario real desde 2026-08-02 (`rule-engine-cron.yml`). |
 | `metrics-collector` | Trae métricas reales desde la API de analíticas de Zernio (`GET /v1/analytics?postId=`, no Instagram Graph API — cambio 2026-08-04/05, ver "Métricas vía Zernio Analytics" más abajo). Cron real cada 6h desde 2026-08-02 (`metrics-collector-cron.yml`). |
+| `copilot` | Copiloto Reflexivo (Fase 4 del plan estratégico 2026-08-16): consejo del día cacheado (`advice`) + chat stateless sobre datos propios reales (`chat`). Cron diario real desde 2026-08-17 (`copilot-advice-cron.yml`) pre-genera el consejo del día. |
 
 Deploy: `.github/workflows/deploy-functions.yml` (push a `supabase/functions/**`, o manual con función específica) — usa `SUPABASE_ACCESS_TOKEN` y `SUPABASE_PROJECT_REF` como secrets del repo.
 
@@ -333,11 +353,12 @@ Tablas en el schema `public`, todas con RLS habilitado (`calendar_events` se dro
 | `metrics` | Métricas de posts publicados (likes, comments, reach, `clicks`, `engagement_rate` calculado) |
 | `success_rules` | Reglas aprendidas por `rule-engine`, con `evidence text` (`013_success_rules_evidence.sql`) — leídas por `orchestrator` desde Fase 2 del plan estratégico 2026-08-16 |
 | `run_log` | Observabilidad real (Fase 3 del plan estratégico 2026-08-16): una fila por corrida de cada script/Edge Function del pipeline, éxito o error — ver sección propia más abajo |
+| `copilot_advice` | Copiloto Reflexivo (Fase 4 del plan estratégico 2026-08-16): "consejo del día" cacheado por fecha (`advice_date UNIQUE`) — ver sección propia más abajo |
 | `app_admins` | Allowlist de emails con acceso (ver sección de auth) |
 
 Función RAG: `match_documents(query_embedding, match_count, similarity_threshold)` — búsqueda por similitud coseno sobre `doc_chunks` vía índice `ivfflat`, con cast `::REAL` (ver bug corregido arriba). Bucket de Storage: `vault` (privado).
 
-`supabase/migrations/`: schema SQL + pgvector, `001` a `014` en orden correlativo con el de ejecución real, todas ya aplicadas contra la base real vía `supabase db query --linked -f <archivo>` (no `db push`, ver "Bug conocido del CLI"). Las primeras siete (`001_initial_schema.sql` a `007_feed_posts_render.sql`) arman el schema base + auth/RLS real; de `008` en adelante cada una es un cambio puntual documentado en su propio comentario de cabecera y, cuando corresponde, en la sección de fase del plan estratégico que la motivó (`011`/`012`/`013`/`014` → Fases 0/1/2/3 del plan 2026-08-16, ver arriba).
+`supabase/migrations/`: schema SQL + pgvector, `001` a `015` en orden correlativo con el de ejecución real, todas ya aplicadas contra la base real vía `supabase db query --linked -f <archivo>` (no `db push`, ver "Bug conocido del CLI"). Las primeras siete (`001_initial_schema.sql` a `007_feed_posts_render.sql`) arman el schema base + auth/RLS real; de `008` en adelante cada una es un cambio puntual documentado en su propio comentario de cabecera y, cuando corresponde, en la sección de fase del plan estratégico que la motivó (`011`/`012`/`013`/`014`/`015` → Fases 0/1/2/3/4 del plan 2026-08-16, ver arriba).
 
 ### System prompts reales de los 3 agentes (tabla `agent_config`, verificado en vivo)
 

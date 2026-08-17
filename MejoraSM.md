@@ -4294,4 +4294,560 @@ export function startTimer() {
 
 ---
 
+## Parte 7 — Fase 4: Copiloto Reflexivo, y la autorización para seguir solo toda la noche (2026-08-17)
+
+Con la Fase 3 cerrada y documentada, se le presentó a Pablo una disyuntiva concreta: las Fases 4, 5 y 6 del plan estratégico habían quedado escritas en `CLAUDE.md` como "roadmap, no en este ciclo" — a diferencia de las Fases 0 a 3, que ya venían con diseño concreto desde el planteo original, estas tres solo tenían una frase de intención ("Copiloto reflexivo: consejo diario + chat sobre datos propios en el Dashboard, con la voz de marca" para la 4; absorber los sitios estáticos como rutas del EDA para la 5; multi-tenant vendible a terceros para la 6). Preguntado si correspondía arrancar la Fase 4 ahora, cerrar el ciclo en la Fase 3, o atender otra prioridad puntual, la respuesta fue clara y sin ambigüedad: seguir con la Fase 4 hasta la última de manera autónoma, sin más check-ins — la sesión se quedaría trabajando sola mientras Pablo dormía.
+
+Esa respuesta amplió el alcance de la autonomía ya delegada: ya no se trataba solo de ejecutar sin preguntar decisiones de prioridad entre fases con diseño ya cerrado, sino de diseñar el detalle concreto de fases que hasta ese momento eran solo una frase de intención, y seguir encadenando las siguientes sin esperar confirmación. Se documentó esa ampliación en `CLAUDE.md`, citando la frase exacta de la autorización, antes de arrancar a construir.
+
+El diseño de la Fase 4 partió de un diagnóstico simple: el sistema ya medía (`metrics`), ya aprendía (`rule-engine` generando `success_rules`), y desde la Fase 3 ya sabía si estaba sano (`run_log`) — pero nada de eso se traducía a lenguaje humano para Pablo. Había que abrir el Dashboard y leer números sueltos, o consultar la base directo, para entender qué estaba pasando. El Copiloto Reflexivo resuelve eso con dos modos.
+
+El primero es un "consejo del día": un párrafo breve, en la voz de MejoraOK, que resume lo que dicen los datos reales de esa jornada. El segundo es un chat abierto donde Pablo puede preguntar lo que quiera sobre sus propios datos — "¿qué formato rindió mejor esta semana?", por ejemplo — y recibir una respuesta anclada en la misma fuente de verdad. Los dos modos comparten una función central, `gatherDataSummary()`, que junta en paralelo las métricas reales de los últimos 30 posts (excluyendo filas de prueba vía `is_test`), las reglas aprendidas con confianza mayor o igual a 60%, los errores reales del pipeline en las últimas 48 horas (leídos directo de `run_log` — la primera pieza del sistema que consume esa tabla, no solo la escribe), y el conteo de piezas agendadas/publicadas en la última semana. Ese resumen, más una búsqueda RAG contra la Bóveda de documentos de marca (el mismo mecanismo que ya usan `orchestrator` y `vault-process`, copiado en vez de compartido — mismo criterio de una función por Edge Function que ya regía en el proyecto), arma el contexto real que se le pasa al modelo. La regla innegociable, escrita explícitamente en el system prompt de los dos modos: nunca inventar una cifra que no esté en ese contexto. Si los datos son insuficientes para un consejo con sustancia, decirlo con franqueza en vez de rellenar con algo genérico.
+
+El consejo del día se genera una sola vez por día real y se cachea en una tabla nueva, `copilot_advice`, con `advice_date` como columna única — así una segunda carga del Dashboard el mismo día no vuelve a llamar al modelo, y si dos requests llegan en simultáneo (una carrera real, no hipotética, dado que el cron y una visita manual podrían coincidir), la inserción que pierde la carrera por la restricción única simplemente relee la fila que ya quedó guardada en vez de fallar. El chat, en cambio, es deliberadamente stateless: no tiene tabla de sesiones ni de mensajes propia — el historial de la conversación vive en el estado de React del componente y se manda completo (acotado a los últimos diez turnos) en cada pregunta nueva. Fue una decisión consciente de no replicar el peso de esquema de Mesa de Diálogo (que sí necesita persistir sesiones y turnos, porque de ahí salen propuestas reales que se autoagendan) para un asistente que es, por diseño, más liviano.
+
+La función de IA elegida para el copiloto fue Anthropic con `claude-sonnet-5` como modelo principal y Groq como respaldo si el primero falla — el mismo par que ya usa `orchestrator` para sus tres agentes, sin necesidad de abrir el abanico completo de cuatro proveedores que sí tiene disponible Mesa de Diálogo. Deliberadamente no se agregó como un cuarto agente en la tabla `agent_config`: esa tabla es específicamente el espacio de los tres agentes del debate (Estratega, Creativo, Crítico), y mezclar ahí un asistente de consulta habría difuminado esa frontera sin necesidad — el copiloto tiene su propio prompt de sistema escrito directo en el código de la función.
+
+El primer borrador del código de la función introdujo once usos de `any` explícito — en las respuestas de Anthropic y Groq, en los resultados de la búsqueda RAG, en las filas de las cuatro tablas que consulta `gatherDataSummary()` — que hubieran subido el conteo de errores de lint de 44 (el número ya establecido como línea de base desde las fases anteriores) a 55. Se corrigió tipando cada una de esas formas con interfaces concretas y parciales en vez de castear a `any`, exactamente la misma disciplina aplicada en la Fase 3 cuando apareció el mismo problema en `orchestrator`. El lint volvió a los 44 errores de siempre, ninguno nuevo.
+
+La verificación en producción se hizo en dos pasos, sin arriesgar nada real: primero se desplegó la función y se disparó el cron nuevo (`copilot-advice-cron.yml`) una vez por `workflow_dispatch` — el mismo patrón ya usado para probar `rule-engine` y `sync-history` en la Fase 3, disparar a mano un cron que de todas formas corre solo. Devolvió un consejo real y honesto: con solo tres métricas genuinas disponibles y un engagement promedio real de cero, el copiloto no inventó una conclusión — dijo explícitamente que no había suficiente información para un consejo con sustancia. Confirmado también en la base: la fila quedó cacheada con la evidencia numérica real adjunta, y una fila nueva en `run_log` con la duración real de la llamada al modelo incluida. Para probar el chat —que comparte casi todo el código con el consejo del día, salvo el manejo del historial de turnos— se armó un workflow temporal, se disparó una sola vez con una pregunta real sobre los datos, devolvió una respuesta anclada correctamente en las cifras reales, y se borró el workflow apenas quedó confirmado — no se dejó como infraestructura permanente del repo.
+
+El frontend sumó una tarjeta nueva al Dashboard, entre el resumen operativo y los KPIs de rendimiento social: el consejo del día con un estado de carga mientras se genera, y debajo un chat mínimo con burbujas de conversación y una caja de texto. El historial de mensajes vive en un hook propio que no depende de ningún estado del servidor. No fue posible verificar la tarjeta en una sesión de navegador autenticada real, porque el login pide un código que llega al mail de Pablo — la misma limitación ya documentada varias veces en este proyecto — así que la verificación quedó a nivel de la batería de tests de componentes (que sigue pasando completa, con la tarjeta nueva montada) y de un build de producción limpio.
+
+Con la Fase 4 cerrada — backend probado con datos reales, frontend integrado, documentación al día — quedan las Fases 5 y 6 del plan, ambas todavía sin diseño concreto más allá de la frase de intención original, para las que la autorización de Pablo también aplica: seguir sin más consultas, diseñando sobre la marcha, hasta terminarlas o hasta que la sesión se corte por falta de crédito, momento en el que este mismo protocolo de continuidad vuelve a aplicar.
+
+### Anexo H — código completo de la Fase 4
+
+**`supabase/migrations/015_copilot_advice.sql`** (íntegro):
+
+```sql
+-- Migration: Fase 4 del plan estratégico 2026-08-16 — Copiloto reflexivo
+--
+-- "Consejo diario": una sola fila real por día con una lectura en lenguaje
+-- natural de los datos propios (metrics, success_rules, run_log), generada
+-- por la Edge Function copilot y cacheada acá — no se regenera en cada
+-- carga del Dashboard, solo la primera vez que se pide ese día. advice_date
+-- UNIQUE es la idempotencia real: dos pedidos el mismo día devuelven la
+-- misma fila, no llaman al LLM dos veces.
+--
+-- El chat del copiloto ("chat sobre datos propios") NO tiene tabla propia
+-- a propósito: es stateless — el frontend mantiene el historial de la
+-- conversación en memoria (React state) y lo manda completo en cada
+-- request, la Edge Function no persiste nada de eso. Menos peso de schema
+-- para una función que es un asistente liviano de consulta, no un registro
+-- editorial como Mesa de Diálogo (que sí necesita persistir sesiones/turnos
+-- porque de ahí salen propuestas reales que se autoagendan).
+--
+-- Ejecutar vía `supabase db query --linked -f supabase/migrations/015_copilot_advice.sql`
+-- (con -f, no `"$(cat ...)"` inline) o el SQL Editor del dashboard — NO con
+-- `supabase db push` (ver CLAUDE.md "Bug conocido del CLI").
+
+CREATE TABLE IF NOT EXISTS copilot_advice (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  advice_date DATE NOT NULL UNIQUE,
+  content TEXT NOT NULL,
+  evidence JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE copilot_advice ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admin full access" ON copilot_advice;
+CREATE POLICY "Admin full access" ON copilot_advice
+  FOR ALL USING (is_app_admin()) WITH CHECK (is_app_admin());
+
+COMMENT ON TABLE copilot_advice IS
+  'Fase 4 del plan estratégico 2026-08-16 (Copiloto reflexivo): un "consejo del día" en lenguaje natural por fecha, generado y cacheado por la Edge Function copilot a partir de metrics/success_rules/run_log reales. No confundir con el chat del copiloto, que es stateless y no tiene tabla propia.';
+```
+
+**`supabase/functions/copilot/index.ts`** (íntegro):
+
+```typescript
+// supabase/functions/copilot/index.ts
+// Copiloto Reflexivo — Fase 4 del plan estratégico 2026-08-16.
+// Dos modos, ambos basados en datos propios reales (metrics, success_rules,
+// run_log, proposals) — nunca en cifras inventadas:
+//   - action: "advice"  → "consejo del día", generado una vez por día y
+//     cacheado en copilot_advice (advice_date UNIQUE evita regenerarlo en
+//     cada carga del Dashboard).
+//   - action: "chat"    → pregunta libre sobre los datos propios, stateless
+//     (el historial de la conversación lo manda el cliente, no se persiste
+//     acá — ver comentario de cabecera de la migración 015).
+//
+// Uso: POST /copilot { action: "advice" } | { action: "chat", question, history? }
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAuth, unauthorizedResponse } from "../_shared/auth.ts";
+import { logRun } from "../_shared/runLog.ts";
+
+const ALLOWED_ORIGINS = [
+  "https://pabloeckert.github.io",
+  "https://mejorasm-*.vercel.app",
+  "http://localhost:8080",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".vercel.app") ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+  };
+}
+
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+);
+
+function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+function validateBody(body: Record<string, unknown>, required: string[]) {
+  const missing = required.filter((k) => body[k] === undefined || body[k] === null);
+  if (missing.length > 0) {
+    throw new Error(`Campos requeridos faltantes: ${missing.join(", ")}`);
+  }
+}
+
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2, baseDelay = 1000): Promise<T> {
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i === maxRetries) throw e;
+      const delay = baseDelay * Math.pow(2, i) + Math.random() * 500;
+      console.warn(`[copilot] Retry ${i + 1}/${maxRetries} after ${Math.round(delay)}ms: ${errorMessage(e)}`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw new Error("Unreachable");
+}
+
+async function callAI(
+  system: string,
+  messages: { role: string; content: string }[],
+  temperature = 0.7
+): Promise<string> {
+  try {
+    return await withRetry(() => callAnthropic(system, messages, temperature));
+  } catch (e) {
+    console.warn(`[copilot] Anthropic falló (${errorMessage(e)}), fallback a Groq`);
+    return await withRetry(() => callGroq(system, messages, temperature));
+  }
+}
+
+interface AnthropicResponse {
+  content?: { type: string; text?: string }[];
+}
+
+async function callAnthropic(
+  system: string,
+  messages: { role: string; content: string }[],
+  temperature: number
+): Promise<string> {
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY no configurada");
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-5",
+      max_tokens: 1024,
+      system,
+      messages,
+      temperature,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Anthropic error ${res.status}: ${err.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as AnthropicResponse;
+  const textBlock = data.content?.find((b) => b.type === "text");
+  if (!textBlock?.text) throw new Error("Anthropic: respuesta sin contenido");
+  return textBlock.text;
+}
+
+interface GroqResponse {
+  choices?: { message?: { content?: string } }[];
+}
+
+async function callGroq(
+  system: string,
+  messages: { role: string; content: string }[],
+  temperature: number
+): Promise<string> {
+  const apiKey = Deno.env.get("GROQ_API_KEY");
+  if (!apiKey) throw new Error("GROQ_API_KEY no configurada");
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "system", content: system }, ...messages],
+      temperature,
+      max_tokens: 1024,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Groq error ${res.status}: ${err.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as GroqResponse;
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error("Groq: respuesta sin contenido");
+  return content;
+}
+
+interface DocChunkRow {
+  content: string;
+}
+
+async function getContextDocs(query: string): Promise<string> {
+  try {
+    const hfKey = Deno.env.get("HF_API_KEY");
+    if (!hfKey) throw new Error("HF_API_KEY no configurada");
+
+    const embedRes = await fetch(
+      "https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${hfKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ inputs: [query], options: { wait_for_model: true } }),
+      }
+    );
+    if (!embedRes.ok) throw new Error(`HF error: ${embedRes.status}`);
+    const embeddings = (await embedRes.json()) as number[][];
+
+    if (embeddings?.[0]) {
+      const { data: chunks } = await supabase.rpc("match_documents", {
+        query_embedding: embeddings[0],
+        match_count: 4,
+      });
+      const rows = chunks as DocChunkRow[] | null;
+      if (rows?.length) {
+        return rows.map((c) => `### Fragmento relevante:\n${c.content}`).join("\n\n");
+      }
+    }
+  } catch (e) {
+    console.warn(`[copilot] Búsqueda vectorial falló: ${errorMessage(e)}, usando fallback`);
+  }
+
+  const { data: docs } = await supabase
+    .from("documents")
+    .select("title, content")
+    .order("created_at", { ascending: false })
+    .limit(3);
+
+  if (!docs?.length) return "No hay documentos en la bóveda aún.";
+  return docs.map((d) => `### ${d.title}\n${d.content?.slice(0, 800)}`).join("\n\n");
+}
+
+interface DataSummary {
+  summaryText: string;
+  evidence: Record<string, unknown>;
+}
+
+interface MetricRow {
+  engagement_rate: number | null;
+  likes: number | null;
+  reach: number | null;
+  impressions: number | null;
+  proposals: { format: string | null; is_test: boolean | null } | null;
+}
+
+interface SuccessRuleRow {
+  rule_type: string;
+  action: { reason?: string } | null;
+  confidence: number;
+  evidence: string | null;
+}
+
+interface RunLogErrorRow {
+  source: string;
+  step: string;
+  error: string | null;
+  created_at: string;
+}
+
+async function gatherDataSummary(): Promise<DataSummary> {
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const sevenDaysAgoIso = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const sevenDaysFromNowIso = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const fortyEightHoursAgoIso = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
+
+  const [metricsRes, rulesRes, runLogErrorsRes, scheduledRes, publishedRes] = await Promise.all([
+    supabase
+      .from("metrics")
+      .select("engagement_rate, likes, reach, impressions, proposals(format, is_test)")
+      .order("measured_at", { ascending: false })
+      .limit(30),
+    supabase
+      .from("success_rules")
+      .select("rule_type, action, confidence, evidence")
+      .gte("confidence", 0.6)
+      .order("confidence", { ascending: false })
+      .limit(5),
+    supabase
+      .from("run_log")
+      .select("source, step, error, created_at")
+      .eq("status", "error")
+      .gte("created_at", fortyEightHoursAgoIso)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("proposals")
+      .select("id")
+      .eq("status", "scheduled")
+      .gte("scheduled_at", nowIso)
+      .lte("scheduled_at", sevenDaysFromNowIso),
+    supabase
+      .from("proposals")
+      .select("id")
+      .eq("status", "published")
+      .gte("published_at", sevenDaysAgoIso),
+  ]);
+
+  const realMetrics = ((metricsRes.data as MetricRow[] | null) || []).filter((m) => !m.proposals?.is_test);
+  const avgEngagement =
+    realMetrics.length > 0
+      ? realMetrics.reduce((sum, m) => sum + (m.engagement_rate || 0), 0) / realMetrics.length
+      : null;
+
+  const rules = (rulesRes.data as SuccessRuleRow[] | null) || [];
+  const runLogErrors = (runLogErrorsRes.data as RunLogErrorRow[] | null) || [];
+  const scheduledCount = scheduledRes.data?.length || 0;
+  const publishedCount = publishedRes.data?.length || 0;
+
+  const evidence = {
+    realMetricsCount: realMetrics.length,
+    avgEngagement,
+    learnedRulesCount: rules.length,
+    runLogErrorsLast48h: runLogErrors.length,
+    scheduledNext7Days: scheduledCount,
+    publishedLast7Days: publishedCount,
+  };
+
+  const lines = [
+    `Métricas reales disponibles: ${realMetrics.length} (filas de prueba excluidas).`,
+    avgEngagement !== null
+      ? `Engagement promedio real: ${Math.round(avgEngagement * 100) / 100}%.`
+      : "Todavía no hay métricas reales para calcular un promedio.",
+    rules.length > 0
+      ? `Reglas aprendidas con confianza >= 60%: ${rules
+          .map((r) => r.action?.reason || `${r.rule_type} (${r.evidence || "sin evidencia registrada"})`)
+          .join(" | ")}`
+      : "Todavía no hay reglas aprendidas con confianza suficiente (rule-engine necesita al menos 5 métricas reales para producir algo).",
+    runLogErrors.length > 0
+      ? `${runLogErrors.length} error(es) real(es) en el pipeline en las últimas 48hs: ${runLogErrors
+          .slice(0, 3)
+          .map((e) => `${e.source}/${e.step}`)
+          .join(", ")}.`
+      : "Sin errores registrados en el pipeline en las últimas 48hs (run_log).",
+    `${scheduledCount} pieza(s) agendada(s) para los próximos 7 días. ${publishedCount} publicada(s) en los últimos 7 días.`,
+  ];
+
+  return { summaryText: lines.join("\n"), evidence };
+}
+
+const ADVICE_SYSTEM_PROMPT = `Sos el Copiloto Reflexivo de MejoraOK — el asistente que ayuda a Pablo a interpretar sus propios datos de contenido (métricas, reglas aprendidas, salud del pipeline) y a pensar mejor sus próximos pasos. Tono argentino, directo, cercano, como alguien de confianza que conoce el negocio — nunca un reporte corporativo genérico. Regla innegociable: nunca inventes una cifra ni un dato que no te haya dado el usuario en el contexto — si la evidencia real es insuficiente para un consejo con sustancia, decilo con franqueza en vez de rellenar con genérico.`;
+
+interface AdviceResult {
+  advice_date: string;
+  content: string;
+  evidence: Record<string, unknown>;
+  cached: boolean;
+}
+
+async function getOrGenerateAdvice(): Promise<AdviceResult> {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data: existing } = await supabase
+    .from("copilot_advice")
+    .select("advice_date, content, evidence")
+    .eq("advice_date", today)
+    .maybeSingle();
+
+  if (existing) {
+    return { ...existing, cached: true };
+  }
+
+  const { summaryText, evidence } = await gatherDataSummary();
+  const contextDocs = await getContextDocs("consejo estratégico de contenido basado en resultados reales");
+
+  const userText = `DATOS REALES DE HOY:\n${summaryText}\n\nDOCUMENTOS DE MARCA:\n${contextDocs}\n\nEscribí un "consejo del día" breve (2 a 4 frases) para Pablo, basado ÚNICAMENTE en los datos reales de arriba. Si son insuficientes para un consejo con sustancia real, decilo con franqueza en vez de rellenar con algo genérico.`;
+
+  const content = await callAI(ADVICE_SYSTEM_PROMPT, [{ role: "user", content: userText }], 0.7);
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("copilot_advice")
+    .insert({ advice_date: today, content, evidence })
+    .select("advice_date, content, evidence")
+    .single();
+
+  if (insertError) {
+    if (insertError.code === "23505") {
+      const { data: existingRace } = await supabase
+        .from("copilot_advice")
+        .select("advice_date, content, evidence")
+        .eq("advice_date", today)
+        .single();
+      if (existingRace) return { ...existingRace, cached: true };
+    }
+    throw new Error(`Error guardando el consejo del día: ${insertError.message}`);
+  }
+
+  return { ...inserted, cached: false };
+}
+
+const CHAT_SYSTEM_PROMPT = `Sos el Copiloto Reflexivo de MejoraOK — el asistente que ayuda a Pablo a interpretar sus propios datos de contenido y a pensar mejor sus próximos pasos. Tono argentino, directo, cercano — como charlar con alguien de confianza que conoce el negocio, no un informe. Regla innegociable: nunca inventes una cifra ni un dato que no esté en el contexto que te dan — si la pregunta pide algo que los datos no cubren, decilo explícitamente. Respuesta breve y concreta: esto es un chat, no un informe largo.`;
+
+async function runChat(question: string, history: { role: string; content: string }[]): Promise<string> {
+  const { summaryText } = await gatherDataSummary();
+  const contextDocs = await getContextDocs(question);
+
+  const system = `${CHAT_SYSTEM_PROMPT}
+
+DATOS REALES DE HOY:
+${summaryText}
+
+DOCUMENTOS DE MARCA:
+${contextDocs}`;
+
+  const messages = [
+    ...history.map((h) => ({ role: h.role === "assistant" ? "assistant" : "user", content: h.content })),
+    { role: "user", content: question },
+  ];
+
+  return callAI(system, messages, 0.6);
+}
+
+Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  const auth = await requireAuth(req);
+  if (!auth.ok) return unauthorizedResponse(auth, corsHeaders);
+
+  const startedAt = Date.now();
+  let action: string | undefined;
+
+  try {
+    const body = (await req.json()) as Record<string, unknown>;
+    action = body.action as string | undefined;
+
+    let result: { cached?: boolean; answer?: string } | undefined;
+
+    switch (action) {
+      case "advice": {
+        result = await getOrGenerateAdvice();
+        break;
+      }
+
+      case "chat": {
+        validateBody(body, ["question"]);
+        const question = body.question as string;
+        const history = Array.isArray(body.history)
+          ? (body.history as { role: string; content: string }[]).slice(-10)
+          : [];
+        const answer = await runChat(question, history);
+        result = { answer };
+        break;
+      }
+
+      default:
+        throw new Error("Acción no válida. Usa 'advice' o 'chat'");
+    }
+
+    await logRun({
+      source: "copilot",
+      step: action,
+      status: "success",
+      durationMs: Date.now() - startedAt,
+      metadata: action === "advice" ? { cached: result?.cached } : {},
+    });
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    const msg = errorMessage(e);
+    await logRun({
+      source: "copilot",
+      step: action || "unknown",
+      status: "error",
+      durationMs: Date.now() - startedAt,
+      error: msg,
+    });
+    const status = msg.includes("Campos requeridos") ? 400 : 500;
+    return new Response(JSON.stringify({ error: msg }), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
+```
+
+**`src/hooks/useCopilot.ts`** (íntegro):
+
+```typescript
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getCopilotAdvice, sendCopilotMessage, type CopilotChatMessage } from "@/services/ai";
+
+export function useCopilotAdvice() {
+  return useQuery({
+    queryKey: ["copilot-advice"],
+    queryFn: getCopilotAdvice,
+    staleTime: 60 * 60 * 1000, // cacheado por fecha en el backend, no hace falta refetch agresivo
+  });
+}
+
+// Chat stateless (ver migración 015): el historial vive acá, en memoria del
+// componente — no hay sesión persistida en el backend, cada mensaje manda
+// el historial completo (acotado a los últimos 10 turnos, igual que hace
+// el backend con lo que le llega).
+export function useCopilotChat() {
+  const [messages, setMessages] = useState<CopilotChatMessage[]>([]);
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function sendMessage(question: string) {
+    const trimmed = question.trim();
+    if (!trimmed || isSending) return;
+
+    const history = messages;
+    setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
+    setIsSending(true);
+    setError(null);
+
+    try {
+      const { answer } = await sendCopilotMessage(trimmed, history);
+      setMessages((prev) => [...prev, { role: "assistant", content: answer }]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error consultando al copiloto");
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  return { messages, sendMessage, isSending, error };
+}
+```
+
+---
+
 *Fin de la transcripción hasta este punto. Se actualiza en paralelo cada vez que se actualiza `CLAUDE.md`, por dogma explícito de Pablo del 2026-08-08.*
