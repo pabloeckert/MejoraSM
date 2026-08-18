@@ -99,7 +99,7 @@ async function callAI(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: model || "llama-3.3-70b-versatile",
+          model: model || "openai/gpt-oss-120b",
           messages: allMessages,
           temperature,
           max_tokens: 2048,
@@ -242,7 +242,7 @@ async function callAgent(
   } catch (e: any) {
     console.warn(`[orchestrator] Anthropic (${model}) falló (${e.message}), fallback a Groq`);
     return await withRetry(() =>
-      callAI("groq", "llama-3.3-70b-versatile", system, messages, temperature)
+      callAI("groq", "openai/gpt-oss-120b", system, messages, temperature)
     );
   }
 }

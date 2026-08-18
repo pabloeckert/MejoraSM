@@ -9,15 +9,18 @@
 // 2026-08-17 falló por esto (ver run_log, source=daily-story). Solo cubre el
 // caso SIN foto (Groq no tiene acá un modelo de visión verificado como
 // confiable) — si hay foto y Anthropic falla, sigue fallando como antes en
-// vez de arriesgar un fallback de visión sin probar. Requiere GROQ_API_KEY
-// como secret de GitHub Actions (hoy NO está seteado ahí — solo existe como
-// secret de Supabase para las Edge Functions — así que este fallback queda
-// inactivo hasta que se agregue).
+// vez de arriesgar un fallback de visión sin probar.
+//
+// GROQ_MODEL actualizado 2026-08-18: Groq retiró "llama-3.3-70b-versatile"
+// el 2026-08-16 (confirmado real — la corrida del cron de daily-story de ese
+// día falló con 404 "model_not_found" pese a que GROQ_API_KEY ya estaba
+// cargada y el fallback se activaba bien). Reemplazo oficial recomendado por
+// Groq: "openai/gpt-oss-120b".
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-5";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_MODEL = "openai/gpt-oss-120b";
 
 async function askAnthropic({ system, userText, image, maxTokens }) {
   const content = [];
