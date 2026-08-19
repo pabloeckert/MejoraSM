@@ -1,0 +1,19 @@
+name: _tmp test classify-photo
+on: workflow_dispatch
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Llamar a classify-photo con una imagen real ya existente
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          IMG_B64=$(base64 -w0 content/published/post-2026-08-03-1-1.jpg)
+          curl -sS -w "\nHTTP_STATUS:%{http_code}\n" -X POST "$SUPABASE_URL/functions/v1/classify-photo" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"action\":\"suggest\",\"imageBase64\":\"$IMG_B64\",\"mimeType\":\"image/jpeg\"}"
