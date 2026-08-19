@@ -1,0 +1,16 @@
+name: _tmp test anthropic restored
+on: workflow_dispatch
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar a copilot (chat) para confirmar si Anthropic ya responde directo
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          curl -sS -w "\nHTTP_STATUS:%{http_code}\n" -X POST "$SUPABASE_URL/functions/v1/copilot" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"chat","question":"Prueba real: confirmar si Anthropic ya responde directo tras subir el límite de gasto. Respondé en una sola frase corta."}'
