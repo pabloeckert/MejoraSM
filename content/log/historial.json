@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-19T12:23:15.964Z",
+  "syncedAt": "2026-08-19T18:18:35.162Z",
   "posts": [
+    {
+      "id": "6a85b23fd4d529d8fa73656e",
+      "date": "2026-08-19",
+      "status": "published",
+      "content": "¿Te cuesta mantener la posición en negociaciones? Anota tu anclaje y revísalo antes de cada reunión. Descubre más en nuestro blog.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-19-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3967197515220519642"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a7c80cc926e72e792f78428",
       "date": "2026-08-12",
