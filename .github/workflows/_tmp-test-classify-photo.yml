@@ -12,8 +12,12 @@ jobs:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          IMG_B64=$(base64 -w0 content/published/post-2026-08-03-1-1.jpg)
+          node -e '
+            const fs = require("fs");
+            const b64 = fs.readFileSync("content/published/post-2026-08-03-1-1.jpg").toString("base64");
+            fs.writeFileSync("/tmp/payload.json", JSON.stringify({ action: "suggest", imageBase64: b64, mimeType: "image/jpeg" }));
+          '
           curl -sS -w "\nHTTP_STATUS:%{http_code}\n" -X POST "$SUPABASE_URL/functions/v1/classify-photo" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Content-Type: application/json" \
-            -d "{\"action\":\"suggest\",\"imageBase64\":\"$IMG_B64\",\"mimeType\":\"image/jpeg\"}"
+            --data-binary @/tmp/payload.json
