@@ -1,0 +1,16 @@
+name: _tmp test orchestrator e2e real
+on: workflow_dispatch
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar Mesa de Diálogo (start) con un tema real
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          curl -sS -w "\nHTTP_STATUS:%{http_code}\n" -X POST "$SUPABASE_URL/functions/v1/orchestrator" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"start","topic":"Cómo distinguir si tu equipo necesita más liderazgo o más proceso — la trampa de resolver todo con más reuniones"}'
