@@ -1,7 +1,11 @@
-# Registra que una story se gestionó A MANO (ej.: borrar una story de
-# Instagram desde la app, porque Zernio no puede despublicar Instagram por
-# API). Solo escribe content/log/acciones-manuales.json — no llama a Zernio,
-# no usa ningún secret de Zernio. Cero riesgo real.
+# Registra que un post/story se gestionó A MANO — el caso original era
+# Instagram (Zernio no puede despublicar Instagram por API), pero
+# "facebook" se agregó el 2026-08-20 tras un caso real: Pablo borró un
+# post de feed a mano en las dos plataformas directo desde las apps
+# (bypaseando a Zernio) porque el copy había salido con un bug real (ver
+# CLAUDE.md, "Ronda de revisión post-Fase 6"). Solo escribe
+# content/log/acciones-manuales.json (+ historial_cache en Supabase) — no
+# llama a Zernio, no usa ningún secret de Zernio. Cero riesgo real.
 name: Mark Manual Action
 
 on:
@@ -17,6 +21,7 @@ on:
         type: choice
         options:
           - instagram
+          - facebook
 
 permissions:
   contents: write
