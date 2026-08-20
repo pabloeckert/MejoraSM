@@ -438,12 +438,38 @@ Incluí:
   ]);
 }
 
+// Detecta el formato recomendado a partir del texto de la Estrategia (o del
+// feedback en una revisión) — misma heurística que ya usaba extractProposal,
+// factorizada acá para poder avisarle al Creativo ANTES de que escriba, no
+// solo para clasificar después.
+function detectFormat(text: string): "carrusel" | "historia" | "post" {
+  const lower = text.toLowerCase();
+  if (lower.includes("carrusel")) return "carrusel";
+  if (lower.includes("historia")) return "historia";
+  return "post";
+}
+
+// Instrucciones de formato de BODY, específicas por tipo de pieza —
+// hallazgo real 2026-08-20: sin esto, el Creativo escribía un guión con
+// encabezados "**Slide 1 (Portada):**" pensado para que un diseñador
+// humano lo interprete, y el renderer automático (que no tiene un humano
+// en el medio) lo mostraba literal, encabezados incluidos, en la pieza
+// publicada de verdad. Le pedimos texto ya listo para el renderer, no una
+// nota de producción.
+function bodyFormatInstructions(format: "carrusel" | "historia" | "post"): string {
+  if (format === "carrusel") {
+    return `BODY: escribí el copy como una lista de líneas cortas, una por renglón, separadas por un salto de línea — cada línea es lo que va a aparecer sola en un slide del carrusel (3 a 4 líneas en total). NUNCA uses encabezados tipo "Slide 1", "Portada", numeración ni notas de diseño — cada línea tiene que poder mostrarse tal cual, sin editar, en una imagen. Cada línea, una idea sola, máximo ~15 palabras.`;
+  }
+  return `BODY: [copy completo del post, en prosa corrida — sin encabezados de slide ni numeración, es un solo texto]`;
+}
+
 async function runCreativo(
   estrategia: string,
   contextDocs: string,
   history: string,
   isReevaluation = false,
-  learnedRules = ""
+  learnedRules = "",
+  format: "carrusel" | "historia" | "post" = "post"
 ): Promise<string> {
   const config = await getAgentConfig("creativo");
   const system = `${config.system_prompt}
@@ -455,14 +481,14 @@ ${learnedRules}
 ${history ? `HISTORIAL DEL DEBATE:\n${history}` : ""}
 
 INSTRUCCIONES:
-Basándote en la estrategia del Agente Estratega, redactá el contenido completo.
+Basándote en la estrategia del Agente Estratega, redactá el contenido completo. El formato de esta pieza es "${format}".
 
 Formato de salida:
 HOOK: [hook principal]
-BODY: [copy completo del post]
+${bodyFormatInstructions(format)}
 CTA: [call to action]
 HASHTAGS: [5-10 hashtags relevantes]
-NOTAS VISUALES: [qué imagen/video necesitás]`;
+NOTAS VISUALES: [qué imagen/video necesitás — esto es solo para referencia interna, nunca aparece en la pieza publicada]`;
 
   return callAgent("creativo", isReevaluation, config.temperature, system, [
     { role: "user", content: estrategia },
@@ -529,8 +555,14 @@ async function startSession(topic: string) {
   history.push(`## Agente Estratega:\n${estrategia}`);
   await saveMessage(session.id, "estratega", estrategia, 1);
 
+  // El formato ya se puede leer de la Estrategia (punto 4 de su estructura)
+  // antes de que el Creativo escriba — así el Creativo sabe si tiene que
+  // redactar para carrusel (líneas cortas por slide) o para post (prosa
+  // corrida), en vez de decidirlo solo después de escribir.
+  const format = detectFormat(estrategia);
+
   // Creativo redacta (Sonnet, primera pasada)
-  const contenido = await runCreativo(estrategia, contextDocs, history.join("\n"), false, learnedRules);
+  const contenido = await runCreativo(estrategia, contextDocs, history.join("\n"), false, learnedRules, format);
   history.push(`## Agente Creativo:\n${contenido}`);
   await saveMessage(session.id, "creativo", contenido, 2);
 
@@ -602,12 +634,7 @@ function extractProposal(contenido: string, estrategia: string) {
   const hashtagsStr = contenido.match(/HASHTAGS:\s*(.+)/i)?.[1]?.trim() || "";
   const hashtags = hashtagsStr.split(/[,\s]+/).filter((h) => h.startsWith("#"));
 
-  // Detectar formato
-  const format = estrategia.toLowerCase().includes("carrusel")
-    ? "carrusel"
-    : estrategia.toLowerCase().includes("historia")
-    ? "historia"
-    : "post";
+  const format = detectFormat(estrategia);
 
   return { hook, body, cta, hashtags, format };
 }
@@ -638,6 +665,11 @@ async function continueSession(sessionId: string, feedback: string) {
   // El feedback del usuario se agrega al historial
   const fullHistory = `${history}\n\n## Usuario:\n${feedback}`;
 
+  // El formato ya se decidió en la primera ronda (queda guardado en
+  // session.metadata.proposal.format) — una revisión no cambia de formato,
+  // así que se reusa en vez de volver a adivinarlo del feedback puntual.
+  const format = (session?.metadata as { proposal?: { format?: "carrusel" | "historia" | "post" } })?.proposal?.format || detectFormat(feedback);
+
   // Re-ejecutar Creativo con feedback (Sonnet igual — reescribir copy no
   // cambia de naturaleza por ser una revisión)
   const contenido = await runCreativo(
@@ -645,7 +677,8 @@ async function continueSession(sessionId: string, feedback: string) {
     contextDocs,
     fullHistory,
     true,
-    learnedRules
+    learnedRules,
+    format
   );
   await saveMessage(sessionId, "creativo", contenido, nextTurn);
 

@@ -106,38 +106,77 @@ async function findPhotos(oferta, count) {
   return files.slice(0, count).map((name) => ({ dir, name, path: path.join(dir, name) }));
 }
 
-// Divide el body en oraciones para repartirlas entre los slides del
-// carrusel — no hay estructura de "slide N" en la propuesta (el Creativo
-// genera un copy corrido, no un guión por slide), así que esta es la forma
-// más simple de no mandar el texto completo apretado en una sola imagen.
+// Divide el body en oraciones — fallback para cuando el Creativo escribió
+// un copy corrido, sin estructura de slides explícita.
 function splitSentences(text = "") {
   const matches = text.match(/[^.!?]+[.!?]+/g);
   if (matches?.length) return matches.map((s) => s.trim()).filter(Boolean);
   return text.trim() ? [text.trim()] : [];
 }
 
-function buildCarruselSlides(proposal, maxSlides = 4) {
-  const sentences = splitSentences(proposal.body || "");
-  const bodySlideCount = Math.max(1, Math.min(maxSlides - (proposal.cta ? 1 : 0), sentences.length || 1));
-  const perSlide = Math.ceil(sentences.length / bodySlideCount) || 1;
-  const bodyChunks = [];
-  for (let i = 0; i < sentences.length; i += perSlide) {
-    bodyChunks.push(sentences.slice(i, i + perSlide).join(" "));
-  }
-  if (bodyChunks.length === 0) bodyChunks.push("");
+// El Estratega a veces recomienda una estructura de N slides (ej. "Slide 1:
+// Hook / Slide 2-3: La trampa..."), y el Creativo la sigue literal,
+// escribiendo el body con encabezados tipo "**Slide 1 (Portada):**" — son
+// notas para un diseñador humano, nunca texto real de la pieza. Hallazgo
+// real 2026-08-20: un carrusel real se publicó con esos encabezados
+// visibles en la imagen Y en la leyenda pública de Instagram/Facebook,
+// porque el render viejo no los reconocía, solo troceaba todo por
+// oraciones sin filtrar. `stripMarkdown` + este regex sacan la etiqueta;
+// si no hay estructura de slides, se cae al troceo por oraciones de antes.
+const SLIDE_MARKER_RE = /\*\*\s*slide\s*\d+[^*]*\*\*:?/gi;
 
-  const slides = bodyChunks.map((chunk, i) => ({
-    headline: i === 0 ? proposal.hook || proposal.title || "" : "",
-    subtext: chunk,
-  }));
-  if (proposal.cta) slides.push({ headline: "", subtext: proposal.cta });
+function stripMarkdown(text = "") {
+  return text.replace(/\*\*/g, "").replace(/\*/g, "").trim();
+}
+
+function hasSlideMarkers(text = "") {
+  return /\*\*\s*slide\s*\d+/i.test(text);
+}
+
+// Un texto corto por slide — "una foto y un texto alcanza" (pedido real de
+// Pablo el 2026-08-20, tras ver un carrusel real con demasiado texto
+// encima) — se toma solo la primera oración de cada bloque detectado, no
+// el bloque completo, y se acota a un puñado de palabras.
+function buildCarruselSlides(proposal, maxSlides = 4) {
+  const rawBody = proposal.body || "";
+  const structured = hasSlideMarkers(rawBody);
+  let chunks = structured
+    ? rawBody.split(SLIDE_MARKER_RE).map((c) => stripMarkdown(c)).filter(Boolean)
+    : splitSentences(rawBody);
+
+  // Si el Creativo escribió un guión por slide, el primer bloque ("Slide 1
+  // / Portada") repite casi textual el hook — se saltea para no duplicar
+  // la misma frase como headline Y como subtexto del slide 1 (hallazgo
+  // real 2026-08-20: el carrusel publicado mostraba la misma frase dos
+  // veces, una vez grande y una vez chica, en el mismo slide).
+  if (structured) chunks = chunks.slice(1);
+
+  // Un texto por slide, no un párrafo — slide 1 es SOLO el hook (headline
+  // grande), cada slide siguiente lleva una única frase corta, sin volver
+  // a mostrar el hook como subtexto.
+  const maxBodySlides = Math.max(0, maxSlides - 1 - (proposal.cta ? 1 : 0));
+  const bodyChunks = chunks.slice(0, maxBodySlides).map((chunk) => {
+    const firstSentence = splitSentences(chunk)[0] || chunk;
+    return truncateWords(firstSentence, 16);
+  });
+
+  const slides = [{ headline: proposal.hook || proposal.title || "", subtext: "" }];
+  bodyChunks.forEach((subtext) => slides.push({ headline: "", subtext }));
+  if (proposal.cta) slides.push({ headline: "", subtext: truncateWords(stripMarkdown(proposal.cta), 16) });
   return slides.slice(0, maxSlides);
 }
 
 function buildCaption(proposal) {
-  // Misma concatenación que tenía supabase/functions/publisher/index.ts
-  // (publishScheduled()) — se mantiene el mismo criterio de caption.
-  return [proposal.hook, "", proposal.body, "", proposal.cta, "", ...(proposal.hashtags || [])]
+  // Carrusel: las slides ya muestran el copy completo — repetir todo en la
+  // leyenda es ruido, y era la fuente real del bug de "Slide N" filtrándose
+  // a la leyenda pública (hallazgo real, 2026-08-20). Post simple: la
+  // imagen no tiene lugar para todo el texto, así que la leyenda sí lleva
+  // el body — limpio de encabezados de slide, por las dudas.
+  if (proposal.format === "carrusel") {
+    return [proposal.hook, "", proposal.cta, "", ...(proposal.hashtags || [])].filter(Boolean).join("\n");
+  }
+  const cleanBody = stripMarkdown((proposal.body || "").replace(SLIDE_MARKER_RE, "\n\n")).replace(/\n{3,}/g, "\n\n");
+  return [proposal.hook, "", cleanBody, "", proposal.cta, "", ...(proposal.hashtags || [])]
     .filter(Boolean)
     .join("\n");
 }
@@ -215,7 +254,10 @@ async function main() {
         const html = await renderSlide(templateBase, {
           photo,
           ofertaLabel,
-          kicker: ofertaLabel,
+          // Sin kicker propio: la pastilla ({{OFERTA_LABEL}}) ya muestra la
+          // dimensión — repetirla acá era una duplicación visual real
+          // (misma palabra dos veces en la pieza), hallazgo 2026-08-20.
+          kicker: "",
           headline: slides[s].headline,
           subtext: slides[s].subtext,
         });
