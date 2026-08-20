@@ -225,21 +225,34 @@ function PostCard({ post, accionesManuales }: { post: HistorialPost; accionesMan
 
         <div className="flex flex-col gap-1.5 text-sm">
           {post.platforms.map((p, i) => {
-            const { className, Icon } = badgeMeta(p.status);
+            // Zernio reporta el estado real de publicación, pero no se
+            // entera si alguien borra la pieza a mano directo desde la
+            // app (bypaseando su API) — sin esto, esa plataforma seguía
+            // mostrando "✓ published" para siempre. Hallazgo real
+            // 2026-08-20: Pablo borró un post a mano en Instagram y
+            // Facebook por un bug de copy, y acá seguía en verde.
+            const manual = accionesManuales.get(`${post.id}:${p.platform}`);
+            const { className, Icon } = manual
+              ? { className: "bg-muted text-muted-foreground", Icon: Check }
+              : badgeMeta(p.status);
             const nombre = NOMBRES_PLATAFORMA[p.platform] || p.platform;
             return (
               <div key={i} className="flex items-center gap-2">
                 <span className={cn("flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full", className)}>
                   <Icon className="h-2.5 w-2.5" />
                 </span>
-                {p.url ? (
+                {manual ? (
+                  <span className="text-muted-foreground line-through decoration-muted-foreground/50">{nombre}</span>
+                ) : p.url ? (
                   <a href={p.url} target="_blank" rel="noopener noreferrer" className="text-primary underline">
                     {nombre}
                   </a>
                 ) : (
                   <span>{nombre}</span>
                 )}
-                <span className="text-muted-foreground">({p.status})</span>
+                <span className="text-muted-foreground">
+                  {manual ? `(borrada a mano el ${manual.marcadoManualEn})` : `(${p.status})`}
+                </span>
               </div>
             );
           })}
