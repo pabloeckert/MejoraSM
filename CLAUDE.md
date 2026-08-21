@@ -871,9 +871,31 @@ Al probar `classify-photo` en producción, la función devolvió un error real d
 - `classify-photo`: confirmado funcionando real, sugiere dimensiones de verdad.
 - `daily-story`: confirmado funcionando real de punta a punta.
 - Mesa de Diálogo (`orchestrator`): confirmado funcionando real de punta a punta, incluida la autoagenda.
-- Publicación automática de posts/carruseles: sigue pausada (decisión de Pablo del 2026-08-05, no tocada) — hay una pieza real esperando aprobación manual.
+- Publicación automática de posts/carruseles: sigue pausada (decisión de Pablo del 2026-08-05, no tocada). La pieza real que había quedado esperando se publicó a mano a pedido de Pablo — ver hallazgo real y fix a continuación.
 - Fuentes de marca: reales, cargadas, en uso.
 - Este archivo: restaurado completo, con la ronda de recuperación documentada.
+
+## Hallazgo real: carrusel publicado con guion de diseñador crudo — 2026-08-20
+
+Pablo pidió publicar a mano el carrusel real que había quedado aprobado y esperando (ver arriba). Se disparó `publish-scheduled-posts.yml` — publicó real en Instagram y Facebook, confirmado con `zernio_post_id` real y URLs reales de las dos plataformas. Hasta acá, todo funcionando como está documentado.
+
+**El resultado publicado era malo, y Pablo lo señaló con una captura real:** la imagen del carrusel tenía texto amontonado (pastilla de oferta + kicker repitiendo la misma palabra + headline + subtexto + firma, todo en un slide sin foto), y la leyenda pública de Instagram/Facebook mostraba literalmente `**Slide 1 (Portada):**`, `**Slide 2:**`, etc. — notación interna de guion, nunca pensada para verse.
+
+**Causa real, no supuesta:** el prompt del Creativo (`runCreativo` en `orchestrator/index.ts`) nunca distinguía carrusel de post — pedía "BODY: [copy completo del post]" sin más. Cuando el Estratega recomendaba una estructura de N slides (cosa que hace seguido, es parte de cómo arma la estrategia), el Creativo la seguía al pie de la letra y escribía un guion completo con encabezados "**Slide N (rol):**" — perfectamente razonable si un diseñador humano fuera a leerlo e interpretarlo, pero el renderer automático (`render-scheduled-posts.mjs`) no tiene ningún humano en el medio: trituraba ese texto por oraciones sin filtrar las etiquetas, así que terminaron visibles en la pieza real.
+
+**Fix en dos frentes, no un parche:**
+1. **Origen** (`orchestrator/index.ts`): nueva `detectFormat()` lee el formato recomendado del texto de la Estrategia apenas el Estratega termina — antes se recién se sabía al final, con `extractProposal()`. Ese formato ahora se le pasa a `runCreativo`, que para carrusel pide explícitamente líneas cortas ya listas para el renderer (sin encabezados de slide, sin numeración) en vez de un guion de producción.
+2. **Salvavidas** (`render-scheduled-posts.mjs`): `buildCarruselSlides()` ahora detecta la notación `**Slide N...**` si el Creativo la escribe igual, y le saca la etiqueta en vez de trocear todo por oraciones sin criterio — un texto por slide, no un párrafo; el slide 1 es solo el hook (headline grande), sin repetir la misma frase como subtexto abajo. `buildCaption()` para carrusel dejó de repetir el body completo en la leyenda (las slides ya lo muestran) — ahora es solo hook + cta + hashtags. El kicker duplicado (misma palabra que la pastilla de oferta, dos veces en cada slide) se sacó.
+
+Probado localmente contra el texto real que causó el bug (el carrusel real ya publicado), no contra un caso inventado — la salida nueva es limpia, confirmado antes de deployar.
+
+**No se relanzó una prueba real de Mesa de Diálogo para confirmar el fix de punta a punta** — hacerlo hubiera significado arriesgar otra publicación real solo para probar, exactamente el mismo patrón que causó este incidente. La verificación quedó a nivel de la lógica real (probada contra el texto real que falló) más lint/tsc/test/build limpios, no de una nueva corrida pública.
+
+**Qué se hizo con el post ya publicado, mal:** Pablo lo borró a mano directo desde las apps de Instagram y Facebook — más rápido y confiable que automatizarlo para un caso único. El sistema se actualizó para reflejar la realidad: `proposals.status` pasó de `published` a `rejected` con el motivo real anotado, y se registró la acción manual para las dos plataformas vía `mark-manual.yml` (que hasta ahora solo aceptaba "instagram" como opción — se agregó "facebook", primera vez que hacía falta de verdad).
+
+**Bug de UI encontrado de paso, también real:** el Monitor solo mostraba "gestionado a mano" cuando Zernio marcaba una plataforma como `failed` — pero acá Zernio nunca se enteró de que Pablo borró el post directo desde las apps, así que seguía reportando "published" y el Monitor seguía mostrando el badge verde para siempre. Corregido: cada fila de plataforma ahora consulta el registro de acciones manuales sin importar lo que diga Zernio — si hay un registro, se muestra tachado con la fecha real en vez del badge verde.
+
+Los tres commits de este episodio (`662059a` fix del pipeline, `95e73a1` mark-manual acepta facebook, `a7ae187` fix del Monitor) están deployados y verificados con lint/tsc/test/build limpios en cada uno.
 
 ## Notas históricas
 
