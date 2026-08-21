@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-21T12:25:12.147Z",
+  "syncedAt": "2026-08-21T18:21:53.460Z",
   "posts": [
+    {
+      "id": "6a88563d5e41e558bb4c1416",
+      "date": "2026-08-21",
+      "status": "published",
+      "content": "¿Cuántas reuniones de tu semana terminan sin ninguna decisión tomada? No es que sobre gente en la sala, es que falta un objetivo antes de convocar. Si te pasa seguido, hablemos.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-21-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3968649184681015578"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a870469d14a4fb236f21f17",
       "date": "2026-08-20",
