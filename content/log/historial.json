@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-22T12:18:20.724Z",
+  "syncedAt": "2026-08-22T18:14:50.928Z",
   "posts": [
+    {
+      "id": "6a89a3dcafdd455756d9b00e",
+      "date": "2026-08-22",
+      "status": "published",
+      "content": "Las reuniones no fallan por falta de tiempo, fallan por falta de foco. ¿Cuál fue la última que salió con un objetivo cumplido? Contanos en los comentarios.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-22-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3969365634550976128"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a88563d5e41e558bb4c1416",
       "date": "2026-08-21",
