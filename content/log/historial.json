@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-23T12:18:59.239Z",
+  "syncedAt": "2026-08-23T18:14:29.784Z",
   "posts": [
+    {
+      "id": "6a8af5a594306deba4e3ae41",
+      "date": "2026-08-23",
+      "status": "published",
+      "content": "El feedback que ataca no cambia nada, solo genera defensa. Separá el hecho de la persona y la conversación cambia por completo. ¿Querés ordenar cómo se da feedback en tu equipo? Escribinos.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-23-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3970091022584089798"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a89a3dcafdd455756d9b00e",
       "date": "2026-08-22",
