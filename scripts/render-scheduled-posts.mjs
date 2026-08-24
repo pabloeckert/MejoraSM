@@ -69,6 +69,20 @@ function truncateWords(text = "", maxWords = 28) {
   return words.slice(0, maxWords).join(" ") + "…";
 }
 
+// Igual que truncateWords, pero si hay que cortar, corta en la última coma
+// dentro del límite en vez de a mitad de frase. Hallazgo real 2026-08-24
+// (carrusel de muestra con contenido real): el corte seco por palabras
+// dejaba slides terminando en "decidís a…" o "foco en…" — gramaticalmente
+// rotas. Si no hay una coma útil cerca del límite, cae al corte de siempre.
+function truncateAtClause(text = "", maxWords = 20) {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= maxWords) return text.trim();
+  const slice = words.slice(0, maxWords).join(" ");
+  const lastComma = slice.lastIndexOf(",");
+  if (lastComma > slice.length * 0.4) return slice.slice(0, lastComma).trim() + ".";
+  return slice + "…";
+}
+
 async function fetchDueProposals() {
   const now = new Date().toISOString();
   const url =
@@ -176,7 +190,7 @@ function buildCarruselSlides(proposal, maxSlides = 3) {
   const maxBodySlides = Math.max(0, maxSlides - 1);
   const bodyChunks = chunks.slice(0, maxBodySlides).map((chunk) => {
     const firstSentence = splitSentences(chunk)[0] || chunk;
-    return truncateWords(firstSentence, 16);
+    return truncateAtClause(firstSentence, 20);
   });
 
   const slides = [{ headline: proposal.hook || proposal.title || "", subtext: "" }];
