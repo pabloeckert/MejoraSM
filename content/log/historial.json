@@ -1,6 +1,54 @@
 {
-  "syncedAt": "2026-08-24T12:26:05.273Z",
+  "syncedAt": "2026-08-24T18:24:30.022Z",
   "posts": [
+    {
+      "id": "6a8c515931852e90561648f6",
+      "date": "2026-08-24",
+      "status": "published",
+      "content": "Si hoy \"apagaste incendios\" todo el día, dejame decirte algo que no te va a gustar: no hiciste nada importante.\n¿Cómo está tu empresa hoy? Agendá tu reunión de evaluación — link en bio.\n#GestiónEmpresarial\n#Emprendedores\n#Productividad\n#LiderazgoReal\n#MejoraContinua\n#ClaridadNoMotivación\n#PYMEs\n#DecisionesEmpresariales",
+      "kind": "post",
+      "proposalId": "819469dd-c9ca-4e04-9f95-dff5138e40fc",
+      "headline": "Si hoy \"apagaste incendios\" todo el día, dejame decirte algo que no te va a gustar: no hiciste nada importante.",
+      "kicker": null,
+      "oferta": "personal",
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-08-24-1-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DcbQBN9jQuY/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1351420737077408"
+        }
+      ]
+    },
+    {
+      "id": "6a8c4b5f13ff8e74df286026",
+      "date": "2026-08-24",
+      "status": "published",
+      "content": "Si no podés resumir el objetivo en una frase, todavía no estás listo para convocar. Guardate esta idea para tu próxima reunión.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-24-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3970824871340837875"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a8af5a594306deba4e3ae41",
       "date": "2026-08-23",
