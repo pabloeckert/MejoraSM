@@ -258,8 +258,13 @@ async function main() {
     await rename(photo.path, path.join(usedDir, photo.name));
   }
 
-  for (let i = 0; i < proposals.length; i++) {
-    const proposal = proposals[i];
+  // Nombre de archivo con el id de la propuesta, no con un índice de lote —
+  // hallazgo real 2026-08-24: dos corridas de render en el mismo día,
+  // ambas con una sola propuesta debida (el caso normal), generaban el
+  // mismo nombre ("post-<fecha>-1[-N].jpg") y la segunda pisaba en
+  // silencio las imágenes de la primera en el repo, aunque fueran
+  // propuestas completamente distintas.
+  for (const proposal of proposals) {
     const ofertaLabel = OFERTA_LABELS[proposal.oferta] || "Mejora Continua";
 
     if (proposal.format === "carrusel") {
@@ -280,7 +285,7 @@ async function main() {
           subtext: slides[s].subtext,
         });
         await page.setContent(html, { waitUntil: "networkidle" });
-        const outputPath = path.join(PUBLISHED_DIR, `post-${date}-${i + 1}-${s + 1}.jpg`);
+        const outputPath = path.join(PUBLISHED_DIR, `post-${date}-${proposal.id.slice(0, 8)}-${s + 1}.jpg`);
         await page.screenshot({ path: outputPath, type: "jpeg", quality: 92 });
         if (photo) await markPhotoUsed(photo, proposal.oferta);
         outputPaths.push(path.relative(ROOT, outputPath));
@@ -307,7 +312,7 @@ async function main() {
       subtext: proposal.body || "",
     });
     await page.setContent(html, { waitUntil: "networkidle" });
-    const outputPath = path.join(PUBLISHED_DIR, `post-${date}-${i + 1}.jpg`);
+    const outputPath = path.join(PUBLISHED_DIR, `post-${date}-${proposal.id.slice(0, 8)}.jpg`);
     await page.screenshot({ path: outputPath, type: "jpeg", quality: 92 });
 
     if (photo) await markPhotoUsed(photo, proposal.oferta);
