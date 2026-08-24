@@ -955,6 +955,8 @@ Pablo pidió un carrusel de muestra para revisar el diseño ya arreglado con con
 
 **Probado real, con la misma pieza, antes y después del fix** — se renderizó dos veces la misma propuesta real (`d975b7e9-...`), primera corrida mostró el bug, segunda corrida (tras el fix) mostró las 3 slides completas y limpias. Las imágenes finales se mandaron a Pablo para revisión — la propuesta quedó en `pending`, **no se publicó**, decisión suya si sale o no.
 
+**Ajuste inmediato tras revisar la muestra:** Pablo pidió sacar el marco rojo que había agregado la otra sesión concurrente (ver sección anterior) — se sacó `.post.solo-texto::after` de `templates/post-template.html`, sin tocar el resto de ese cambio (footer anclado al margen inferior). Re-renderizada la misma pieza real una tercera vez para confirmar visualmente que quedó sin marco antes de mandarla — sigue en `pending`, sin publicar.
+
 ## Notas históricas
 
 Visión fundacional original del EDA (spec escrita por Pablo antes de que existiera código, sigue siendo la intención de fondo del proyecto): *"Construir una aplicación de gestión estratégica de contenidos que funcione mediante la interacción de múltiples Agentes de IA. El sistema debe ser capaz de procesar la identidad de marca localmente, debatir estrategias y ejecutar publicaciones automáticas aprendiendo de los resultados."* — Bóveda → RAG, Mesa de Diálogo → 3 agentes (Estratega/Creativo/Crítico), Bucle de Aprendizaje → `rule-engine`/`success_rules`, son la realización de esa visión original. Un detalle que si cambió: el spec original dejaba el "Modo Supervisión" (aprobación antes de publicar) como opcional — el sistema real fue más allá, no hay ningún gate de aprobación humana desde el overhaul del 2026-08-02.
