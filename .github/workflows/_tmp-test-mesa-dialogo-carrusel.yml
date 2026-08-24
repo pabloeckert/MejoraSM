@@ -14,7 +14,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Disparar Mesa de Diálogo real
+      - name: Continuar sesión real (corregir CTA, buscar aprobación)
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -22,7 +22,7 @@ jobs:
           curl -sS -X POST "$SUPABASE_URL/functions/v1/orchestrator" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Content-Type: application/json" \
-            -d '{"action":"start","topic":"Idea para un carrusel de Instagram dirigido al Emprendedor Saturado: no sabe priorizar y vive apagando incendios, lo que busca es claridad mental y control. Angulo: como distinguir una tarea urgente de una tarea importante."}' \
+            -d '{"action":"continue","sessionId":"a662557c-a195-412d-9f14-a13931290773","feedback":"El Crítico tiene razón: corregí el CTA final para que sea exactamente \"¿Cómo está tu empresa hoy? Agendá tu reunión de evaluación — link en bio.\", sin cambiar ninguna otra palabra (no uses \"sesión de claridad\", esa frase es solo para DMs). Dejá el hook, el body y los hashtags exactamente igual."}' \
             -o response.json
           echo "--- RESPUESTA COMPLETA ---"
           cat response.json
