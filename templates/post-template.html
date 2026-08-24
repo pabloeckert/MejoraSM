@@ -34,20 +34,23 @@
 
   html, body {
     width: 1080px;
-    height: 1080px;
+    height: 1350px;
     overflow: hidden;
     background: var(--blanco);
     font-family: "Bw Modelica", "League Spartan", sans-serif;
   }
 
-  /* Feed 1:1 — a diferencia de la Story (foto arriba / panel blanco abajo,
-     pensada para consumo en secuencia), acá la foto es fondo completo:
-     la pieza tiene que funcionar sola, parada en un grid, sin contexto de
-     lo que viene antes o después. */
+  /* Feed 4:5 (1080×1350) — no 1:1 — más superficie en el scroll, formato
+     que prioriza Instagram desde su algoritmo (skill mejora-continua-brand,
+     sección "Redes sociales — formato y zona segura", agregada 2026-08-24).
+     A diferencia de la Story (foto arriba / panel blanco abajo, pensada
+     para consumo en secuencia), acá la foto es fondo completo: la pieza
+     tiene que funcionar sola, parada en un grid, sin contexto de lo que
+     viene antes o después. */
   .post {
     position: relative;
     width: 1080px;
-    height: 1080px;
+    height: 1350px;
     background: var(--tinta);
   }
 
@@ -70,8 +73,8 @@
 
   .tag {
     position: absolute;
-    top: 56px;
-    left: 56px;
+    top: 80px;
+    left: 60px;
     display: inline-flex;
     align-items: center;
     padding: 14px 28px;
@@ -90,7 +93,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    padding: 0 72px 64px;
+    padding: 0 72px 80px;
     display: flex;
     flex-direction: column;
   }
@@ -169,6 +172,25 @@
   .post.solo-texto .photo,
   .post.solo-texto .scrim { display: none; }
   .post.solo-texto .tag { background: var(--azul); color: var(--blanco); }
+
+  /* Marco de acento — feedback real de Pablo 2026-08-24: en pantalla (celular
+     y desktop) el texto se perdía, con mucho blanco vacío alrededor y nada
+     que le diera peso visual a la pieza — pasaba sobre todo con slides de
+     una sola oración corta. El mockup de referencia que compartió (una
+     tarjeta con borde definido) funcionaba porque el borde resuelve la
+     composición sea cual sea el largo del texto — se toma esa idea, no el
+     diseño: un marco fino en rojo (mismo acento que ya usa `.rule`, "color
+     como puntuación" de la regla de marca, no un color nuevo) en vez del
+     borde con gradiente del mockup. El resto del diseño (tag, tipografía,
+     footer) no cambia. */
+  .post.solo-texto::after {
+    content: "";
+    position: absolute;
+    inset: 48px;
+    border: 6px solid var(--rojo);
+    border-radius: 28px;
+    pointer-events: none;
+  }
   .post.solo-texto .panel {
     top: 0;
     justify-content: center;
@@ -180,6 +202,16 @@
   .post.solo-texto .subtext { color: var(--tinta); opacity: 1; }
   .post.solo-texto .brand { color: var(--azul); }
   .post.solo-texto .site { color: var(--gris); }
+  /* Footer fijo en el margen inferior del marco, no arrastrado por el
+     centrado vertical del bloque de texto — así queda anclado igual sea
+     un headline de una línea o de cuatro, en vez de flotar cerca del
+     centro cuando el texto es corto. */
+  .post.solo-texto .footer {
+    position: absolute;
+    left: 96px;
+    right: 96px;
+    bottom: 72px;
+  }
 </style>
 </head>
 <body>

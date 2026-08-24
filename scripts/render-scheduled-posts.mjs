@@ -230,7 +230,9 @@ async function main() {
 
   const templateBase = await readFile(TEMPLATE_PATH, "utf8");
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1080, height: 1080 }, deviceScaleFactor: 1 });
+  // Feed 4:5 (1080×1350), no 1:1 — ver skill mejora-continua-brand, sección
+  // "Redes sociales — formato y zona segura" (agregada 2026-08-24).
+  const page = await browser.newPage({ viewport: { width: 1080, height: 1350 }, deviceScaleFactor: 1 });
   await mkdir(PUBLISHED_DIR, { recursive: true });
 
   const date = new Date().toISOString().slice(0, 10);
