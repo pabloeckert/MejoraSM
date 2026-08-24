@@ -1,0 +1,28 @@
+# Workflow temporal — prueba supervisada real del fix de carrusel (662059a)
+# a pedido de Pablo, 2026-08-24. Corre una sesión real de Mesa de Diálogo
+# (orchestrator, action "start") con un tema real basado en el buyer persona
+# "El Emprendedor Saturado", pidiendo formato carrusel explícito para forzar
+# el mismo camino de código que produjo el bug del guion crudo. Se borra
+# apenas se confirma el resultado — mismo patrón ya usado varias veces en
+# este repo (ver CLAUDE.md, pruebas de copilot/Groq).
+name: _tmp test mesa dialogo carrusel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar Mesa de Diálogo real
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          curl -sS -X POST "$SUPABASE_URL/functions/v1/orchestrator" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"start","topic":"Idea para un carrusel de Instagram dirigido al Emprendedor Saturado: no sabe priorizar y vive apagando incendios, lo que busca es claridad mental y control. Angulo: como distinguir una tarea urgente de una tarea importante."}' \
+            -o response.json
+          echo "--- RESPUESTA COMPLETA ---"
+          cat response.json
