@@ -1,0 +1,49 @@
+# Workflow temporal — SOLO renderiza (no publica) la propuesta real de
+# prueba insertada a mano el 2026-08-24 (id 819469dd-c9ca-4e04-9f95-dff5138e40fc,
+# contenido real aprobado por el Crítico real, sesión a662557c-...) para que
+# Pablo revise la imagen del carrusel ANTES de decidir si reactivar el cron
+# de publicación automática. Deliberadamente omite el paso de publish-
+# scheduled-posts.mjs — cero riesgo de publicación real. Se borra apenas se
+# confirme el resultado.
+name: _tmp render only test
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar Playwright
+        run: npm install playwright
+
+      - name: Instalar Chromium para Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Buscar propuestas debidas y renderizar la imagen
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/render-scheduled-posts.mjs
+
+      - name: Commitear imágenes renderizadas (públicas vía raw.githubusercontent.com)
+        run: |
+          git config user.name "mejora-story-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add content/published content/used
+          git diff --cached --quiet || git commit -m "test: render de prueba supervisada (819469dd) — NO publicado"
+          git push
+
+      - name: Mostrar manifiesto real
+        run: cat content/work/scheduled-posts.json
