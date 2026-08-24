@@ -1,0 +1,26 @@
+# Workflow temporal — carrusel de MUESTRA a pedido de Pablo (2026-08-24),
+# para revisar visualmente el diseño ya arreglado (4:5, zona segura, slides
+# uniformes, sin CTA aparte) con contenido real nuevo. Corre una sesión real
+# de Mesa de Diálogo (orchestrator, action "start"). Se borra apenas se
+# confirma el resultado.
+name: _tmp mesa dialogo muestra
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar Mesa de Diálogo real
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          curl -sS -X POST "$SUPABASE_URL/functions/v1/orchestrator" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"start","topic":"Idea para un carrusel de Instagram dirigido a El que Necesita Orden para Crecer: creció rápido y sabe que así desbarranca, necesita estructura y sistema, no más esfuerzo. Angulo: la diferencia entre crecer y crecer con orden, y por que seguir sin sistema termina costando mas caro despues."}' \
+            -o response.json
+          echo "--- RESPUESTA COMPLETA ---"
+          cat response.json
