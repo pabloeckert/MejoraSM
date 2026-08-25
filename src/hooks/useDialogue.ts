@@ -25,7 +25,16 @@ export function useDialogueSession(id: string) {
   });
 }
 
-export function useDialogueMessages(sessionId: string) {
+// Hallazgo real de auditoría 2026-08-25: esto se llamaba para CADA sesión
+// listada (seleccionada o no), con un refetchInterval fijo de 5s sin mirar
+// el status — con N sesiones históricas en la lista, eso dispara N queries
+// cada 5s indefinidamente mientras la pestaña esté abierta, incluidas
+// sesiones aprobadas/rechazadas hace semanas. `enabled` limita el fetch a
+// la sesión realmente expandida; el polling se corta apenas la sesión deja
+// de estar "active" (aprobada/rechazada no va a recibir mensajes nuevos).
+export function useDialogueMessages(sessionId: string, options?: { enabled?: boolean; isActive?: boolean }) {
+  const enabled = (options?.enabled ?? true) && !!sessionId;
+  const isActive = options?.isActive ?? true;
   return useQuery({
     queryKey: ["dialogue-messages", sessionId],
     queryFn: async () => {
@@ -33,8 +42,8 @@ export function useDialogueMessages(sessionId: string) {
       if (error) throw error;
       return data;
     },
-    enabled: !!sessionId,
-    refetchInterval: 5000, // Poll while dialogue is active
+    enabled,
+    refetchInterval: isActive ? 5000 : false,
   });
 }
 

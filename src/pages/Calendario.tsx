@@ -155,9 +155,9 @@ function CalendarioContent() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Calendario Editorial</h1>
           <p className="mt-1 text-muted-foreground">
-            Fuente real: lo que se agenda y publica solo. Click en una pieza para ver el detalle completo o
-            arrastrala a otro día para reprogramarla. Para cancelar algo antes de que salga, también se hace
-            acá mismo, desde el detalle.
+            Fuente real: lo que se agenda y publica solo. Tocá una pieza para ver el detalle completo — desde ahí
+            se reprograma o se cancela antes de que salga.{" "}
+            <span className="hidden sm:inline">En pantallas grandes también se puede arrastrar a otro día.</span>
           </p>
         </div>
         <div className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3.5 py-2">

@@ -245,9 +245,13 @@ describe("Calendario Page", () => {
   });
 
   it("renders real drag-and-drop rescheduling copy, not the old read-only text", async () => {
+    // Texto ajustado 2026-08-25 (auditoría real: la pista de "arrastrar"
+    // no aplica en mobile, donde el drag-and-drop HTML5 no funciona) —
+    // sigue mencionando la reprogramación por arrastre en pantallas
+    // grandes, ya no como única forma de hacerlo.
     const { default: Calendario } = await import("@/pages/Calendario");
     renderWithProviders(<Calendario />);
-    expect(screen.getByText(/arrastrala a otro día para reprogramarla/i)).toBeInTheDocument();
+    expect(screen.getByText(/se puede arrastrar a otro día/i)).toBeInTheDocument();
   });
 
   it("renders month/week view toggle", async () => {

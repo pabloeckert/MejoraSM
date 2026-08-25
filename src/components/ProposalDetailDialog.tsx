@@ -26,6 +26,7 @@ import {
   Check,
   Loader2,
   Info,
+  AlertTriangle,
 } from "lucide-react";
 import {
   useApproveProposal,
@@ -443,7 +444,18 @@ export function ProposalDetailDialog({
                 {isScheduled ? <Repeat className="h-3.5 w-3.5" /> : <Calendar className="h-3.5 w-3.5" />}
                 {isScheduled ? "Reprogramar" : "Agendar"}
               </Label>
-              <Input type="datetime-local" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} />
+              <Input
+                type="datetime-local"
+                min={toDatetimeLocal(new Date().toISOString())}
+                value={scheduleDate}
+                onChange={(e) => setScheduleDate(e.target.value)}
+              />
+              {scheduleDate && new Date(scheduleDate).getTime() - Date.now() < 30 * 60 * 1000 && (
+                <p className="flex items-center gap-1.5 text-xs text-amber-600">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  Esto se publica en menos de 30 minutos, sin más revisión — confirmá que la fecha/hora es la correcta.
+                </p>
+              )}
               {!isScheduled && (
                 <Select value={scheduleOferta} onValueChange={setScheduleOferta}>
                   <SelectTrigger>

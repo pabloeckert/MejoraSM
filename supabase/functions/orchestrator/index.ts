@@ -541,6 +541,26 @@ async function startSession(topic: string) {
   if (sessionError) throw new Error(`Error creando sesión: ${sessionError.message}`);
   if (!session) throw new Error("No se pudo crear la sesión");
 
+  try {
+    return await runDebate(session, topic);
+  } catch (e: unknown) {
+    // Hallazgo real de auditoría 2026-08-25: si el debate de 3 agentes
+    // falla a mitad de camino (Anthropic y Groq caídos a la vez, timeout,
+    // etc.), la sesión quedaba en "active" para siempre — indistinguible
+    // en la UI de una sesión que sigue en curso ahora mismo. Sin este
+    // catch, quien vuelve a mirar la pantalla más tarde no tiene forma de
+    // saber que se rompió, y no hay ningún botón de "reintentar" posible
+    // porque técnicamente "sigue activa".
+    const message = e instanceof Error ? e.message : String(e);
+    await supabase
+      .from("dialogue_sessions")
+      .update({ status: "error", metadata: { error: message.slice(0, 500) }, updated_at: new Date().toISOString() })
+      .eq("id", session.id);
+    throw e;
+  }
+}
+
+async function runDebate(session: { id: string }, topic: string) {
   // 2. Obtener contexto de la bóveda + lo que ya aprendimos de datos reales
   // (Fase 2 del plan estratégico 2026-08-16 — cierra el loop de
   // aprendizaje: rule-engine generaba reglas que nadie leía al generar).

@@ -234,11 +234,16 @@ function SessionCard({
   onContinue: (sessionId: string) => void;
   isContinuing: boolean;
 }) {
-  const { data: messages } = useDialogueMessages(session.id);
+  const { data: messages } = useDialogueMessages(session.id, {
+    enabled: isSelected,
+    isActive: session.status === "active",
+  });
 
   const statusVariant =
     session.status === "approved"
       ? "default"
+      : session.status === "error"
+      ? "destructive"
       : session.status === "needs_review"
       ? "secondary"
       : "outline";
@@ -257,6 +262,8 @@ function SessionCard({
             <Badge variant={statusVariant}>
               {session.status === "approved"
                 ? "Aprobado"
+                : session.status === "error"
+                ? "Error — reintentá"
                 : session.status === "needs_review"
                 ? "Revisar"
                 : "Activa"}
@@ -295,13 +302,32 @@ function SessionCard({
                 );
               })}
             </div>
-          ) : (
+          ) : session.status !== "error" ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               <span className="ml-2 text-sm text-muted-foreground">
                 Los agentes están trabajando...
               </span>
             </div>
+          ) : null}
+
+          {/* Sesión rota a mitad de debate — hallazgo real de auditoría
+              2026-08-25: sin esto, una sesión con 0-2 mensajes que falló
+              antes de terminar se veía indistinguible de una realmente en
+              curso ("Los agentes están trabajando..." para siempre). */}
+          {session.status === "error" && (
+            <Card className="border-destructive/50 bg-destructive/5">
+              <CardContent className="flex items-start gap-3 p-3">
+                <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                <div>
+                  <p className="text-sm font-medium">El debate se cortó a mitad de camino</p>
+                  <p className="text-xs text-muted-foreground">
+                    {session.metadata?.error || "Error desconocido"} — probá iniciar una sesión nueva con el mismo
+                    tema.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Evaluation result */}
