@@ -22,4 +22,4 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: node scripts/_tmp-test-vault-extraction.mjs
+        run: node scripts/_tmp-test-vault-extraction.mjs --cleanup
