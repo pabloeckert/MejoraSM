@@ -1,0 +1,25 @@
+# Workflow temporal — verifica que el refactor de startSession (split en
+# startSession + runDebate, para el catch de sesión colgada) sigue
+# funcionando real de punta a punta. Tema neutro, formato historia
+# explícito (no autopublica). Se borra apenas se confirme.
+name: _tmp verify orchestrator refactor
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar Mesa de Diálogo real
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          curl -sS -X POST "$SUPABASE_URL/functions/v1/orchestrator" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"start","topic":"Idea rapida para una historia de Instagram sobre la importancia de tomarse un recreo real durante la jornada laboral, sin culpa."}' \
+            -o response.json
+          echo "--- RESPUESTA COMPLETA ---"
+          cat response.json
