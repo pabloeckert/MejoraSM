@@ -56,7 +56,7 @@ describe("AI Service", () => {
 const { mockFrom, mockStorageFrom } = vi.hoisted(() => {
   const chain = () => {
     const obj: Record<string, any> = {};
-    const methods = ["select", "eq", "order", "single", "limit", "insert", "update", "delete"];
+    const methods = ["select", "eq", "order", "single", "limit", "range", "insert", "update", "delete"];
     methods.forEach((m) => {
       obj[m] = vi.fn(() => obj);
     });

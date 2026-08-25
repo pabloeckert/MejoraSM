@@ -18,6 +18,30 @@ if (!supabaseUrl || !supabaseKey) {
 
 export const supabase = createClient(supabaseUrl ?? "", supabaseKey ?? "");
 
+// PostgREST devuelve como máximo 1000 filas por default (db-max-rows), sin
+// error ni aviso — simplemente falta el resto. Hallazgo real de auditoría
+// 2026-08-25: `proposals`/`metrics` todavía no llegan a ese volumen, pero
+// tanto el Dashboard (KPIs agregados reales) como la exportación de
+// Auditoría (pensada como fuente de verdad completa) necesitan el set
+// entero, no una muestra silenciosa. Este helper pagina con `.range()`
+// hasta agotar resultados reales.
+const PAGE_SIZE = 1000;
+async function fetchAllPages<T>(
+  buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
+): Promise<{ data: T[] | null; error: { message: string } | null }> {
+  const all: T[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await buildQuery(from, from + PAGE_SIZE - 1);
+    if (error) return { data: null, error };
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return { data: all, error: null };
+}
+
 // ═══════════════════════════════════════
 // DOCUMENTOS (Bóveda)
 // ═══════════════════════════════════════
@@ -100,11 +124,16 @@ export const dialogueApi = {
 // ═══════════════════════════════════════
 
 export const proposalsApi = {
+  // Pagina de a 1000 filas reales — sin esto, pasado ese volumen faltaban
+  // propuestas en silencio tanto acá como en el export de Auditoría.
   list: () =>
-    supabase
-      .from("proposals")
-      .select("*, dialogue_sessions(topic)")
-      .order("created_at", { ascending: false }),
+    fetchAllPages<Record<string, unknown>>((from, to) =>
+      supabase
+        .from("proposals")
+        .select("*, dialogue_sessions(topic)")
+        .order("created_at", { ascending: false })
+        .range(from, to)
+    ),
 
   approve: (id: string) =>
     supabase.from("proposals").update({ status: "approved" }).eq("id", id),
@@ -201,12 +230,15 @@ export const metricsApi = {
   // Fase 0 del plan estratégico 2026-08-16 — antes se inferían del prefijo
   // de UUID de la propuesta).
   all: () =>
-    supabase
-      .from("metrics")
-      .select(
-        "*, proposals(id, title, hook, format, status, zernio_post_id, oferta, rendered_image_path, is_test)"
-      )
-      .order("measured_at", { ascending: false }),
+    fetchAllPages<Record<string, unknown>>((from, to) =>
+      supabase
+        .from("metrics")
+        .select(
+          "*, proposals(id, title, hook, format, status, zernio_post_id, oferta, rendered_image_path, is_test)"
+        )
+        .order("measured_at", { ascending: false })
+        .range(from, to)
+    ),
 
   byProposal: (proposalId: string) =>
     supabase

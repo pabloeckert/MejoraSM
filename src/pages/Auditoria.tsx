@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Download, FileJson, FileSpreadsheet, Loader2 } from "lucide-react";
 import { proposalsApi, metricsApi, runLogApi } from "@/services/supabase";
 import { downloadCsv, downloadJson } from "@/lib/export";
+import { toast } from "@/hooks/use-toast";
 
 // Auditoría exportable — Fase 6 del plan estratégico 2026-08-16. Exporta
 // los datos operativos reales del sistema (propuestas, métricas, reglas
@@ -75,6 +76,12 @@ export default function Auditoria() {
       const filename = `mejorasm-${source.key}-${today()}.${format}`;
       if (format === "csv") downloadCsv(filename, rows);
       else downloadJson(filename, rows);
+      // Hallazgo real de auditoría 2026-08-25: sin ningún conteo visible,
+      // un export cortado en silencio (por el límite de 1000 filas de
+      // PostgREST, ya corregido en services/supabase.ts) hubiera sido
+      // indistinguible de uno completo — el número acá es la única forma
+      // de notarlo si algún día vuelve a pasar.
+      toast({ title: `${source.label} exportado`, description: `${rows.length} filas en ${filename}.` });
     } catch (e) {
       setError(e instanceof Error ? e.message : `Error exportando ${source.label}`);
     } finally {
@@ -90,6 +97,8 @@ export default function Auditoria() {
         SOURCES.map(async (s) => [s.key, await s.fetch()] as const)
       );
       downloadJson(`mejorasm-auditoria-completa-${today()}.json`, Object.fromEntries(entries));
+      const resumen = entries.map(([key, rows]) => `${key}: ${rows.length}`).join(" · ");
+      toast({ title: "Auditoría completa exportada", description: resumen });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error exportando la auditoría completa");
     } finally {
@@ -125,7 +134,7 @@ export default function Auditoria() {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={loadingKey !== null}
+                  disabled={loadingKey === `${source.key}-csv`}
                   onClick={() => handleExport(source, "csv")}
                 >
                   {loadingKey === `${source.key}-csv` ? (
@@ -138,7 +147,7 @@ export default function Auditoria() {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={loadingKey !== null}
+                  disabled={loadingKey === `${source.key}-json`}
                   onClick={() => handleExport(source, "json")}
                 >
                   {loadingKey === `${source.key}-json` ? (
