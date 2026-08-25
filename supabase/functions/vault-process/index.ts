@@ -6,6 +6,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import mammoth from "npm:mammoth@1.8.0";
 import { getDocumentProxy, extractText } from "npm:unpdf@1.4.0";
+import { Buffer } from "node:buffer";
 import { requireAuth, unauthorizedResponse } from "../_shared/auth.ts";
 import { logRun } from "../_shared/runLog.ts";
 
@@ -236,8 +237,13 @@ async function processDocumentInner(documentId: string) {
         const { text } = await extractText(pdf, { mergePages: true });
         content = text;
       } else if (isDocx) {
+        // La build de mammoth que resuelve `npm:mammoth` en Deno es la de
+        // Node, que espera `{ buffer: Buffer }` — la clave `arrayBuffer`
+        // solo existe en su build de navegador (mammoth.browser.js), que
+        // acá no se está usando. Confirmado real: sin este cambio, fallaba
+        // con "Could not find file in options" (probado 2026-08-25).
         const arrayBuffer = await fileData.arrayBuffer();
-        const result = await mammoth.extractRawText({ arrayBuffer });
+        const result = await mammoth.extractRawText({ buffer: Buffer.from(arrayBuffer) });
         content = result.value;
       } else if (doc.file_path.endsWith(".doc")) {
         // .doc legacy (binario pre-2007) no tiene extractor confiable
