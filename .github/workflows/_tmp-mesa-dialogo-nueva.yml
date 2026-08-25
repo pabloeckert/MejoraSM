@@ -1,0 +1,24 @@
+# Workflow temporal — nueva propuesta real de carrusel (2026-08-25), a
+# pedido de Pablo, con autorización previa para publicar apenas el Crítico
+# real apruebe. Se borra apenas se confirme el resultado.
+name: _tmp mesa dialogo nueva
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar Mesa de Diálogo real
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          curl -sS -X POST "$SUPABASE_URL/functions/v1/orchestrator" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"start","topic":"Idea para un carrusel de Instagram dirigido al Vendedor sin Resultados: trabaja mucho pero la caja no lo refleja, necesita direccion comercial y proceso, no mas esfuerzo de venta. Angulo: la diferencia entre vender con esfuerzo y vender con proceso, por que mas llamados o mas horas no es la solucion si falta un sistema de ventas real."}' \
+            -o response.json
+          echo "--- RESPUESTA COMPLETA ---"
+          cat response.json
