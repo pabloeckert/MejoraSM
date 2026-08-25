@@ -170,30 +170,67 @@ function AccionesFacebookFallido({ post }: { post: HistorialPost }) {
 // Zernio ya marcó la plataforma como "failed"), esto se muestra siempre
 // para un post de feed publicado — el control humano acá es posterior a
 // publicar, no un gate previo.
+//
+// Hallazgo real de auditoría 2026-08-25: acá solo se ofrecía el ID de
+// propuesta (para manage-post.yml, que reintenta/despublica vía la API de
+// Zernio), pero no había ningún link a "ya lo gestioné a mano" — el mismo
+// caso real que motivó el fix a7ae187 (Pablo borrando un post directo
+// desde las apps de Instagram/Facebook), pero para un post de feed
+// publicado con éxito en vez de uno fallido. Si alguien improvisaba
+// copiando el ID de propuesta que sí veía en pantalla y lo pegaba en
+// mark-manual.yml, el registro se guardaba pero nunca iba a matchear
+// contra `accionesManuales` (esa tabla usa el id real de Zernio,
+// `post.id`, no el id de propuesta de Supabase) — el badge se quedaba en
+// verde para siempre. Ahora se ofrecen los dos IDs, cada uno con su acción
+// y su explicación, para no repetir ese bug.
 function GestionPostDeFeed({ post }: { post: HistorialPost }) {
   if (post.kind !== "post" || !post.proposalId) return null;
   return (
-    <div className="space-y-2 border-t border-border pt-3">
-      <p className="text-[11px] font-semibold text-muted-foreground">Post de feed — si no te convence, gestionalo:</p>
-      <div className="flex items-center gap-2">
-        <code className="max-w-[110px] truncate rounded bg-muted px-1.5 py-0.5 text-[11px]" title={post.proposalId}>
-          {post.proposalId}
-        </code>
-        <CopyIdButton id={post.proposalId} />
+    <div className="space-y-3 border-t border-border pt-3">
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold text-muted-foreground">Reintentar o despublicar de verdad (vía Zernio):</p>
+        <div className="flex items-center gap-2">
+          <code className="max-w-[110px] truncate rounded bg-muted px-1.5 py-0.5 text-[11px]" title={post.proposalId}>
+            {post.proposalId}
+          </code>
+          <CopyIdButton id={post.proposalId} />
+        </div>
+        <a
+          href={MANAGE_POST_WORKFLOW_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block rounded-md border border-border py-1.5 text-center text-xs font-semibold hover:border-primary"
+        >
+          Ir a Actions → Run workflow
+        </a>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Con el ID de propuesta copiado: "Run workflow", elegí la plataforma y "despublicar" (Facebook se baja de verdad;
+          Instagram no se puede despublicar por API — hay que borrarlo a mano desde la app). En "confirmacion" escribí
+          exactamente CONFIRMO.
+        </p>
       </div>
-      <a
-        href={MANAGE_POST_WORKFLOW_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block rounded-md border border-border py-1.5 text-center text-xs font-semibold hover:border-primary"
-      >
-        Ir a Actions → Run workflow
-      </a>
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Con el ID de propuesta copiado: "Run workflow", elegí la plataforma y "despublicar" (Facebook se baja de verdad;
-        Instagram no se puede despublicar por API — hay que borrarlo a mano desde la app). En "confirmacion" escribí
-        exactamente CONFIRMO.
-      </p>
+
+      <div className="space-y-2 border-t border-border pt-3">
+        <p className="text-[11px] font-semibold text-muted-foreground">¿Ya lo borraste vos a mano desde Instagram/Facebook?</p>
+        <div className="flex items-center gap-2">
+          <code className="max-w-[110px] truncate rounded bg-muted px-1.5 py-0.5 text-[11px]" title={post.id}>
+            {post.id}
+          </code>
+          <CopyIdButton id={post.id} />
+        </div>
+        <a
+          href={MARK_MANUAL_WORKFLOW_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block rounded-md border border-border py-1.5 text-center text-xs font-semibold hover:border-primary"
+        >
+          Ya lo hice a mano →
+        </a>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Con este otro ID (no el de propuesta) pegado en "post_id" y la plataforma correcta, marca el post como
+          gestionado a mano — así el badge deja de mostrarlo en verde acá.
+        </p>
+      </div>
     </div>
   );
 }
@@ -204,7 +241,12 @@ function PostCard({ post, accionesManuales }: { post: HistorialPost; accionesMan
   return (
     <Card className="flex flex-col overflow-hidden">
       {post.imageUrl && (
-        <img src={post.imageUrl} alt={`Story del ${post.date}`} loading="lazy" className="aspect-[9/16] w-full bg-muted object-cover" />
+        <img
+          src={post.imageUrl}
+          alt={post.kind === "story" ? `Story del ${post.date}` : `Post del ${post.date}`}
+          loading="lazy"
+          className={cn("w-full bg-muted object-cover", post.kind === "story" ? "aspect-[9/16]" : "aspect-[4/5]")}
+        />
       )}
       <CardContent className="flex flex-1 flex-col gap-2.5 p-4">
         <div className="flex items-center justify-between gap-2">

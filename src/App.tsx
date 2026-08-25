@@ -55,8 +55,8 @@ const App = () => (
                 <Route path="/monitor" element={<Monitor />} />
                 <Route path="/biblioteca" element={<Biblioteca />} />
                 <Route path="/auditoria" element={<Auditoria />} />
+                <Route path="*" element={<NotFound />} />
               </Route>
-              <Route path="*" element={<NotFound />} />
             </Routes>
           </ErrorBoundary>
         </AuthGate>
