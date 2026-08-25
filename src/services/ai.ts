@@ -37,6 +37,32 @@ class ApiError extends Error {
   }
 }
 
+// Hallazgo real de auditoría 2026-08-25: el debate de 3 agentes (Estratega
+// → Creativo → Crítico, cada uno con reintentos y fallback Anthropic→Groq)
+// podía tardar varios minutos sin que la UI diera ninguna indicación de
+// cuánto ni forma de cancelar — un fetch colgado se veía igual que uno que
+// sigue trabajando de verdad. 150s da margen real (peor caso: ~6 llamadas
+// externas con backoff) sin dejar a alguien esperando indefinidamente.
+const DIALOGUE_TIMEOUT_MS = 150_000;
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new ApiError(
+        `Los agentes tardaron más de ${Math.round(timeoutMs / 1000)}s sin responder — probá de nuevo.`,
+        408
+      );
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function handleResponse<T>(res: Response, fallbackMsg: string): Promise<T> {
   if (!res.ok) {
     let errorMsg = fallbackMsg;
@@ -89,20 +115,28 @@ export interface ContinueResult {
 }
 
 export async function startDialogue(topic: string): Promise<DialogueResult> {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/orchestrator`, {
-    method: "POST",
-    headers: await buildHeaders(),
-    body: JSON.stringify({ action: "start", topic }),
-  });
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/orchestrator`,
+    {
+      method: "POST",
+      headers: await buildHeaders(),
+      body: JSON.stringify({ action: "start", topic }),
+    },
+    DIALOGUE_TIMEOUT_MS
+  );
   return handleResponse(res, "Error iniciando el diálogo con los agentes");
 }
 
 export async function continueDialogue(sessionId: string, feedback: string): Promise<ContinueResult> {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/orchestrator`, {
-    method: "POST",
-    headers: await buildHeaders(),
-    body: JSON.stringify({ action: "continue", sessionId, feedback }),
-  });
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/orchestrator`,
+    {
+      method: "POST",
+      headers: await buildHeaders(),
+      body: JSON.stringify({ action: "continue", sessionId, feedback }),
+    },
+    DIALOGUE_TIMEOUT_MS
+  );
   return handleResponse(res, "Error continuando el diálogo");
 }
 

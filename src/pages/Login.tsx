@@ -23,9 +23,6 @@ function translateAuthError(message: string): string {
   if (lower.includes("invalid login credentials")) {
     return "Email o contraseña incorrectos.";
   }
-  if (lower.includes("user already registered") || lower.includes("already exists")) {
-    return "Ya existe una cuenta con ese email — iniciá sesión en vez de crear una nueva.";
-  }
   if (lower.includes("rate limit") || lower.includes("too many requests")) {
     return "Demasiados intentos seguidos — esperá un minuto y probá de nuevo.";
   }
@@ -38,7 +35,15 @@ function translateAuthError(message: string): string {
 export function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState<"signin" | "signup" | "otp">("signin");
+  // Alta de cuenta (self-signup) sacada a propósito el 2026-08-25 — "resolve
+  // todo" tras la auditoría integral. Mitigado por RLS real (is_app_admin()
+  // bloquea a cualquier no-admin, cero fuga de datos), pero era fricción y
+  // superficie de confusión innecesaria para una herramienta de un solo
+  // dueño: Pablo ya tiene su cuenta real creada, y el flujo OTP sirve como
+  // respaldo sin contraseña. Si algún día hace falta dar de alta a alguien
+  // más, se hace por SQL directo en `app_admins` (ver sección de auth en
+  // este archivo) + Supabase Admin API, no desde acá.
+  const [mode, setMode] = useState<"signin" | "otp">("signin");
   const [otpCode, setOtpCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -49,23 +54,12 @@ export function Login() {
     setLoading(true);
     setMessage(null);
 
-    const { error } =
-      mode === "signin"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     setLoading(false);
 
     if (error) {
       setMessage({ type: "error", text: translateAuthError(error.message) });
-      return;
-    }
-
-    if (mode === "signup") {
-      setMessage({
-        type: "info",
-        text: "Cuenta creada. Si Supabase pide confirmación por email, revisá la bandeja de entrada.",
-      });
     }
   }
 
@@ -111,9 +105,7 @@ export function Login() {
           </div>
           <CardTitle>EDA — MejoraOK</CardTitle>
           <CardDescription>
-            {mode === "signin" && "Iniciá sesión para continuar"}
-            {mode === "signup" && "Crear cuenta"}
-            {mode === "otp" && "Entrar sin contraseña"}
+            {mode === "signin" ? "Iniciá sesión para continuar" : "Entrar sin contraseña"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -189,7 +181,7 @@ export function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
-                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                  autoComplete="current-password"
                 />
               </div>
               {message && (
@@ -198,33 +190,21 @@ export function Login() {
                 </p>
               )}
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Un momento…" : mode === "signin" ? "Iniciar sesión" : "Crear cuenta"}
+                {loading ? "Un momento…" : "Iniciar sesión"}
               </Button>
             </form>
           )}
-          <div className="mt-4 space-y-2">
-            {mode !== "otp" && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("otp");
-                  setMessage(null);
-                }}
-                className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
-              >
-                Entrar sin contraseña (código por email)
-              </button>
-            )}
+          <div className="mt-4">
             <button
               type="button"
               onClick={() => {
-                setMode(mode === "signin" ? "signup" : "signin");
+                setMode(mode === "signin" ? "otp" : "signin");
                 setOtpSent(false);
                 setMessage(null);
               }}
               className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
             >
-              {mode === "signup" ? "Ya tengo cuenta, iniciar sesión" : mode === "otp" ? "Volver a contraseña" : "¿Primera vez? Crear cuenta"}
+              {mode === "otp" ? "Volver a contraseña" : "Entrar sin contraseña (código por email)"}
             </button>
           </div>
         </CardContent>

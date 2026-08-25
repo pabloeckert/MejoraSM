@@ -50,6 +50,8 @@ const agentColors: Record<string, string> = {
   critico: "text-amber-500 bg-amber-500/10",
 };
 
+const AGENT_SEQUENCE = ["estratega", "creativo", "critico"];
+
 const agentLabels: Record<string, string> = {
   estratega: "Estratega",
   creativo: "Creativo",
@@ -277,7 +279,12 @@ function SessionCard({
 
       {isSelected && (
         <CardContent className="space-y-4 border-t pt-4">
-          {/* Agent messages */}
+          {/* Agent messages — hallazgo real de auditoría 2026-08-25: antes
+              esto solo mostraba un spinner genérico sin decir cuánto podía
+              tardar ni qué agente estaba trabajando. El polling de
+              mensajes ya los va guardando turno a turno en tiempo real —
+              alcanza con leer cuántos llegaron para mostrar progreso real
+              en vez de un spinner ciego. */}
           {messages && messages.length > 0 ? (
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {messages.map((msg: any) => {
@@ -301,13 +308,20 @@ function SessionCard({
                   </div>
                 );
               })}
+              {session.status === "active" && messages.length < AGENT_SEQUENCE.length && (
+                <div className="flex items-center gap-2 py-2 pl-11 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {agentLabels[AGENT_SEQUENCE[messages.length]]} trabajando…
+                </div>
+              )}
             </div>
           ) : session.status !== "error" ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-sm text-muted-foreground">
-                Los agentes están trabajando...
-              </span>
+            <div className="flex flex-col items-center justify-center gap-1.5 py-8">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Estratega pensando el ángulo…</span>
+              </div>
+              <span className="text-xs text-muted-foreground/70">Puede tardar hasta 2 minutos.</span>
             </div>
           ) : null}
 
