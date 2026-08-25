@@ -327,7 +327,16 @@ App.addFiles = function (fileList, targetAlbum) {
         render();
         if (connected) {
           App.pushToast(`${files.length} foto${files.length > 1 ? "s" : ""} — guardando en el repo…`, `Dimensión: ${dimLabel(dimension)}. Se están commiteando a content/inbox/.`, "info");
-          newIds.forEach((nid) => App.persistPhoto(nid));
+          // Secuencial, no en paralelo — hallazgo real de auditoría
+          // 2026-08-25: la API de Contents de GitHub no está pensada para
+          // escrituras concurrentes sobre la misma rama (409/423
+          // intermitentes cuando se dispara más de un PUT a la vez). Mismo
+          // criterio ya aplicado en src/hooks/useGithubUpload.ts (Hub).
+          (async () => {
+            for (const nid of newIds) {
+              await App.persistPhoto(nid);
+            }
+          })();
         } else {
           App.pushToast(`${files.length} foto${files.length > 1 ? "s" : ""} subida${files.length > 1 ? "s" : ""} (en memoria)`, "Conectá GitHub para guardarlas de verdad en el repo.", "info", true);
         }
