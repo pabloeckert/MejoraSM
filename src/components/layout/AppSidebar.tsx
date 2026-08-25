@@ -8,7 +8,6 @@ import {
   Settings,
   CalendarDays,
   FileCheck,
-  LogOut,
   Upload,
   MonitorPlay,
   Images,
@@ -16,7 +15,6 @@ import {
   Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import lockup from "@/assets/lockup-horizontal-color.png";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -71,13 +69,6 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       <div className="border-t border-sidebar-border px-6 py-4">
-        <button
-          onClick={() => supabase.auth.signOut()}
-          className="mb-2 flex w-full items-center gap-2 text-xs font-medium text-sidebar-foreground/70 hover:text-sidebar-foreground"
-        >
-          <LogOut className="h-3.5 w-3.5" />
-          Cerrar sesión
-        </button>
         <p className="text-xs text-muted-foreground">EDA v1.0 — MejoraOK</p>
       </div>
     </div>

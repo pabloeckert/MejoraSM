@@ -1,18 +1,23 @@
 // supabase/functions/_shared/auth.ts
 //
 // Guard de autorización compartido por todas las Edge Functions del EDA.
-// Antes de esto, ninguna función validaba quién llamaba — solo el apikey
-// público (anon key), que cualquiera puede leer del bundle del frontend.
-// Con esto, cada función exige UNA de estas dos cosas:
 //
-//   1. Un JWT de usuario de Supabase Auth cuyo email esté en la tabla
-//      app_admins (llamadas desde el frontend, sesión iniciada). Es la
-//      MISMA tabla que usa is_app_admin() para el RLS de Postgres — una
-//      sola fuente de verdad para "quién es admin", no una lista aparte
-//      en un secret que se puede desincronizar (así estaba antes, con
-//      ADMIN_EMAILS + un default hardcodeado; se sacaron los dos).
-//   2. La propia SUPABASE_SERVICE_ROLE_KEY como Bearer token (llamadas
-//      servidor-a-servidor: cron de GitHub Actions, otra Edge Function).
+// 2026-08-25 — DESACTIVADO A PROPÓSITO, decisión explícita de Pablo, no un
+// descuido: "es para uso personal, saca el login... que sea sin login". Se
+// le explicó el riesgo real antes de tocar nada (sitio en URL pública de
+// GitHub Pages, sin login cualquiera con el link podría publicar en
+// Instagram/Facebook real, borrar datos, gastar créditos de IA, o leer la
+// Bóveda de marca) y confirmó igual: "Nada, es para uso interno entonces
+// quiero abrir como cualquier cosa... doble click y listo". Ver también
+// 019_open_access_personal_use.sql (revierte el RLS real a "Allow all") y
+// CLAUDE.md, sección "Remoción deliberada del login — uso personal,
+// 2026-08-25" para el detalle completo.
+//
+// Ahora acepta también la anon key pelada como credencial válida — es la
+// única que el frontend manda desde que no hay sesión de Supabase Auth.
+// Se deja intacta la validación de JWT de admin y de service-role por si en
+// algún momento se quiere volver a cerrar el acceso (alcanza con sacar la
+// rama de la anon key de acá abajo y reaplicar 006_real_rls_and_auth.sql).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 export interface AuthResult {
@@ -39,6 +44,10 @@ export async function requireAuth(req: Request): Promise<AuthResult> {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   if (!supabaseUrl || !anonKey) {
     return { ok: false, status: 500, error: "Config de Supabase incompleta en la función" };
+  }
+
+  if (token === anonKey) {
+    return { ok: true, email: "anon-sin-login" };
   }
 
   const client = createClient(supabaseUrl, anonKey);

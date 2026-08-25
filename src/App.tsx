@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Onboarding } from "@/components/Onboarding";
-import { AuthGate } from "@/components/AuthGate";
 import Dashboard from "./pages/Dashboard";
 import Boveda from "./pages/Boveda";
 import MesaDialogo from "./pages/MesaDialogo";
@@ -39,27 +38,25 @@ const App = () => (
       <Toaster />
       <Sonner />
       <HashRouter>
-        <AuthGate>
-          <Onboarding />
-          <ErrorBoundary>
-            <Routes>
-              <Route element={<AppLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/boveda" element={<Boveda />} />
-                <Route path="/mesa" element={<MesaDialogo />} />
-                <Route path="/laboratorio" element={<Laboratorio />} />
-                <Route path="/configuracion" element={<Configuracion />} />
-                <Route path="/calendario" element={<Calendario />} />
-                <Route path="/propuestas" element={<Propuestas />} />
-                <Route path="/hub" element={<Hub />} />
-                <Route path="/monitor" element={<Monitor />} />
-                <Route path="/biblioteca" element={<Biblioteca />} />
-                <Route path="/auditoria" element={<Auditoria />} />
-                <Route path="*" element={<NotFound />} />
-              </Route>
-            </Routes>
-          </ErrorBoundary>
-        </AuthGate>
+        <Onboarding />
+        <ErrorBoundary>
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/boveda" element={<Boveda />} />
+              <Route path="/mesa" element={<MesaDialogo />} />
+              <Route path="/laboratorio" element={<Laboratorio />} />
+              <Route path="/configuracion" element={<Configuracion />} />
+              <Route path="/calendario" element={<Calendario />} />
+              <Route path="/propuestas" element={<Propuestas />} />
+              <Route path="/hub" element={<Hub />} />
+              <Route path="/monitor" element={<Monitor />} />
+              <Route path="/biblioteca" element={<Biblioteca />} />
+              <Route path="/auditoria" element={<Auditoria />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
+          </Routes>
+        </ErrorBoundary>
       </HashRouter>
     </TooltipProvider>
   </QueryClientProvider>
