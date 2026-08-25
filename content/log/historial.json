@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-25T06:27:51.133Z",
+  "syncedAt": "2026-08-25T12:26:46.837Z",
   "posts": [
+    {
+      "id": "6a8d83faecb40d277f293e68",
+      "date": "2026-08-25",
+      "status": "published",
+      "content": "Estás laburando 10 horas por día y la caja te devuelve 4.\n¿Cómo está tu proceso comercial hoy? Agendá tu Sesión de Claridad.\n#VentasArgentina\n#ProcesoComercial\n#GestiónDeVentas\n#Pymes\n#Vendedores\n#MejoraContinua\n#LiderazgoComercial",
+      "kind": "post",
+      "proposalId": "dcbf5e93-585d-401a-89b9-9f8c73ce0d90",
+      "headline": "Estás laburando 10 horas por día y la caja te devuelve 4.",
+      "kicker": null,
+      "oferta": "personal",
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-08-25-dcbf5e93-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DcdluPREamo/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1352158100337005"
+        }
+      ]
+    },
     {
       "id": "6a8c515931852e90561648f6",
       "date": "2026-08-24",
