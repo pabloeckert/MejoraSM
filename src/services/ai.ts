@@ -72,6 +72,14 @@ export interface DialogueResult {
   evaluacion: { aprobado: boolean; feedback: string };
   proposal: { hook: string; body: string; cta: string; hashtags: string[]; format: string };
   aprobado: boolean;
+  proposalId: string | null;
+  // Si aprobado y el formato tiene pipeline autónomo (post/carrusel), la
+  // propuesta ya quedó agendada sola en este mismo request — sin esto el
+  // usuario no tiene forma de saber, desde Mesa de Diálogo, que ya se
+  // programó una publicación real (hallazgo de auditoría 2026-08-25).
+  autoPublished: boolean;
+  scheduledAt: string | null;
+  oferta: string | null;
 }
 
 export interface ContinueResult {

@@ -573,24 +573,17 @@ async function startSession(topic: string) {
   // 4. Extraer propuesta estructurada
   const proposal = extractProposal(contenido, estrategia);
 
-  // 5. Actualizar sesión
-  await supabase
-    .from("dialogue_sessions")
-    .update({
-      status: evaluacion.aprobado ? "approved" : "needs_review",
-      final_proposal: contenido,
-      metadata: {
-        estrategia,
-        evaluacion,
-        proposal,
-      },
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", session.id);
-
-  // 6. Crear propuesta si fue aprobada — autoagendada si es un formato con
+  // 5. Crear propuesta si fue aprobada — autoagendada si es un formato con
   // pipeline autónomo (ver AUTO-AGENDA arriba), pending si no.
   let proposalId: string | null = null;
+  // scheduledAt/oferta/autoPublished van en la respuesta Y en el metadata
+  // de la sesión, para que tanto el toast inmediato como la vista
+  // histórica de la sesión puedan avisar "esto ya se agendó solo" —
+  // hallazgo real de auditoría 2026-08-25: antes la única forma de
+  // enterarse era adivinar que había que ir a /propuestas o /calendario.
+  let scheduledAt: string | null = null;
+  let oferta: string | null = null;
+  const autoPublished = evaluacion.aprobado && AUTO_PUBLISH_FORMATS.includes(proposal.format || "post");
   if (evaluacion.aprobado) {
     const format = proposal.format || "post";
     const insert: Record<string, unknown> = {
@@ -607,6 +600,8 @@ async function startSession(topic: string) {
       insert.status = "scheduled";
       insert.oferta = await pickNextOferta();
       insert.scheduled_at = await pickNextSlot();
+      oferta = insert.oferta as string;
+      scheduledAt = insert.scheduled_at as string;
     } else {
       insert.status = "pending";
     }
@@ -614,6 +609,26 @@ async function startSession(topic: string) {
     const { data: insertedProposal } = await supabase.from("proposals").insert(insert).select("id").single();
     proposalId = insertedProposal?.id ?? null;
   }
+
+  // 6. Actualizar sesión (después de crear la propuesta, para poder
+  // guardar el proposalId/autoPublished en el metadata también)
+  await supabase
+    .from("dialogue_sessions")
+    .update({
+      status: evaluacion.aprobado ? "approved" : "needs_review",
+      final_proposal: contenido,
+      metadata: {
+        estrategia,
+        evaluacion,
+        proposal,
+        proposalId,
+        autoPublished,
+        scheduledAt,
+        oferta,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", session.id);
 
   return {
     sessionId: session.id,
@@ -623,6 +638,9 @@ async function startSession(topic: string) {
     proposal,
     aprobado: evaluacion.aprobado,
     proposalId,
+    autoPublished,
+    scheduledAt,
+    oferta,
   };
 }
 

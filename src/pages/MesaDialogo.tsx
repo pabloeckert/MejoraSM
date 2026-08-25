@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ import {
   CheckCircle,
   XCircle,
   Send,
+  Rocket,
 } from "lucide-react";
 import {
   useDialogueSessions,
@@ -30,6 +32,11 @@ import {
   useContinueDialogue,
 } from "@/hooks/useDialogue";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { toast } from "@/hooks/use-toast";
+
+function formatScheduledAt(iso: string) {
+  return new Date(iso).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+}
 
 const agentIcons: Record<string, typeof Brain> = {
   estratega: Brain,
@@ -70,9 +77,19 @@ function MesaDialogoContent() {
   const handleStart = () => {
     if (!newTopic.trim()) return;
     startMutation.mutate(newTopic, {
-      onSuccess: () => {
+      onSuccess: (result) => {
         setNewTopic("");
         setDialogOpen(false);
+        // Hallazgo real de auditoría 2026-08-25: si el Crítico aprueba un
+        // post/carrusel acá mismo, el sistema lo agenda solo para publicar
+        // sin que nadie lo revise — sin este aviso, no había forma de
+        // enterarse desde esta pantalla.
+        if (result.autoPublished && result.scheduledAt) {
+          toast({
+            title: "Aprobado — ya se agendó para publicarse solo",
+            description: `Sale el ${formatScheduledAt(result.scheduledAt)}. Podés cancelarlo desde Propuestas si no querés que salga.`,
+          });
+        }
       },
     });
   };
@@ -304,6 +321,34 @@ function SessionCard({
                     {session.metadata.evaluacion.feedback}
                   </p>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Aviso de autopublicación — hallazgo real de auditoría 2026-08-25:
+              esta sesión ya quedó agendada para publicarse sola, sin
+              revisión humana; sin este aviso persistente, alguien que
+              vuelve a mirar la sesión más tarde no tiene forma de saberlo
+              desde acá (solo yendo a Propuestas/Calendario a adivinar). */}
+          {session.metadata?.autoPublished && (
+            <Card className="border-blue-500/50 bg-blue-500/5">
+              <CardContent className="flex items-center justify-between gap-3 p-3">
+                <div className="flex items-center gap-3">
+                  <Rocket className="h-5 w-5 shrink-0 text-blue-500" />
+                  <div>
+                    <p className="text-sm font-medium">Se agendó sola para publicarse</p>
+                    <p className="text-xs text-muted-foreground">
+                      {session.metadata.scheduledAt
+                        ? `Sale el ${formatScheduledAt(session.metadata.scheduledAt)}, sin revisión previa.`
+                        : "Sin revisión previa."}
+                    </p>
+                  </div>
+                </div>
+                {session.metadata?.proposalId && (
+                  <Button asChild variant="outline" size="sm" className="shrink-0">
+                    <Link to={`/propuestas?id=${session.metadata.proposalId}`}>Ver / cancelar</Link>
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
