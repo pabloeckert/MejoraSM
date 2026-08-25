@@ -9,7 +9,12 @@ async function uploadAndProcess(filePath, fileName, mimeType) {
 
   const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/vault/${storagePath}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": mimeType, "x-upsert": "true" },
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      "Content-Type": mimeType,
+      "x-upsert": "true",
+    },
     body: buf,
   });
   if (!uploadRes.ok) throw new Error(`Upload falló: ${uploadRes.status} ${await uploadRes.text()}`);
