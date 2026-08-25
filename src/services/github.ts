@@ -104,7 +104,23 @@ async function putFile(path: string, base64Content: string, message: string, sha
   const url = `${apiBase()}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}`;
   const body: Record<string, unknown> = { message, content: base64Content, branch: GH_BRANCH };
   if (sha) body.sha = sha;
-  const res = await fetch(url, { method: "PUT", headers: { ...apiHeaders(true), "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "PUT",
+      headers: { ...apiHeaders(true), "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    // Hallazgo real de auditoría 2026-08-25: a diferencia de whoami(), este
+    // fetch no tenía try/catch — si fallaba la conexión (sin señal, DNS,
+    // CORS), el error crudo del navegador ("Failed to fetch") le llegaba
+    // tal cual a alguien sin contexto técnico subiendo una foto del celular.
+    throw new Error("No se pudo contactar GitHub (¿sin internet o señal débil?) — probá de nuevo.");
+  }
+
+  if (res.status === 401) throw new Error("El token venció o es inválido — reconectá GitHub.");
   if (!res.ok) {
     let detail = "";
     try {

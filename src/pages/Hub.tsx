@@ -22,11 +22,13 @@ import {
   ExternalLink,
   Sparkles,
   X,
+  RotateCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { github } from "@/services/github";
 import { useGithubConnection, useDirListing, usePhotoUpload } from "@/hooks/useGithubUpload";
 import { suggestPhotoDimension, type DimensionSuggestion } from "@/services/ai";
+import { toast } from "@/hooks/use-toast";
 
 // Rediseño 2026-08-17, a pedido directo de Pablo: "Subir material" dejó de
 // ser 5 links a la UI cruda de upload de GitHub — ahora es una interfaz
@@ -164,7 +166,7 @@ export default function Hub() {
   const [connectOpen, setConnectOpen] = useState(false);
   const [selectedDim, setSelectedDim] = useState("personal");
   const connected = github.isConnected();
-  const { uploads, uploadFiles, clearUploads } = usePhotoUpload(selectedDim, () => setTimeout(clearUploads, 2500));
+  const { uploads, uploadFiles, retryUpload, clearUploads } = usePhotoUpload(selectedDim, () => setTimeout(clearUploads, 2500));
   const [dragActive, setDragActive] = useState(false);
 
   // "El sistema propone" — respuesta real de Pablo y Sindy al Taller de la
@@ -177,8 +179,22 @@ export default function Hub() {
   const [suggesting, setSuggesting] = useState(false);
 
   async function handleFilesSelected(fileList: FileList | File[]) {
-    const files = Array.from(fileList).filter((f) => f.type.startsWith("image/"));
-    if (!files.length) return;
+    const all = Array.from(fileList);
+    const files = all.filter((f) => f.type.startsWith("image/"));
+    if (!files.length) {
+      // Hallazgo real de auditoría 2026-08-25: arrastrar o elegir por error
+      // un archivo que no es imagen (PDF, video, un contacto compartido
+      // desde la galería del celular) no hacía absolutamente nada — sin
+      // este aviso es indistinguible de "la app no responde".
+      if (all.length > 0) {
+        toast({
+          variant: "destructive",
+          title: "Eso no es una imagen",
+          description: "El sistema solo procesa fotos (jpg, png, webp) por ahora.",
+        });
+      }
+      return;
+    }
     setPendingFiles(files);
     setSuggestion(null);
     setSuggesting(true);
@@ -224,9 +240,15 @@ export default function Hub() {
             Ver historial en el Monitor
           </Link>
           {connected ? (
-            <Badge variant="secondary" className="gap-1.5">
-              <Check className="h-3 w-3" /> GitHub conectado
-            </Badge>
+            <button
+              onClick={() => setConnectOpen(true)}
+              title="Cambiar o reconectar el token de GitHub"
+              className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-full"
+            >
+              <Badge variant="secondary" className="gap-1.5 cursor-pointer hover:bg-secondary/70">
+                <Check className="h-3 w-3" /> GitHub conectado
+              </Badge>
+            </button>
           ) : (
             <Button variant="outline" size="sm" onClick={() => setConnectOpen(true)}>
               <Plug className="mr-1.5 h-3.5 w-3.5" />
@@ -339,12 +361,28 @@ export default function Hub() {
 
           {uploads.length > 0 && (
             <div className="mt-4 space-y-1.5">
-              {uploads.map((u, i) => (
-                <div key={i} className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-1.5 text-xs">
+              {uploads.map((u) => (
+                <div key={u.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-3 py-1.5 text-xs">
                   <span className="truncate">{u.fileName}</span>
-                  {u.status === "uploading" && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-                  {u.status === "done" && <Check className="h-3.5 w-3.5 text-emerald-600" />}
-                  {u.status === "error" && <span className="text-destructive">{u.error || "Error"}</span>}
+                  <div className="flex shrink-0 items-center gap-2">
+                    {u.status === "uploading" && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                    {u.status === "done" && <Check className="h-3.5 w-3.5 text-emerald-600" />}
+                    {u.status === "error" && (
+                      <>
+                        <span className="text-destructive">{u.error || "Error"}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          aria-label={`Reintentar subir ${u.fileName}`}
+                          title="Reintentar"
+                          onClick={() => retryUpload(u.id)}
+                        >
+                          <RotateCw className="h-3.5 w-3.5" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
