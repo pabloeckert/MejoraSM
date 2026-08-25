@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-25T12:26:46.837Z",
+  "syncedAt": "2026-08-25T18:23:31.050Z",
   "posts": [
+    {
+      "id": "6a8d9c59d1413b13187a2191",
+      "date": "2026-08-25",
+      "status": "published",
+      "content": "El feedback que más cuesta dar no es el más duro, es el que queda ambiguo. Separá el hecho de la interpretación esta semana. ¿A quién le debés esa conversación?",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-25-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3971548527754831355"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a8d83faecb40d277f293e68",
       "date": "2026-08-25",
