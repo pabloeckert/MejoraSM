@@ -56,7 +56,14 @@ function LaboratorioContent() {
 
   const handleApprove = (proposalId: string) => {
     approveMutation.mutate(proposalId);
-    toast({ title: "Propuesta aprobada", description: "El contenido pasó a pendiente de publicación." });
+    // Hallazgo real de auditoría 2026-08-25: "pasó a pendiente de
+    // publicación" sugiere que ya está en camino de salir — en realidad
+    // "Aprobar" acá solo cambia el status, todavía falta agendarla con
+    // fecha desde Propuestas para que se publique.
+    toast({
+      title: "Propuesta aprobada",
+      description: "Todavía falta agendarla con fecha en Propuestas para que se publique.",
+    });
   };
 
   return (

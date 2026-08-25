@@ -6,6 +6,35 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Zap } from "lucide-react";
 
+// Hallazgo real de auditoría 2026-08-25: los errores de Supabase Auth
+// llegan en inglés crudo ("Token has expired or is invalid", "Invalid
+// login credentials"), mezclados con una UI 100% en español justo en el
+// momento de más fricción para el usuario. Traduce los casos reales más
+// comunes; lo que no matchea cae al mensaje original tal cual, nunca se
+// oculta información real.
+function translateAuthError(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes("token has expired") || lower.includes("otp expired")) {
+    return "El código venció — pedí uno nuevo.";
+  }
+  if (lower.includes("invalid") && (lower.includes("otp") || lower.includes("token"))) {
+    return "Código incorrecto — revisá los números o pedí uno nuevo.";
+  }
+  if (lower.includes("invalid login credentials")) {
+    return "Email o contraseña incorrectos.";
+  }
+  if (lower.includes("user already registered") || lower.includes("already exists")) {
+    return "Ya existe una cuenta con ese email — iniciá sesión en vez de crear una nueva.";
+  }
+  if (lower.includes("rate limit") || lower.includes("too many requests")) {
+    return "Demasiados intentos seguidos — esperá un minuto y probá de nuevo.";
+  }
+  if (lower.includes("failed to fetch") || lower.includes("network")) {
+    return "No se pudo contactar el servidor — revisá tu conexión.";
+  }
+  return message;
+}
+
 export function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,7 +57,7 @@ export function Login() {
     setLoading(false);
 
     if (error) {
-      setMessage({ type: "error", text: error.message });
+      setMessage({ type: "error", text: translateAuthError(error.message) });
       return;
     }
 
@@ -55,7 +84,7 @@ export function Login() {
     });
     setLoading(false);
     if (error) {
-      setMessage({ type: "error", text: error.message });
+      setMessage({ type: "error", text: translateAuthError(error.message) });
       return;
     }
     setOtpSent(true);
@@ -69,7 +98,7 @@ export function Login() {
     const { error } = await supabase.auth.verifyOtp({ email, token: otpCode, type: "email" });
     setLoading(false);
     if (error) {
-      setMessage({ type: "error", text: error.message });
+      setMessage({ type: "error", text: translateAuthError(error.message) });
     }
   }
 
