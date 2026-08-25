@@ -147,29 +147,34 @@ function hasSlideMarkers(text = "") {
   return /\*\*\s*slide\s*\d+/i.test(text);
 }
 
+// Slide de cierre fija — estilo aprobado por Pablo el 2026-08-25 ("Excelente!!!!
+// Memoriza este estilo para todos los CTA"), memoria permanente en
+// feedback_cierres_nunca_agresivos.md. Dos partes: impacto/introspección
+// (grounded en el Manifiesto real de marca, no una frase genérica) + llamado
+// directo de baja fricción a escribir/comunicarse (no "agendar", eso ya vive
+// en el CTA dinámico de la leyenda). Texto fijo, no generado por IA por
+// pieza — la calidad y el tono ya están aprobados, generarlo de nuevo cada
+// vez arriesgaría variación. El CTA dinámico de cada tema sigue solo en
+// buildCaption(), sin cambios — esta slide es un agregado emocional, no un
+// reemplazo.
+const CLOSING_SLIDE = {
+  headline: "Cargás solo con el peso de decisiones que nadie más ve.",
+  subtext: "No hace falta que sigas cargándolo solo. Escribinos y contanos qué está pasando.",
+};
+
 // Un texto corto por slide — "una foto y un texto alcanza" (pedido real de
 // Pablo el 2026-08-20, tras ver un carrusel real con demasiado texto
 // encima) — se toma solo la primera oración de cada bloque detectado, no
 // el bloque completo, y se acota a un puñado de palabras.
 //
-// Dos reglas más, feedback real de Pablo 2026-08-24 sobre una prueba real:
-// 1. Todas las slides usan el mismo campo `headline` (misma tipografía
-//    grande) — antes el hook iba en `headline` y el resto del cuerpo en
-//    `subtext` (más chico, más gris), y el carrusel se veía como dos
-//    piezas de diseño distintas ("que el diseño sea idéntico a la primera,
-//    todas iguales").
-// 2. Sin slide final de CTA. Cerrar el carrusel con una slide dedicada solo
-//    al llamado a la acción, aislada del resto, lee como venta agresiva
-//    aunque el texto sea el aprobado por marca — el problema es la puesta
-//    en escena, no la frase (ver Criterio Medular: "no es agresivo... no
-//    vende, clarifica"; posicionamiento "padrino, no proveedor"). El CTA
-//    sigue viviendo en la leyenda (buildCaption) — nunca en su propia
-//    slide. Regla dura para todo cierre futuro, no solo esta pieza.
-// Tope bajado de 4 a 3 slides (hook + 2 de cuerpo) el 2026-08-24, mismo
-// feedback real: "pieza 4 del carrusel no, cierra con la 3" — sacar la
-// slide de CTA sin bajar el tope hacía que un cuarto slide de cuerpo
-// ocupara ese lugar en vez de dejar el carrusel más corto, como se pidió.
-function buildCarruselSlides(proposal, maxSlides = 3) {
+// Todas las slides de cuerpo usan el mismo campo `headline` (misma
+// tipografía grande) — antes el hook iba en `headline` y el resto del
+// cuerpo en `subtext` (más chico, más gris), y el carrusel se veía como
+// dos piezas de diseño distintas (feedback real 2026-08-24: "que el
+// diseño sea idéntico a la primera, todas iguales"). La slide de cierre
+// es la única excepción deliberada: sí usa headline+subtext juntos,
+// aprobado explícitamente por Pablo para ese caso puntual.
+function buildCarruselSlides(proposal, maxSlides = 4) {
   const rawBody = proposal.body || "";
   const structured = hasSlideMarkers(rawBody);
   let chunks = structured
@@ -183,11 +188,9 @@ function buildCarruselSlides(proposal, maxSlides = 3) {
   // veces, una vez grande y una vez chica, en el mismo slide).
   if (structured) chunks = chunks.slice(1);
 
-  // Un texto por slide, no un párrafo — slide 1 es SOLO el hook, cada
-  // slide siguiente lleva una única frase corta. Ya no se reserva un slot
-  // para CTA (no hay slide de CTA); el largo real del carrusel lo define
-  // el contenido disponible, no un conteo fijo.
-  const maxBodySlides = Math.max(0, maxSlides - 1);
+  // Un texto por slide, no un párrafo — slide 1 es el hook, la última es
+  // siempre el cierre fijo; el resto es cuerpo.
+  const maxBodySlides = Math.max(0, maxSlides - 2);
   const bodyChunks = chunks.slice(0, maxBodySlides).map((chunk) => {
     const firstSentence = splitSentences(chunk)[0] || chunk;
     return truncateAtClause(firstSentence, 20);
@@ -195,6 +198,7 @@ function buildCarruselSlides(proposal, maxSlides = 3) {
 
   const slides = [{ headline: proposal.hook || proposal.title || "", subtext: "" }];
   bodyChunks.forEach((text) => slides.push({ headline: text, subtext: "" }));
+  slides.push(CLOSING_SLIDE);
   return slides.slice(0, maxSlides);
 }
 
