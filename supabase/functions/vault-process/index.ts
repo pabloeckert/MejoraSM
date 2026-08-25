@@ -4,8 +4,17 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import mammoth from "npm:mammoth@1.8.0";
+import { getDocumentProxy, extractText } from "npm:unpdf@1.4.0";
 import { requireAuth, unauthorizedResponse } from "../_shared/auth.ts";
 import { logRun } from "../_shared/runLog.ts";
+
+// Límite de tamaño de archivo — hallazgo real de auditoría 2026-08-25: sin
+// esto, un PDF/DOCX grande podía agotar memoria/tiempo del runtime de Deno
+// y fallar como "documento fantasma" (contenido a medias, sin aviso claro).
+// 20MB es holgado para un manual de marca en texto, corto para video/fotos
+// (que no deberían subirse acá de todas formas).
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 
 const ALLOWED_ORIGINS = [
   "https://pabloeckert.github.io",
@@ -150,9 +159,27 @@ async function generateEmbeddings(texts: string[]): Promise<number[][]> {
 // PROCESAMIENTO PRINCIPAL
 // ═══════════════════════════════════════
 
+async function setStatus(documentId: string, processing_status: string, processing_error: string | null = null) {
+  await supabase.from("documents").update({ processing_status, processing_error }).eq("id", documentId);
+}
+
 async function processDocument(documentId: string) {
   validateUUID(documentId, "documentId");
 
+  try {
+    return await processDocumentInner(documentId);
+  } catch (e: unknown) {
+    // Sin este catch, un error a mitad de camino dejaba `processing_status`
+    // en el último valor intermedio ("extracting"/"chunking"/"embedding")
+    // para siempre — indistinguible en la UI de "sigue procesando ahora
+    // mismo". Hallazgo real de auditoría 2026-08-25.
+    const message = e instanceof Error ? e.message : String(e);
+    await setStatus(documentId, "error", message.slice(0, 500));
+    throw e;
+  }
+}
+
+async function processDocumentInner(documentId: string) {
   // 1. Obtener documento
   const { data: doc, error: docError } = await supabase
     .from("documents")
@@ -167,6 +194,7 @@ async function processDocument(documentId: string) {
   let content = doc.content;
 
   if (!content) {
+    await setStatus(documentId, "extracting");
     // Descargar del storage
     const { data: fileData, error: downloadError } = await supabase.storage
       .from("vault")
@@ -175,13 +203,49 @@ async function processDocument(documentId: string) {
     if (downloadError) throw new Error(`Error descargando archivo: ${downloadError.message}`);
     if (!fileData) throw new Error(`No se pudo descargar el archivo: ${doc.file_path}`);
 
-    // Extraer texto según tipo
+    if (fileData.size > MAX_FILE_SIZE_BYTES) {
+      throw new Error(
+        `El archivo pesa ${(fileData.size / 1024 / 1024).toFixed(1)}MB, el máximo soportado es ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB`
+      );
+    }
+
+    // Extraer texto según tipo real. Hallazgo real de auditoría 2026-08-25:
+    // hasta ahora PDF/DOC/DOCX caían al mismo `fileData.text()` que texto
+    // plano, lo que sobre bytes binarios reales produce basura ilegible
+    // que se guardaba, troceaba y embebía como si fuera texto real, sin
+    // ningún error — un documento de marca "fantasma", indistinguible en
+    // la UI de uno que funciona. `scripts/load-vault-documents.mjs` ya
+    // había resuelto esto con `mammoth` para su propio camino de carga
+    // masiva (Node) — acá se agrega el equivalente real para el camino
+    // normal de /boveda (Deno Edge Function): `mammoth` para DOCX,
+    // `unpdf` (PDF.js empaquetado para runtimes serverless/edge, sin
+    // dependencias de Node) para PDF.
+    const isPdf = doc.file_type === "application/pdf" || doc.file_path.endsWith(".pdf");
+    const isDocx =
+      doc.file_type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      doc.file_path.endsWith(".docx");
+    const isPlainText =
+      doc.file_type === "text/plain" || doc.file_path.endsWith(".txt") || doc.file_path.endsWith(".md");
+
     try {
-      if (doc.file_type === "text/plain" || doc.file_path.endsWith(".txt") || doc.file_path.endsWith(".md")) {
+      if (isPlainText) {
         content = await fileData.text();
+      } else if (isPdf) {
+        const buffer = new Uint8Array(await fileData.arrayBuffer());
+        const pdf = await getDocumentProxy(buffer);
+        const { text } = await extractText(pdf, { mergePages: true });
+        content = text;
+      } else if (isDocx) {
+        const arrayBuffer = await fileData.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        content = result.value;
+      } else if (doc.file_path.endsWith(".doc")) {
+        // .doc legacy (binario pre-2007) no tiene extractor confiable
+        // disponible para Deno/edge — mammoth solo soporta .docx (XML).
+        // Fallar con un mensaje claro es mejor que guardar basura binaria.
+        throw new Error(".doc (Word 97-2003) no está soportado — convertí el archivo a .docx o .pdf y volvé a subirlo");
       } else {
-        // Para PDF/DOC: intentar extraer texto (limitado sin librería especializada)
-        content = await fileData.text();
+        throw new Error(`Tipo de archivo no soportado: ${doc.file_type || doc.file_path}`);
       }
     } catch (e: any) {
       throw new Error(`Error extrayendo texto del archivo: ${e.message}`);
@@ -204,10 +268,12 @@ async function processDocument(documentId: string) {
   }
 
   // 3. Chunking
+  await setStatus(documentId, "chunking");
   const chunks = chunkText(content);
   if (chunks.length === 0) throw new Error("El documento no generó chunks de texto");
 
   // 4. Generar embeddings (opcional — si HF falla, guardar sin vectores)
+  await setStatus(documentId, "embedding");
   let embeddings: number[][] | null = null;
   try {
     embeddings = await generateEmbeddings(chunks);
@@ -229,6 +295,13 @@ async function processDocument(documentId: string) {
 
   const { error: insertError } = await supabase.from("doc_chunks").insert(chunkRecords);
   if (insertError) throw new Error(`Error guardando chunks: ${insertError.message}`);
+
+  // Sin embeddings, el documento no es un error (tiene contenido real y
+  // chunks reales) pero tampoco es buscable por RAG — estado propio para
+  // que la UI lo distinga, en vez de mostrarlo como "Procesado" sin más
+  // (hallazgo real de auditoría: quedaba invisible para match_documents
+  // sin que nadie se enterara).
+  await setStatus(documentId, embeddings ? "ready" : "ready_no_search");
 
   return {
     documentId,
