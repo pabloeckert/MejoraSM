@@ -93,6 +93,10 @@ function ConnectGithubDialog({ open, onOpenChange }: { open: boolean; onOpenChan
             En Repository access elegí Only select repositories → {github.owner}/{github.repo}.
           </li>
           <li>En Permissions → Repository → Contents ponelo en Read and write.</li>
+          <li>
+            En Permissions → Repository → Actions ponelo también en Read and write (hace falta para reintentar/
+            despublicar/marcar a mano desde acá, en Monitor, sin ir a GitHub).
+          </li>
           <li>Generá el token, copialo y pegalo acá abajo.</li>
         </ol>
         <Input

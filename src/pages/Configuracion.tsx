@@ -37,7 +37,8 @@ const agentDefs = [
 ];
 
 const providers = [
-  { value: "groq", label: "Groq (Llama 4 Scout)" },
+  { value: "anthropic", label: "Anthropic (Claude Sonnet 5 / Opus 5)" },
+  { value: "groq", label: "Groq (openai/gpt-oss-120b)" },
   { value: "deepseek", label: "DeepSeek V3.2" },
   { value: "gemini", label: "Gemini 1.5 Flash" },
 ];

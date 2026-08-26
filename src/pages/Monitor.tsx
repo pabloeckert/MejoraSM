@@ -3,16 +3,26 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, X, Clock, Copy, ExternalLink, RefreshCw } from "lucide-react";
+import { Check, X, Clock, ExternalLink, RefreshCw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { historialApi } from "@/services/supabase";
+import { github } from "@/services/github";
+import { useWorkflowAction } from "@/hooks/useGithubUpload";
+import { toast } from "@/hooks/use-toast";
 
 // Fase 5 del plan estratégico 2026-08-16 (Un solo panel) — port fiel de
 // dashboard/index.html: mismas acciones de reversión (manage-story.yml/
-// manage-post.yml/mark-manual.yml, siempre por link a GitHub Actions — acá
-// tampoco se ejecuta nada directo, solo se arma el link y se copia el ID,
-// el "Run workflow" con CONFIRMO lo hace Pablo en GitHub).
-// dashboard/index.html original sigue existiendo tal cual en paralelo.
+// manage-post.yml/mark-manual.yml). dashboard/index.html original sigue
+// existiendo tal cual en paralelo.
+//
+// Hallazgo real 2026-08-26 (Pablo: "por qué tengo que ir a GitHub para
+// completar" al reintentar/republicar): hasta acá, cada acción armaba un
+// link a GitHub Actions y pedía copiar el ID + tipear CONFIRMO a mano en
+// esa pantalla. Ahora dispara el mismo workflow_dispatch directo desde acá
+// (github.triggerWorkflow, mismo token ya conectado en Subir material) — el
+// gesto de confirmación explícita para lo irreversible (despublicar) sigue
+// existiendo, pero como un confirm() nativo en vez de tipear en GitHub. El
+// link a GitHub Actions queda como respaldo, no como único camino.
 //
 // Fix de raíz 2026-08-17 (Pablo reportó "Failed to fetch"): el historial
 // ya NO se trae de raw.githubusercontent.com — ese CDN tiene caídas reales
@@ -22,7 +32,6 @@ import { historialApi } from "@/services/supabase";
 // sync-history.mjs/mark-manual.mjs — ver migración 016_historial_cache.sql.
 const MANAGE_STORY_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/manage-story.yml";
 const MANAGE_POST_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/manage-post.yml";
-const MARK_MANUAL_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/mark-manual.yml";
 
 const NOMBRES_PLATAFORMA: Record<string, string> = { instagram: "Instagram", facebook: "Facebook" };
 
@@ -69,37 +78,40 @@ function badgeMeta(status: string) {
   return { className: "bg-accent text-foreground", Icon: Clock };
 }
 
-function CopyIdButton({ id }: { id: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      className={cn("h-7 gap-1 px-2 text-xs", copied && "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-600")}
-      onClick={() => {
-        navigator.clipboard.writeText(id);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      }}
-    >
-      <Copy className="h-3 w-3" />
-      {copied ? "Copiado ✓" : "Copiar ID"}
-    </Button>
-  );
-}
-
 // Stories se gestionan por post_id de Zernio (manage-story.yml); posts de
 // feed por el id de la propuesta en Supabase (manage-post.yml) — workflows
 // e ids distintos, aunque la UI se vea igual.
 function manageTarget(post: HistorialPost) {
   if (post.kind === "post" && post.proposalId) {
-    return { workflowUrl: MANAGE_POST_WORKFLOW_URL, idLabel: "ID de propuesta", idValue: post.proposalId };
+    return {
+      workflowFile: "manage-post.yml",
+      workflowUrl: MANAGE_POST_WORKFLOW_URL,
+      idLabel: "ID de propuesta",
+      idValue: post.proposalId,
+      inputKey: "proposal_id" as const,
+    };
   }
-  return { workflowUrl: MANAGE_STORY_WORKFLOW_URL, idLabel: "Post ID", idValue: post.id };
+  return {
+    workflowFile: "manage-story.yml",
+    workflowUrl: MANAGE_STORY_WORKFLOW_URL,
+    idLabel: "Post ID",
+    idValue: post.id,
+    inputKey: "post_id" as const,
+  };
 }
 
-function AvisoInstagramFallido({ post, platform, accionesManuales }: { post: HistorialPost; platform: Platform; accionesManuales: Map<string, AccionManual> }) {
+function AvisoInstagramFallido({
+  post,
+  platform,
+  accionesManuales,
+  onDone,
+}: {
+  post: HistorialPost;
+  platform: Platform;
+  accionesManuales: Map<string, AccionManual>;
+  onDone: () => void;
+}) {
+  const { pending, run } = useWorkflowAction();
   const marca = accionesManuales.get(`${post.id}:instagram`);
   if (marca) {
     return (
@@ -108,6 +120,17 @@ function AvisoInstagramFallido({ post, platform, accionesManuales }: { post: His
       </div>
     );
   }
+
+  async function handleMarkManual() {
+    const ok = await run(
+      "mark-manual",
+      "mark-manual.yml",
+      { post_id: post.id, platform: "instagram" },
+      "Se va a reflejar en el Monitor en un rato — apretá Actualizar más tarde."
+    );
+    if (ok) onDone();
+  }
+
   return (
     <div className="space-y-2 rounded-lg border border-accent bg-accent/10 p-3">
       <p className="text-xs leading-relaxed text-foreground">
@@ -121,47 +144,78 @@ function AvisoInstagramFallido({ post, platform, accionesManuales }: { post: His
           </>
         )}
       </p>
-      <div className="flex items-center gap-2">
-        <code className="max-w-[110px] truncate rounded bg-muted px-1.5 py-0.5 text-[11px]" title={post.id}>
-          {post.id}
-        </code>
-        <CopyIdButton id={post.id} />
-      </div>
-      <a
-        href={MARK_MANUAL_WORKFLOW_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block rounded-md border border-border py-1.5 text-center text-xs font-semibold hover:border-primary"
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full text-xs font-semibold"
+        disabled={pending === "mark-manual"}
+        onClick={handleMarkManual}
       >
+        {pending === "mark-manual" && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
         Ya lo borré a mano →
-      </a>
+      </Button>
     </div>
   );
 }
 
-function AccionesFacebookFallido({ post }: { post: HistorialPost }) {
-  const { workflowUrl, idLabel, idValue } = manageTarget(post);
+function AccionesFacebookFallido({ post, onDone }: { post: HistorialPost; onDone: () => void }) {
+  const { pending, run } = useWorkflowAction();
+  const { workflowFile, workflowUrl, idValue, inputKey } = manageTarget(post);
+
+  async function handleAction(action: "reintentar" | "despublicar") {
+    if (action === "despublicar") {
+      const ok = window.confirm(
+        `¿Despublicar de verdad "facebook" para esta pieza? Esto la baja realmente de Facebook — no se puede deshacer.`
+      );
+      if (!ok) return;
+    }
+    const ok = await run(
+      action,
+      workflowFile,
+      { [inputKey]: idValue, platform: "facebook", action, confirmacion: "CONFIRMO" },
+      action === "reintentar"
+        ? "Reintentando en Facebook — se va a ver en el Monitor en un rato."
+        : "Despublicando de Facebook — se va a ver en el Monitor en un rato."
+    );
+    if (ok) onDone();
+  }
+
   return (
     <div className="space-y-2 border-t border-border pt-3">
-      <div className="flex items-center gap-2">
-        <code className="max-w-[110px] truncate rounded bg-muted px-1.5 py-0.5 text-[11px]" title={idValue}>
-          {idValue}
-        </code>
-        <CopyIdButton id={idValue} />
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1 text-xs font-semibold"
+          disabled={!!pending}
+          onClick={() => handleAction("reintentar")}
+        >
+          {pending === "reintentar" && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+          Reintentar en Facebook
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1 text-xs font-semibold text-destructive"
+          disabled={!!pending}
+          onClick={() => handleAction("despublicar")}
+        >
+          {pending === "despublicar" && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+          Despublicar
+        </Button>
       </div>
       <a
         href={workflowUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="block rounded-md border border-border py-1.5 text-center text-xs font-semibold hover:border-primary"
+        className="flex items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-primary hover:underline"
       >
-        Ir a Actions → Run workflow
+        <ExternalLink className="h-3 w-3" />
+        Ver el resultado en GitHub Actions
       </a>
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Con el {idLabel} copiado: abrí el link de arriba, "Run workflow", pegalo, elegí "facebook" y la acción (reintentar
-        la crea de nuevo con la misma imagen; despublicar la baja de verdad). En "confirmacion" escribí exactamente
-        CONFIRMO — cualquier otro valor corta sin hacer nada.
-      </p>
     </div>
   );
 }
@@ -183,59 +237,153 @@ function AccionesFacebookFallido({ post }: { post: HistorialPost }) {
 // `post.id`, no el id de propuesta de Supabase) — el badge se quedaba en
 // verde para siempre. Ahora se ofrecen los dos IDs, cada uno con su acción
 // y su explicación, para no repetir ese bug.
-function GestionPostDeFeed({ post }: { post: HistorialPost }) {
+const PLATAFORMAS_DESPUBLICAR: Array<{ value: "instagram" | "facebook"; label: string }> = [
+  { value: "instagram", label: "Instagram" },
+  { value: "facebook", label: "Facebook" },
+];
+
+function GestionPostDeFeed({ post, onDone }: { post: HistorialPost; onDone: () => void }) {
+  const { pending, run } = useWorkflowAction();
+  const [markPlatform, setMarkPlatform] = useState<"instagram" | "facebook">("instagram");
+
   if (post.kind !== "post" || !post.proposalId) return null;
+  const { workflowUrl, idValue } = manageTarget(post);
+
+  async function handleAction(platform: "instagram" | "facebook", action: "reintentar" | "despublicar") {
+    if (platform === "instagram" && action === "despublicar") {
+      toast({
+        title: "Instagram no se puede despublicar por API",
+        description: "Es una limitación de Meta — borralo a mano desde la app y después marcalo abajo.",
+      });
+      return;
+    }
+    if (action === "despublicar") {
+      const ok = window.confirm(
+        `¿Despublicar de verdad "${platform}" para esta pieza? Esto la baja realmente de la red — no se puede deshacer.`
+      );
+      if (!ok) return;
+    }
+    const key = `${action}-${platform}`;
+    const ok = await run(
+      key,
+      "manage-post.yml",
+      { proposal_id: post.proposalId as string, platform, action, confirmacion: "CONFIRMO" },
+      `${action === "reintentar" ? "Reintentando" : "Despublicando"} en ${platform} — se va a ver en el Monitor en un rato.`
+    );
+    if (ok) onDone();
+  }
+
+  async function handleMarkManual() {
+    const ok = await run(
+      `mark-manual-${markPlatform}`,
+      "mark-manual.yml",
+      { post_id: post.id, platform: markPlatform },
+      "Se va a reflejar en el Monitor en un rato — apretá Actualizar más tarde."
+    );
+    if (ok) onDone();
+  }
+
   return (
     <div className="space-y-3 border-t border-border pt-3">
       <div className="space-y-2">
         <p className="text-[11px] font-semibold text-muted-foreground">Reintentar o despublicar de verdad (vía Zernio):</p>
-        <div className="flex items-center gap-2">
-          <code className="max-w-[110px] truncate rounded bg-muted px-1.5 py-0.5 text-[11px]" title={post.proposalId}>
-            {post.proposalId}
-          </code>
-          <CopyIdButton id={post.proposalId} />
+        <div className="grid grid-cols-2 gap-1.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            disabled={!!pending}
+            onClick={() => handleAction("instagram", "reintentar")}
+          >
+            {pending === "reintentar-instagram" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+            Reintentar IG
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            disabled={!!pending}
+            onClick={() => handleAction("facebook", "reintentar")}
+          >
+            {pending === "reintentar-facebook" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+            Reintentar FB
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs text-destructive"
+            disabled={!!pending}
+            onClick={() => handleAction("instagram", "despublicar")}
+          >
+            Despublicar IG
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs text-destructive"
+            disabled={!!pending}
+            onClick={() => handleAction("facebook", "despublicar")}
+          >
+            {pending === "despublicar-facebook" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+            Despublicar FB
+          </Button>
         </div>
-        <a
-          href={MANAGE_POST_WORKFLOW_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block rounded-md border border-border py-1.5 text-center text-xs font-semibold hover:border-primary"
-        >
-          Ir a Actions → Run workflow
-        </a>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Con el ID de propuesta copiado: "Run workflow", elegí la plataforma y "despublicar" (Facebook se baja de verdad;
-          Instagram no se puede despublicar por API — hay que borrarlo a mano desde la app). En "confirmacion" escribí
-          exactamente CONFIRMO.
-        </p>
       </div>
 
       <div className="space-y-2 border-t border-border pt-3">
         <p className="text-[11px] font-semibold text-muted-foreground">¿Ya lo borraste vos a mano desde Instagram/Facebook?</p>
-        <div className="flex items-center gap-2">
-          <code className="max-w-[110px] truncate rounded bg-muted px-1.5 py-0.5 text-[11px]" title={post.id}>
-            {post.id}
-          </code>
-          <CopyIdButton id={post.id} />
+        <div className="flex gap-1.5">
+          <select
+            value={markPlatform}
+            onChange={(e) => setMarkPlatform(e.target.value as "instagram" | "facebook")}
+            className="rounded-md border border-input bg-background px-2 text-xs"
+          >
+            {PLATAFORMAS_DESPUBLICAR.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="flex-1 text-xs font-semibold"
+            disabled={!!pending}
+            onClick={handleMarkManual}
+          >
+            {pending === `mark-manual-${markPlatform}` && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+            Ya lo hice a mano →
+          </Button>
         </div>
-        <a
-          href={MARK_MANUAL_WORKFLOW_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block rounded-md border border-border py-1.5 text-center text-xs font-semibold hover:border-primary"
-        >
-          Ya lo hice a mano →
-        </a>
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Con este otro ID (no el de propuesta) pegado en "post_id" y la plataforma correcta, marca el post como
-          gestionado a mano — así el badge deja de mostrarlo en verde acá.
-        </p>
       </div>
+
+      <a
+        href={workflowUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-primary hover:underline"
+      >
+        <ExternalLink className="h-3 w-3" />
+        Ver el resultado en GitHub Actions ({idValue})
+      </a>
     </div>
   );
 }
 
-function PostCard({ post, accionesManuales }: { post: HistorialPost; accionesManuales: Map<string, AccionManual> }) {
+function PostCard({
+  post,
+  accionesManuales,
+  onDone,
+}: {
+  post: HistorialPost;
+  accionesManuales: Map<string, AccionManual>;
+  onDone: () => void;
+}) {
   const fallidas = post.platforms.filter((p) => p.status === "failed");
 
   return (
@@ -304,12 +452,12 @@ function PostCard({ post, accionesManuales }: { post: HistorialPost; accionesMan
           {fallidas.length > 0
             ? fallidas.map((p, i) =>
                 p.platform === "instagram" ? (
-                  <AvisoInstagramFallido key={i} post={post} platform={p} accionesManuales={accionesManuales} />
+                  <AvisoInstagramFallido key={i} post={post} platform={p} accionesManuales={accionesManuales} onDone={onDone} />
                 ) : (
-                  <AccionesFacebookFallido key={i} post={post} />
+                  <AccionesFacebookFallido key={i} post={post} onDone={onDone} />
                 )
               )
-            : <GestionPostDeFeed post={post} />}
+            : <GestionPostDeFeed post={post} onDone={onDone} />}
         </div>
       </CardContent>
     </Card>
@@ -325,14 +473,37 @@ export default function Monitor() {
   const posts = data?.posts || [];
   const accionesManuales = data?.accionesManuales || new Map<string, AccionManual>();
 
+  // manage-post.yml/manage-story.yml solo tocan Zernio/proposals — a
+  // diferencia de mark-manual.yml, no escriben historial_cache. Sin este
+  // paso, un reintento/despublicación quedaba invisible acá hasta el cron
+  // de sync-history de cada 6hs. Dispara sync-history.yml solo (best-effort,
+  // no bloquea ni avisa si falla — Pablo siempre puede tocar "Actualizar" a
+  // mano) después de darle tiempo real al workflow anterior a terminar.
+  function refreshAfterAction() {
+    setTimeout(() => {
+      if (github.isConnected()) {
+        github.triggerWorkflow("sync-history.yml", {}).catch(() => {
+          // best-effort — el link a GitHub Actions sigue disponible como respaldo
+        });
+      }
+      setTimeout(() => refetch(), 20_000);
+    }, 75_000);
+  }
+
   return (
     <div className="space-y-7">
-      <div>
-        <h1 className="text-[32px] font-medium leading-tight text-primary">Monitor de stories y posts</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Historial real de lo publicado en Instagram y Facebook (stories y posts de feed) — sincronizado directo desde
-          Zernio.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[32px] font-medium leading-tight text-primary">Monitor de stories y posts</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Historial real de lo publicado en Instagram y Facebook (stories y posts de feed) — sincronizado directo
+            desde Zernio.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isRefetching}>
+          <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", isRefetching && "animate-spin")} />
+          Actualizar
+        </Button>
       </div>
 
       {isError ? (
@@ -362,14 +533,15 @@ export default function Monitor() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} accionesManuales={accionesManuales} />
+          <PostCard key={post.id} post={post} accionesManuales={accionesManuales} onDone={refreshAfterAction} />
         ))}
       </div>
 
       {posts.length > 0 && (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <ExternalLink className="h-3 w-3" />
-          Los links de "Run workflow" abren GitHub Actions en una pestaña nueva — ninguna acción se ejecuta desde acá.
+          Reintentar/despublicar/marcar a mano se disparan directo desde acá — el link a GitHub Actions de cada pieza
+          es solo para ver el detalle de la corrida si hace falta.
         </p>
       )}
     </div>

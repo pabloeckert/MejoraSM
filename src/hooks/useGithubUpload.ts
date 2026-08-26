@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { github, type GhWhoami } from "@/services/github";
+import { toast } from "@/hooks/use-toast";
 
 export function useGithubConnection() {
   const [connected, setConnected] = useState(github.isConnected());
@@ -42,6 +43,35 @@ export function useGithubConnection() {
   }
 
   return { connected, checking, user, error, connect, disconnect };
+}
+
+// Dispara manage-post.yml/manage-story.yml/mark-manual.yml directo desde la
+// app — hallazgo real de auditoría 2026-08-26 (Pablo: "por qué tengo que ir
+// a GitHub para completar" al reintentar/republicar desde el Monitor). Un
+// solo pending global (no por acción) porque en la práctica nunca se
+// disparan dos acciones a la vez desde la misma pantalla.
+export function useWorkflowAction() {
+  const [pending, setPending] = useState<string | null>(null);
+
+  async function run(key: string, workflowFile: string, inputs: Record<string, string>, successMessage: string): Promise<boolean> {
+    if (!github.isConnected()) {
+      toast({ title: "No conectado a GitHub", description: "Conectá GitHub desde Subir material primero.", variant: "destructive" });
+      return false;
+    }
+    setPending(key);
+    try {
+      await github.triggerWorkflow(workflowFile, inputs);
+      toast({ title: "Disparado ✓", description: successMessage });
+      return true;
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "Error desconocido", variant: "destructive" });
+      return false;
+    } finally {
+      setPending(null);
+    }
+  }
+
+  return { pending, run };
 }
 
 export function useDirListing(path: string, enabled = true) {

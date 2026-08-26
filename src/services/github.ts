@@ -99,6 +99,44 @@ async function listDir(path: string): Promise<GhFileEntry[]> {
   }));
 }
 
+// Dispara un workflow_dispatch real (manage-post.yml / manage-story.yml /
+// mark-manual.yml) directo desde el navegador — hallazgo real 2026-08-26:
+// Pablo reportó que reintentar/despublicar/marcar a mano lo mandaba a
+// GitHub Actions a completar la acción a mano (copiar ID, "Run workflow",
+// tipear CONFIRMO), en vez de poder hacerlo desde acá. La API de dispatch
+// no devuelve el run creado (202 sin body) — no hay forma de confirmar acá
+// mismo que terminó bien, el resultado real se ve en Monitor cuando
+// sync-history/mark-manual corran (unos minutos).
+async function triggerWorkflow(workflowFile: string, inputs: Record<string, string>): Promise<void> {
+  if (!isConnected()) throw new Error("No conectado a GitHub");
+  const url = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/actions/workflows/${workflowFile}/dispatches`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { ...apiHeaders(true), "Content-Type": "application/json" },
+      body: JSON.stringify({ ref: GH_BRANCH, inputs }),
+    });
+  } catch {
+    throw new Error("No se pudo contactar GitHub (¿sin internet o señal débil?) — probá de nuevo.");
+  }
+  if (res.status === 401) throw new Error("El token venció o es inválido — reconectá GitHub.");
+  if (res.status === 403 || res.status === 404) {
+    throw new Error(
+      'El token no tiene permiso para ejecutar workflows — regenerá el token con "Actions" en Read and write (además de Contents) y reconectá.'
+    );
+  }
+  if (!res.ok) {
+    let detail = "";
+    try {
+      detail = (await res.json()).message || "";
+    } catch {
+      // sin detalle disponible, se usa el mensaje genérico
+    }
+    throw new Error(`No se pudo disparar el workflow (${res.status}${detail ? `: ${detail}` : ""})`);
+  }
+}
+
 async function putFile(path: string, base64Content: string, message: string, sha?: string) {
   if (!isConnected()) throw new Error("No conectado a GitHub");
   const url = `${apiBase()}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}`;
@@ -163,5 +201,6 @@ export const github = {
   listDir,
   putFile,
   commitPhoto,
+  triggerWorkflow,
   rawUrl,
 };

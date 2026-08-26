@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +40,15 @@ import {
   useConvertProposalFormat,
 } from "@/hooks/useProposals";
 
+// Hallazgo real 2026-08-26: Pablo reportó que en el detalle de una
+// propuesta (abierto desde Propuestas o desde "Ver propuesta" en Monitor)
+// solo veía el texto (hook/body/cta) y no la imagen final tal cual se ve
+// publicada — el dato ya se traía (proposals.rendered_image_path viene con
+// el `select("*")` de proposalsApi.list()), pero este diálogo nunca lo
+// declaraba en su tipo ni lo renderizaba. Mismo RAW_BASE_URL que ya usa
+// Dashboard.tsx para la misma columna.
+const RAW_BASE_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main";
+
 // Mismas 6 dimensiones que content/inbox/ (ver scripts/generate-brief.mjs) —
 // de acá sale la foto que usa render-scheduled-posts.mjs al publicar.
 // "Sociales" agregada 2026-08-17 (Taller de la Oferta).
@@ -75,6 +85,7 @@ export interface ProposalDetail {
   created_at: string | null;
   oferta: string | null;
   zernio_post_id: string | null;
+  rendered_image_path: string | null;
   is_test?: boolean | null;
   dialogue_sessions?: { topic: string | null } | null;
 }
@@ -288,6 +299,29 @@ export function ProposalDetailDialog({
               ? `Programada para: ${fmtDate(proposal.scheduled_at)}`
               : "Sin fecha de publicación ni programación"}
           </p>
+
+          {proposal.rendered_image_path ? (
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-muted-foreground">Así se ve la pieza, tal cual se publica</p>
+              <img
+                src={`${RAW_BASE_URL}/${proposal.rendered_image_path}`}
+                alt="Imagen final renderizada"
+                loading="lazy"
+                className={cn(
+                  "w-full rounded-md border border-border bg-muted object-cover",
+                  proposal.format === "historia" ? "aspect-[9/16]" : "aspect-[4/5]"
+                )}
+              />
+            </div>
+          ) : (
+            (isScheduled || isApproved || isPublished) &&
+            proposal.format !== "historia" && (
+              <p className="rounded-md border border-dashed border-border bg-muted/30 p-2.5 text-xs text-muted-foreground">
+                Todavía no se renderizó la imagen final — se genera cuando corre el pipeline de publicación
+                (`render-scheduled-posts.mjs`), no al aprobar.
+              </p>
+            )
+          )}
 
           {isRejected && proposal.rejection_reason && (
             <p className="rounded-md border border-destructive/30 bg-destructive/5 p-2.5 text-xs text-destructive">
