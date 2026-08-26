@@ -19,6 +19,8 @@ import { useStartDialogue } from "@/hooks/useDialogue";
 import { useProposals, useApproveProposal } from "@/hooks/useProposals";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "@/components/ui/use-toast";
+import { ProposalDetailDialog, type ProposalDetail } from "@/components/ProposalDetailDialog";
+import { ExternalLink } from "lucide-react";
 
 export default function Laboratorio() {
   return (
@@ -35,6 +37,15 @@ function LaboratorioContent() {
   const { data: proposals } = useProposals();
   const approveMutation = useApproveProposal();
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  // Hallazgo real 2026-08-26 (Pablo: "con un click quiero ver tal cual como
+  // se va a ver..."): acá nunca se podía abrir el detalle compartido
+  // (mismo diálogo que ya muestra la imagen real en Propuestas/Calendario/
+  // Monitor) — las filas de "Propuestas recientes" eran texto plano sin
+  // click.
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
+  const selectedProposal: ProposalDetail | null = selectedProposalId
+    ? (proposals || []).find((p: ProposalDetail) => p.id === selectedProposalId) ?? null
+    : null;
 
   const handleGenerate = () => {
     if (!description.trim()) return;
@@ -251,6 +262,24 @@ function LaboratorioContent() {
                 <Badge variant="outline">{generatedContent.proposal.format || "post"}</Badge>
               </div>
             )}
+
+            {generatedContent.proposalId && (
+              <button
+                type="button"
+                onClick={() => setSelectedProposalId(generatedContent.proposalId)}
+                className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+              >
+                Ver propuesta completa
+                <ExternalLink className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {generatedContent.autoPublished && (
+              <p className="text-xs text-muted-foreground">
+                Se agendó sola para {generatedContent.oferta} —{" "}
+                {generatedContent.scheduledAt && new Date(generatedContent.scheduledAt).toLocaleString("es-AR")}. La
+                imagen final se ve en el detalle apenas corra el render (no es inmediato).
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -266,14 +295,18 @@ function LaboratorioContent() {
               {proposals.slice(0, 5).map((p: any) => (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
+                  className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/40"
                 >
-                  <div className="flex-1 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProposalId(p.id)}
+                    className="min-w-0 flex-1 text-left"
+                  >
                     <p className="text-sm font-medium truncate">{p.title || "Sin título"}</p>
                     <p className="text-xs text-muted-foreground">
                       {p.dialogue_sessions?.topic || "Sin tema"} · {p.format || "post"}
                     </p>
-                  </div>
+                  </button>
                   <div className="flex items-center gap-2">
                     <Badge
                       variant={
@@ -322,6 +355,12 @@ function LaboratorioContent() {
           </CardContent>
         </Card>
       )}
+
+      <ProposalDetailDialog
+        proposal={selectedProposal}
+        open={!!selectedProposal}
+        onOpenChange={(open) => !open && setSelectedProposalId(null)}
+      />
     </div>
   );
 }

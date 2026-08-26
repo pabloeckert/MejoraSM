@@ -51,7 +51,14 @@ export function useStartDialogue() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (topic: string) => startDialogue(topic),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["dialogue-sessions"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["dialogue-sessions"] });
+      // Hallazgo real 2026-08-26: si el Crítico aprueba y autoagenda
+      // (post/carrusel), la propuesta nueva no aparecía en Laboratorio
+      // ("Propuestas recientes") ni se podía abrir por id hasta que algo
+      // más refetcheara ["proposals"] — esta mutación nunca lo invalidaba.
+      qc.invalidateQueries({ queryKey: ["proposals"] });
+    },
   });
 }
 
