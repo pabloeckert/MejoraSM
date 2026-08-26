@@ -1115,6 +1115,18 @@ Frente al pendiente de arriba ("Biblioteca queda afuera a propósito"), Pablo re
 
 **Sigue pendiente, sin resolver a propósito:** "En biblioteca"/"Confirmada" siguen siendo de ejemplo — no hay tabla real de catálogo de fotos/categorías/álbumes todavía (Paso 3 de la Fase 5, documentado desde 2026-08-16). Encararlo es diseñar e implementar esa persistencia real de punta a punta, no un ajuste de lectura como este.
 
+## Fix real: el embed de Biblioteca nunca funcionó, era el CSP del propio EDA — 2026-08-26
+
+Pablo mandó una captura de `/biblioteca` mostrando el placeholder vacío ("Ver la Biblioteca acá mismo... si no carga, usá 'Abrir Biblioteca' arriba") y fue terminante: el proyecto tiene que funcionar HOY, y Biblioteca **no debe abrir aparte** — tiene que estar embebida dentro del sistema, no en una pestaña nueva.
+
+**Causa real, no la que se había investigado antes:** el CSP de `index.html` tenía `frame-src 'none'` — bloquea CUALQUIER iframe sin importar de dónde venga. La investigación del 2026-08-17 (documentada más arriba en "Ronda de revisión post-Fase 6") miró los headers de respuesta del lado de `biblioteca/` (`X-Frame-Options`, sin bloqueo ahí) pero nunca el CSP del propio EDA — que era el bloqueo real, y probablemente estuvo ahí desde que se agregó el hardening de seguridad original (2026-07-28), antes incluso de que existiera el embed de Biblioteca (Fase 5, 2026-08-17). El embed nunca funcionó en producción, ni una vez, desde que se implementó — el "workaround" del botón "Abrir Biblioteca" como acceso primario no arreglaba nada, solo evitaba mostrar el síntoma.
+
+**Fix:** `frame-src 'none'` → `frame-src 'self'` en `index.html`. Alcanza porque `biblioteca/` vive en el mismo origen de GitHub Pages (`pabloeckert.github.io`) que el EDA (`/app/`) — no hace falta permitir ningún origen externo.
+
+**Rediseño de `Biblioteca.tsx` acorde al pedido explícito:** con el bloqueo real resuelto, se sacó el patrón de "click para ver" (paliativo de un problema que en realidad era este CSP) — el iframe ahora carga directo al entrar a la pantalla, sin ningún paso previo. El botón grande "Abrir Biblioteca" (que había quedado como acceso *primario*, ver Ronda de revisión post-Fase 6) se redujo a un link chico y secundario "Abrir en pestaña nueva" — sigue disponible como respaldo, pero ya no es el camino principal. Se mantiene la detección de timeout (8s) con botón de recarga, por si hay un hiccup real de red puntual.
+
+**Probado real contra producción, no solo el fix aplicado:** desplegado y confirmado en el sitio real (`https://pabloeckert.github.io/MejoraSM/app/#/biblioteca`) que el iframe carga la Biblioteca real de punta a punta sin ningún click previo — mismo contenido, misma herramienta, ahora efectivamente "dentro del sistema" como se pidió. Verificado además: `tsc --noEmit` limpio, lint en 42 errores preexistentes (sin regresión), 64/64 tests, build limpio.
+
 ## Notas históricas
 
 Visión fundacional original del EDA (spec escrita por Pablo antes de que existiera código, sigue siendo la intención de fondo del proyecto): *"Construir una aplicación de gestión estratégica de contenidos que funcione mediante la interacción de múltiples Agentes de IA. El sistema debe ser capaz de procesar la identidad de marca localmente, debatir estrategias y ejecutar publicaciones automáticas aprendiendo de los resultados."* — Bóveda → RAG, Mesa de Diálogo → 3 agentes (Estratega/Creativo/Crítico), Bucle de Aprendizaje → `rule-engine`/`success_rules`, son la realización de esa visión original. Un detalle que si cambió: el spec original dejaba el "Modo Supervisión" (aprobación antes de publicar) como opcional — el sistema real fue más allá, no hay ningún gate de aprobación humana desde el overhaul del 2026-08-02.
