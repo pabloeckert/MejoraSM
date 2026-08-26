@@ -41,8 +41,8 @@ const TUTORIAL_STEPS = [
   { screen: "library", title: "Bienvenida a tu Línea de tiempo", body: "Acá entra todo lo que sacás — talleres, clientes, notas — y acá seguís su recorrido completo: de la biblioteca a etiquetada, programada y publicada. No reemplaza nada de lo que ya funciona: se suma como fuente." },
   { screen: "library", title: "Etiquetas, no carpetas únicas", body: "Una foto puede ser \"Capacitaciones\" y \"Trabajo con clientes\" a la vez. Elegí la vista — lista, miniaturas o íconos grandes — según cómo te resulte más cómodo mirar." },
   { screen: "library", title: "Álbumes por evento", body: "\"Taller en Chapadmalal\", \"13 años del primer after\" — un álbum agrupa fotos de un mismo momento, cruzando las etiquetas de arriba. Es otra forma de mirar lo mismo, no una jerarquía." },
-  { screen: "library", title: "Cuatro etapas, una sola vista", body: "Filtrá por En biblioteca, Confirmada, Programada o Publicada. Programada y Publicada muestran datos de ejemplo del Monitor, siempre marcados como tal — la publicación real vive en esa herramienta." },
-  { screen: "calendar", title: "Calendario de publicaciones", body: "Mirá de un vistazo lo que ya se publicó (rojo) y lo que está programado (azul). Tocá cualquier publicación para modificarla, reprogramarla a otra fecha o borrarla. Son datos de ejemplo del Monitor por ahora." },
+  { screen: "library", title: "Cuatro etapas, una sola vista", body: "Filtrá por En biblioteca, Confirmada, Programada o Publicada. Programada y Publicada son datos reales, traídos directo del sistema — En biblioteca y Confirmada todavía son de ejemplo hasta que esas dos etapas tengan su propio catálogo real." },
+  { screen: "calendar", title: "Calendario de publicaciones", body: "Mirá de un vistazo lo que ya se publicó (rojo) y lo que está programado (azul) — datos reales del sistema. Tocá cualquier publicación para modificarla, reprogramarla a otra fecha o borrarla." },
   { screen: "quick", title: "Día a día: carga rápida", body: "Algo te llega por WhatsApp o Drive — lo soltás acá, sin fricción. El sistema propone etiquetas al toque; las confirmás con un toque." },
   { screen: "batch", title: "En bloque: después de un evento", body: "Subís la tanda entera y el sistema propone álbum y etiquetas para todas. Vos revisás y confirmás rápido — no escribís de cero." },
   { screen: "batch", title: "Propuesta vs. confirmada", body: "Ese detalle importa: cada corrección tuya queda guardada y ajusta la próxima propuesta. Con el tiempo vas a corregir cada vez menos." },
@@ -56,7 +56,7 @@ const MANUAL_ITEMS = [
   { title: "Etiquetas y álbumes", content: "Una pieza puede tener varias etiquetas a la vez — nunca se fuerza una sola categoría. Un álbum agrupa fotos de un evento o proyecto puntual, cruzando esas etiquetas — es una agrupación aparte, no una jerarquía." },
   { title: "Carga rápida vs. sesión en bloque", content: "Día a día: algo llega por WhatsApp o Drive, se sube rápido, sin fricción. En bloque: una tanda grande después de un evento se organiza en una sesión aparte, con el sistema proponiendo y vos confirmando rápido." },
   { title: "Tipos de pieza", content: "Foto con texto para un momento puntual. Collage para 2 a 4 fotos del mismo álbum. Cartel para una frase o idea sin foto, jugando con tipografía grande y el trazo del isotipo — nunca con más color saturado." },
-  { title: "Línea de tiempo: de biblioteca a publicada", content: "Biblioteca y Monitor convergen en una sola vista: cada pieza se ve entrando, etiquetada, programada y publicada, sin cambiar de pantalla. Programada y Publicada muestran datos de ejemplo del Monitor real, siempre marcados como tal." },
+  { title: "Línea de tiempo: de biblioteca a publicada", content: "Biblioteca y Monitor convergen en una sola vista: cada pieza se ve entrando, etiquetada, programada y publicada, sin cambiar de pantalla. Programada y Publicada son datos reales — tocar una de esas piezas lleva directo a su propuesta real en el sistema." },
   { title: "Cómo se conecta con Stories", content: "El sistema elige solo qué pieza usar cada día. Después de publicada, podés pedir que se cambie o regenere — incluso ya publicada. Lo que haya que borrar de una red social, lo borrás vos ahí directamente." },
 ];
 
@@ -505,14 +505,36 @@ App.calToday = function () {
 App.openCalEntry = function (id) {
   const it = state.items.find((x) => x.id === id);
   if (!it) return;
+  // Real: ni siquiera abre el modal de edición local (no hay nada que
+  // editar de verdad desde acá) — va directo a la propuesta real.
+  if (isRealItem(id)) return window.open(realProposalUrl(id), "_blank", "noopener");
   App.setState({ calSelectedId: id, calDraftWhen: it.when || "" });
 };
 App.closeCalEntry = function () { App.setState({ calSelectedId: null, calDraftWhen: "" }); };
 App.updateCalDraftWhen = function (val) { state.calDraftWhen = val; };
+// Hallazgo real 2026-08-26: reprogramar/borrar acá nunca escribió nada
+// real (Zernio/Supabase) — antes daba igual porque todo era de ejemplo,
+// pero con datos reales de verdad tocando esta misma pantalla, "guardar"
+// mostraría un toast de éxito sin cambiar nada de verdad en el sistema
+// (la pieza real seguiría publicándose/publicada tal cual estaba). Se
+// bloquea acá y se manda al lugar real (Propuestas/Monitor). isRealItem()
+// está definida más arriba, junto a cardHTML/realProposalUrl.
+function warnRealItemReadOnly() {
+  App.pushToast(
+    "Esta pieza es real",
+    "Reprogramar o borrar de verdad se hace desde Propuestas o Monitor, no desde acá.",
+    "info",
+    true
+  );
+}
 App.saveCalEntry = function () {
   const id = state.calSelectedId;
   const it = state.items.find((x) => x.id === id);
   if (!it) return App.closeCalEntry();
+  if (isRealItem(id)) {
+    App.closeCalEntry();
+    return warnRealItemReadOnly();
+  }
   const snap = App.snapshot();
   const when = state.calDraftWhen || null;
   // Si la nueva fecha es a futuro, queda "programada"; si es hoy o pasado, "publicada".
@@ -531,6 +553,10 @@ App.saveCalEntry = function () {
 };
 App.deleteCalEntry = function () {
   const id = state.calSelectedId;
+  if (isRealItem(id)) {
+    App.setState({ calSelectedId: null, calDraftWhen: "" });
+    return warnRealItemReadOnly();
+  }
   const it = state.items.find((x) => x.id === id);
   const snap = App.snapshot();
   App.setState({ items: state.items.filter((x) => x.id !== id), calSelectedId: null, calDraftWhen: "", lastSnapshot: snap });
@@ -538,6 +564,10 @@ App.deleteCalEntry = function () {
 };
 App.modifyCalEntry = function () {
   const id = state.calSelectedId;
+  if (isRealItem(id)) {
+    App.setState({ calSelectedId: null, calDraftWhen: "" });
+    return warnRealItemReadOnly();
+  }
   App.setState({ calSelectedId: null, calDraftWhen: "" });
   App.openPreview(id);
 };
@@ -597,10 +627,21 @@ App.confirmBatchAll = function () {
 // ================================================================
 // Render — componentes compartidos
 // ================================================================
+// Real desde el 2026-08-26 (proposals con status scheduled/published) — se
+// distinguen por el prefijo "real-" que les puso loadRealPublishedItems().
+// Sin escritura real implementada acá (Zernio/Supabase), así que se tratan
+// como de solo lectura: nada de borrar/confirmar/editar categorías desde
+// esta pantalla — eso sigue viviendo en Propuestas/Monitor.
+function isRealItem(id) {
+  return typeof id === "string" && id.indexOf("real-") === 0;
+}
+function realProposalUrl(id) {
+  return "https://pabloeckert.github.io/MejoraSM/app/#/propuestas?id=" + encodeURIComponent(id.slice("real-".length));
+}
+
 function stepperHTML(it) {
   let idx = STAGES.findIndex((s) => s.key === it.stage);
   if (idx < 0) idx = 0;
-  const isSimulated = it.stage === "programada" || it.stage === "publicada";
   const isPublished = it.stage === "publicada";
   const dots = STAGES.map((st, i) => {
     const width = i === idx ? 14 : 8;
@@ -613,20 +654,28 @@ function stepperHTML(it) {
     <div class="stepper-label-row">
       <span class="stepper-label ${isPublished ? "published" : ""}">${label}</span>
       ${isPublished ? '<span class="stepper-pub-dot"></span>' : ""}
-      ${isSimulated ? '<span class="stepper-sim-badge">Dato de ejemplo · Monitor</span>' : ""}
     </div>
   </div>`;
 }
 
 function cardHTML(it, size) {
   const isList = size === "list";
+  const isReal = isRealItem(it.id);
   const h = size === "large" ? 210 : size === "thumb" ? 150 : 56;
   const imgStyle = isList ? `width:56px;height:${h}px;flex:0 0 auto;` : `height:${h}px;`;
-  const actions = `<div class="card-actions">
+  const actions = isReal
+    ? ""
+    : `<div class="card-actions">
       <button type="button" class="card-action-btn del" title="Borrar" aria-label="Borrar" onclick="App.deleteItem(event,'${escapeAttr(it.id)}')">${ICONS.x}</button>
       <button type="button" class="card-action-btn save ${it.proposed ? "" : "done"}" title="${it.proposed ? "Guardar / confirmar" : "Confirmada"}" aria-label="Guardar" onclick="App.confirmItem(event,'${escapeAttr(it.id)}')">${ICONS.check}</button>
     </div>`;
-  return `<div class="card ${isList ? "list" : ""}" onclick="App.openPreview('${escapeAttr(it.id)}')" role="button" tabindex="0">
+  // Una pieza real abre la propuesta de verdad en el EDA (misma pieza que
+  // Monitor enlaza) en vez del modal local de edición de categorías/álbum
+  // — acá no hay ninguna escritura real que hacer, ver comentario arriba.
+  const onclick = isReal
+    ? `window.open('${realProposalUrl(it.id)}', '_blank', 'noopener')`
+    : `App.openPreview('${escapeAttr(it.id)}')`;
+  return `<div class="card ${isList ? "list" : ""}" onclick="${onclick}" role="button" tabindex="0">
     <div class="card-img" style="${imgStyle}">${isList ? "" : actions}<img src="${escapeAttr(it.img)}" style="object-position:${escapeAttr(it.pos)}"></div>
     <div class="card-meta">
       <div class="card-title">${escapeHtml(it.title)}</div>
@@ -789,7 +838,7 @@ function buildLibraryScreen(mobile) {
         </div>
       </div>
       ${stageTabsHTML()}
-      ${(state.stageFilter === "programada" || state.stageFilter === "publicada") ? `<div class="notice-box">Estas piezas muestran datos de ejemplo del Monitor — la publicación y programación reales viven en esa herramienta, no acá.</div>` : ""}
+      ${(state.stageFilter === "programada" || state.stageFilter === "publicada") ? `<div class="notice-box">Datos reales del sistema — tocar una pieza abre su propuesta real en el EDA (solo lectura desde acá, se gestiona desde Propuestas o Monitor).</div>` : ""}
     </div>
     <div id="lib-grid">${gridHTML(filtered, mobile)}</div>
   `;
@@ -839,7 +888,7 @@ function buildCalendarScreen(mobile) {
     <div class="cal-top">
       <div>
         <div class="screen-title ${mobile ? "mobile" : ""}">${escapeHtml(MONTH_NAMES[m])} ${y}</div>
-        <div class="screen-sub">${totalOnCal} publicaciones en el calendario · tocá una para modificar, reprogramar o borrar</div>
+        <div class="screen-sub">${totalOnCal} publicaciones reales en el calendario · tocá una para verla en Propuestas</div>
       </div>
       <div class="cal-nav">
         <button type="button" class="icon-btn" title="Mes anterior" onclick="App.calPrevMonth()">${ICONS.chevronL}</button>
@@ -850,7 +899,7 @@ function buildCalendarScreen(mobile) {
     <div class="cal-legend">
       <span><span class="cal-dot scheduled"></span>Programada</span>
       <span><span class="cal-dot published"></span>Publicada</span>
-      <span class="cal-legend-note">Datos de ejemplo del Monitor</span>
+      <span class="cal-legend-note">Datos reales del sistema</span>
     </div>
     <div class="cal-weekdays">${WEEKDAY_NAMES.map((w) => `<div>${w}</div>`).join("")}</div>
     <div class="cal-grid">${cells}</div>
@@ -883,7 +932,9 @@ function dimensionSelectorHTML() {
   </div>`;
 }
 function buildQuickScreen(mobile) {
-  const recentItems = state.items.slice(0, 6);
+  // Carga rápida es para taggear fotos recién subidas, no para las piezas
+  // reales ya publicadas/agendadas que ahora también viven en state.items.
+  const recentItems = state.items.filter(function (it) { return !isRealItem(it.id); }).slice(0, 6);
   const list = recentItems.length
     ? `<div style="display:flex;flex-direction:column;gap:10px;">
         ${!mobile ? `<div class="side-label">Recién llegado</div>` : ""}
@@ -1091,7 +1142,9 @@ function collageStyleToggleHTML() {
 }
 function pickerHTML(mobile) {
   const cols = mobile ? 4 : 5;
-  const items = state.items.map((it) => {
+  // Armar pieza usa fotos de material propio como fuente — una pieza real
+  // ya publicada no es una foto para reusar acá.
+  const items = state.items.filter((it) => !isRealItem(it.id)).map((it) => {
     const selected = state.composeSelection.includes(it.id);
     return `<div class="picker-item ${selected ? "selected" : ""}" onclick="App.toggleComposeSelect('${escapeAttr(it.id)}')">
       <img src="${escapeAttr(it.img)}" style="object-position:${escapeAttr(it.pos)}">
@@ -1369,6 +1422,71 @@ function checkResize() {
   if (m !== _wasMobile) { _wasMobile = m; render(); }
 }
 window.addEventListener("resize", checkResize);
+
+// ---------- Datos reales: Programada / Publicada (2026-08-26) ----------
+// Hasta acá esas dos etapas SIEMPRE mostraban datos de ejemplo de
+// seed-demo.js, marcados como tal en el propio tutorial — a pedido
+// explícito de Pablo ("todo datos reales sistema en producción") se
+// reemplazan por lo real: proposals con status scheduled/published, misma
+// anon key pública que ya usa el resto del sitio (sin build, sin login).
+// No toca "biblioteca"/"confirmada" — esas dos etapas todavía no tienen
+// una tabla real donde persistir el catálogo de fotos/categorías (Paso 3
+// en curso, ver CLAUDE.md) — no hay de dónde traer datos reales para ellas
+// sin construir esa pieza aparte primero.
+const SUPABASE_URL = "https://hsglmdarztrshihmzfph.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_GXn6-T6gWNSzZR-sIQ6_5g_97ZCFxWp";
+const RAW_BASE_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main";
+
+function isoDateLocal(dateInput) {
+  const d = new Date(dateInput);
+  const p = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
+async function loadRealPublishedItems() {
+  try {
+    const url =
+      SUPABASE_URL +
+      "/rest/v1/proposals?select=id,title,hook,oferta,status,scheduled_at,published_at,rendered_image_path" +
+      "&status=in.(scheduled,published)&order=created_at.desc&limit=200";
+    const res = await fetch(url, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY },
+    });
+    if (!res.ok) return;
+    const rows = await res.json();
+    const realItems = rows
+      .filter(function (r) { return !!r.rendered_image_path; })
+      .map(function (r) {
+        const isPublished = r.status === "published";
+        const whenSource = isPublished ? (r.published_at || r.scheduled_at) : r.scheduled_at;
+        const when = whenSource ? isoDateLocal(whenSource) : null;
+        return {
+          id: "real-" + r.id,
+          title: r.hook || r.title || "Sin título",
+          categories: [],
+          album: null,
+          context: r.oferta || null,
+          proposed: false,
+          date: "hoy",
+          img: RAW_BASE_URL + "/" + r.rendered_image_path,
+          pos: "50% 50%",
+          stage: isPublished ? "publicada" : "programada",
+          stageMeta: when ? App.calRelLabel(when) : null,
+          when: when,
+        };
+      });
+    if (realItems.length === 0) return;
+    App.setState({
+      items: realItems.concat(
+        state.items.filter(function (it) { return it.stage !== "programada" && it.stage !== "publicada"; })
+      ),
+    });
+  } catch (e) {
+    // Sin datos reales disponibles ahora (sin señal, RLS, lo que sea) — la
+    // pantalla sigue funcionando con lo que ya tenía, no se rompe nada.
+  }
+}
+
 function tutorialAlreadySeen() {
   try { return localStorage.getItem("mc_biblioteca_tutorial_seen") === "1"; } catch (e) { return false; }
 }
@@ -1378,6 +1496,7 @@ function markTutorialSeen() {
 document.addEventListener("DOMContentLoaded", function () {
   _wasMobile = App.isMobile();
   render();
+  void loadRealPublishedItems();
   // Tutorial automático la primera vez (solo una vez; se puede reabrir con el botón "?").
   if (!tutorialAlreadySeen()) {
     markTutorialSeen();

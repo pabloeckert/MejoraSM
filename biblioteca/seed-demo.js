@@ -31,6 +31,11 @@
   // Columnas: title, categories, album, stage, proposed, stageMeta, hue, sat, dayOffset
   // dayOffset: días respecto de hoy para el calendario (negativo = ya publicada,
   // positivo = programada a futuro; null = todavía no tiene fecha).
+  // Solo "biblioteca"/"confirmada" — todavía no hay una tabla real donde
+  // persistir el catálogo de fotos ni sus categorías/álbumes (Paso 3 en
+  // curso, ver CLAUDE.md), así que estas dos etapas siguen siendo de
+  // ejemplo. "programada"/"publicada" YA NO están acá — app.js las carga
+  // reales desde Supabase (proposals + historial_cache), 2026-08-26.
   const D = [
     // album "Taller en Chapadmalal"
     ["Ronda de apertura del taller", ["Eventos y talleres", "Capacitaciones"], "Taller en Chapadmalal", "biblioteca", true, null, 145, 30, null],
@@ -40,18 +45,11 @@
     ["Brindis de aniversario", ["Eventos y talleres", "Detrás de escena"], "13 años del primer after", "confirmada", false, null, 340, 22, null],
     ["El equipo de siempre", ["Detrás de escena"], "13 años del primer after", "biblioteca", true, null, 8, 40, null],
     // album "Entrevista en Radio del Plata"
-    ["Al aire en Radio del Plata", ["Entrevistas", "Participaciones"], "Entrevista en Radio del Plata", "programada", false, "Mañana 9:00", 205, 24, 1],
     ["Antes de entrar al estudio", ["Detrás de escena", "Entrevistas"], "Entrevista en Radio del Plata", "biblioteca", true, null, 190, 20, null],
     // sueltas
     ["Reunión con cliente PyME", ["Trabajo con clientes"], null, "biblioteca", true, null, 168, 24, null],
     ["Capacitación online de equipos", ["Capacitaciones"], null, "confirmada", false, null, 262, 22, null],
     ["Asociado nuevo en Córdoba", ["Asociados (otras ciudades)"], null, "biblioteca", true, null, 95, 28, null],
-    ["Nota en el diario local", ["Notas periodísticas", "Menciones"], null, "publicada", false, "Hace 2 días", 15, 18, -2],
-    ["Mención en un podcast", ["Menciones", "Participaciones"], null, "publicada", false, "Hace 5 días", 285, 20, -5],
-    // extras para poblar el calendario
-    ["Capacitación en Rosario", ["Capacitaciones", "Asociados (otras ciudades)"], null, "programada", false, "En 3 días", 210, 26, 3],
-    ["Cierre de mes con el equipo", ["Detrás de escena"], null, "programada", false, "En 6 días", 320, 22, 6],
-    ["Testimonio de cliente", ["Trabajo con clientes", "Menciones"], null, "publicada", false, "Hace 8 días", 130, 24, -8],
   ];
 
   // Fecha ISO (YYYY-MM-DD) a partir de un offset de días respecto de hoy.
