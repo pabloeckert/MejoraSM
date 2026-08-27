@@ -1,17 +1,17 @@
 {
-  "syncedAt": "2026-08-27T00:09:40.065Z",
+  "syncedAt": "2026-08-27T00:15:13.467Z",
   "posts": [
     {
       "id": "6a8f7eda8b074a2e02a08433",
       "date": "2026-08-27",
       "status": "published",
       "content": "Si todo depende de vos, no tenés un equipo. Tenés empleados esperando que colapses.\nPensás que delegar es perder el control. Por eso hacés todo vos, siempre. Pero una cosa es la tarea. Otra muy distinta es el estándar. Podés soltar la ejecución sin soltar la vara.\n¿Cómo está tu empresa hoy? Descubrilo en mejoraok.com\n#MejoraOK\n#Delegar\n#LiderazgoReal\n#EmprendedorSaturado\n#GestionDeEquipos\n#OrdenMental\n#CrecerSinQuemarse",
-      "kind": "story",
-      "proposalId": null,
-      "headline": null,
+      "kind": "post",
+      "proposalId": "169225fb-6964-40dc-95b3-34eea8968520",
+      "headline": "Si todo depende de vos, no tenés un equipo. Tenés empleados esperando que colapses.",
       "kicker": null,
-      "oferta": null,
-      "imageUrl": null,
+      "oferta": "personal",
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-08-27-169225fb.jpg",
       "platforms": [
         {
           "platform": "instagram",
