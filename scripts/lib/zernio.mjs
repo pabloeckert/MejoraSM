@@ -57,7 +57,11 @@ export async function createPostAndPoll({ apiKey, content, imageUrl, platforms }
       // confundirlo con un fallo genérico.
       return {
         success: false,
-        error: JSON.stringify(data).slice(0, 300),
+        // Mismo hallazgo que el corte de abajo: 300 caracteres es
+        // demasiado poco para un error real de la API — se sube a 2000
+        // (igual se corta algo si Zernio devuelve un payload gigante, pero
+        // ya no pierde el mensaje real por un límite arbitrario chico).
+        error: JSON.stringify(data).slice(0, 2000),
         existingPostId: data.existingPostId,
       };
     }
@@ -79,11 +83,23 @@ export async function createPostAndPoll({ apiKey, content, imageUrl, platforms }
 
     const failed = perPlatform.filter((p) => p.status !== "published");
 
+    // Hallazgo real 2026-08-26/27: acá se truncaba JSON.stringify(failed) a
+    // 300 caracteres, pero cada elemento de failed trae el objeto accountId
+    // COMPLETO (incluida la URL larga de la foto de perfil de Instagram) —
+    // eso solo ya come los 300 caracteres, y el campo real que explica el
+    // fallo (status/error/reason de Zernio) nunca sobrevivía al corte.
+    // Ahora se arma un resumen chico por plataforma, sin el accountId.
+    const failedSummary = failed.map((p) => ({
+      platform: p.platform,
+      status: p.status,
+      error: p.error ?? p.errorMessage ?? p.reason ?? p.message ?? null,
+    }));
+
     return {
       success: failed.length === 0,
       postId,
       platforms: perPlatform,
-      error: failed.length > 0 ? JSON.stringify(failed).slice(0, 300) : undefined,
+      error: failed.length > 0 ? JSON.stringify(failedSummary) : undefined,
     };
   } catch (e) {
     return { success: false, error: e.message };
@@ -196,7 +212,7 @@ export async function unpublishPost(postId, platform, apiKey) {
 
     const data = await res.json();
     if (!res.ok) {
-      return { success: false, error: JSON.stringify(data).slice(0, 300) };
+      return { success: false, error: JSON.stringify(data).slice(0, 2000) };
     }
     return { success: true, message: data.message };
   } catch (e) {
