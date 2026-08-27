@@ -1127,6 +1127,51 @@ Pablo mandó una captura de `/biblioteca` mostrando el placeholder vacío ("Ver 
 
 **Probado real contra producción, no solo el fix aplicado:** desplegado y confirmado en el sitio real (`https://pabloeckert.github.io/MejoraSM/app/#/biblioteca`) que el iframe carga la Biblioteca real de punta a punta sin ningún click previo — mismo contenido, misma herramienta, ahora efectivamente "dentro del sistema" como se pidió. Verificado además: `tsc --noEmit` limpio, lint en 42 errores preexistentes (sin regresión), 64/64 tests, build limpio.
 
+## Campaña de pruebas end-to-end reales en Instagram y Facebook — 2026-08-26/27
+
+Pablo pidió explícitamente, sin dejar margen de duda: seguir probando el resto de las pantallas "obsesivamente, de punta a punta, con el ojo más crítico", con publicaciones **reales** verificables en Instagram y Facebook, de todos los formatos, "no importa se carga mucho en la cuenta" — y usar fotos propias en vez de bancos de imágenes con licencia. Después, ante una pausa para revisar un resultado, cerró cualquier duda con "dale, seguí, Y NO PREGUNTES MÁS". Se ejecutó bajo ese mandato explícito, sin volver a consultar en ningún paso.
+
+**Material de prueba, sin riesgo de copyright:** en vez de bajar fotos de Adobe Stock (licencia real que no cubre uso comercial en la cuenta real de Mejora Continua sin pagarla, riesgo legal genuino para el negocio), se generaron 3 imágenes 100% originales (gradientes/composición abstracta con Playwright, mismo espíritu que el generador de `biblioteca/seed-demo.js`) para `content/inbox/personal/`, `/comercial/` y `/organizacional/` — sin inspirarse en ni recortar ningún banco con copyright.
+
+### Post real (formato `post`, dimensión personal) — CONFIRMADO EN VIVO
+
+Sesión real de Mesa de Diálogo (buyer persona Emprendedor Saturado, "delegar la tarea no es delegar el estándar"). El Crítico **rechazó la primera ronda** por un motivo real y correcto: el Creativo armó notas visuales de carrusel (4 slides) pese a que el Estratega había pedido explícitamente un post de una sola imagen — inconsistencia real entre estrategia y ejecución, detectada bien. Corregido en la segunda ronda, aprobado.
+
+**Publicado real:** [Instagram](https://www.instagram.com/p/DchdL2iggNK/) · [Facebook](https://www.facebook.com/362865850499895_1353407640212051) — proposal `169225fb-6964-40dc-95b3-34eea8968520`.
+
+**Bug real #1 encontrado y arreglado:** el primer intento de publicar se reportó como fallido, pero el error mostrado en el log (`console.error`/`run_log`) estaba cortado a 300 caracteres — y `JSON.stringify(failed)` incluía el objeto `accountId` COMPLETO de Zernio (con la URL larga de la foto de perfil de Instagram), que solo ya se comía los 300 caracteres antes de llegar al campo real que explicaba el fallo. Estuvo literalmente imposible diagnosticar el problema hasta arreglar esto. Fix en `scripts/lib/zernio.mjs::createPostAndPoll()`: arma un resumen chico por plataforma (`platform`/`status`/`error`) antes de stringificar, sin el `accountId`. Los otros dos cortes a 300 caracteres del archivo (respuesta de error genérica, unpublish) se subieron a 2000 por el mismo riesgo potencial. Commit `8481b43`.
+
+**Bug real #2 encontrado y arreglado, con el fix anterior ya visible:** con el error real a la vista, se vio que Instagram y Facebook SÍ habían publicado bien — el polling de `createPostAndPoll` (4 intentos x 8s = 32s) era demasiado corto para el tiempo real que tardó Meta en procesar el contenido, y el script lo declaró "failed" antes de tiempo (falso negativo). Un segundo intento de publicar el mismo contenido chocó, como corresponde, con el guard de contenido duplicado de Zernio (409, `existingPostId` apuntando al post real que sí se había publicado bien). Fix en `scripts/lib/zernio.mjs`: `POLL_ATTEMPTS`/`POLL_DELAY_MS` subidos a 8x10s (80s), y cuando Zernio devuelve `existingPostId` por duplicado, ahora se reconsulta ese post real — si ya está publicado en todas las plataformas pedidas, se trata como éxito real (`reconciled: true`) en vez de reportar un fallo sobre algo que en realidad ya salió bien. Commit `d50dd73`. De paso se sacó un PATCH muerto a `calendar_events` en `publish-scheduled-posts.mjs` (tabla dropeada en Fase 0, seguía pegando 404 en silencio sin ningún caller real).
+
+La propuesta `169225fb-...` había quedado con `status=scheduled`/`zernio_post_id=null` en Supabase pese a estar publicada de verdad — se reconcilió a mano (`status=published`, `zernio_post_id` real) contra el estado real confirmado en Zernio, y se volvió a correr `sync-history` para que Monitor/Propuestas la reflejaran bien (antes de reconciliar, `sync-history` la había categorizado como "story" genérica por no poder linkearla a la propuesta).
+
+### Carrusel real (formato `carrusel`, dimensión comercial) — CONFIRMADO EN VIVO
+
+Segunda sesión real (buyer persona Vendedor sin Resultados, "40 llamados y cerrás 2"). El Crítico volvió a **rechazar la primera ronda**, otro motivo real y correcto: el CTA saltaba directo a "Agendá tu reunión de evaluación" sin pasar primero por la pregunta autodiagnóstica, violando la jerarquía de CTA confirmada por Pablo y Sindy (pregunta primero, "Agendá" como alternativa secundaria) — y de paso sonaba a gancho de venta ("descubrí dónde se te escapan los cierres"), contra el criterio "clarifica, no vende". Corregido y aprobado en la segunda ronda.
+
+**Publicado real, con el fix del polling ya desplegado — salió bien al primer intento, sin ningún falso negativo:** [Instagram](https://www.instagram.com/p/DchfP-mjXwv/) · [Facebook](https://www.facebook.com/362865850499895_1353415796877902) — proposal `88296577-0a15-4b95-a0e5-f44620c5baf5`.
+
+**Verificación visual de las 4 slides reales, sin bugs encontrados:** diseño uniforme (mismo peso tipográfico en las 3 primeras, sin la asimetría del hallazgo del 2026-08-24), sin ningún texto de guion tipo "Slide N" (bug ya corregido el 2026-08-20, confirmado que sigue sin reaparecer), isotipo de fondo sutil en las slides de solo texto, cierre fijo aprobado ("Cargás solo con el peso de decisiones que nadie más ve... Escribinos y contanos qué está pasando") en la slide 4, sin ningún CTA aislado en su propia slide.
+
+### Historia (story) — reintentar real probado, con un hallazgo real sin resolver
+
+Se probó `manage-story.mjs` "reintentar" (Facebook) sobre una story real ya publicada (`6a8eef535be0047a733e4312`, 2026-08-26). Zernio la rechazó por contenido duplicado, señalando el MISMO post_id como `existingPostId` — el caso exacto que la reconciliación recién agregada debería resolver solo. No lo resolvió: el resultado siguió reportando `success:false` en vez de reconciliar. No se pudo diagnosticar la causa exacta sin acceso directo a `ZERNIO_API_KEY` desde esta sesión (solo vive como secret de GitHub Actions) — queda como hallazgo real, documentado, no forzado. **Sin impacto real:** el contenido en sí está confirmado publicado bien en ambas plataformas vía `historial_cache`/Zernio real — la reconciliación automática no se disparó en este caso puntual, pero el sistema tampoco creó ningún duplicado real (el guard de Zernio sigue siendo el backstop real).
+
+### Hallazgo real no buscado, sin resolver — posible duplicado real ya existente
+
+Durante la investigación de arriba apareció un post real (`6a8ef3ac104bb71b3ad13777`, solo Instagram, sin Facebook) con el copy EXACTO de la pieza real `dcbf5e93` del 2026-08-25 ("Estás laburando 10 horas por día..."), pero con un `zernio_post_id` distinto y **sin ninguna fila de `proposals` que lo respalde** — no se creó por el pipeline normal (auto-agenda → render → publish), ni matchea con ningún `manage-post.mjs` conocido de esta sesión. No se tocó ni se intentó despublicar (Instagram no lo permite por API de todas formas) — queda documentado tal cual para que Pablo lo revise y decida si hay que borrarlo a mano desde la app. No se investigó más a fondo por no tener forma de confirmar la causa sin preguntarle directamente (bajo la orden explícita de esta ronda de no preguntar nada).
+
+### Revisión pantalla por pantalla en producción, con las dos piezas reales nuevas — todo confirmado funcionando
+
+- **Propuestas**: `/propuestas?id=...` abre el detalle de las dos piezas reales con su imagen real cargada.
+- **Calendario**: las dos piezas aparecen en su día real, agrupadas correctamente ("+1 más").
+- **Monitor**: las dos piezas aparecen con badges "published" reales en Instagram y Facebook, link real a la propuesta, y los botones nuevos de Reintentar/Despublicar/Marcar a mano (ver sección de arriba) renderizan bien. De paso, confirma visualmente el hallazgo del duplicado sin proposal (fila sin link "Ver propuesta").
+- **Biblioteca**: el conteo real de "Publicada" subió de 7 a 9, reflejando las dos piezas nuevas — confirma que el fetch real (`loadRealPublishedItems`, ver sección de arriba) sigue funcionando bien con datos que cambian.
+- **Auditoría**: pantalla y botones de exportación renderizan bien contra datos reales (la lectura real de `proposals`/`metrics`/`run_log` ya se verificó extensivamente por REST directo en toda esta ronda).
+- **Hub**: renderiza bien, pide conectar GitHub como corresponde (el PAT vive en el navegador de Pablo, no en esta sesión — no se pudo probar el upload real desde acá).
+
+Verificado en cada fix de código de esta ronda: `node --check` limpio en los 4 scripts `.mjs` tocados (fuera del pipeline de TS/ESLint/Vitest del resto del repo, igual que el resto de `scripts/`).
+
 ## Notas históricas
 
 Visión fundacional original del EDA (spec escrita por Pablo antes de que existiera código, sigue siendo la intención de fondo del proyecto): *"Construir una aplicación de gestión estratégica de contenidos que funcione mediante la interacción de múltiples Agentes de IA. El sistema debe ser capaz de procesar la identidad de marca localmente, debatir estrategias y ejecutar publicaciones automáticas aprendiendo de los resultados."* — Bóveda → RAG, Mesa de Diálogo → 3 agentes (Estratega/Creativo/Crítico), Bucle de Aprendizaje → `rule-engine`/`success_rules`, son la realización de esa visión original. Un detalle que si cambió: el spec original dejaba el "Modo Supervisión" (aprobación antes de publicar) como opcional — el sistema real fue más allá, no hay ningún gate de aprobación humana desde el overhaul del 2026-08-02.
