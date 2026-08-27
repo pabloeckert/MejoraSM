@@ -1172,6 +1172,27 @@ Durante la investigación de arriba apareció un post real (`6a8ef3ac104bb71b3ad
 
 Verificado en cada fix de código de esta ronda: `node --check` limpio en los 4 scripts `.mjs` tocados (fuera del pipeline de TS/ESLint/Vitest del resto del repo, igual que el resto de `scripts/`).
 
+## Purga de archivos sueltos fuera de git — 2026-08-27
+
+Pablo pidió explícitamente: "todo lo que no sea del proyecto se borra, revisa, depura y purga". Antes de borrar nada se investigó el contenido real de los 4 elementos sin trackear que había en el checkout local (`git status` los mostraba como `??` desde el inicio de esta sesión) — dos de los cuatro NO eran basura, así que se le presentó a Pablo el inventario real antes de ejecutar, en vez de borrar a ciegas por el riesgo real de pérdida irreversible de material de trabajo:
+
+- `Data/` (1.9 MB): CSVs reales de analytics de Meta (seguidores, interacciones, ingresos, etc.) + `analisis-redes-mejora-continua.md`, que **ya estaba citado y en uso real** en el código del Dashboard (`SEED_INSIGHTS`, ver más arriba en este archivo). Pablo confirmó borrarlo igual — el dato ya vive copiado en el código, se pierde solo la fuente/trazabilidad original.
+- `Data.zip` (32 KB): probablemente redundante con `Data/` ya descomprimida. Pablo confirmó borrarlo.
+- `.claude/` (9 KB): config local de Claude Code (permisos de sesión, configs de servidores de desarrollo armadas en esta sesión — incluida `mejorasm-static`, usada para verificar Biblioteca localmente). Pablo confirmó borrarlo.
+- `scripts/cargar-clave-zernio.ps1`: herramienta real y segura del proyecto (pide la clave por input oculto, sin ninguna clave hardcodeada) para cargar `ZERNIO_API_KEY` en los 3 lugares donde hace falta. Pablo confirmó **dejarla** — sigue sin trackear en git, a propósito, tal como estaba.
+
+Los tres primeros se borraron con `rm`. Sin commit real asociado (son archivos que nunca estuvieron en git — no hay nada que sacar del historial, la sincronización con GitHub ya estaba al día).
+
+## Borrar manualmente del Monitor — 2026-08-27
+
+Pablo reportó: "en monitor quiero poder borrar manualmente porque no sincroniza correctamente, no esta dando informacion real ni publicado en instagram y facebook ni en zernio" — muy probablemente el mismo hallazgo real ya documentado arriba (post `6a8ef3ac104bb71b3ad13777`, solo Instagram, mismo copy que la pieza real `dcbf5e93` de un día antes, sin ninguna fila de `proposals` que lo respalde).
+
+**Diseño explícito, no ambiguo:** el Monitor lee `historial_cache`, que `sync-history.mjs` sobreescribe entero cada 6hs con lo que Zernio reporta — no había ninguna forma de sacar de esa vista algo que Zernio sigue devolviendo, aunque ya no sea real (borrado a mano en la red, dato viejo/duplicado de Zernio). Se agregó `historialApi.removePost(postId)` en `src/services/supabase.ts` — lee el array `posts`, saca la fila por id, reescribe (PostgREST no tiene un operador nativo para sacar un elemento de un array jsonb por condición). Botón de tacho nuevo en cada card de `Monitor.tsx`, con `confirm()` nativo que aclara explícitamente: esto **solo saca la fila de esta caché de lectura**, no borra nada real de Instagram/Facebook/Zernio — si Zernio la sigue reportando de verdad, puede volver a aparecer en la próxima sincronización. Refetch inmediato al confirmar (a diferencia de `refreshAfterAction`, que espera ~95s para las acciones que disparan un workflow — acá no hace falta, es una escritura directa).
+
+**Aplicado real de inmediato** al caso ya identificado: se sacó `6a8ef3ac104bb71b3ad13777` del Monitor con la función nueva. El post real en Instagram (si sigue vivo ahí) no se tocó — eso Pablo lo gestiona a mano desde la app, como ya estaba documentado.
+
+Verificado: `tsc --noEmit` limpio, lint en 42 errores preexistentes (sin regresión), 64/64 tests, build limpio.
+
 ## Notas históricas
 
 Visión fundacional original del EDA (spec escrita por Pablo antes de que existiera código, sigue siendo la intención de fondo del proyecto): *"Construir una aplicación de gestión estratégica de contenidos que funcione mediante la interacción de múltiples Agentes de IA. El sistema debe ser capaz de procesar la identidad de marca localmente, debatir estrategias y ejecutar publicaciones automáticas aprendiendo de los resultados."* — Bóveda → RAG, Mesa de Diálogo → 3 agentes (Estratega/Creativo/Crítico), Bucle de Aprendizaje → `rule-engine`/`success_rules`, son la realización de esa visión original. Un detalle que si cambió: el spec original dejaba el "Modo Supervisión" (aprobación antes de publicar) como opcional — el sistema real fue más allá, no hay ningún gate de aprobación humana desde el overhaul del 2026-08-02.

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, X, Clock, ExternalLink, RefreshCw, Loader2 } from "lucide-react";
+import { Check, X, Clock, ExternalLink, RefreshCw, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { historialApi } from "@/services/supabase";
 import { github } from "@/services/github";
@@ -379,12 +379,42 @@ function PostCard({
   post,
   accionesManuales,
   onDone,
+  onDeleted,
 }: {
   post: HistorialPost;
   accionesManuales: Map<string, AccionManual>;
   onDone: () => void;
+  onDeleted: () => void;
 }) {
   const fallidas = post.platforms.filter((p) => p.status === "failed");
+  const [deleting, setDeleting] = useState(false);
+
+  // Hallazgo real 2026-08-27 (Pablo: "no sincroniza correctamente, no
+  // esta dando informacion real ni publicado... ni en zernio"): Zernio
+  // puede seguir reportando una pieza que en la práctica ya no es real
+  // (borrada a mano en la red, o un dato viejo/duplicado sin ninguna
+  // propuesta real detrás) — sync-history.mjs solo refleja lo que Zernio
+  // devuelve, no hay forma de sacarla del Monitor. Esto borra la fila
+  // SOLO de esta caché de lectura (no toca Zernio/Instagram/Facebook) —
+  // si Zernio la sigue reportando de verdad, puede volver a aparecer en
+  // la próxima sincronización (cada 6hs), aviso explícito en el confirm.
+  async function handleDelete() {
+    const ok = window.confirm(
+      `¿Sacar esta pieza del Monitor? Esto solo la saca de esta vista, no borra nada de Instagram/Facebook/Zernio. Si Zernio la sigue reportando de verdad, puede volver a aparecer en la próxima sincronización.`
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      const { error } = await historialApi.removePost(post.id);
+      if (error) throw error;
+      toast({ title: "Sacada del Monitor" });
+      onDeleted();
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "Error desconocido", variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <Card className="flex flex-col overflow-hidden">
@@ -399,15 +429,26 @@ function PostCard({
       <CardContent className="flex flex-1 flex-col gap-2.5 p-4">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-secondary">{post.date}</span>
-          {post.proposalId && (
-            <Link
-              to={`/propuestas?id=${post.proposalId}`}
-              className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+          <div className="flex items-center gap-2">
+            {post.proposalId && (
+              <Link
+                to={`/propuestas?id=${post.proposalId}`}
+                className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+              >
+                Ver propuesta
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            )}
+            <button
+              type="button"
+              title="Sacar del Monitor (no toca Instagram/Facebook/Zernio)"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="text-muted-foreground hover:text-destructive disabled:opacity-50"
             >
-              Ver propuesta
-              <ExternalLink className="h-3 w-3" />
-            </Link>
-          )}
+              {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            </button>
+          </div>
         </div>
         {post.oferta && <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{post.oferta}</span>}
         {post.headline && <span className="text-sm font-medium leading-tight text-primary">{post.headline}</span>}
@@ -533,7 +574,13 @@ export default function Monitor() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} accionesManuales={accionesManuales} onDone={refreshAfterAction} />
+          <PostCard
+            key={post.id}
+            post={post}
+            accionesManuales={accionesManuales}
+            onDone={refreshAfterAction}
+            onDeleted={() => refetch()}
+          />
         ))}
       </div>
 

@@ -280,4 +280,25 @@ export const historialApi = {
       .select("synced_at, posts, acciones_manuales")
       .eq("id", 1)
       .maybeSingle(),
+
+  // Hallazgo real 2026-08-27 (Pablo: "no sincroniza correctamente, no
+  // esta dando informacion real ni publicado... ni en zernio"): apareció
+  // un post real en el historial sin ninguna fila de `proposals` que lo
+  // respalde — historial_cache lo trae porque sync-history.mjs solo
+  // refleja lo que Zernio devuelve, y no hay forma de sacar del Monitor
+  // algo que Zernio sigue reportando aunque ya no sea real (borrado a
+  // mano en la red, o un dato viejo de Zernio). Esto borra la fila SOLO
+  // de esta caché de lectura — no toca Zernio ni Instagram/Facebook, para
+  // eso están los botones de despublicar. Lee-modifica-escribe el array
+  // completo porque PostgREST no tiene un operador nativo para sacar un
+  // elemento de un jsonb array por condición.
+  removePost: async (postId: string) => {
+    const { data, error } = await supabase.from("historial_cache").select("posts").eq("id", 1).maybeSingle();
+    if (error) throw error;
+    const posts = ((data?.posts as { id: string }[] | null) || []).filter((p) => p.id !== postId);
+    return supabase
+      .from("historial_cache")
+      .update({ posts, updated_at: new Date().toISOString() })
+      .eq("id", 1);
+  },
 };
