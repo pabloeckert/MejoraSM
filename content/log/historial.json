@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-27T00:15:13.467Z",
+  "syncedAt": "2026-08-27T00:24:39.615Z",
   "posts": [
+    {
+      "id": "6a8f82fb504b3906f22a1372",
+      "date": "2026-08-27",
+      "status": "published",
+      "content": "Hacés 40 llamados por semana y cerrás 2. El problema no es que no laburás.\n¿Tu equipo de ventas tiene proceso o tiene esfuerzo?\n#Ventas\n#ProcesoDeVentas\n#MejoraOK\n#Emprendedores\n#Pymes\n#GestiónComercial\n#Productividad\n#Argentina",
+      "kind": "post",
+      "proposalId": "88296577-0a15-4b95-a0e5-f44620c5baf5",
+      "headline": "Hacés 40 llamados por semana y cerrás 2. El problema no es que no laburás.",
+      "kicker": null,
+      "oferta": "comercial",
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-08-27-88296577-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DchfP-mjXwv/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1353415796877902"
+        }
+      ]
+    },
     {
       "id": "6a8f7eda8b074a2e02a08433",
       "date": "2026-08-27",
