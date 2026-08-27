@@ -13,8 +13,16 @@ const ZERNIO_API_URL = "https://zernio.com/api/v1/posts";
 // fallo — se resuelve solo unos segundos después. Reconsultamos el post
 // antes de darlo por perdido (docs.zernio.com: "Fetch the post back — its
 // status tells you exactly where it is in the pipeline").
-const POLL_ATTEMPTS = 4;
-const POLL_DELAY_MS = 8000;
+//
+// Hallazgo real 2026-08-27, ronda de pruebas end-to-end: con 4 intentos x
+// 8s (32s totales), un post real de prueba se marcó "failed" en este script
+// pese a que Instagram terminó de procesarlo poco después — confirmado
+// contra el historial real de Zernio minutos más tarde (published, con URL
+// real). El corte de 32s era demasiado corto para el caso real observado.
+// Subido a 8 intentos x 10s (80s totales) — sigue acotado (no cuelga el
+// job para siempre) pero le da más margen real a Meta antes de rendirse.
+const POLL_ATTEMPTS = 8;
+const POLL_DELAY_MS = 10000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -53,8 +61,23 @@ export async function createPostAndPoll({ apiKey, content, imageUrl, platforms }
     const data = await res.json();
     if (!res.ok) {
       // 409 = Zernio detectó contenido duplicado dentro de las últimas 24hs
-      // y no creó un post nuevo — viene con existingPostId, útil para no
-      // confundirlo con un fallo genérico.
+      // y no creó un post nuevo — viene con existingPostId.
+      //
+      // Hallazgo real 2026-08-27, mismo caso que motivó subir el polling de
+      // arriba: si el intento ANTERIOR se declaró "failed" acá por un
+      // timeout de polling corto, pero en realidad terminó publicando bien
+      // unos segundos después, un reintento choca con este 409 — y hasta
+      // ahora eso se reportaba como un fallo más, escondiendo que la pieza
+      // real ya está publicada de verdad. Antes de devolver error, se
+      // reconsulta el post existente — si ya está publicado en todas las
+      // plataformas pedidas, se lo trata como éxito real (self-healing),
+      // en vez de dejar a quien reintenta creyendo que no salió nada.
+      if (data.existingPostId) {
+        const existing = await fetchPostPlatforms(data.existingPostId, apiKey);
+        if (existing && existing.every((p) => p.status === "published")) {
+          return { success: true, postId: data.existingPostId, platforms: existing, reconciled: true };
+        }
+      }
       return {
         success: false,
         // Mismo hallazgo que el corte de abajo: 300 caracteres es

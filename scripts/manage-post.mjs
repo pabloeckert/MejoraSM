@@ -96,7 +96,11 @@ async function reintentar(apiKey, proposal) {
     process.exit(1);
   }
 
-  console.log(`Reintento OK — nuevo post: ${result.postId}`);
+  console.log(
+    result.reconciled
+      ? `Reintento OK — resultó ser el mismo post de un intento anterior que sí había salido bien (${result.postId}), Zernio lo confirmó publicado en todas las plataformas.`
+      : `Reintento OK — nuevo post: ${result.postId}`
+  );
 }
 
 async function despublicar(apiKey, proposal) {

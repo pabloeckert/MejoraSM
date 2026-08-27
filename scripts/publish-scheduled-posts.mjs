@@ -49,11 +49,6 @@ async function markPublished(proposalId, zernioPostId) {
       `RIESGO DE DUPLICADO: la propuesta ${proposalId} sigue viéndose "scheduled" — la próxima corrida la va a volver a publicar. Corregir el status a mano ya mismo.`
     );
   }
-  await fetch(`${SUPABASE_URL}/rest/v1/calendar_events?proposal_id=eq.${proposalId}`, {
-    method: "PATCH",
-    headers: restHeaders({ Prefer: "return=minimal" }),
-    body: JSON.stringify({ status: "published" }),
-  });
 }
 
 // Segunda capa de la misma mitigación: re-chequea el status justo antes de
