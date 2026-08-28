@@ -1,6 +1,54 @@
 {
-  "syncedAt": "2026-08-27T17:04:20.161Z",
+  "syncedAt": "2026-08-28T01:53:50.788Z",
   "posts": [
+    {
+      "id": "6a90be106535bb1f5804fda7",
+      "date": "2026-08-27",
+      "status": "published",
+      "content": "Los equipos no se traban por falta de ganas, se traban cuando nadie sabe bien dónde termina su rol y empieza el del otro. Si sentís que en tu equipo todos hacen un poco de todo (y nada avanza del todo), hablemos.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-27-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3973270193254019550"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
+    {
+      "id": "6a90bdf600fe893489ad2977",
+      "date": "2026-08-27",
+      "status": "published",
+      "content": "Todo cambio en tu empresa empieza por quien lidera. Trabajamos liderazgo, gestión emocional y creencias en conjunto, nunca por separado. Escribinos y arranquemos por ahí.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-27-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3973269993092732581"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a8ef3ac104bb71b3ad13777",
       "date": "2026-08-26",
