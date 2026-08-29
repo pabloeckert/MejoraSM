@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-29T16:07:30.316Z",
+  "syncedAt": "2026-08-29T20:09:12.065Z",
   "posts": [
+    {
+      "id": "6a930f979315ed752cb9ce09",
+      "date": "2026-08-29",
+      "status": "published",
+      "content": "La agenda llena no es lo mismo que el día bien usado. ¿Cuál es tu única prioridad de hoy? Contanos en los comentarios.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-29-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3974544786245736221"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a92112b37065ab1527b3290",
       "date": "2026-08-28",
