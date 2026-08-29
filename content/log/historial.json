@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-28T17:52:31.231Z",
+  "syncedAt": "2026-08-29T01:18:11.935Z",
   "posts": [
+    {
+      "id": "6a92112b37065ab1527b3290",
+      "date": "2026-08-28",
+      "status": "published",
+      "content": "Negociar bien no es regalar descuentos, es encontrar dónde se encuentran tu valor y lo que el cliente necesita. Si sentís que cada venta termina en rebaja, hablemos de tu estrategia comercial.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-28-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3973998417215034872"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a90be106535bb1f5804fda7",
       "date": "2026-08-27",
