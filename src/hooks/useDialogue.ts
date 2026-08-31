@@ -67,6 +67,18 @@ export function useContinueDialogue() {
   return useMutation({
     mutationFn: ({ sessionId, feedback }: { sessionId: string; feedback: string }) =>
       continueDialogue(sessionId, feedback),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["dialogue-sessions"] }),
+    // Hallazgo real 2026-08-31 (Pablo: mandó feedback tras un rechazo y la
+    // pantalla quedó "igual, como si no hubiera tomado nada"): esto solo
+    // invalidaba ["dialogue-sessions"] (la lista) — nunca
+    // ["dialogue-messages", sessionId], la query real de los turnos del
+    // chat. useDialogueMessages además corta su polling de 5s apenas
+    // session.status deja de ser "active" (fix de perf del 2026-08-25), así
+    // que sin esta invalidación explícita los turnos nuevos del Creativo/
+    // Crítico de la segunda vuelta nunca llegaban a la pantalla — quedaba
+    // literalmente congelada en la ronda anterior hasta un F5 manual.
+    onSuccess: (_result, variables) => {
+      qc.invalidateQueries({ queryKey: ["dialogue-sessions"] });
+      qc.invalidateQueries({ queryKey: ["dialogue-messages", variables.sessionId] });
+    },
   });
 }

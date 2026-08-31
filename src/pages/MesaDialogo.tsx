@@ -93,6 +93,15 @@ function MesaDialogoContent() {
           });
         }
       },
+      // Mismo hallazgo real 2026-08-31 que en handleContinue — sin esto,
+      // un fallo acá (timeout de 150s, red) no avisaba nada.
+      onError: (e) => {
+        toast({
+          title: "No se pudo iniciar la sesión",
+          description: e instanceof Error ? e.message : "Error desconocido — probá de nuevo.",
+          variant: "destructive",
+        });
+      },
     });
   };
 
@@ -100,7 +109,20 @@ function MesaDialogoContent() {
     if (!feedback.trim()) return;
     continueMutation.mutate(
       { sessionId, feedback },
-      { onSuccess: () => setFeedback("") }
+      {
+        onSuccess: () => setFeedback(""),
+        // Hallazgo real 2026-08-31: si esto fallaba (timeout de 150s, red),
+        // no había ningún aviso — el feedback quedaba tipeado en la caja
+        // sin ninguna señal de que no se mandó, indistinguible de un éxito
+        // silencioso para quien lo está mirando.
+        onError: (e) => {
+          toast({
+            title: "No se pudo mandar el feedback",
+            description: e instanceof Error ? e.message : "Error desconocido — probá de nuevo.",
+            variant: "destructive",
+          });
+        },
+      }
     );
   };
 
