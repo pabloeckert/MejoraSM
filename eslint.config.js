@@ -5,10 +5,13 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  // supabase/functions/** son Deno (Deno.serve, imports npm:/jsr:, sin este
+  // tsconfig) — este ESLint es la config del frontend browser/React y sobre
+  // esos archivos solo genera falsos positivos. Deno tiene su propio lint.
+  { ignores: ["dist", "supabase/functions/**"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ["**/*.{ts,tsx}"],
+    files: ["src/**/*.{ts,tsx}"],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,

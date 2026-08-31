@@ -23,13 +23,14 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      # PM5 (auditoría 2026-08-31): la deuda de lint bajó de 42 errores a 0
+      # (no-explicit-any tipados, eslint acotado a src/, Deno fuera de scope).
+      # Se saca continue-on-error — lint vuelve a ser bloqueante.
+      - name: Typecheck
+        run: npx tsc --noEmit
+
       - name: Lint
-        run: npm run lint --if-present
-        # 42 errores preexistentes documentados (no-explicit-any, deuda
-        # aceptada), sin branch protection en main. Sin continue-on-error
-        # acá, este step corta el job y "Run tests"/"Build" —las que
-        # detectan regresiones funcionales reales— nunca llegan a correr.
-        continue-on-error: true
+        run: npm run lint
 
       - name: Run tests
         run: npm test

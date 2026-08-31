@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ProposalRow } from "@/shared/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useStartDialogue } from "@/hooks/useDialogue";
+import type { DialogueResult } from "@/services/ai";
 import { useProposals, useApproveProposal } from "@/hooks/useProposals";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "@/components/ui/use-toast";
@@ -32,7 +34,7 @@ export default function Laboratorio() {
 
 function LaboratorioContent() {
   const [description, setDescription] = useState("");
-  const [generatedContent, setGeneratedContent] = useState<any>(null);
+  const [generatedContent, setGeneratedContent] = useState<DialogueResult | null>(null);
   const startDialogue = useStartDialogue();
   const { data: proposals } = useProposals();
   const approveMutation = useApproveProposal();
@@ -51,7 +53,7 @@ function LaboratorioContent() {
     if (!description.trim()) return;
 
     startDialogue.mutate(description, {
-      onSuccess: (result: any) => {
+      onSuccess: (result: DialogueResult) => {
         setGeneratedContent(result);
         setDescription("");
       },
@@ -300,7 +302,7 @@ function LaboratorioContent() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {proposals.slice(0, 5).map((p: any) => (
+              {(proposals as ProposalRow[]).slice(0, 5).map((p) => (
                 <div
                   key={p.id}
                   className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/40"

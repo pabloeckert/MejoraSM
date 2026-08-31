@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import type { DocRow } from "@/shared/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -86,7 +87,7 @@ function BovedaContent() {
     }
   };
 
-  const filteredDocs = documents?.filter((d: any) =>
+  const filteredDocs = (documents as DocRow[] | undefined)?.filter((d) =>
     d.title?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -203,7 +204,7 @@ function BovedaContent() {
         </Card>
       ) : (
         <div className="grid gap-3">
-          {filteredDocs.map((doc: any) => {
+          {filteredDocs.map((doc: DocRow) => {
             const status: ProcessingStatus = doc.processing_status || (doc.content ? "ready" : "pending");
             const meta = STATUS_META[status] || STATUS_META.pending;
             // B18 (auditoría 2026-08-31): antes solo se podía reprocesar desde

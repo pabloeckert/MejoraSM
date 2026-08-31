@@ -55,7 +55,7 @@ describe("AI Service", () => {
 // Use vi.hoisted so mocks are available when vi.mock is hoisted
 const { mockFrom, mockStorageFrom } = vi.hoisted(() => {
   const chain = () => {
-    const obj: Record<string, any> = {};
+    const obj: Record<string, unknown> = {};
     const methods = ["select", "eq", "order", "single", "limit", "range", "insert", "update", "delete"];
     methods.forEach((m) => {
       obj[m] = vi.fn(() => obj);

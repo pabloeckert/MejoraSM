@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ProposalRow } from "@/shared/types";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -651,19 +652,19 @@ function DashboardContent() {
   ];
 
   const formatCounts: Record<string, number> = {};
-  proposals?.forEach((p: any) => {
+  (proposals as ProposalRow[] | undefined)?.forEach((p) => {
     const format = p.format || "post";
     formatCounts[format] = (formatCounts[format] || 0) + 1;
   });
   const formatData = Object.entries(formatCounts).map(([name, value]) => ({ name, value }));
 
-  const recentActivity = (proposals || [])
-    .filter((p: any) => p.status === "published" || p.status === "scheduled" || p.status === "pending")
-    .map((p: any) => ({
+  const recentActivity = (proposals as ProposalRow[] | undefined ?? [])
+    .filter((p) => p.status === "published" || p.status === "scheduled" || p.status === "pending")
+    .map((p) => ({
       ...p,
       displayDate: p.published_at || p.scheduled_at || p.created_at,
     }))
-    .sort((a: any, b: any) => new Date(b.displayDate).getTime() - new Date(a.displayDate).getTime())
+    .sort((a: ProposalRow & { displayDate?: string }, b: ProposalRow & { displayDate?: string }) => new Date(b.displayDate || 0).getTime() - new Date(a.displayDate || 0).getTime())
     .slice(0, 5);
 
   const lastSync = visibleMetrics.reduce<string | null>((latest, m) => {
@@ -1062,7 +1063,7 @@ function DashboardContent() {
             </div>
           ) : (
             <div className="flex flex-col">
-              {pendingProposals.slice(0, 5).map((p: any) => (
+              {(pendingProposals as ProposalRow[]).slice(0, 5).map((p) => (
                 <Link
                   key={p.id}
                   to="/laboratorio"
@@ -1105,7 +1106,7 @@ function DashboardContent() {
             </div>
           ) : (
             <div className="flex flex-col">
-              {recentActivity.map((p: any) => {
+              {(recentActivity as (ProposalRow & { displayDate?: string })[]).map((p) => {
                 const statusMeta = STATUS_META[p.status] ?? STATUS_META.pending;
                 return (
                   <div
