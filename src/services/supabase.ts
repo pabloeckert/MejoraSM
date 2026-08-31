@@ -16,7 +16,17 @@ if (!supabaseUrl || !supabaseKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl ?? "", supabaseKey ?? "");
+// createClient() valida el formato de la URL de forma síncrona al importar
+// el módulo — con "" (caso sin .env) tira "supabaseUrl is required." y
+// rompe cualquier test/build que importe este archivo, no solo las
+// pantallas que de verdad necesitan la conexión real. El placeholder
+// mantiene el formato válido para no crashear en frío; el error real de
+// red al llamar la API sigue avisando fuerte igual, y el console.error de
+// arriba ya deja explícito qué falta configurar.
+export const supabase = createClient(
+  supabaseUrl || "https://placeholder.supabase.co",
+  supabaseKey || "placeholder-anon-key"
+);
 
 // PostgREST devuelve como máximo 1000 filas por default (db-max-rows), sin
 // error ni aviso — simplemente falta el resto. Hallazgo real de auditoría
