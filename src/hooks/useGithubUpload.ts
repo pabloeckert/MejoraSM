@@ -4,6 +4,7 @@ import { github, type GhWhoami } from "@/services/github";
 import { toast } from "@/hooks/use-toast";
 
 export function useGithubConnection() {
+  const queryClient = useQueryClient();
   const [connected, setConnected] = useState(github.isConnected());
   const [checking, setChecking] = useState(false);
   const [user, setUser] = useState<string | null>(null);
@@ -17,6 +18,10 @@ export function useGithubConnection() {
     if (r.ok && r.canWrite) {
       setConnected(true);
       setUser(r.login ?? null);
+      // B13 (auditoría 2026-08-31): antes esto forzaba window.location.reload()
+      // para "refrescar el estado en toda la pantalla" — tiraba scroll, estado
+      // y trabajo en vuelo. Alcanza con re-consultar los listados de GitHub.
+      queryClient.invalidateQueries({ queryKey: ["gh-dir"] });
     } else if (r.ok && !r.canWrite) {
       // Hallazgo real de auditoría 2026-08-25: un token válido pero de solo
       // lectura (permiso "Contents" en Read-only, un error fácil de cometer
@@ -40,6 +45,7 @@ export function useGithubConnection() {
     setConnected(false);
     setUser(null);
     setError(null);
+    queryClient.invalidateQueries({ queryKey: ["gh-dir"] });
   }
 
   return { connected, checking, user, error, connect, disconnect };
@@ -87,6 +93,10 @@ interface UploadState {
   id: string;
   file: File;
   fileName: string;
+  // B10 (auditoría 2026-08-31): la dimensión se leía del closure del hook, así
+  // que cambiar de pestaña mientras una tanda subía mandaba el lote a la
+  // dimensión equivocada. Ahora viaja pegada a cada item de la cola.
+  dimension: string;
   status: "pending" | "uploading" | "done" | "error";
   error?: string;
 }
@@ -95,7 +105,7 @@ function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function usePhotoUpload(dimension: string, onDone?: () => void) {
+export function usePhotoUpload(onDone?: () => void) {
   const [uploads, setUploads] = useState<UploadState[]>([]);
   const queryClient = useQueryClient();
   // Cola real (ref, no state) + flag de "procesando" — hallazgo real de
@@ -135,32 +145,47 @@ export function usePhotoUpload(dimension: string, onDone?: () => void) {
     try {
       const dataUrl = await readAsDataUrl(item.file);
       const filename = safeFilename(item.file.name);
-      await github.commitPhoto(dimension, filename, dataUrl);
+      await github.commitPhoto(item.dimension, filename, dataUrl);
       setUploads((prev) => prev.map((u) => (u.id === item.id ? { ...u, status: "done" } : u)));
+      return item.dimension;
     } catch (e) {
       setUploads((prev) =>
         prev.map((u) => (u.id === item.id ? { ...u, status: "error", error: e instanceof Error ? e.message : "Error" } : u))
       );
+      return null;
     }
   }
 
   async function processQueue() {
     if (processingRef.current) return;
     processingRef.current = true;
+    const touched = new Set<string>();
     while (queueRef.current.length > 0) {
       const item = queueRef.current.shift();
-      if (item) await runOne(item);
+      if (item) {
+        const dim = await runOne(item);
+        if (dim) touched.add(dim);
+      }
     }
     processingRef.current = false;
-    queryClient.invalidateQueries({ queryKey: ["gh-dir", `content/inbox/${dimension}`] });
+    for (const dim of touched) {
+      queryClient.invalidateQueries({ queryKey: ["gh-dir", `content/inbox/${dim}`] });
+    }
     onDone?.();
   }
 
-  function uploadFiles(fileList: FileList | File[]) {
-    const files = Array.from(fileList).filter((f) => f.type.startsWith("image/"));
-    if (!files.length) return;
+  // Acepta [{ file, dimension }] — la dimensión viaja por foto, no del closure.
+  function uploadFiles(entries: { file: File; dimension: string }[]) {
+    const valid = entries.filter((e) => e.file.type.startsWith("image/"));
+    if (!valid.length) return;
 
-    const items: UploadState[] = files.map((f) => ({ id: makeId(), file: f, fileName: f.name, status: "pending" }));
+    const items: UploadState[] = valid.map((e) => ({
+      id: makeId(),
+      file: e.file,
+      fileName: e.file.name,
+      dimension: e.dimension,
+      status: "pending",
+    }));
     setUploads((prev) => [...prev, ...items]);
     queueRef.current.push(...items);
     void processQueue();

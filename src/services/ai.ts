@@ -44,6 +44,12 @@ class ApiError extends Error {
 // sigue trabajando de verdad. 150s da margen real (peor caso: ~6 llamadas
 // externas con backoff) sin dejar a alguien esperando indefinidamente.
 const DIALOGUE_TIMEOUT_MS = 150_000;
+// B14 (auditoría 2026-08-31): antes solo el debate tenía timeout — vault-process,
+// classify-photo y el copiloto usaban fetch pelado y podían colgarse para
+// siempre. classify-photo es el peor caso: bloquea el botón "Confirmar" del
+// flujo de subida.
+const VAULT_TIMEOUT_MS = 90_000;
+const QUICK_TIMEOUT_MS = 45_000;
 
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
@@ -152,11 +158,11 @@ export interface ProcessResult {
 }
 
 export async function processDocument(documentId: string): Promise<ProcessResult> {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/vault-process`, {
-    method: "POST",
-    headers: await buildHeaders(),
-    body: JSON.stringify({ action: "process", documentId }),
-  });
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/vault-process`,
+    { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "process", documentId }) },
+    VAULT_TIMEOUT_MS
+  );
   return handleResponse(res, "Error procesando el documento");
 }
 
@@ -177,11 +183,11 @@ export interface CopilotChatMessage {
 }
 
 export async function getCopilotAdvice(): Promise<CopilotAdvice> {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/copilot`, {
-    method: "POST",
-    headers: await buildHeaders(),
-    body: JSON.stringify({ action: "advice" }),
-  });
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/copilot`,
+    { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "advice" }) },
+    QUICK_TIMEOUT_MS
+  );
   return handleResponse(res, "Error generando el consejo del día");
 }
 
@@ -189,11 +195,11 @@ export async function sendCopilotMessage(
   question: string,
   history: CopilotChatMessage[]
 ): Promise<{ answer: string }> {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/copilot`, {
-    method: "POST",
-    headers: await buildHeaders(),
-    body: JSON.stringify({ action: "chat", question, history }),
-  });
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/copilot`,
+    { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "chat", question, history }) },
+    QUICK_TIMEOUT_MS
+  );
   return handleResponse(res, "Error consultando al copiloto");
 }
 
@@ -207,10 +213,10 @@ export interface DimensionSuggestion {
 }
 
 export async function suggestPhotoDimension(imageBase64: string, mimeType: string): Promise<DimensionSuggestion> {
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/classify-photo`, {
-    method: "POST",
-    headers: await buildHeaders(),
-    body: JSON.stringify({ action: "suggest", imageBase64, mimeType }),
-  });
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/classify-photo`,
+    { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "suggest", imageBase64, mimeType }) },
+    QUICK_TIMEOUT_MS
+  );
   return handleResponse(res, "Error sugiriendo la dimensión de la foto");
 }

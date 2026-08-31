@@ -46,10 +46,10 @@ describe("usePhotoUpload", () => {
       })
       .mockResolvedValue({});
 
-    const { result } = renderHook(() => usePhotoUpload("personal"), { wrapper });
+    const { result } = renderHook(() => usePhotoUpload(), { wrapper });
 
     act(() => {
-      result.current.uploadFiles([makeFile("foto-tanda-1.jpg")]);
+      result.current.uploadFiles([{ file: makeFile("foto-tanda-1.jpg"), dimension: "personal" }]);
     });
 
     await waitFor(() => {
@@ -59,7 +59,7 @@ describe("usePhotoUpload", () => {
 
     // Se confirma una segunda tanda (2 fotos) MIENTRAS la primera sigue colgada.
     act(() => {
-      result.current.uploadFiles([makeFile("foto-tanda-2-a.jpg"), makeFile("foto-tanda-2-b.jpg")]);
+      result.current.uploadFiles([{ file: makeFile("foto-tanda-2-a.jpg"), dimension: "personal" }, { file: makeFile("foto-tanda-2-b.jpg"), dimension: "personal" }]);
     });
 
     // Las 3 fotos conviven en el estado — nada se pisó.
@@ -89,10 +89,10 @@ describe("usePhotoUpload", () => {
   it("reintentar una foto que falló la vuelve a subir sin afectar a las demás", async () => {
     commitPhotoMock.mockRejectedValueOnce(new Error("No se pudo commitear (401)")).mockResolvedValue({});
 
-    const { result } = renderHook(() => usePhotoUpload("personal"), { wrapper });
+    const { result } = renderHook(() => usePhotoUpload(), { wrapper });
 
     act(() => {
-      result.current.uploadFiles([makeFile("falla.jpg")]);
+      result.current.uploadFiles([{ file: makeFile("falla.jpg"), dimension: "personal" }]);
     });
 
     await waitFor(() => {
@@ -114,10 +114,10 @@ describe("usePhotoUpload", () => {
   it("clearUploads deja los errores visibles y solo saca lo que salió bien", async () => {
     commitPhotoMock.mockRejectedValueOnce(new Error("falló")).mockResolvedValueOnce({});
 
-    const { result } = renderHook(() => usePhotoUpload("personal"), { wrapper });
+    const { result } = renderHook(() => usePhotoUpload(), { wrapper });
 
     act(() => {
-      result.current.uploadFiles([makeFile("ok.jpg"), makeFile("mal.jpg")]);
+      result.current.uploadFiles([{ file: makeFile("ok.jpg"), dimension: "personal" }, { file: makeFile("mal.jpg"), dimension: "personal" }]);
     });
 
     await waitFor(() => {

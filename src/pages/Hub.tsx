@@ -10,6 +10,12 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import {
   Upload,
@@ -23,27 +29,26 @@ import {
   Sparkles,
   X,
   RotateCw,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { github } from "@/services/github";
 import { useGithubConnection, useDirListing, usePhotoUpload } from "@/hooks/useGithubUpload";
-import { suggestPhotoDimension, type DimensionSuggestion } from "@/services/ai";
+import { suggestPhotoDimension } from "@/services/ai";
 import { toast } from "@/hooks/use-toast";
 
 // Rediseño 2026-08-17, a pedido directo de Pablo: "Subir material" dejó de
 // ser 5 links a la UI cruda de upload de GitHub — ahora es una interfaz
-// propia, con el mismo UX/UI que el resto del EDA, que además deja VER lo
-// que ya se subió (pendiente y ya usado por el pipeline) y da acceso al
-// historial real (Monitor). Usa el mismo cliente de GitHub y la MISMA
-// clave de localStorage que la Biblioteca (src/services/github.ts) — una
-// sola sesión de GitHub para todo el sitio.
+// propia. Usa el mismo cliente de GitHub y la MISMA clave de localStorage
+// que la Biblioteca (src/services/github.ts).
 //
-// Ajustado el mismo día tras el Taller de la Oferta (artifact respondido
-// por Pablo y Sindy juntos): "Oferta" confundía — se renombró a "Dimensión
-// del servicio" en toda la UI. Se agregó "Sociales" como 6ta dimensión, la
-// única que NO es de servicio (es la vida social/de equipo de la marca —
-// After Office, alianzas, celebraciones). La lista queda estática a
-// propósito ("los Servicios deberían ser estático hoy" — respuesta real).
+// Auditoría 2026-08-31:
+//  B9  — antes classify-photo miraba solo la 1ra foto del lote y la dimensión
+//        se aplicaba a todas. Ahora se clasifica cada foto y hay un selector
+//        de dimensión por foto en el paso de confirmación, con thumbnail.
+//  B10 — la dimensión viaja pegada a cada foto (ver useGithubUpload), no del
+//        estado del componente.
+//  B13 — conectar GitHub ya no hace window.location.reload().
 const OFERTAS = [
   { key: "personal", kicker: "Personal", title: "Liderazgo y foco" },
   { key: "organizacional", kicker: "Organizacional", title: "Equipo y cultura" },
@@ -53,8 +58,26 @@ const OFERTAS = [
   { key: "sociales", kicker: "Sociales", title: "Equipo, alianzas y celebraciones" },
 ];
 
-function ConnectGithubDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const { checking, error, connect } = useGithubConnection();
+const KICKER = (key: string) => OFERTAS.find((o) => o.key === key)?.kicker ?? key;
+
+// GitHub Contents API corta cerca de los 40MB por archivo; y las fotos del
+// celular en HEIC no las renderiza ni el navegador ni el pipeline (Chromium).
+const MAX_FILE_MB = 25;
+const HEIC_RE = /\.(heic|heif)$/i;
+
+function ConnectGithubDialog({
+  open,
+  onOpenChange,
+  connect,
+  checking,
+  error,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  connect: (token: string) => Promise<{ ok: boolean }>;
+  checking: boolean;
+  error: string | null;
+}) {
   const [token, setToken] = useState("");
 
   async function handleConnect() {
@@ -62,7 +85,6 @@ function ConnectGithubDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     if (r.ok) {
       setToken("");
       onOpenChange(false);
-      window.location.reload(); // refresca el estado de conexión en toda la pantalla
     }
   }
 
@@ -95,7 +117,7 @@ function ConnectGithubDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           <li>En Permissions → Repository → Contents ponelo en Read and write.</li>
           <li>
             En Permissions → Repository → Actions ponelo también en Read and write (hace falta para reintentar/
-            despublicar/marcar a mano desde acá, en Monitor, sin ir a GitHub).
+            despublicar/marcar a mano desde Monitor).
           </li>
           <li>Generá el token, copialo y pegalo acá abajo.</li>
         </ol>
@@ -123,7 +145,13 @@ function PhotoGrid({ dimension, folder, emptyLabel }: { dimension: string; folde
   const photos = (entries || []).filter((e) => e.type === "file");
 
   if (isLoading) {
-    return <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="aspect-square animate-pulse rounded-md bg-muted" />)}</div>;
+    return (
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="aspect-square animate-pulse rounded-md bg-muted" />
+        ))}
+      </div>
+    );
   }
   if (isError) {
     return <p className="text-xs text-muted-foreground">No se pudo consultar esta carpeta ahora mismo.</p>;
@@ -148,7 +176,16 @@ function PhotoGrid({ dimension, folder, emptyLabel }: { dimension: string; folde
             loading="lazy"
             className="h-full w-full object-cover transition-opacity group-hover:opacity-80"
             onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
+              const el = e.currentTarget as HTMLImageElement;
+              el.style.display = "none";
+              const parent = el.parentElement;
+              if (parent && !parent.querySelector(".img-fallback")) {
+                const span = document.createElement("span");
+                span.className =
+                  "img-fallback absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground";
+                span.textContent = "no disponible";
+                parent.appendChild(span);
+              }
             }}
           />
         </a>
@@ -166,74 +203,129 @@ function readAsDataUrl(file: File): Promise<string> {
   });
 }
 
+// Reduce la imagen a ~1280px de lado mayor antes de mandarla a classify-photo —
+// una foto de celular en full res son varios MB de base64 al pedo para una
+// clasificación (B14/perf, auditoría 2026-08-31).
+async function downscaleForClassify(file: File): Promise<{ base64: string; mimeType: string }> {
+  const dataUrl = await readAsDataUrl(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("no image"));
+      el.src = dataUrl;
+    });
+    const max = 1280;
+    const scale = Math.min(1, max / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const out = canvas.toDataURL("image/jpeg", 0.8);
+    return { base64: out.slice(out.indexOf(",") + 1), mimeType: "image/jpeg" };
+  } catch {
+    return { base64: dataUrl.slice(dataUrl.indexOf(",") + 1), mimeType: file.type || "image/jpeg" };
+  }
+}
+
+interface PendingPhoto {
+  id: string;
+  file: File;
+  previewUrl: string;
+  dimension: string;
+  suggested: string | null;
+  suggesting: boolean;
+}
+
 export default function Hub() {
   const [connectOpen, setConnectOpen] = useState(false);
   const [selectedDim, setSelectedDim] = useState("personal");
-  const connected = github.isConnected();
-  const { uploads, uploadFiles, retryUpload, clearUploads } = usePhotoUpload(selectedDim, () => setTimeout(clearUploads, 2500));
+  const { connected, checking, error, connect, disconnect, user } = useGithubConnection();
+  const { uploads, uploadFiles, retryUpload, clearUploads } = usePhotoUpload(() => setTimeout(clearUploads, 2500));
   const [dragActive, setDragActive] = useState(false);
 
-  // "El sistema propone" — respuesta real de Pablo y Sindy al Taller de la
-  // Oferta (2026-08-17): antes de commitear, se sugiere la dimensión
-  // mirando la foto real (classify-photo, Claude con visión), pre-seleccionando
-  // la pestaña — el humano confirma o corrige antes de que se guarde, nunca
-  // se decide sola.
-  const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
-  const [suggestion, setSuggestion] = useState<DimensionSuggestion | null>(null);
-  const [suggesting, setSuggesting] = useState(false);
+  const [pending, setPending] = useState<PendingPhoto[] | null>(null);
 
   async function handleFilesSelected(fileList: FileList | File[]) {
     const all = Array.from(fileList);
-    const files = all.filter((f) => f.type.startsWith("image/"));
-    if (!files.length) {
-      // Hallazgo real de auditoría 2026-08-25: arrastrar o elegir por error
-      // un archivo que no es imagen (PDF, video, un contacto compartido
-      // desde la galería del celular) no hacía absolutamente nada — sin
-      // este aviso es indistinguible de "la app no responde".
-      if (all.length > 0) {
-        toast({
-          variant: "destructive",
-          title: "Eso no es una imagen",
-          description: "El sistema solo procesa fotos (jpg, png, webp) por ahora.",
-        });
+    const rejected: string[] = [];
+    const files = all.filter((f) => {
+      if (!f.type.startsWith("image/") && !HEIC_RE.test(f.name)) {
+        rejected.push(`${f.name}: no es una imagen`);
+        return false;
       }
-      return;
+      if (HEIC_RE.test(f.name)) {
+        rejected.push(`${f.name}: HEIC no se puede usar (convertila a JPG en el celu primero)`);
+        return false;
+      }
+      if (f.size > MAX_FILE_MB * 1024 * 1024) {
+        rejected.push(`${f.name}: pesa ${(f.size / 1024 / 1024).toFixed(1)}MB (máx ${MAX_FILE_MB}MB)`);
+        return false;
+      }
+      return true;
+    });
+
+    if (rejected.length) {
+      toast({
+        variant: "destructive",
+        title: rejected.length === all.length ? "No se puede usar ninguno" : "Algunas fotos quedaron afuera",
+        description: rejected.slice(0, 4).join(" · "),
+      });
     }
-    setPendingFiles(files);
-    setSuggestion(null);
-    setSuggesting(true);
-    try {
-      const dataUrl = await readAsDataUrl(files[0]);
-      const mimeType = files[0].type || "image/jpeg";
-      const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
-      const result = await suggestPhotoDimension(base64, mimeType);
-      setSuggestion(result);
-      setSelectedDim(result.dimension);
-    } catch {
-      // Si la sugerencia falla (red, IA no disponible, etc.) no bloquea el
-      // flujo — el humano sigue pudiendo elegir la dimensión a mano y confirmar.
-    } finally {
-      setSuggesting(false);
-    }
+    if (!files.length) return;
+
+    const items: PendingPhoto[] = files.map((f) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      file: f,
+      previewUrl: URL.createObjectURL(f),
+      dimension: selectedDim,
+      suggested: null,
+      suggesting: true,
+    }));
+    setPending(items);
+
+    // B9: clasificar cada foto, en paralelo. Si falla una, queda con la
+    // dimensión de la pestaña seleccionada — el humano confirma o corrige.
+    await Promise.allSettled(
+      items.map(async (it) => {
+        try {
+          const { base64, mimeType } = await downscaleForClassify(it.file);
+          const res = await suggestPhotoDimension(base64, mimeType);
+          setPending((prev) =>
+            prev
+              ? prev.map((p) => (p.id === it.id ? { ...p, dimension: res.dimension, suggested: res.dimension, suggesting: false } : p))
+              : prev
+          );
+        } catch {
+          setPending((prev) => (prev ? prev.map((p) => (p.id === it.id ? { ...p, suggesting: false } : p)) : prev));
+        }
+      })
+    );
+  }
+
+  function setPendingDimension(id: string, dimension: string) {
+    setPending((prev) => (prev ? prev.map((p) => (p.id === id ? { ...p, dimension } : p)) : prev));
   }
 
   function confirmUpload() {
-    if (!pendingFiles) return;
-    uploadFiles(pendingFiles);
-    setPendingFiles(null);
-    setSuggestion(null);
+    if (!pending) return;
+    uploadFiles(pending.map((p) => ({ file: p.file, dimension: p.dimension })));
+    pending.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+    setPending(null);
   }
 
   function cancelUpload() {
-    setPendingFiles(null);
-    setSuggestion(null);
+    pending?.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+    setPending(null);
   }
+
+  const anySuggesting = !!pending?.some((p) => p.suggesting);
 
   return (
     <div className="space-y-7">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-[32px] font-medium leading-tight text-primary">Subir material</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-primary">Subir material</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
             Elegí la dimensión del servicio, subí la foto y quedá guardada de verdad en el repo — sin salir del panel.
           </p>
@@ -244,15 +336,32 @@ export default function Hub() {
             Ver historial en el Monitor
           </Link>
           {connected ? (
-            <button
-              onClick={() => setConnectOpen(true)}
-              title="Cambiar o reconectar el token de GitHub"
-              className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-full"
-            >
-              <Badge variant="secondary" className="gap-1.5 cursor-pointer hover:bg-secondary/70">
-                <Check className="h-3 w-3" /> GitHub conectado
-              </Badge>
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  title="GitHub conectado"
+                  className="rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                >
+                  <Badge variant="secondary" className="gap-1.5 cursor-pointer hover:bg-secondary/70">
+                    <Check className="h-3 w-3" /> GitHub conectado
+                    <ChevronDown className="h-3 w-3" />
+                  </Badge>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {user && <DropdownMenuItem disabled className="text-xs">{user}</DropdownMenuItem>}
+                <DropdownMenuItem onClick={() => setConnectOpen(true)}>Cambiar / reconectar token</DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    disconnect();
+                    toast({ title: "GitHub desconectado", description: "El token se borró de este navegador." });
+                  }}
+                  className="text-destructive"
+                >
+                  Desconectar GitHub
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
             <Button variant="outline" size="sm" onClick={() => setConnectOpen(true)}>
               <Plug className="mr-1.5 h-3.5 w-3.5" />
@@ -262,12 +371,20 @@ export default function Hub() {
         </div>
       </div>
 
-      <ConnectGithubDialog open={connectOpen} onOpenChange={setConnectOpen} />
+      <ConnectGithubDialog
+        open={connectOpen}
+        onOpenChange={setConnectOpen}
+        connect={connect}
+        checking={checking}
+        error={error}
+      />
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Dimensión del servicio">
         {OFERTAS.map((o) => (
           <button
             key={o.key}
+            role="tab"
+            aria-selected={selectedDim === o.key}
             onClick={() => setSelectedDim(o.key)}
             className={cn(
               "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
@@ -291,41 +408,63 @@ export default function Hub() {
           {!connected ? (
             <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border p-8 text-center">
               <AlertCircle className="h-8 w-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                Conectá GitHub para poder subir fotos de verdad al repo.
-              </p>
+              <p className="text-sm text-muted-foreground">Conectá GitHub para poder subir fotos de verdad al repo.</p>
               <Button size="sm" onClick={() => setConnectOpen(true)}>
                 <Plug className="mr-1.5 h-3.5 w-3.5" />
                 Conectar GitHub
               </Button>
             </div>
-          ) : pendingFiles ? (
-            <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-5">
-              <p className="text-sm font-medium">
-                {pendingFiles.length} foto{pendingFiles.length > 1 ? "s" : ""} lista{pendingFiles.length > 1 ? "s" : ""} para subir a{" "}
-                <span className="text-primary">{OFERTAS.find((o) => o.key === selectedDim)?.kicker}</span>
-              </p>
-
-              <div className="flex items-start gap-2 rounded-md bg-background p-3 text-sm">
-                <Sparkles className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
-                {suggesting ? (
-                  <span className="text-muted-foreground">Mirando la primera foto para sugerir la dimensión…</span>
-                ) : suggestion ? (
-                  <span>
-                    El sistema sugiere <strong>{OFERTAS.find((o) => o.key === suggestion.dimension)?.kicker}</strong> — {suggestion.reason}
-                    {" "}
-                    <span className="text-muted-foreground">Elegí otra pestaña arriba si no es correcto.</span>
-                  </span>
+          ) : pending ? (
+            <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+              <div className="flex items-center gap-2 text-sm">
+                <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+                {anySuggesting ? (
+                  <span className="text-muted-foreground">Mirando cada foto para sugerir su dimensión…</span>
                 ) : (
-                  <span className="text-muted-foreground">
-                    No se pudo sugerir la dimensión automáticamente — elegí la correcta arriba antes de confirmar.
+                  <span>
+                    Revisá la dimensión de cada foto antes de confirmar. Lo que sugirió el sistema está pre-elegido —
+                    cambialo si no corresponde.
                   </span>
                 )}
               </div>
 
+              <div className="grid gap-2 sm:grid-cols-2">
+                {pending.map((p) => (
+                  <div key={p.id} className="flex items-center gap-2 rounded-md bg-background p-2">
+                    <img
+                      src={p.previewUrl}
+                      alt={p.file.name}
+                      className="h-14 w-14 shrink-0 rounded object-cover"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium">{p.file.name}</p>
+                      {p.suggesting ? (
+                        <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" /> analizando…
+                        </p>
+                      ) : (
+                        <select
+                          value={p.dimension}
+                          onChange={(e) => setPendingDimension(p.id, e.target.value)}
+                          aria-label={`Dimensión de ${p.file.name}`}
+                          className="mt-0.5 w-full rounded border border-input bg-background px-1.5 py-1 text-xs"
+                        >
+                          {OFERTAS.map((o) => (
+                            <option key={o.key} value={o.key}>
+                              {o.kicker}
+                              {p.suggested === o.key ? " (sugerida)" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               <div className="flex gap-2">
-                <Button onClick={confirmUpload} disabled={suggesting}>
-                  Confirmar y subir a {OFERTAS.find((o) => o.key === selectedDim)?.kicker}
+                <Button onClick={confirmUpload} disabled={anySuggesting}>
+                  Subir {pending.length} foto{pending.length > 1 ? "s" : ""}
                 </Button>
                 <Button variant="outline" onClick={cancelUpload}>
                   <X className="mr-1.5 h-3.5 w-3.5" />
@@ -367,7 +506,9 @@ export default function Hub() {
             <div className="mt-4 space-y-1.5">
               {uploads.map((u) => (
                 <div key={u.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-3 py-1.5 text-xs">
-                  <span className="truncate">{u.fileName}</span>
+                  <span className="truncate">
+                    {u.fileName} <span className="text-muted-foreground">→ {KICKER(u.dimension)}</span>
+                  </span>
                   <div className="flex shrink-0 items-center gap-2">
                     {u.status === "uploading" && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
                     {u.status === "done" && <Check className="h-3.5 w-3.5 text-emerald-600" />}
@@ -397,7 +538,7 @@ export default function Hub() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardContent className="p-5">
-            <p className="mb-3 text-sm font-medium">Pendientes en {OFERTAS.find((o) => o.key === selectedDim)?.kicker}</p>
+            <p className="mb-3 text-sm font-medium">Pendientes en {KICKER(selectedDim)}</p>
             <PhotoGrid dimension={selectedDim} folder="inbox" emptyLabel="Nada pendiente todavía — subí una foto arriba." />
           </CardContent>
         </Card>
@@ -405,7 +546,7 @@ export default function Hub() {
           <CardContent className="p-5">
             <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
               <ImageOff className="h-3.5 w-3.5" />
-              Ya usadas en {OFERTAS.find((o) => o.key === selectedDim)?.kicker}
+              Ya usadas en {KICKER(selectedDim)}
             </p>
             <PhotoGrid dimension={selectedDim} folder="used" emptyLabel="Todavía no se usó ninguna foto de esta dimensión." />
           </CardContent>
@@ -414,11 +555,8 @@ export default function Hub() {
 
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <ExternalLink className="h-3 w-3" />
-        Por ahora solo se procesan fotos. Los videos se pueden subir igual desde{" "}
-        <a href={`https://github.com/${github.owner}/${github.repo}/upload/main/content/inbox/${selectedDim}`} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-          la UI de GitHub
-        </a>{" "}
-        — quedan guardados, pero todavía no se arma una pieza con ellos.
+        Por ahora solo se procesan fotos (jpg/png/webp). Los videos y las capturas HEIC del celular todavía no arman
+        una pieza — convertí el HEIC a JPG antes de subir.
       </p>
     </div>
   );

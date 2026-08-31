@@ -57,6 +57,28 @@ const agentLabels: Record<string, string> = {
   critico: "Crítico",
 };
 
+interface DialogueSession {
+  id: string;
+  topic: string | null;
+  status: string;
+  created_at: string;
+  final_proposal?: string | null;
+  metadata?: {
+    error?: string;
+    evaluacion?: { aprobado: boolean; feedback: string };
+    autoPublished?: boolean;
+    scheduledAt?: string | null;
+    proposalId?: string | null;
+  } | null;
+}
+
+interface DialogueMessage {
+  id: string;
+  agent: string;
+  content: string;
+  turn: number;
+}
+
 export default function MesaDialogo() {
   return (
     <ErrorBoundary>
@@ -221,7 +243,7 @@ function MesaDialogoContent() {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {sessions.map((session: any) => (
+          {(sessions as DialogueSession[]).map((session) => (
             <SessionCard
               key={session.id}
               session={session}
@@ -248,7 +270,7 @@ function SessionCard({
   onContinue,
   isContinuing,
 }: {
-  session: any;
+  session: DialogueSession;
   isSelected: boolean;
   onSelect: () => void;
   onContinue: (sessionId: string, feedback: string, onClear: () => void) => void;
@@ -312,7 +334,7 @@ function SessionCard({
               en vez de un spinner ciego. */}
           {messages && messages.length > 0 ? (
             <div className="space-y-3 max-h-96 overflow-y-auto">
-              {messages.map((msg: any) => {
+              {(messages as DialogueMessage[] | undefined ?? []).map((msg) => {
                 const Icon = agentIcons[msg.agent] || Brain;
                 const colorClass = agentColors[msg.agent] || "text-gray-500 bg-gray-500/10";
                 const label = agentLabels[msg.agent] || msg.agent;
