@@ -27,6 +27,7 @@ Este archivo tiene dos mitades:
 | **Fallback de IA** | Anthropic (`claude-sonnet-5`/`opus-5`) → Groq `openai/gpt-oss-120b`. `llama-3.3-70b-versatile` se retiró el 2026-08-16, ya migrado en los 3 puntos | 2026-08-18 |
 | **Límite de cuenta Anthropic** | resuelto — Pablo subió el límite de gasto, sin bloqueo | 2026-08-19 |
 | **Multi-tenant (Fase 6)** | pausado a propósito — es decisión de producto de Pablo, no técnica | 2026-08-17 |
+| **Rediseño pendiente (brief 2026-08-16)** | 3 de 6 puntos sin ejecutar: fusionar Mesa+Laboratorio, renombrar Bóveda → "Manual de Identidad de Marca" (+ zip + categorías), Motor de insights con IA. Plan A-E documentado abajo ("Contraste con Claude Design + plan de continuación"). A retomar cuando Pablo lo diga | 2026-08-31 |
 
 ## Fuente de verdad
 
@@ -1293,6 +1294,55 @@ Pablo pidió una auditoría propia (Diseño / PM / UX-UI, obsesiva, buscando bug
 - Decidir sobre B6/B7 (acceso) — arriba.
 
 Detalle completo con archivo:línea de los 34 bugs y las 18 oportunidades: artifact `auditoria-mejorasm.html` (Pablo lo tiene como archivo).
+
+## Contraste con la propuesta de Claude Design + plan de continuación — 2026-08-31
+
+Cerrado el "arreglá todo", Pablo trajo el zip **"Análisis de diseño y mejoras 2026"** de Claude Design (CD): una auditoría broadsheet (`MejoraSM Auditoria 2026.dc.html`) + un mockup del Dashboard (`MejoraSM Dashboard Propuesta 2026.dc.html`) + un design system "broadsheet" que **no aplica** (es la estética de la maqueta de CD, no la de la marca — MejoraSM sigue con `mejora-continua-brand`).
+
+**Nota de método sobre el contraste:** CD sincronizó `main` a las 20:33 UTC, en medio de los 9 batches — agarró batches 1-4 (`eda0d95`), no 5-9, y su texto describe en varios puntos el estado de antes de los fixes. Buena parte de lo que CD marca **ya estaba resuelto**: dropdowns muertos de Configuración (batch 6), footer "EDA v1.0" (batch 5), sidebar de 11 ítems planos (batch 5), drag del Calendario en touch (batch 4), Bóveda multi-upload (batch 6, sin zip), franja de alertas en el Dashboard (batch 7, con contenido operativo en vez del analítico de CD), fuentes woff2 + League Spartan por `<link>` + paleta de marca (batch 5, idéntico a lo que hizo CD).
+
+**Lo que CD aporta que la auditoría de código no tenía — adherencia al brief de rediseño del 2026-08-16** (transcripto en `MejoraSM.md` ~líneas 78-142, salió de la sesión "Lovable propone"). De los **6 puntos del brief:**
+
+| Punto del brief | Estado |
+|---|---|
+| **4. Propuestas — reconstrucción completa** | 🟢 hecho (rediseño 2026-08-07) |
+| **5. Calendario — reconstrucción completa** | 🟢 hecho (2026-08-07 + drag + batch 4 touch) |
+| **6. Configuración — ruteo de IA automático** | 🟡 parcial: `pickModel()` desde 2026-08-05 + dropdowns muertos sacados (batch 6). **Falta:** la pantalla debía volverse "de supervisión — ver qué decidió el sistema y por qué" (últimas decisiones, costo por sesión) |
+| **1. Fusionar Mesa de Diálogo + Laboratorio** | 🔴 **no hecho.** Batch 7 solo agregó copy que las distingue. El brief pide: discontinuar Laboratorio como pantalla, y en Mesa dos entradas — "modo libre" (el sistema propone tema) + "modo dirigido" — las dos con **preview visual real** de la pieza + sugerencia de horario + valoración de "vale la pena" |
+| **2. Renombrar Bóveda → "Manual de Identidad de Marca"** | 🔴 **no hecho.** Falta el rename + carga de `.zip` con clasificación automática de tipo de documento + organización por categoría (hoy lista plana) |
+| **3. Motor de insights con IA en el Dashboard** | 🔴 **no hecho.** Siguen las 6 tarjetas fijas de `SEED_INSIGHTS` (congeladas desde 2026-08-07). El brief lo pidió explícito "en este mismo prompt, no en fase separada". CD dejó un mockup concreto: insights recalculados semanalmente contra métricas reales, con % de confianza + cita a la métrica + botones "Útil/No aplica" + botón "Generar informe" (infografía parametrizable) |
+
+Las 3 sin ejecutar **no son "oportunidades 2026" ni features inventadas** — son decisiones que Pablo tomó el 2026-08-16. La auditoría de código las había clasificado mal como roadmap.
+
+**Dos ideas de CD que no estaban en la auditoría de código:**
+- **Conectar los templates reales de Playwright** (`templates/post-template.html` / `story-template.html`, que ya renderizan para publicar) al preview del modal — cierra "falta preview visual" en Propuestas, Calendario y Mesa de Diálogo a la vez, sin un cuarto sistema de render.
+- **Rol de revisor read-only para Sindy** sobre Propuestas y Dashboard (ver + comentar, sin tocar Configuración ni el pipeline). CD nota que Sindy ya participa de decisiones de contenido (Taller de la Oferta) sin ningún rol en el sistema.
+
+### Plan de continuación — documentado, a ejecutar cuando Pablo lo retome
+
+Pablo pidió cerrar acá y dejar esto documentado para no perderlo. **Artifact del plan con ejemplos antes/después:** `plan-mejorasm.html` (publicado en `https://claude.ai/code/artifact/bb4d0bad-b4ff-439a-a2e4-f830b9c79469`).
+
+**Decisión previa que bloquea la Fase E — la puerta de acceso.** Hoy el EDA está abierto (decisión de Pablo del 2026-08-25, uso personal). Para que Sindy tenga un rol de verdad hace falta que cada persona entre con su propio acceso. Recomendación: **Cloudflare Access** adelante de `/app/` — cada uno con su mail, ~1h de setup, no toca RLS ni código. Las Fases A-D no dependen de esto; E sí. Sin puerta, un "rol de revisor" es de mentira.
+
+| Fase | Qué | Tiempo | Riesgo |
+|---|---|---|---|
+| **A — Motor de insights** | Edge Function nueva (`insights`, mismo patrón que `metrics-collector`): cron semanal que le pasa a Claude las métricas reales de las últimas N semanas + los 6 insights semilla y le pide **contrastarlos** (confirmar/refinar/reemplazar, nunca inventar sin dato — mismo principio que `NO_SOURCE_KPIS`). Tabla nueva para cachear. Tarjeta en el Dashboard con % confianza + cita + "Útil/No aplica". Botón "Generar informe" arriba de eso. | ~1 día | bajo (no toca publicación) |
+| **B — Fusionar Mesa + Laboratorio** | Una sola pantalla "Mesa de Diálogo". Sacar `Laboratorio` de `App.tsx` + `AppSidebar`. Dos botones de entrada: "Tengo un tema" / "Proponeme un tema" (este último: el `orchestrator` elige un tema desde `success_rules` + buyer personas). Conectar `render-scheduled-posts.mjs`/`render-story.mjs` (o un endpoint de render) al modal de resultado para el preview visual. Sumar "conviene publicarlo el {día} a las {hora}" (de `pickNextSlot`/regla de timing) y la valoración del Crítico. | ~1-2 días | bajo (el motor de agentes no se toca) |
+| **C — Manual de Identidad de Marca** | Rename "Bóveda" → "Manual de Identidad de Marca" (`AppSidebar`, `Boveda.tsx` → renombrar archivo/ruta o solo el texto visible, decidir). Descompresor de `.zip` client-side (JSZip o similar) → sube cada archivo por separado al pipeline de `vault-process`, con un paso de clasificación de tipo (un prompt corto: manual / buyer persona / tono / ejemplo). `documents` necesita una columna `category`. UI agrupada por categoría en vez de lista plana. | ~1-2 días | bajo-medio |
+| **D — Ajustes finos** | Monitor: targets de 44px + reemplazar `window.confirm` por `ConfirmDialog` (unificar con el resto). Configuración: vista de "últimas decisiones del sistema" (leer de `run_log` / `dialogue_sessions.metadata` qué modelo se usó por sesión + costo si se loguea). Auditoría: filtro de rango de fechas en los exports. Propuestas: sacar la pestaña "Video" (siempre vacía, `proposals_format_check` no lo permite). Dashboard: tiles muestran "—" mientras cargan, no "0". | ~1 día total | mínimo |
+| **E — Rol de revisor (Sindy)** | Acceso read-only a `/propuestas` y `/` (Dashboard). Comentarios anclados a una propuesta (`proposal_comments` tabla nueva, o reusar un campo). Sin acceso a Configuración ni a las acciones del pipeline. **Requiere la puerta de acceso primero.** | ~1 día | bajo (después de la puerta) |
+
+**Orden sugerido:** decisión de acceso → A → B → C → D → E. Total ≈ 1,5-2 semanas. Se puede arrancar por A o por B indistinto.
+
+### Fuera de este plan — features grandes, cada una con su decisión + qué las bloquea hoy
+
+Todo lo social pasa por **Zernio** (`scripts/lib/zernio.mjs`), la única integración de publicación y métricas. Hoy solo se le pide: publicar imágenes y traer números agregados (nunca el texto de un comentario).
+
+- **LinkedIn.** *Limitante:* no se sabe si Zernio publica en LinkedIn ni si hay una página conectada ahí (el código solo usa `ZERNIO_INSTAGRAM_ACCOUNT_ID` / `ZERNIO_FACEBOOK_ACCOUNT_ID`). Lo demás es chico: variante del template para la medida de LinkedIn, adaptación del copy. **Primer paso: preguntarle a Zernio / mirar su doc.** Si soporta → ~2-3 días. Si no → API de LinkedIn directa (Marketing API gateada, con aprobación) = proyecto.
+- **Video / Reels.** *Limitante:* no existe ningún motor de armado de video — el pipeline renderiza imágenes estáticas con Playwright + HTML. Un Reel necesita fotos/clips + texto + música → MP4 (ffmpeg en el runner). Además a `content/inbox/` no entra video (Hub filtra imágenes), y no se sabe si Zernio publica Reels. Dos casos: *Reel simple armado de fotos* (Ken Burns + texto animado) ≈ 2-3 días; *Reel de video real* (grabado/editado/subtitulado) = proyecto grande (archivos grandes, GitHub no es el storage). Ojo: ni el mejor pipeline arregla el "6.9s de reproducción" — eso es problema del gancho, o sea de contenido.
+- **Bandeja de comentarios y DMs.** *Limitante:* Zernio casi seguro no expone el texto de comentarios ni los DMs (es una herramienta de publicación) → hay que ir a la API de Meta directo. Comentarios: permisos estándar, manejable. DMs: Instagram Messaging API necesita **revisión de app de Meta** (`instagram_manage_messages`), semanas de trámite. Y `metrics` guarda solo números — hace falta un modelo de datos nuevo para texto/sentimiento/conversaciones. *Arranque chico posible:* leer los últimos N comentarios de cada pieza reciente + etiqueta de sentimiento + resumen diario "esto reaccionó distinto" ≈ 3-4 días, sin el laberinto de los DMs.
+- **Reciclado de contenido.** *Limitante:* **nada técnico** — el sistema ya tiene `metrics` (qué rindió), la pieza renderizada guardada, `success_rules`, y sabe autoagendar. Falta poco: consulta "publicadas hace >90 días con engagement > promedio" + UI para elegir + prompt para refrescar hook/CTA + reinsertar como propuesta `scheduled`. **~1 día.** El único freno real: hoy `metrics` tiene 2-3 piezas reales + la campaña de fin de agosto — no hay de dónde elegir todavía. En 1-2 meses de pipeline corriendo, sí.
+- **Experimentos A/B formales** (hook, horario) con significancia estadística real, y **mover el token de GitHub** de `localStorage` a un backend propio (recomendado por la auditoría y por CD, pero es reingeniería) — sin fecha.
 
 ## Notas históricas
 
