@@ -109,7 +109,7 @@ export default function Auditoria() {
   return (
     <div className="space-y-7">
       <div>
-        <h1 className="text-[32px] font-medium leading-tight text-primary">Auditoría</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-primary">Auditoría</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">
           Exportá el rastro operativo real del sistema — propuestas, métricas, reglas aprendidas y corridas del
           pipeline — para revisión, backup o transparencia.

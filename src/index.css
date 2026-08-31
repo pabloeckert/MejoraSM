@@ -1,23 +1,22 @@
 /* Bw Modelica — tipografía real de marca (licencia de Agencia Dominó, ver
-   src/assets/fonts/LICENCIA.txt). Mismo patrón que biblioteca/styles.css.
-   League Spartan queda como secundaria/fallback, vía Google Fonts. */
-@import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&display=swap');
-
+   src/assets/fonts/LICENCIA.txt). D1 (auditoría 2026-08-31): pasada de .otf
+   (~75KB c/u) a .woff2 (~36KB c/u). League Spartan (fallback / --font-heading-alt)
+   se carga vía <link> en index.html, no vía @import render-blocking. */
 @font-face {
   font-family: "Bw Modelica"; font-style: normal; font-weight: 400;
-  src: url("./assets/fonts/BwModelica-Regular.otf") format("opentype"); font-display: swap;
+  src: url("./assets/fonts/BwModelica-Regular.woff2") format("woff2"); font-display: swap;
 }
 @font-face {
   font-family: "Bw Modelica"; font-style: normal; font-weight: 500;
-  src: url("./assets/fonts/BwModelica-Medium.otf") format("opentype"); font-display: swap;
+  src: url("./assets/fonts/BwModelica-Medium.woff2") format("woff2"); font-display: swap;
 }
 @font-face {
   font-family: "Bw Modelica"; font-style: normal; font-weight: 600;
-  src: url("./assets/fonts/BwModelica-Medium.otf") format("opentype"); font-display: swap;
+  src: url("./assets/fonts/BwModelica-Medium.woff2") format("woff2"); font-display: swap;
 }
 @font-face {
   font-family: "Bw Modelica"; font-style: normal; font-weight: 700;
-  src: url("./assets/fonts/BwModelica-Bold.otf") format("opentype"); font-display: swap;
+  src: url("./assets/fonts/BwModelica-Bold.woff2") format("woff2"); font-display: swap;
 }
 
 @tailwind base;
@@ -27,14 +26,12 @@
 @layer base {
   :root {
     /* Tipografía — mismos nombres que el tokens/typography.css del design system
-       exportado, sin itálicas de Bw Modelica ni bundle local de League Spartan
-       (ver @font-face arriba: solo Regular/Medium/Bold, League Spartan vía
-       Google Fonts). */
+       exportado. */
     --font-display: "Bw Modelica", "League Spartan", sans-serif;
     --font-heading-alt: "League Spartan", sans-serif;
     --font-body: "Bw Modelica", "League Spartan", sans-serif;
 
-    /* Color — valores exactos del tokens/colors.css del design system exportado.
+    /* Color — valores del tokens/colors.css del design system exportado.
        --primary/--secondary/--accent = blue-700/red-500/yellow-500. */
     --background: 0 0% 100%;
     --foreground: 0 0% 17%;
@@ -47,10 +44,16 @@
     --secondary: 353 95% 45%;
     --secondary-foreground: 0 0% 100%;
     --muted: 210 11% 96%;
-    --muted-foreground: 220 9% 46%;
+    /* D5 (auditoría 2026-08-31): 46% no llegaba a AA para texto chico
+       (text-[10px]/[11px], que se usa por todos lados). Bajado a 40%. */
+    --muted-foreground: 220 10% 40%;
     --accent: 49 93% 52%;
     --accent-foreground: 0 0% 17%;
-    --destructive: 353 95% 45%;
+    /* D2 (auditoría 2026-08-31): --destructive era EXACTAMENTE el rojo de marca
+       (--secondary, 353 95% 45%) — "publicación fallida" y "acento rojo de
+       Mejora Continua" eran el mismo color. Ahora un rojo de peligro distinto,
+       menos magenta, para separar semántica de branding. */
+    --destructive: 2 78% 44%;
     --destructive-foreground: 0 0% 100%;
     --border: 225 10% 92%;
     --input: 225 10% 92%;
@@ -65,10 +68,10 @@
     --sidebar-border: 225 10% 92%;
     --sidebar-ring: 220 61% 42%;
 
-    --success: 142 71% 45%;
+    --success: 152 55% 34%;
     --success-foreground: 0 0% 100%;
-    --warning: 44 89% 52%;
-    --warning-foreground: 230 97% 18%;
+    --warning: 32 82% 38%;
+    --warning-foreground: 0 0% 100%;
     --info: 215 65% 33%;
     --info-foreground: 0 0% 100%;
   }
@@ -86,5 +89,18 @@
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
+  }
+
+  /* D7 (auditoría 2026-08-31): sin esto, todos los animate-spin / animate-pulse
+     / transition-* corrían igual para quien pidió menos movimiento. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

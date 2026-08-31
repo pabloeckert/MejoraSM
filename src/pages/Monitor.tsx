@@ -568,7 +568,7 @@ export default function Monitor() {
     <div className="space-y-7">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-[32px] font-medium leading-tight text-primary">Monitor de stories y posts</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-primary">Monitor de stories y posts</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
             Historial real de lo publicado en Instagram y Facebook (stories y posts de feed) — sincronizado directo
             desde Zernio.

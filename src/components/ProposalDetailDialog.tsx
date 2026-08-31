@@ -325,8 +325,12 @@ export function ProposalDetailDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{proposal.hook || proposal.title || "Sin título"}</DialogTitle>
-            <DialogDescription>{proposal.dialogue_sessions?.topic || "Sin tema asociado"}</DialogDescription>
+            <DialogTitle className="line-clamp-2 text-base leading-snug">
+              {proposal.hook || proposal.title || "Sin título"}
+            </DialogTitle>
+            <DialogDescription className="line-clamp-2">
+              {proposal.dialogue_sessions?.topic || "Sin tema asociado"}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-wrap items-center gap-2">

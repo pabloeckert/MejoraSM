@@ -46,7 +46,7 @@ export default function Biblioteca() {
     <div className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-[32px] font-medium leading-tight text-primary">Biblioteca de Contenido</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-primary">Biblioteca de Contenido</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
             Cargar, etiquetar y organizar el contenido que alimenta las Stories.
           </p>

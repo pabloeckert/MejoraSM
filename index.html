@@ -6,24 +6,35 @@
     <title>MejoraSM — Estratega Digital Autónoma</title>
     <meta name="description" content="Sistema EDA — Gestión estratégica de contenidos en Instagram con IA para MejoraOK. Agentes que debaten, crean y optimizan tu contenido." />
     <meta name="author" content="MejoraOK" />
-    <meta name="theme-color" content="#0f0f23" />
+    <!-- D4 (auditoría 2026-08-31): era #0f0f23, un azul casi negro que no está
+         en la paleta de Mejora Continua. Ahora el azul de marca (--primary). -->
+    <meta name="theme-color" content="#1A3D84" />
     <link rel="canonical" href="https://pabloeckert.github.io/MejoraSM/app/" />
 
-    <!-- Open Graph -->
+    <!-- League Spartan: fallback / --font-heading-alt. Bw Modelica (woff2 local)
+         carga primero. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&display=swap"
+    />
+
+    <!-- Open Graph — B34 (auditoría 2026-08-31): og:image apuntaba a
+         mejorasm.vercel.app, dominio que devuelve 404. Se saca hasta que haya
+         una imagen real servible. -->
     <meta property="og:title" content="MejoraSM — Estratega Digital Autónoma" />
-    <meta property="og:description" content="Sistema EDA — Gestión estratégica de contenidos en Instagram con IA para MejoraOK" />
+    <meta property="og:description" content="Gestión estratégica de contenidos en Instagram con IA para Mejora Continua" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://pabloeckert.github.io/MejoraSM/app/" />
-    <meta property="og:image" content="https://mejorasm.vercel.app/og-image.png" />
     <meta property="og:locale" content="es_AR" />
     <meta property="og:site_name" content="MejoraSM" />
 
     <!-- Twitter -->
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:card" content="summary" />
     <meta name="twitter:site" content="@mejoraok" />
     <meta name="twitter:title" content="MejoraSM — Estratega Digital Autónoma" />
     <meta name="twitter:description" content="Agentes de IA que crean contenido estratégico para Instagram" />
-    <meta name="twitter:image" content="https://mejorasm.vercel.app/og-image.png" />
 
     <!-- Security Headers -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
@@ -38,7 +49,7 @@
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
       font-src 'self' https://fonts.gstatic.com;
       img-src 'self' data: https: blob:;
-      connect-src 'self' https://*.supabase.co https://api.groq.com https://api.deepseek.com https://generativelanguage.googleapis.com https://api-inference.huggingface.com https://api.github.com;
+      connect-src 'self' https://*.supabase.co https://api.groq.com https://api.deepseek.com https://generativelanguage.googleapis.com https://api-inference.huggingface.co https://api.github.com;
       frame-src 'self';
       object-src 'none';
       base-uri 'self';
