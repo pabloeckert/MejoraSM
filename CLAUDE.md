@@ -21,8 +21,9 @@ Este archivo tiene dos mitades:
 | **Posts/carruseles de feed** | 100% automáticos (Crítico aprueba → autoagenda → publica), cron `publish-scheduled-posts.yml` cada 15 min | reactivado 2026-08-24 (estuvo pausado 2026-08-05 → 08-24) |
 | **Login / auth del EDA** | **removido a propósito** — EDA completamente abierto, sin usuario ni contraseña. Decisión informada de Pablo (uso personal). Revisar si el uso deja de ser estrictamente personal | 2026-08-25 |
 | **RLS de Supabase** | revertido a abierto (`USING (true)`, migración `019`). `app_admins` / `is_app_admin()` quedan vestigiales. Reactivar = reaplicar `006_real_rls_and_auth.sql` + sacar rama anon key de `_shared/auth.ts` | 2026-08-25 |
-| **CI (`ci.yml`)** | lint no bloqueante (~42 errores preexistentes, deuda aceptada), test + build reales sí corren y deben pasar | fix 2026-08-31 |
+| **CI (`ci.yml`)** | **lint + tsc bloqueantes de nuevo** — la deuda bajó de 42 errores a 0; ESLint acotado a `src/**` (Deno fuera de scope). test + build siguen corriendo | 2026-08-31 (batch 8 de la auditoría) |
 | **Edge Functions** | 6: `orchestrator`, `vault-process`, `rule-engine`, `metrics-collector`, `copilot`, `classify-photo`. `publisher` y `ai-gateway` borradas | `publisher` borrada 2026-08-16 |
+| **Auto-agenda (`pickNextSlot`)** | apunta a bloques horarios reales (12/16/23 UTC ≈ 09/13/20 ART), o a la hora de una `success_rule` de timing si hay una con confianza alta — ya no publica a la hora en que arrancó la primera cadena | 2026-08-31 (batch 2) |
 | **Fallback de IA** | Anthropic (`claude-sonnet-5`/`opus-5`) → Groq `openai/gpt-oss-120b`. `llama-3.3-70b-versatile` se retiró el 2026-08-16, ya migrado en los 3 puntos | 2026-08-18 |
 | **Límite de cuenta Anthropic** | resuelto — Pablo subió el límite de gasto, sin bloqueo | 2026-08-19 |
 | **Multi-tenant (Fase 6)** | pausado a propósito — es decisión de producto de Pablo, no técnica | 2026-08-17 |
@@ -1240,6 +1241,58 @@ Pablo reportó: "en monitor quiero poder borrar manualmente porque no sincroniza
 **Aplicado real de inmediato** al caso ya identificado: se sacó `6a8ef3ac104bb71b3ad13777` del Monitor con la función nueva. El post real en Instagram (si sigue vivo ahí) no se tocó — eso Pablo lo gestiona a mano desde la app, como ya estaba documentado.
 
 Verificado: `tsc --noEmit` limpio, lint en 42 errores preexistentes (sin regresión), 64/64 tests, build limpio.
+
+## Auditoría obsesiva propia + "arreglá todo" — 2026-08-31
+
+Pablo pidió una auditoría propia (Diseño / PM / UX-UI, obsesiva, buscando bugs y fallas + funcionalidades 2026), separada de las 7 devoluciones externas que había traído. Se leyó el código real de punta a punta — `src/` completo (13.047 líneas), `biblioteca/app.js`, `scripts/`, `supabase/functions/`, migraciones, `index.html` — y se armó un informe con **34 bugs verificados (archivo:línea), ~20 hallazgos de Diseño/UX/PM y 18 oportunidades 2026**, ordenado por severidad (artifact `auditoria-mejorasm.html`, entregado como archivo — la publicación como Artifact la bloqueó el clasificador del entorno). Después Pablo dijo **"arregla todo"** — se ejecutó en 9 batches, cada uno con `tsc`/`lint`/`test`/`build` verdes y commit+push, deployado por los workflows normales.
+
+**Qué se arregló (bugs):**
+
+- **B1 — "guardado" mentiroso, sistémico.** El cliente de Supabase no rechaza la promesa en error (devuelve `{ error }`); las ~15 mutaciones de `useProposals.ts` hacían `mutationFn: (id) => proposalsApi.x(id)` sin mirarlo, así que `onSuccess` (y el toast "guardado") disparaba siempre, aunque el RLS/constraint/red hubieran tumbado el `UPDATE`. Helper `run()` que hace `throw` en error real; `useVault.useDeleteDocument` y `documentsApi.delete` (storage) también. Con eso los `onError` que ya existían en la UI empezaron a funcionar de verdad. **Este era el "falso guardado" que temían las devoluciones externas, en el código.**
+- **B2** — "Cancelar publicación" pasaba a `rejected` con un clic, sin confirmación y sin vuelta atrás. Ahora: `ConfirmDialog` + `proposalsApi.reactivate` + `useReactivateProposal` + botón "Reactivar" para `rejected` (→ `pending`, limpia `scheduled_at`).
+- **B3** — convertir el formato de una pieza `scheduled` de/hacia `historia` la dejaba fantasma (la UI la mostraba "Se publica solo", el pipeline solo levanta `post`/`carrusel`). Bloqueado en `ProposalDetailDialog`.
+- **B4** — `pickNextSlot()` del `orchestrator` devolvía `max(now, lastSlot + 24h)` sin fijar hora: si la primera cadena arrancó a las 03:38 UTC, todo post autónomo salía ~00:38 ART. Ahora `snapToPreferredHour()` apunta a 12/16/23 UTC (≈ 09/13/20 ART, coherente con "audiencia online 11–23h" de los `SEED_INSIGHTS`), o a la hora de una `success_rule` de timing con `confidence >= 0.6`. `pickNextOferta()` rota sobre los últimos 30 días y excluye `is_test`, no sobre el acumulado histórico. De paso: `rule-engine` analizaba timing sobre `measured_at` (ruido del cron de `metrics-collector` cada 6h) — ahora usa `published_at` (fallback `scheduled_at`) en UTC explícito.
+- **B5** — timeout del cliente (150s) + retry automático de react-query → 2º `start` con el mismo topic mientras el 1º sigue corriendo → 2º debate → 2º post autoagendado. `startSession()` ahora busca una sesión reciente del mismo tema: si ya terminó hace poco devuelve su resultado (`resultFromSession()`); si sigue `active` y es reciente (< 6 min) espera a que termine; si no termina, tira un error claro en vez de arrancar el duplicado.
+- **B9/B10** — `classify-photo` miraba solo la 1ra foto del lote y la dimensión (leída del closure del hook) se aplicaba a todas. Ahora Hub clasifica cada foto en paralelo (con downscale a ~1280px antes de mandarla), y hay un selector de dimensión por foto con thumbnail en el paso de confirmación; la dimensión viaja pegada a cada item de la cola (`usePhotoUpload([{ file, dimension }])`).
+- **B11** — el drag-and-drop del Calendario no funciona en touch. Nuevo "modo mover" (ícono → tocás el día destino), + guarda contra fechas pasadas (antes se podía soltar una pieza en un día vencido y el cron la publicaba).
+- **B13** — conectar GitHub hacía `window.location.reload()`. Ahora el estado de conexión se lifteó a Hub y `connect`/`disconnect` invalidan las queries de listado.
+- **B14** — `vault-process`/`classify-photo`/`copilot` usaban `fetch` pelado sin timeout. Ahora todas pasan por `fetchWithTimeout`.
+- **B7 (parcial)** — "Desconectar GitHub" real en un menú del badge (antes `disconnect()` existía pero no estaba cableado a ningún botón — para limpiar el token había que ir a DevTools). **Lo demás de B6/B7 (el token en `localStorage` de un origen público, ahora con permiso de Actions; y el acceso abierto de la base) queda para Pablo — ver "Pendientes reales" abajo.**
+- **B15** — Dashboard "Contenidos generados — Últimos 30 días" mostraba el histórico total.
+- **B16** — Monitor decía "{N} story(s)" para posts de feed → "{N} piezas (X stories, Y posts)".
+- **B18** — "Reprocesar" en la Bóveda ahora disponible desde cualquier estado que no sea `ready`/spinning (antes un `pending` colgado no tenía botón).
+- **B20** — `escapeAttr` de `biblioteca/app.js` ahora escapa la comilla simple (faltaba, y hay decenas de `onclick="App.x('${...}')"` con nombres de categoría editables).
+- **B21** — imagen del detalle de propuesta: `object-contain` en vez de `object-cover` (no recorta contenido de marca).
+- **B22/B23** — reset del `ProposalDetailDialog` también al cerrar; validación de fecha futura real en agendar/reprogramar (antes solo un aviso).
+- **B24** — el botón "Despublicar IG" era un no-op que solo tiraba un toast. Ahora deshabilitado con el motivo en el `title`.
+- **B25** — `refreshAfterAction` del Monitor eran 95s a ciegas; ahora hay un aviso "Sincronizando con Zernio…" visible.
+- **B27** — `runLogApi.all()` paginado (antes `.limit(500)`); `runLogApi.recent()` nuevo para la vista de F11.
+- **B28** — CSV de export con BOM (`﻿`) — sin él, Excel abre tildes/ñ como mojibake.
+- **B29** — el guardado de Configuración hacía un upsert por fila en un loop (no transaccional). Ahora un solo upsert.
+- **B30** — Configuración: se sacaron los dropdowns de Proveedor/Modelo (ignorados por `pickModel()` desde el 2026-08-05, con default a un modelo inexistente). Queda solo prompt + temperatura.
+- **B32** — label del pie chart del Dashboard hacía `(percent * 100)` — recharts pasa `percent` undefined durante la animación → "NaN%".
+- **B33** — `randomCategory()` (un `Math.random()` puro que podía meter una foto en una categoría al azar) sacado de `biblioteca/app.js`; una foto entra sin etiquetar.
+- **B34** — `og:image` apuntaba a `mejorasm.vercel.app` (404) → se saca; CSP `api-inference.huggingface.com` → `.co`.
+
+**Diseño (D):** fuentes `.otf` (~75KB c/u) → `.woff2` (~36KB, `fonttools`), se saca el `@import` render-blocking de Google Fonts (League Spartan pasa a un `<link>` con preconnect); `--destructive` dejó de ser exactamente el rojo de marca (`--secondary`); `theme-color` `#0f0f23` → `#1A3D84`; `--muted-foreground` 46% → 40% (contraste AA en texto chico); sidebar de 11 ítems planos a 4 grupos con "Subir material" arriba; `@media (prefers-reduced-motion: reduce)` global; h1 de páginas unificados a `text-3xl`; título del `ProposalDetailDialog` con `line-clamp-2`; footer "EDA v1.0 — MejoraOK" → "MejoraSM — Mejora Continua". **Dark mode: NO se agregó** — `next-themes` lo importa `sonner.tsx` pero no hay `ThemeProvider`; agregar un tema oscuro sin poder probarlo en la app real es más riesgo que valor. Queda como decisión de diseño futura explícita.
+
+**UX:** el onboarding no decía que el sistema publica solo — nuevo paso 3 dedicado ("¡Bienvenido a EDA!" → "MejoraSM"); franja "Necesita tu atención" arriba del Dashboard (Stories pendientes, piezas que salen en < 2h, docs sin procesar); Mesa de Diálogo y Laboratorio ahora se distinguen explícito en el encabezado (son el mismo backend); feedback de agentes en `Textarea` en vez de `Input` de una línea, con estado local por sesión (antes uno solo compartido — escribías en A y aparecía en B); feedback oculto en sesiones `approved`/`error`; Bóveda con multi-upload + dropzone; Laboratorio muestra el BODY y el copy "3 propuestas" (entregaba 1) corregido; Copiloto con render mínimo de markdown + botón "Limpiar" chat; `MiniMarkdown` sin dependencia nueva.
+
+**PM:** `src/shared/constants.ts` como fuente única de `AUTONOMOUS_FORMATS`/`PIPELINE_FORMATS`/`DIMENSIONES` para el frontend (antes duplicadas a mano en 6 lados — el badge "Se publica solo" podía quedar desincronizado); `src/shared/types.ts` (`ProposalRow`/`DocRow`) para bajar los `any`; **`React.lazy` por ruta** en `App.tsx` — `index.js` bajó de 469KB a 304KB, Recharts (400KB) solo carga al entrar al Dashboard, el flujo de subir una foto del celu ya no lo arrastra; **deuda de lint 42 → 0** (`any` tipados, ESLint acotado a `src/**`, Deno fuera de scope), `ci.yml` con `lint` y `tsc --noEmit` **bloqueantes de nuevo** (se sacó `continue-on-error`); `useDialogueSessions` con `refetchInterval` condicional (una sesión que terminó server-side ya no queda "Activa" en pantalla); observabilidad real en `/auditoria` (tabla de las últimas 100 corridas de `run_log`, cierra F11); `useDeleteDocument`/`documentsApi.delete` chequean el error de storage (no más archivos huérfanos); el `localStorage.setItem("eda-agent-config")` muerto de Configuración se sacó.
+
+**Qué NO se hizo, a propósito:**
+
+- **Las 18 "oportunidades 2026" (F1–F18)** — son features nuevas (bandeja de comentarios/DMs, LinkedIn, Reels, calendario editorial planeable, freno de emergencia automático, modelo de Asset real para la Biblioteca, experimentos A/B, reporte ejecutivo mensual, etc.), no correcciones. Necesitan decisión de producto de Pablo. F11 (observabilidad) sí se hizo porque era una tabla contra datos que ya existían.
+- **B6 (base abierta) y el resto de B7 (token de GitHub en `localStorage` de un origen público, ahora también con permiso de Actions).** Cerrar el acceso es una decisión de producto que Pablo tomó de forma informada el 2026-08-25 ("uso personal, tratarlo como un archivo local"); el CLAUDE.md ya dice que hay que revisarla si el uso deja de ser estrictamente personal. La recomendación concreta de la auditoría: **Cloudflare Access (o un Worker con basic-auth) adelante de `/app/`** — ~1h, no toca RLS, es el punto medio real entre "login completo" y "abierto a cualquiera con el link". No se ejecutó porque cambia cómo todos acceden al sistema.
+- **Reescribir la Biblioteca a React** (sigue siendo un iframe a `biblioteca/`) — decisión de Fase 5 ya tomada, la brecha real es el modelo de datos de assets (F14), no el iframe.
+- **PM8 (entorno de staging)** — necesita setup de Pablo.
+
+**Pendientes reales, sin ambigüedad:**
+- El **incidente de `daily-story.yml`** del 2026-08-31 19:21 UTC (`ENOENT content/work/briefs.json` en un re-dispatch manual) es un bug preexistente del pipeline de Stories, ajeno a esta auditoría — no se tocó. La corrida del cron normal de las 13:00 UTC de ese día sí funcionó.
+- Verificar en vivo el `pickNextSlot`/dedup nuevos con una sesión real de Mesa de Diálogo cuando Pablo quiera — no se disparó una a propósito para no generar contenido real solo para probar (mismo criterio de cautela de siempre). El deploy de las Edge Functions (`deploy-functions.yml`) sí quedó verde.
+- Decidir sobre B6/B7 (acceso) — arriba.
+
+Detalle completo con archivo:línea de los 34 bugs y las 18 oportunidades: artifact `auditoria-mejorasm.html` (Pablo lo tiene como archivo).
 
 ## Notas históricas
 

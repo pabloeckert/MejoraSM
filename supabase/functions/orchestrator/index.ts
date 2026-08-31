@@ -629,7 +629,11 @@ async function startSession(topic: string) {
   ) {
     return resultFromSession(prior);
   }
-  if (prior && prior.status === "active") {
+  // Solo se considera "en progreso" un `active` RECIENTE — una sesión colgada
+  // en `active` de hace rato (antes de que existiera el status `error`) no
+  // debe bloquear un pedido legítimo nuevo del mismo tema.
+  const STALE_ACTIVE_MS = 6 * 60 * 1000;
+  if (prior && prior.status === "active" && priorAgeMs < STALE_ACTIVE_MS) {
     let priorFailed = false;
     for (let i = 0; i < 20; i++) {
       await new Promise((r) => setTimeout(r, 3000));
