@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -74,7 +73,6 @@ function MesaDialogoContent() {
   const [newTopic, setNewTopic] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState("");
 
   const handleStart = () => {
     if (!newTopic.trim()) return;
@@ -105,12 +103,16 @@ function MesaDialogoContent() {
     });
   };
 
-  const handleContinue = (sessionId: string) => {
+  // B8 (auditoría 2026-08-31): antes el texto del feedback era un solo useState
+  // del padre compartido por todas las tarjetas — escribías en la sesión A y
+  // aparecía en la B. Ahora cada SessionCard tiene su propio estado y pasa el
+  // texto acá. `onClear` lo limpia solo si el envío salió bien.
+  const handleContinue = (sessionId: string, feedback: string, onClear: () => void) => {
     if (!feedback.trim()) return;
     continueMutation.mutate(
       { sessionId, feedback },
       {
-        onSuccess: () => setFeedback(""),
+        onSuccess: onClear,
         // Hallazgo real 2026-08-31: si esto fallaba (timeout de 150s, red),
         // no había ningún aviso — el feedback quedaba tipeado en la caja
         // sin ninguna señal de que no se mandó, indistinguible de un éxito
@@ -229,8 +231,6 @@ function MesaDialogoContent() {
                   selectedSession === session.id ? null : session.id
                 )
               }
-              feedback={feedback}
-              onFeedbackChange={setFeedback}
               onContinue={handleContinue}
               isContinuing={continueMutation.isPending}
             />
@@ -245,23 +245,26 @@ function SessionCard({
   session,
   isSelected,
   onSelect,
-  feedback,
-  onFeedbackChange,
   onContinue,
   isContinuing,
 }: {
   session: any;
   isSelected: boolean;
   onSelect: () => void;
-  feedback: string;
-  onFeedbackChange: (v: string) => void;
-  onContinue: (sessionId: string) => void;
+  onContinue: (sessionId: string, feedback: string, onClear: () => void) => void;
   isContinuing: boolean;
 }) {
+  const [feedback, setFeedback] = useState("");
   const { data: messages } = useDialogueMessages(session.id, {
     enabled: isSelected,
     isActive: session.status === "active",
   });
+
+  // UX3 (auditoría 2026-08-31): en una sesión ya aprobada (se publicó/agendó)
+  // o con error (el cartel dice "probá una sesión nueva"), la caja de feedback
+  // no tiene sentido — mandarla no hace nada útil.
+  const feedbackUsable = session.status !== "approved" && session.status !== "error";
+  const send = () => onContinue(session.id, feedback, () => setFeedback(""));
 
   const statusVariant =
     session.status === "approved"
@@ -343,7 +346,7 @@ function SessionCard({
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Estratega pensando el ángulo…</span>
               </div>
-              <span className="text-xs text-muted-foreground/70">Puede tardar hasta 2 minutos.</span>
+              <span className="text-xs text-muted-foreground/70">Puede tardar un par de minutos.</span>
             </div>
           ) : null}
 
@@ -416,30 +419,30 @@ function SessionCard({
           )}
 
           {/* Feedback input */}
-          <div className="flex gap-2">
-            <Input
-              placeholder="Dale feedback a los agentes..."
-              value={feedback}
-              onChange={(e) => onFeedbackChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  onContinue(session.id);
-                }
-              }}
-            />
-            <Button
-              size="icon"
-              onClick={() => onContinue(session.id)}
-              disabled={!feedback.trim() || isContinuing}
-            >
-              {isContinuing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
+          {feedbackUsable ? (
+            <div className="flex gap-2">
+              <Textarea
+                rows={2}
+                placeholder="Dale feedback a los agentes (qué ajustar del hook, el tono, el CTA…). Enter para enviar, Shift+Enter para salto de línea."
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                className="min-h-[44px] resize-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    send();
+                  }
+                }}
+              />
+              <Button size="icon" className="shrink-0" onClick={send} disabled={!feedback.trim() || isContinuing}>
+                {isContinuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
+          ) : session.status === "error" ? null : (
+            <p className="text-xs text-muted-foreground">
+              Esta sesión ya cerró. Para probar otro ángulo, iniciá una sesión nueva.
+            </p>
+          )}
         </CardContent>
       )}
     </Card>

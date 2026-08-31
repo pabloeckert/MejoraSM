@@ -6,6 +6,27 @@ Este es el **único archivo de documentación del repo**. El 2026-08-02 Pablo pi
 
 Excepciones que siguen siendo archivos aparte porque no son documentación, son funcionales: `public/robots.txt` y `dist/robots.txt` (los lee el crawler web, tienen que existir en esa ruta exacta), `biblioteca/fonts/LICENCIA.txt` (licencia legal de la tipografía, tiene que viajar junto a los archivos de fuente), y `MejoraSM.md` (transcripción cruda de sesión, ver "Transcripción de sesión" más abajo — no es documentación del producto, es un log).
 
+## Empezá acá
+
+Este archivo tiene dos mitades:
+
+1. **Referencia estable** (desde acá hasta el separador `# ━━━ BITÁCORA ━━━`): comandos, arquitectura, deploy, modelo de datos, seguridad, decisiones vigentes. Es lo que hay que leer para trabajar en el repo.
+2. **Bitácora cronológica** (después del separador): registro fechado de cada sesión — qué se probó, qué se encontró, qué quedó pendiente. Es historia y evidencia, no instrucciones. Consultar una entrada puntual por fecha o tema, no leer de corrido. Cuando algo de la referencia estable y la bitácora se contradicen, gana la bitácora más reciente (y hay que corregir la referencia estable).
+
+### Estado actual del sistema (snapshot — mantener al día)
+
+| Pieza | Estado | Desde |
+|---|---|---|
+| **Stories diarias** | 100% automáticas, cron `daily-story.yml` 13:00 UTC | producción desde jul-2026 |
+| **Posts/carruseles de feed** | 100% automáticos (Crítico aprueba → autoagenda → publica), cron `publish-scheduled-posts.yml` cada 15 min | reactivado 2026-08-24 (estuvo pausado 2026-08-05 → 08-24) |
+| **Login / auth del EDA** | **removido a propósito** — EDA completamente abierto, sin usuario ni contraseña. Decisión informada de Pablo (uso personal). Revisar si el uso deja de ser estrictamente personal | 2026-08-25 |
+| **RLS de Supabase** | revertido a abierto (`USING (true)`, migración `019`). `app_admins` / `is_app_admin()` quedan vestigiales. Reactivar = reaplicar `006_real_rls_and_auth.sql` + sacar rama anon key de `_shared/auth.ts` | 2026-08-25 |
+| **CI (`ci.yml`)** | lint no bloqueante (~42 errores preexistentes, deuda aceptada), test + build reales sí corren y deben pasar | fix 2026-08-31 |
+| **Edge Functions** | 6: `orchestrator`, `vault-process`, `rule-engine`, `metrics-collector`, `copilot`, `classify-photo`. `publisher` y `ai-gateway` borradas | `publisher` borrada 2026-08-16 |
+| **Fallback de IA** | Anthropic (`claude-sonnet-5`/`opus-5`) → Groq `openai/gpt-oss-120b`. `llama-3.3-70b-versatile` se retiró el 2026-08-16, ya migrado en los 3 puntos | 2026-08-18 |
+| **Límite de cuenta Anthropic** | resuelto — Pablo subió el límite de gasto, sin bloqueo | 2026-08-19 |
+| **Multi-tenant (Fase 6)** | pausado a propósito — es decisión de producto de Pablo, no técnica | 2026-08-17 |
+
 ## Fuente de verdad
 
 Este archivo (y la conversación de Claude Code donde se decide algo con Pablo) es la única fuente de verdad para MejoraSM. Cualquier otro insumo — otra sesión de IA, otra persona, otro chat en paralelo — se incorpora **solo cuando Pablo lo trae acá de forma expresa**; hasta entonces no aplica y no se vuelve a discutir. Esto se confirmó de forma directa el 2026-08-02 después de que surgiera una duda legítima sobre si un objetivo de diseño (autonomía total sin gate de aprobación humana, ver más abajo) venía de esta conversación o se había cruzado con una decisión distinta tomada en otro lado — Pablo cortó la ambigüedad: lo que se decide acá, vale; lo demás, no, hasta que él lo traiga expresamente.
@@ -15,6 +36,8 @@ Este archivo (y la conversación de Claude Code donde se decide algo con Pablo) 
 Pablo pidió, en tono explícito de orden permanente ("tomá como dogma"): cada vez que se actualiza este archivo, actualizar también `MejoraSM.md` (raíz del repo) con la transcripción de la conversación completa hasta ese punto — de corrido, sin etiquetar quién dice cada parte, con decisiones/hallazgos/explicaciones y el código final completo (HTML/MD) transcriptos literal, sin filtrar. Quedan afuera de esa transcripción los comandos de terminal, el JSON crudo de herramientas y los outputs técnicos (curl/git/SQL) — esos no se transcriben, se resumen en prosa si hace falta el hallazgo que arrojaron.
 
 `MejoraSM.md` no reemplaza a este archivo ni se le aplica el mismo criterio de "única fuente de verdad" — es un log histórico de sesión, este archivo (`CLAUDE.md`) sigue siendo la única fuente de verdad operativa del producto.
+
+**Cuándo aplica la transcripción (criterio, para no cargarla de más):** cuando la sesión agrega una entrada nueva a la bitácora — un hallazgo, una decisión, una fase, un fix con contexto. No aplica a correcciones de tipeo, ajustes de formato, o edición de la referencia estable sin cambio de fondo. Ante la duda de si un cambio "cuenta", cuenta.
 
 ## Gobierno del proyecto: "Lovable propone, Claude Code dispone, Pablo decide" (dogma, 2026-08-16)
 
@@ -223,19 +246,38 @@ De paso se encontraron y corrigieron dos bugs reales preexistentes (no relaciona
 ## Comandos principales
 
 ```bash
-npm run dev           # Vite dev server, app EDA (React), puerto 8080
-npm run build          # Build de producción (dist/)
-npm run preview        # Sirve el build de dist/ localmente
-npm run lint           # ESLint (*.ts/*.tsx)
-npm test               # Vitest (src/**/*.{test,spec}.{ts,tsx}, jsdom)
-npm run test:watch     # Vitest en modo watch
+npm install --legacy-peer-deps   # instalar deps (NO npm ci/install pelado — falla por peer deps)
+npm run dev                       # Vite dev server, app EDA (React), puerto 8080
+npm run build                     # build de producción (dist/)
+npm run preview                   # sirve el build de dist/ localmente
+npm run lint                      # ESLint (*.ts/*.tsx)
+npm test                          # Vitest (src/**/*.{test,spec}.{ts,tsx}, jsdom)
+npm run test:watch                # Vitest en modo watch
+npx tsc --noEmit                  # typecheck sin emitir (parte del gate de verificación)
 ```
 
-`npm install --legacy-peer-deps` si `npm ci`/`npm install` falla localmente por peer deps. Si `npm test` falla con `Cannot find package '@vitejs/plugin-react-swc'`, es que `node_modules` no tiene las devDependencies instaladas — no es un problema del código.
+**Correr un solo test:**
+```bash
+npx vitest run src/pages/Dashboard.test.tsx          # un archivo
+npx vitest run -t "nombre del test o del describe"    # por patrón de nombre
+```
 
-`.github/workflows/ci.yml` corre `npm ci --legacy-peer-deps`, lint, test y build en cada push/PR a `main`.
+**Scripts del pipeline autónomo (`scripts/*.mjs`)** — Node/ESM puro, **fuera** del pipeline de TS/ESLint/Vitest. No hay lint ni test propio; se verifican con:
+```bash
+node --check scripts/publish-scheduled-posts.mjs
+```
+
+**Cambios de schema en Supabase:** usar `supabase db query --linked "<SQL>"` (o el SQL Editor del dashboard), **no** `supabase db push` (ver "Bug conocido del CLI" en la bitácora). Las migraciones en `supabase/migrations/` son el registro, se aplican a mano.
+
+**Deploy de Edge Functions:** automático al pushear a `supabase/functions/**` (`deploy-functions.yml`), o `supabase functions deploy <nombre> --project-ref hsglmdarztrshihmzfph`.
+
+`.github/workflows/ci.yml` corre `npm ci --legacy-peer-deps`, lint (no bloqueante), test y build en cada push/PR a `main`. Si `npm test` falla con `Cannot find package '@vitejs/plugin-react-swc'`, es que `node_modules` no tiene las devDependencies — no es un problema del código.
+
+**`.env` y `secrets/`:** el `.env` local ya existe con `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` (las dos únicas que necesita el frontend) — no hace falta crearlo. `secrets/` está gitignoreado y **no se lee** (bloqueado a propósito en sesiones anteriores); las claves reales las pasa Pablo por chat cuando hacen falta, se usan una vez y no se persisten. Las claves de Edge Functions viven como secrets de Supabase, las de Actions como secrets de GitHub — nunca en archivos del repo.
 
 ## Autenticación y seguridad (EDA)
+
+> **⚠️ Estado actual (2026-08-25): el login y el RLS de admin se removieron a propósito** — el EDA quedó completamente abierto por decisión informada de Pablo (uso personal). Ver "Remoción deliberada del login" en la bitácora. Toda esta sección describe el modelo de auth **anterior**, que sigue documentado acá porque es el que hay que reaplicar (`006_real_rls_and_auth.sql` + sacar la rama anon key de `_shared/auth.ts`) si alguna vez se vuelve a cerrar el acceso.
 
 Hasta 2026-07-28 el EDA no tenía ningún control de acceso: RLS con políticas `"Allow all" USING (true)`, cero login en el frontend, y las Edge Functions no validaban quién las llamaba — cualquiera con la anon key (pública en el bundle) tenía acceso total a los datos y podía disparar publicaciones reales a Instagram vía `publisher`. Esto se corrigió en tres capas:
 
@@ -547,6 +589,12 @@ Stub vacío (solo `README.md`, sin código) para una fase futura del roadmap ("F
 ## Privacidad
 
 **Pendiente real, no resuelto:** el EDA hoy tiene login real y usuarios (aunque sea uno solo, `pabloeckert@gmail.com`) con datos personales (documentos de marca en la Bóveda, sesiones de diálogo, propuestas). Existía un borrador de política de privacidad (`Documents/PRIVACIDAD.md`, borrado en esta consolidación) pero describía un producto que ya no existe (la extensión de Chrome) y un modelo de datos viejo (RLS abierto, multi-usuario) — no es reutilizable tal cual. Si hace falta una política de privacidad real, hay que rehacerla desde cero acorde al EDA actual (sin extensión, con login/RLS real por `app_admins`, con Zernio/Anthropic como proveedores de datos además de Groq/DeepSeek/Gemini/HuggingFace/Supabase) — no inventarla sin que Pablo la revise, es un documento de cara a usuarios reales.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ━━━ BITÁCORA ━━━
+
+Lo que sigue es el registro cronológico de sesiones — evidencia y decisiones fechadas, **no instrucciones operativas**. Buscar una entrada puntual por fecha o tema; no leer de corrido. Si una entrada vieja contradice el estado actual (ver "Estado actual del sistema" al principio del archivo), gana el estado actual.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ## Inventario de backend — 2026-08-04
 

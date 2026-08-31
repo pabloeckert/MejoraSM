@@ -36,6 +36,7 @@ vi.mock("@/hooks/useProposals", () => ({
   useApproveProposal: () => ({ mutate: vi.fn(), isPending: false }),
   useRejectProposal: () => ({ mutate: vi.fn(), isPending: false }),
   useCancelProposal: () => ({ mutate: vi.fn(), isPending: false }),
+  useReactivateProposal: () => ({ mutate: vi.fn(), isPending: false }),
   useScheduleProposal: () => ({ mutate: vi.fn(), isPending: false }),
   useEditProposal: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteProposal: () => ({ mutate: vi.fn(), isPending: false }),

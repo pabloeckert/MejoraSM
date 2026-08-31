@@ -10,6 +10,14 @@ export function useDialogueSessions() {
       if (error) throw error;
       return data;
     },
+    // B12 (auditoría 2026-08-31): sin esto, una sesión que terminó server-side
+    // seguía mostrando "Activa" y su tarjeta de autopublicación no aparecía
+    // hasta navegar afuera y volver. Mientras haya alguna sesión `active`,
+    // refetch cada 4s; si no, nada.
+    refetchInterval: (query) => {
+      const sessions = query.state.data as Array<{ status?: string }> | undefined;
+      return sessions?.some((s) => s.status === "active") ? 4000 : false;
+    },
   });
 }
 

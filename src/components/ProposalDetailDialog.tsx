@@ -33,6 +33,7 @@ import {
   useApproveProposal,
   useRejectProposal,
   useCancelProposal,
+  useReactivateProposal,
   useScheduleProposal,
   useEditProposal,
   useDeleteProposal,
@@ -96,6 +97,7 @@ function fmtDate(d: string | null) {
     weekday: "short",
     day: "numeric",
     month: "short",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -121,6 +123,7 @@ export function ProposalDetailDialog({
   const approveMutation = useApproveProposal();
   const rejectMutation = useRejectProposal();
   const cancelMutation = useCancelProposal();
+  const reactivateMutation = useReactivateProposal();
   const scheduleMutation = useScheduleProposal();
   const editMutation = useEditProposal();
   const deleteMutation = useDeleteProposal();
@@ -130,6 +133,7 @@ export function ProposalDetailDialog({
   const [isEditing, setIsEditing] = useState(false);
   const [editFields, setEditFields] = useState({ title: "", hook: "", body: "", cta: "", hashtags: "" });
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [showReject, setShowReject] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
@@ -137,6 +141,10 @@ export function ProposalDetailDialog({
   const [convertTo, setConvertTo] = useState("");
   const [copied, setCopied] = useState(false);
 
+  // B22 (auditoría 2026-08-31): antes el reset dependía solo de proposal.id,
+  // así que abrir la pieza A → Editar → cerrar sin guardar → reabrir la misma A
+  // dejaba el modo edición y los cambios stale. Ahora también resetea al
+  // cerrar el diálogo.
   useEffect(() => {
     if (!proposal) return;
     setIsEditing(false);
@@ -152,7 +160,7 @@ export function ProposalDetailDialog({
     setScheduleDate(toDatetimeLocal(proposal.scheduled_at));
     setScheduleOferta(proposal.oferta || "");
     setConvertTo("");
-  }, [proposal?.id]);
+  }, [proposal?.id, open]);
 
   if (!proposal) return null;
 
@@ -167,9 +175,13 @@ export function ProposalDetailDialog({
     .join("\n");
 
   function handleCopy() {
-    navigator.clipboard.writeText(fullCopy);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard.writeText(fullCopy).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      },
+      () => toast({ title: "No se pudo copiar", description: "El navegador bloqueó el portapapeles.", variant: "destructive" })
+    );
   }
 
   function handleSaveEdit() {
@@ -205,8 +217,18 @@ export function ProposalDetailDialog({
     });
   }
 
+  // B23 (auditoría 2026-08-31): el aviso de "&lt; 30 min" no bloqueaba el submit
+  // y no había ninguna validación de fecha pasada — una fecha vencida la
+  // publica el cron en la siguiente corrida.
+  function isPastDate(v: string) {
+    return !v || new Date(v).getTime() <= Date.now();
+  }
+
   function handleReschedule() {
-    if (!scheduleDate) return;
+    if (isPastDate(scheduleDate)) {
+      toast({ title: "La fecha ya pasó", description: "Elegí una fecha y hora futuras.", variant: "destructive" });
+      return;
+    }
     rescheduleMutation.mutate(
       { id: proposal.id, date: new Date(scheduleDate).toISOString() },
       {
@@ -217,7 +239,11 @@ export function ProposalDetailDialog({
   }
 
   function handleSchedule() {
-    if (!scheduleDate || !scheduleOferta) return;
+    if (!scheduleOferta) return;
+    if (isPastDate(scheduleDate)) {
+      toast({ title: "La fecha ya pasó", description: "Elegí una fecha y hora futuras.", variant: "destructive" });
+      return;
+    }
     scheduleMutation.mutate(
       { id: proposal.id, date: new Date(scheduleDate).toISOString(), oferta: scheduleOferta },
       {
@@ -227,8 +253,23 @@ export function ProposalDetailDialog({
     );
   }
 
+  // B3 (auditoría 2026-08-31): convertir una pieza ya `scheduled` hacia/desde
+  // `historia` la deja fantasma — la UI la muestra "Se publica solo" pero
+  // render-scheduled-posts.mjs solo levanta post/carrusel. Se bloquea ese caso.
+  const convertBlocked =
+    isScheduled && (convertTo === "historia" || proposal.format === "historia");
+
   function handleConvert() {
     if (!convertTo || convertTo === proposal.format) return;
+    if (convertBlocked) {
+      toast({
+        title: "No se puede convertir así una pieza programada",
+        description:
+          "Cambiar de/hacia Story en una pieza ya programada la dejaría sin publicarse. Cancelala primero y volvé a agendarla.",
+        variant: "destructive",
+      });
+      return;
+    }
     convertMutation.mutate(
       { id: proposal.id, format: convertTo },
       {
@@ -239,6 +280,13 @@ export function ProposalDetailDialog({
         onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
       }
     );
+  }
+
+  function handleReactivate() {
+    reactivateMutation.mutate(proposal.id, {
+      onSuccess: () => toast({ title: "Propuesta reactivada", description: "Volvió a Pendiente — podés aprobarla o agendarla de nuevo." }),
+      onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    });
   }
 
   function handleApprove() {
@@ -264,7 +312,10 @@ export function ProposalDetailDialog({
 
   function handleCancelScheduled() {
     cancelMutation.mutate(proposal.id, {
-      onSuccess: () => toast({ title: "Publicación cancelada" }),
+      onSuccess: () => {
+        setConfirmCancel(false);
+        toast({ title: "Publicación cancelada", description: "La pieza quedó como Rechazada. Se puede reactivar desde el detalle." });
+      },
       onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
     });
   }
@@ -281,12 +332,14 @@ export function ProposalDetailDialog({
           <div className="flex flex-wrap items-center gap-2">
             <PipelineBadge format={proposal.format} />
             <Badge variant="outline">{proposal.format || "post"}</Badge>
-            <Badge variant={isPublished ? "default" : isRejected ? "destructive" : "secondary"}>
+            <Badge
+              variant={isPublished ? "default" : isRejected ? "destructive" : isScheduled ? "default" : "secondary"}
+            >
               {{
                 pending: "Pendiente",
                 approved: "Aprobada",
                 rejected: "Rechazada",
-                scheduled: "Programada",
+                scheduled: "● En vivo — se publica sola",
                 published: "Publicada",
               }[proposal.status || "pending"] || proposal.status}
             </Badge>
@@ -308,7 +361,7 @@ export function ProposalDetailDialog({
                 alt="Imagen final renderizada"
                 loading="lazy"
                 className={cn(
-                  "w-full rounded-md border border-border bg-muted object-cover",
+                  "w-full rounded-md border border-border bg-muted object-contain",
                   proposal.format === "historia" ? "aspect-[9/16]" : "aspect-[4/5]"
                 )}
               />
@@ -430,9 +483,19 @@ export function ProposalDetailDialog({
                 </Button>
               )}
               {isScheduled && (
-                <Button size="sm" variant="outline" onClick={handleCancelScheduled} disabled={cancelMutation.isPending}>
+                <Button size="sm" variant="outline" onClick={() => setConfirmCancel(true)} disabled={cancelMutation.isPending}>
                   {cancelMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                   Cancelar publicación
+                </Button>
+              )}
+              {isRejected && (
+                <Button size="sm" onClick={handleReactivate} disabled={reactivateMutation.isPending}>
+                  {reactivateMutation.isPending ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Repeat className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Reactivar
                 </Button>
               )}
               <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
@@ -534,6 +597,7 @@ export function ProposalDetailDialog({
               <Label>Convertir formato</Label>
               <p className="text-[11px] text-muted-foreground">
                 Solo cambia el campo format — no agenda ni desagenda la pieza por su cuenta.
+                {isScheduled && " En una pieza ya programada no se puede pasar de/hacia Story (la dejaría sin publicarse)."}
               </p>
               <div className="flex gap-2">
                 <Select value={convertTo} onValueChange={setConvertTo}>
@@ -541,14 +605,20 @@ export function ProposalDetailDialog({
                     <SelectValue placeholder="Elegir formato..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {CONVERTIBLE_FORMATS.filter((f) => f.value !== proposal.format).map((f) => (
-                      <SelectItem key={f.value} value={f.value}>
-                        {f.label}
-                      </SelectItem>
-                    ))}
+                    {CONVERTIBLE_FORMATS.filter((f) => f.value !== proposal.format)
+                      .filter((f) => !(isScheduled && (f.value === "historia" || proposal.format === "historia")))
+                      .map((f) => (
+                        <SelectItem key={f.value} value={f.value}>
+                          {f.label}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
-                <Button size="sm" onClick={handleConvert} disabled={!convertTo || convertMutation.isPending}>
+                <Button
+                  size="sm"
+                  onClick={handleConvert}
+                  disabled={!convertTo || convertBlocked || convertMutation.isPending}
+                >
                   {convertMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                   Convertir
                 </Button>
@@ -566,6 +636,16 @@ export function ProposalDetailDialog({
         confirmText="Borrar"
         variant="destructive"
         onConfirm={handleDelete}
+      />
+
+      <ConfirmDialog
+        open={confirmCancel}
+        onOpenChange={setConfirmCancel}
+        title="¿Cancelar esta publicación?"
+        description="La pieza no va a salir. Queda como Rechazada — la podés reactivar después desde su detalle, pero perdés el horario que tenía."
+        confirmText="Cancelar publicación"
+        variant="destructive"
+        onConfirm={handleCancelScheduled}
       />
     </>
   );

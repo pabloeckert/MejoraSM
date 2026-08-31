@@ -68,8 +68,15 @@ export function useUploadDocument() {
 export function useDeleteDocument() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => documentsApi.delete(id),
+    // B1/B31: documentsApi.delete puede tirar (storage) o devolver { error }
+    // (el DELETE final) sin rechazar — chequeamos las dos cosas.
+    mutationFn: async (id: string) => {
+      const res = await documentsApi.delete(id);
+      if (res.error) throw new Error(res.error.message);
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["documents"] }),
+    onError: (err: Error) =>
+      toast({ variant: "destructive", title: "No se pudo borrar el documento", description: err.message }),
   });
 }
 

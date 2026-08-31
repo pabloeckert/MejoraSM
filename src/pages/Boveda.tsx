@@ -176,7 +176,12 @@ function BovedaContent() {
           {filteredDocs.map((doc: any) => {
             const status: ProcessingStatus = doc.processing_status || (doc.content ? "ready" : "pending");
             const meta = STATUS_META[status] || STATUS_META.pending;
-            const canRetry = status === "error" || status === "ready_no_search";
+            // B18 (auditoría 2026-08-31): antes solo se podía reprocesar desde
+            // error/ready_no_search. Un `pending` colgado (la Edge Function
+            // 202'ó o murió sin setear estado) quedaba sin ningún botón. Ahora
+            // se puede reprocesar desde cualquier estado que no sea "ready" ni
+            // un estado activo con spinner.
+            const canRetry = status !== "ready" && !meta.spinning;
             return (
               <Card key={doc.id}>
                 <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -208,10 +213,20 @@ function BovedaContent() {
                         size="icon"
                         aria-label={`Reprocesar ${doc.title}`}
                         title="Reprocesar documento"
-                        onClick={() => processMutation.mutate(doc.id)}
-                        disabled={processMutation.isPending}
+                        onClick={() =>
+                          processMutation.mutate(doc.id, {
+                            onSuccess: () => toast({ title: "Reprocesando", description: `"${doc.title}" está procesándose de nuevo.` }),
+                          })
+                        }
+                        disabled={processMutation.isPending && processMutation.variables === doc.id}
                       >
-                        <RotateCw className={processMutation.isPending ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+                        <RotateCw
+                          className={
+                            processMutation.isPending && processMutation.variables === doc.id
+                              ? "h-4 w-4 animate-spin"
+                              : "h-4 w-4"
+                          }
+                        />
                       </Button>
                     )}
                     <Button

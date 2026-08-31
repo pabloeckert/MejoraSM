@@ -95,8 +95,12 @@ export const documentsApi = {
       .eq("id", id)
       .single();
 
-    if (doc) {
-      await supabase.storage.from("vault").remove([doc.file_path]);
+    // B31 (auditoría 2026-08-31): antes el remove de storage no se chequeaba
+    // y la fila se borraba igual → archivo huérfano en el bucket. Ahora, si
+    // el remove falla, no se borra la fila (queda consistente para reintentar).
+    if (doc?.file_path) {
+      const { error: storageError } = await supabase.storage.from("vault").remove([doc.file_path]);
+      if (storageError) throw new Error(`No se pudo borrar el archivo del storage: ${storageError.message}`);
     }
 
     return supabase.from("documents").delete().eq("id", id);
@@ -169,6 +173,17 @@ export const proposalsApi = {
       .from("proposals")
       .update({ status: "rejected", rejection_reason: "Cancelada antes de publicar" })
       .eq("id", id),
+
+  // Recuperar una propuesta rechazada/cancelada (B2, auditoría 2026-08-31).
+  // Vuelve a `pending` y limpia scheduled_at/rejection_reason — desde ahí se
+  // puede volver a aprobar/agendar. No toca `published` (no hay reactivación
+  // de algo que ya salió).
+  reactivate: (id: string) =>
+    supabase
+      .from("proposals")
+      .update({ status: "pending", scheduled_at: null, rejection_reason: null })
+      .eq("id", id)
+      .neq("status", "published"),
 
   pending: () =>
     supabase
@@ -269,7 +284,21 @@ export const metricsApi = {
 // ═══════════════════════════════════════
 
 export const runLogApi = {
-  all: (limit = 500) =>
+  // Paginado real (B27, auditoría 2026-08-31): run_log es la tabla de mayor
+  // volumen (una fila por paso de cada cron/script/función). Con .limit(500)
+  // pelado, una "auditoría completa" no veía más allá de ~2-3 semanas.
+  all: () =>
+    fetchAllPages<Record<string, unknown>>((from, to) =>
+      supabase
+        .from("run_log")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .range(from, to)
+    ),
+
+  // Vista de observabilidad en /auditoria (F11) — últimas N corridas, sin
+  // paginar, para mostrar en pantalla.
+  recent: (limit = 200) =>
     supabase
       .from("run_log")
       .select("*")
