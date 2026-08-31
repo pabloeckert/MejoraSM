@@ -253,17 +253,13 @@ const PLATAFORMAS_DESPUBLICAR: Array<{ value: "instagram" | "facebook"; label: s
 function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () => void }) {
   const { pending, run } = useWorkflowAction();
   const [markPlatform, setMarkPlatform] = useState<"instagram" | "facebook">("instagram");
+  // UX9 (auditoría 2026-08-31): antes esta caja con 6+ controles destructivos
+  // se mostraba siempre abierta en cada tarjeta de una pieza que funciona bien.
+  const [open, setOpen] = useState(false);
 
   const { workflowFile, workflowUrl, idValue, inputKey } = manageTarget(post);
 
   async function handleAction(platform: "instagram" | "facebook", action: "reintentar" | "despublicar") {
-    if (platform === "instagram" && action === "despublicar") {
-      toast({
-        title: "Instagram no se puede despublicar por API",
-        description: "Es una limitación de Meta — borralo a mano desde la app y después marcalo abajo.",
-      });
-      return;
-    }
     if (action === "despublicar") {
       const ok = window.confirm(
         `¿Despublicar de verdad "${platform}" para esta pieza? Esto la baja realmente de la red — no se puede deshacer.`
@@ -290,10 +286,29 @@ function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () 
     if (ok) onDone();
   }
 
+  if (!open) {
+    return (
+      <div className="border-t border-border pt-2">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="text-[11px] font-medium text-muted-foreground hover:text-primary hover:underline"
+        >
+          Gestionar (reintentar / despublicar / marcar a mano) →
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3 border-t border-border pt-3">
-      <div className="space-y-2">
+      <div className="flex items-center justify-between">
         <p className="text-[11px] font-semibold text-muted-foreground">Reintentar o despublicar de verdad (vía Zernio):</p>
+        <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar" className="text-muted-foreground hover:text-foreground">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="space-y-2">
         <div className="grid grid-cols-2 gap-1.5">
           <Button
             type="button"
@@ -317,15 +332,19 @@ function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () 
             {pending === "reintentar-facebook" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
             Reintentar FB
           </Button>
+          {/* B24 (auditoría 2026-08-31): Instagram no se puede despublicar por
+              API (limitación de Meta). Antes este botón, al tocarlo, solo tiraba
+              un toast que se explicaba a sí mismo — ahora está deshabilitado con
+              el motivo a la vista. */}
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="text-xs text-destructive"
-            disabled={!!pending}
-            onClick={() => handleAction("instagram", "despublicar")}
+            className="text-xs"
+            disabled
+            title="Instagram no permite despublicar por API — borralo a mano y marcalo abajo"
           >
-            Despublicar IG
+            Despublicar IG (a mano)
           </Button>
           <Button
             type="button"
@@ -520,6 +539,7 @@ export default function Monitor() {
 
   const posts = data?.posts || [];
   const accionesManuales = data?.accionesManuales || new Map<string, AccionManual>();
+  const [syncing, setSyncing] = useState(false);
 
   // manage-post.yml/manage-story.yml solo tocan Zernio/proposals — a
   // diferencia de mark-manual.yml, no escriben historial_cache. Sin este
@@ -527,14 +547,20 @@ export default function Monitor() {
   // de sync-history de cada 6hs. Dispara sync-history.yml solo (best-effort,
   // no bloquea ni avisa si falla — Pablo siempre puede tocar "Actualizar" a
   // mano) después de darle tiempo real al workflow anterior a terminar.
+  // B25 (auditoría 2026-08-31): antes eran 95s a ciegas sin ningún indicador —
+  // si el workflow tardaba más, el refetch traía data vieja y parecía que falló.
   function refreshAfterAction() {
+    setSyncing(true);
     setTimeout(() => {
       if (github.isConnected()) {
         github.triggerWorkflow("sync-history.yml", {}).catch(() => {
           // best-effort — el link a GitHub Actions sigue disponible como respaldo
         });
       }
-      setTimeout(() => refetch(), 20_000);
+      setTimeout(async () => {
+        await refetch();
+        setSyncing(false);
+      }, 20_000);
     }, 75_000);
   }
 
@@ -554,6 +580,13 @@ export default function Monitor() {
         </Button>
       </div>
 
+      {syncing && (
+        <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+          Sincronizando con Zernio — la acción tarda ~1–2 min en reflejarse. Podés tocar "Actualizar" más tarde si no aparece.
+        </div>
+      )}
+
       {isError ? (
         <Card className="border-destructive/40 bg-destructive/5">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -572,8 +605,16 @@ export default function Monitor() {
           {!isLoading && posts.length === 0 && "Todavía no hay historial sincronizado."}
           {!isLoading && posts.length > 0 && data?.syncedAt && (
             <>
-              {posts.length} story(s) — última sincronización:{" "}
-              {new Date(data.syncedAt).toLocaleString("es-AR")}
+              {(() => {
+                const stories = posts.filter((p) => p.kind === "story").length;
+                const feed = posts.length - stories;
+                const parts = [
+                  stories > 0 ? `${stories} ${stories === 1 ? "story" : "stories"}` : null,
+                  feed > 0 ? `${feed} ${feed === 1 ? "post" : "posts"} de feed` : null,
+                ].filter(Boolean);
+                return `${posts.length} pieza${posts.length === 1 ? "" : "s"} (${parts.join(", ")})`;
+              })()}{" "}
+              — última sincronización: {new Date(data.syncedAt).toLocaleString("es-AR")}
             </>
           )}
         </p>

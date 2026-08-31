@@ -591,7 +591,14 @@ function DashboardContent() {
     },
     {
       label: "Contenidos generados",
-      value: String(proposals?.length ?? 0),
+      // B15 (auditoría 2026-08-31): antes mostraba proposals.length (histórico
+      // total) con subtítulo "Últimos 30 días".
+      value: String(
+        (proposals || []).filter(
+          (p: { created_at?: string }) =>
+            p.created_at && Date.now() - new Date(p.created_at).getTime() <= 30 * 24 * 60 * 60 * 1000
+        ).length
+      ),
       sub: "Últimos 30 días",
       href: "/laboratorio",
       icon: Sparkles,
@@ -847,7 +854,7 @@ function DashboardContent() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }) => `${name} ${Math.round((percent ?? 0) * 100)}%`}
                     outerRadius={72}
                     fill="#1A3D84"
                     dataKey="value"

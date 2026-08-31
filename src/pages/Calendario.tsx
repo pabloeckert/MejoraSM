@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { CalendarDays, Loader2, ChevronLeft, ChevronRight, Clock, Zap, Hand } from "lucide-react";
+import { CalendarDays, Loader2, ChevronLeft, ChevronRight, Clock, Zap, Hand, Move, X } from "lucide-react";
 import { useProposals, useRescheduleProposal } from "@/hooks/useProposals";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { cn } from "@/lib/utils";
@@ -66,6 +66,10 @@ function CalendarioContent() {
   const [showTestRows, setShowTestRows] = useState(false);
   const [draggedProposal, setDraggedProposal] = useState<ProposalDetail | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  // B11 (auditoría 2026-08-31): el drag-and-drop HTML5 no funciona en touch.
+  // "Modo mover": tocás una pieza programada → tocás un día → se reprograma.
+  // Funciona con teclado y touch, no solo con mouse.
+  const [movingProposal, setMovingProposal] = useState<ProposalDetail | null>(null);
 
   const selectedProposal: ProposalDetail | null = selectedProposalId
     ? (proposals || []).find((p: ProposalDetail) => p.id === selectedProposalId) ?? null
@@ -82,7 +86,9 @@ function CalendarioContent() {
   const prevWeek = () => setCurrentDate(new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000));
   const nextWeek = () => setCurrentDate(new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000));
 
-  const monthName = currentDate.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+  const monthNameRaw = currentDate.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+  // D11: `capitalize` de CSS convertía "agosto de 2026" → "Agosto De 2026".
+  const monthName = monthNameRaw.charAt(0).toUpperCase() + monthNameRaw.slice(1);
   const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000);
   const weekLabel = `${weekStart.toLocaleDateString("es-AR", { day: "numeric", month: "short" })} – ${weekEnd.toLocaleDateString("es-AR", { day: "numeric", month: "short" })}`;
 
@@ -118,11 +124,12 @@ function CalendarioContent() {
     })
     .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime());
 
-  function handleDrop(targetDate: Date) {
+  function moveProposalToDay(p: ProposalDetail | null, targetDate: Date) {
     setDragOverKey(null);
-    if (!draggedProposal || !draggedProposal.scheduled_at) return;
-    if (draggedProposal.status !== "scheduled") return; // solo lo programado se puede reprogramar arrastrando
-    const original = new Date(draggedProposal.scheduled_at);
+    setDraggedProposal(null);
+    setMovingProposal(null);
+    if (!p || !p.scheduled_at || p.status !== "scheduled") return;
+    const original = new Date(p.scheduled_at);
     const newDate = new Date(
       targetDate.getFullYear(),
       targetDate.getMonth(),
@@ -130,13 +137,19 @@ function CalendarioContent() {
       original.getHours(),
       original.getMinutes()
     );
-    if (dayKey(newDate) === dayKey(original)) {
-      setDraggedProposal(null);
+    if (dayKey(newDate) === dayKey(original)) return;
+    // B11: guardar contra fechas pasadas — si la nueva fecha ya venció, el cron
+    // la publica en la próxima corrida sin ninguna revisión.
+    if (newDate.getTime() <= Date.now()) {
+      toast({
+        title: "Ese día ya pasó",
+        description: "Elegí un día futuro — una fecha vencida se publicaría de inmediato.",
+        variant: "destructive",
+      });
       return;
     }
-    const proposalId = draggedProposal.id;
     rescheduleMutation.mutate(
-      { id: proposalId, date: newDate.toISOString() },
+      { id: p.id, date: newDate.toISOString() },
       {
         onSuccess: () =>
           toast({
@@ -146,7 +159,14 @@ function CalendarioContent() {
         onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
       }
     );
-    setDraggedProposal(null);
+  }
+
+  function handleDrop(targetDate: Date) {
+    moveProposalToDay(draggedProposal, targetDate);
+  }
+
+  function handleDayTap(targetDate: Date) {
+    if (movingProposal) moveProposalToDay(movingProposal, targetDate);
   }
 
   return (
@@ -156,8 +176,9 @@ function CalendarioContent() {
           <h1 className="text-3xl font-bold tracking-tight">Calendario Editorial</h1>
           <p className="mt-1 text-muted-foreground">
             Fuente real: lo que se agenda y publica solo. Tocá una pieza para ver el detalle completo — desde ahí
-            se reprograma o se cancela antes de que salga.{" "}
-            <span className="hidden sm:inline">En pantallas grandes también se puede arrastrar a otro día.</span>
+            se reprograma o se cancela antes de que salga. Para moverla a otro día, tocá el ícono{" "}
+            <Move className="inline h-3.5 w-3.5 align-text-bottom" /> y después el día destino
+            <span className="hidden sm:inline"> (en desktop también se puede arrastrar a otro día)</span>.
           </p>
         </div>
         <div className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3.5 py-2">
@@ -169,7 +190,7 @@ function CalendarioContent() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
           size="sm"
@@ -186,6 +207,15 @@ function CalendarioContent() {
         >
           Semanal
         </Button>
+        {movingProposal && (
+          <div className="flex items-center gap-2 rounded-md border border-primary bg-primary/5 px-3 py-1.5 text-xs">
+            <Move className="h-3.5 w-3.5 text-primary" />
+            Moviendo <strong className="max-w-[160px] truncate">{movingProposal.hook || movingProposal.title}</strong> — tocá el día destino
+            <button type="button" onClick={() => setMovingProposal(null)} aria-label="Cancelar movimiento" className="text-muted-foreground hover:text-foreground">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -194,7 +224,7 @@ function CalendarioContent() {
             <Button variant="ghost" size="icon" onClick={viewMode === "month" ? prevMonth : prevWeek}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <CardTitle className="text-base capitalize">{viewMode === "month" ? monthName : weekLabel}</CardTitle>
+            <CardTitle className="text-base">{viewMode === "month" ? monthName : weekLabel}</CardTitle>
             <Button variant="ghost" size="icon" onClick={viewMode === "month" ? nextMonth : nextWeek}>
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -234,6 +264,9 @@ function CalendarioContent() {
                       onDrop={() => handleDrop(date)}
                       onSelect={(p) => setSelectedProposalId(p.id)}
                       onDragStartEvent={setDraggedProposal}
+                      movingActive={!!movingProposal}
+                      onDayTap={() => handleDayTap(date)}
+                      onStartMove={setMovingProposal}
                     />
                   );
                 })}
@@ -261,6 +294,9 @@ function CalendarioContent() {
                         onDrop={() => handleDrop(date)}
                         onSelect={(p) => setSelectedProposalId(p.id)}
                         onDragStartEvent={setDraggedProposal}
+                        movingActive={!!movingProposal}
+                        onDayTap={() => handleDayTap(date)}
+                        onStartMove={setMovingProposal}
                       />
                     </div>
                   );
@@ -340,7 +376,6 @@ function CalendarioContent() {
 }
 
 function DayCell({
-  date,
   label,
   compact,
   events,
@@ -351,6 +386,9 @@ function DayCell({
   onDrop,
   onSelect,
   onDragStartEvent,
+  movingActive,
+  onDayTap,
+  onStartMove,
 }: {
   date: Date;
   label: string;
@@ -363,6 +401,9 @@ function DayCell({
   onDrop: () => void;
   onSelect: (p: ProposalDetail) => void;
   onDragStartEvent: (p: ProposalDetail) => void;
+  movingActive: boolean;
+  onDayTap: () => void;
+  onStartMove: (p: ProposalDetail) => void;
 }) {
   const maxVisible = compact ? 2 : 6;
   return (
@@ -374,11 +415,13 @@ function DayCell({
         e.preventDefault();
         onDrop();
       }}
+      onClick={movingActive ? onDayTap : undefined}
       className={cn(
         "rounded-lg border p-1.5 transition-colors",
         compact ? "min-h-[80px]" : "min-h-[220px]",
         isToday ? "border-primary bg-primary/5" : "border-transparent",
-        isDragOver && "border-primary bg-primary/10"
+        isDragOver && "border-primary bg-primary/10",
+        movingActive && "cursor-pointer ring-1 ring-primary/30 hover:bg-primary/10"
       )}
     >
       {label && (
@@ -387,27 +430,50 @@ function DayCell({
       {events.slice(0, maxVisible).map((p) => {
         const draggable = p.status === "scheduled";
         return (
-          <button
+          <div
             key={p.id}
-            type="button"
-            draggable={draggable}
-            onDragStart={() => draggable && onDragStartEvent(p)}
-            onClick={() => onSelect(p)}
-            title={p.hook || p.title || undefined}
             className={cn(
-              "mb-0.5 flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-[10px] font-medium transition-colors hover:opacity-80",
-              draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
+              "mb-0.5 flex w-full items-center gap-1 rounded px-1 py-0.5 text-[10px] font-medium",
               p.status === "published" ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary",
               p.isTest && "outline outline-1 outline-[#F7CC13]"
             )}
           >
-            {isAutonomousFormat(p.format) ? (
-              <Zap className="h-2.5 w-2.5 flex-shrink-0" />
-            ) : (
-              <Hand className="h-2.5 w-2.5 flex-shrink-0" />
+            <button
+              type="button"
+              draggable={draggable}
+              onDragStart={() => draggable && onDragStartEvent(p)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(p);
+              }}
+              title={p.hook || p.title || undefined}
+              className={cn(
+                "flex min-w-0 flex-1 items-center gap-1 truncate text-left transition-colors hover:opacity-80",
+                draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+              )}
+            >
+              {isAutonomousFormat(p.format) ? (
+                <Zap className="h-2.5 w-2.5 flex-shrink-0" />
+              ) : (
+                <Hand className="h-2.5 w-2.5 flex-shrink-0" />
+              )}
+              <span className="truncate">{p.hook || p.title || "Sin título"}</span>
+            </button>
+            {draggable && (
+              <button
+                type="button"
+                aria-label={`Mover "${p.hook || p.title}" a otro día`}
+                title="Mover a otro día"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStartMove(p);
+                }}
+                className="shrink-0 text-primary/60 hover:text-primary"
+              >
+                <Move className="h-2.5 w-2.5" />
+              </button>
             )}
-            <span className="truncate">{p.hook || p.title || "Sin título"}</span>
-          </button>
+          </div>
         );
       })}
       {events.length > maxVisible && (
