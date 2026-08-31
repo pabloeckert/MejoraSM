@@ -375,12 +375,54 @@ const OFERTAS = ["personal", "organizacional", "comercial", "empresarial", "prof
 // sin tocar el resto del pipeline.
 const POST_SPACING_HOURS = 24;
 
+// B4 (auditoría 2026-08-31): pickNextSlot devolvía max(now, lastSlot + 24h) sin
+// fijar hora del día, así que si la primera cadena arrancó a las 03:38 UTC,
+// todo post autónomo salía ~00:38 ART — justo cuando la audiencia B2B no está.
+// Ahora se apunta a bloques horarios reales (≈ 09/13/20 ART = 12/16/23 UTC,
+// coherente con "audiencia online 11–23h" de los insights del Dashboard), y si
+// rule-engine aprendió una regla de timing con confianza alta, se prioriza esa.
+const PREFERRED_UTC_HOURS = [12, 16, 23];
+const ROLLING_WINDOW_DAYS = 30;
+
+async function getLearnedTimingHour(): Promise<number | null> {
+  const { data } = await supabase
+    .from("success_rules")
+    .select("condition, confidence")
+    .eq("rule_type", "timing")
+    .gte("confidence", LEARNED_RULES_MIN_CONFIDENCE)
+    .order("confidence", { ascending: false })
+    .limit(1);
+  const h = data?.[0]?.condition?.hour;
+  return typeof h === "number" && h >= 0 && h <= 23 ? h : null;
+}
+
+// Adelanta `from` hasta la próxima ocurrencia de una hora preferida (UTC),
+// minutos/segundos en 0. Si la hora actual ya es preferida y todavía no pasó,
+// la usa; si no, la próxima del día o la primera del día siguiente.
+function snapToPreferredHour(from: Date, hoursUtc: number[]): Date {
+  const hours = [...new Set(hoursUtc)].sort((a, b) => a - b);
+  const d = new Date(from);
+  d.setUTCMinutes(0, 0, 0);
+  if (from.getUTCMinutes() > 0 || from.getUTCSeconds() > 0) d.setUTCHours(d.getUTCHours() + 1);
+  const next = hours.find((h) => h >= d.getUTCHours());
+  if (next !== undefined) {
+    d.setUTCHours(next);
+  } else {
+    d.setUTCDate(d.getUTCDate() + 1);
+    d.setUTCHours(hours[0]);
+  }
+  return d;
+}
+
 async function pickNextOferta(): Promise<string> {
+  const since = new Date(Date.now() - ROLLING_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const { data } = await supabase
     .from("proposals")
     .select("oferta")
     .in("format", AUTO_PUBLISH_FORMATS)
     .in("status", ["scheduled", "published"])
+    .eq("is_test", false)
+    .gte("created_at", since)
     .not("oferta", "is", null);
 
   const counts = Object.fromEntries(OFERTAS.map((o) => [o, 0]));
@@ -402,7 +444,11 @@ async function pickNextSlot(): Promise<string> {
   const now = Date.now();
   const lastSlot = data?.[0]?.scheduled_at ? new Date(data[0].scheduled_at).getTime() : 0;
   const spacingMs = POST_SPACING_HOURS * 60 * 60 * 1000;
-  return new Date(Math.max(now, lastSlot + spacingMs)).toISOString();
+  const earliest = new Date(Math.max(now, lastSlot + spacingMs));
+
+  const learnedHour = await getLearnedTimingHour();
+  const hours = learnedHour !== null ? [learnedHour] : PREFERRED_UTC_HOURS;
+  return snapToPreferredHour(earliest, hours).toISOString();
 }
 
 // ═══════════════════════════════════════
@@ -530,7 +576,85 @@ SUGERENCIAS: [si fue rechazado, qué cambiar]`;
 // FLUJO PRINCIPAL
 // ═══════════════════════════════════════
 
+// B5 (auditoría 2026-08-31): reconstruir el DialogueResult desde una fila de
+// sesión ya terminada, sin volver a correr el debate — todos los campos ya
+// viven en metadata + final_proposal.
+function resultFromSession(session: Record<string, any>) {
+  const m = session.metadata || {};
+  return {
+    sessionId: session.id,
+    estrategia: m.estrategia ?? "",
+    contenido: session.final_proposal ?? "",
+    evaluacion: m.evaluacion ?? { aprobado: false, feedback: "" },
+    proposal: m.proposal ?? null,
+    aprobado: m.evaluacion?.aprobado ?? false,
+    proposalId: m.proposalId ?? null,
+    autoPublished: m.autoPublished ?? false,
+    scheduledAt: m.scheduledAt ?? null,
+    oferta: m.oferta ?? null,
+  };
+}
+
+// Ventana amplia para detectar un debate del mismo tema todavía CORRIENDO
+// (retry-storm). Ventana corta para uno ya TERMINADO: cubre el retry automático
+// de react-query (~150s después del start) sin bloquear una re-corrida
+// deliberada del mismo tema más tarde.
+const DEDUPE_ACTIVE_WINDOW_MS = 15 * 60 * 1000;
+const DEDUPE_DONE_WINDOW_MS = 4 * 60 * 1000;
+
 async function startSession(topic: string) {
+  // B5 (auditoría 2026-08-31): el timeout del cliente (150s) + el retry
+  // automático de react-query dispara un 2º "start" con el mismo topic mientras
+  // el 1º sigue corriendo server-side → 2º debate → 2º post autoagendado (mismo
+  // patrón de los duplicados de carrusel ya documentados). Antes de arrancar,
+  // buscamos una sesión reciente con el mismo topic:
+  //  - si ya terminó hace poco: devolvemos su resultado, sin re-debatir.
+  //  - si sigue activa: esperamos a que termine y devolvemos eso; si no termina,
+  //    tiramos un error claro en vez de arrancar el duplicado.
+  const { data: recent } = await supabase
+    .from("dialogue_sessions")
+    .select("*")
+    .eq("topic", topic)
+    .gte("created_at", new Date(Date.now() - DEDUPE_ACTIVE_WINDOW_MS).toISOString())
+    .neq("status", "error")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const prior = recent?.[0];
+  const priorAgeMs = prior ? Date.now() - new Date(prior.created_at).getTime() : Infinity;
+  if (
+    prior &&
+    (prior.status === "approved" || prior.status === "needs_review") &&
+    priorAgeMs < DEDUPE_DONE_WINDOW_MS
+  ) {
+    return resultFromSession(prior);
+  }
+  if (prior && prior.status === "active") {
+    let priorFailed = false;
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const { data: check } = await supabase
+        .from("dialogue_sessions")
+        .select("*")
+        .eq("id", prior.id)
+        .single();
+      if (check && check.status !== "active") {
+        if (check.status === "error") {
+          priorFailed = true;
+          break;
+        }
+        return resultFromSession(check);
+      }
+    }
+    // El original sigue corriendo: NO arrancamos otro debate (sería el
+    // duplicado). Salvo que el original ya haya fallado.
+    if (!priorFailed) {
+      throw new Error(
+        "Ya hay un debate corriendo sobre este mismo tema — esperá un momento y miralo en la lista de sesiones."
+      );
+    }
+  }
+
   // 1. Crear sesión
   const { data: session, error: sessionError } = await supabase
     .from("dialogue_sessions")

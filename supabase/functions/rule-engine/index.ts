@@ -47,7 +47,7 @@ async function analyzeMetrics(): Promise<RuleCandidate[]> {
   // Get metrics with proposal details
   const { data: metrics } = await supabase
     .from("metrics")
-    .select("*, proposals(title, format, hook, hashtags, body)")
+    .select("*, proposals(title, format, hook, hashtags, body, published_at, scheduled_at)")
     .order("measured_at", { ascending: false })
     .limit(100);
 
@@ -118,10 +118,15 @@ async function analyzeMetrics(): Promise<RuleCandidate[]> {
     }
   }
 
-  // 3. Analyze timing
+  // 3. Analyze timing — B4 (auditoría 2026-08-31): antes usaba measured_at, que
+  // es cuando corrió metrics-collector (un cron cada 6h) — puro ruido de cron,
+  // no la hora real de publicación. Ahora usa published_at (fallback
+  // scheduled_at, y measured_at solo si no hay ninguno), en UTC explícito para
+  // que coincida con pickNextSlot del orchestrator.
   const byHour: Record<number, typeof metrics> = {};
   for (const m of metrics) {
-    const hour = new Date(m.measured_at).getHours();
+    const when = m.proposals?.published_at || m.proposals?.scheduled_at || m.measured_at;
+    const hour = new Date(when).getUTCHours();
     if (!byHour[hour]) byHour[hour] = [];
     byHour[hour].push(m);
   }
