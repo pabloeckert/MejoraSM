@@ -23,6 +23,17 @@ const LOCAL_BRIEFS_PATH = path.join(LOG_DIR, "local-briefs.json");
 const ZERNIO_API_URL = "https://zernio.com/api/v1/posts";
 const PAGE_LIMIT = 100;
 
+// Posts reales que Zernio sigue reportando pero que no tienen ninguna
+// `proposals` real detrás (huérfanos/duplicados, confirmados a mano) — sin
+// esto, la fila vuelve a aparecer en el Monitor en cada corrida de este
+// script (cada ~15min), pisando cualquier borrado manual hecho desde la UI
+// (historialApi.removePost() solo saca la fila de esa corrida puntual).
+// No borra nada real de Zernio/Instagram/Facebook — Instagram no soporta
+// despublicar por API, hay que hacerlo a mano en la app si hace falta.
+const EXCLUDED_POST_IDS = new Set([
+  "6a8ef3ac104bb71b3ad13777", // 2026-08-31: mismo copy que dcbf5e93-... (25/08), sin proposal real
+]);
+
 const RAW_BASE_URL = process.env.RAW_BASE_URL;
 if (!RAW_BASE_URL) {
   console.error("Falta RAW_BASE_URL en el entorno.");
@@ -128,7 +139,10 @@ async function main() {
   const byId = new Map();
   for (const accountId of accountIds) {
     const posts = await fetchAllPostsForAccount(accountId, apiKey);
-    for (const post of posts) byId.set(post._id, post);
+    for (const post of posts) {
+      if (EXCLUDED_POST_IDS.has(post._id)) continue;
+      byId.set(post._id, post);
+    }
   }
 
   const localBriefs = await loadLocalBriefs();
