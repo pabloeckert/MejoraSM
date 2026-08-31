@@ -38,5 +38,10 @@ export function useCopilotChat() {
     }
   }
 
-  return { messages, sendMessage, isSending, error };
+  function clear() {
+    setMessages([]);
+    setError(null);
+  }
+
+  return { messages, sendMessage, isSending, error, clear };
 }
