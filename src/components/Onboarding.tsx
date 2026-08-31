@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, MessageSquare, Zap, ArrowRight, Check } from "lucide-react";
+import { Upload, MessageSquare, Zap, ArrowRight, Check, Rocket } from "lucide-react";
 import { useDocuments } from "@/hooks/useVault";
 
 const STORAGE_KEY = "eda-onboarding-completed";
@@ -38,13 +38,13 @@ export function Onboarding() {
 
   const steps = [
     {
-      title: "¡Bienvenido a EDA! 🚀",
-      description: "Tu Estratega Digital Autónomo está listo para trabajar. Te guiamos en 3 pasos rápidos.",
+      title: "Bienvenido a MejoraSM 🚀",
+      description: "La Estratega Digital Autónoma de Mejora Continua. Te guiamos en 4 pasos rápidos.",
       icon: Zap,
       content: (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            EDA usa 3 agentes de IA para crear contenido estratégico para Instagram:
+            MejoraSM usa 3 agentes de IA para crear contenido estratégico para Instagram y Facebook:
           </p>
           <div className="grid gap-3">
             <div className="flex items-center gap-3 rounded-lg border p-3">
@@ -135,6 +135,37 @@ export function Onboarding() {
             El Estratega propone el ángulo, el Creativo redacta el copy, y el Crítico evalúa
             si cumple con tu marca. Si no aprueba, podés dar feedback y reiterar.
           </p>
+        </div>
+      ),
+    },
+    {
+      title: "Paso 3: El sistema publica solo",
+      description: "Lo más importante que tenés que saber.",
+      icon: Rocket,
+      content: (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-primary/40 bg-primary/5 p-4">
+            <p className="text-sm font-medium text-primary">
+              Si el Crítico aprueba un Post o un Carrusel, MejoraSM lo agenda y lo publica solo en
+              Instagram y Facebook — sin que nadie apriete "publicar".
+            </p>
+          </div>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li className="flex items-start gap-2">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+              Mientras esté <span className="font-medium text-foreground">Programada</span>, la cancelás desde
+              <span className="font-medium text-foreground"> Propuestas</span> o el <span className="font-medium text-foreground">Calendario</span>.
+            </li>
+            <li className="flex items-start gap-2">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+              Ya publicada, se despublica desde el <span className="font-medium text-foreground">Monitor</span>
+              (Instagram hay que bajarlo a mano — limitación de Meta).
+            </li>
+            <li className="flex items-start gap-2">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+              Las <span className="font-medium text-foreground">Stories</span> también salen solas, todos los días.
+            </li>
+          </ul>
         </div>
       ),
     },

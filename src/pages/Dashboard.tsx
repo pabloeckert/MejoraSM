@@ -229,6 +229,42 @@ function PlatformBadge({
   );
 }
 
+function AttentionStrip({
+  pendingHistorias,
+  soon,
+  failedDocs,
+}: {
+  pendingHistorias: number;
+  soon: number;
+  failedDocs: number;
+}) {
+  const items: { text: string; href: string }[] = [];
+  if (pendingHistorias > 0)
+    items.push({
+      text: `${pendingHistorias} ${pendingHistorias === 1 ? "Story pendiente" : "Stories pendientes"} de aprobación manual`,
+      href: "/propuestas",
+    });
+  if (soon > 0)
+    items.push({ text: `${soon} ${soon === 1 ? "pieza se publica" : "piezas se publican"} en las próximas 2 h`, href: "/calendario" });
+  if (failedDocs > 0)
+    items.push({ text: `${failedDocs} ${failedDocs === 1 ? "documento" : "documentos"} sin procesar en la Bóveda`, href: "/boveda" });
+
+  if (items.length === 0) return null;
+
+  return (
+    <Card className="border-amber-500/40 bg-amber-500/5">
+      <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-1.5 p-4">
+        <span className="text-sm font-semibold text-amber-700">Necesita tu atención:</span>
+        {items.map((it, i) => (
+          <Link key={i} to={it.href} className="text-sm text-foreground underline decoration-amber-500/40 hover:decoration-amber-500">
+            {it.text}
+          </Link>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 function KpiTile({
   label,
   value,
@@ -663,6 +699,15 @@ function DashboardContent() {
           </label>
         </div>
       </div>
+
+      {/* UX6 (auditoría 2026-08-31): franja de "qué necesita tu atención" arriba
+          de todo. Para un sistema que publica solo, lo primero tiene que ser
+          "¿algo salió mal o necesita mis ojos?", no 4 contadores. */}
+      <AttentionStrip
+        pendingHistorias={(pendingProposals || []).filter((p: { format?: string }) => p.format === "historia").length}
+        soon={scheduledUpcoming.filter((p) => new Date(p.scheduled_at as string).getTime() - Date.now() < 2 * 60 * 60 * 1000).length}
+        failedDocs={(documents || []).filter((d: { processing_status?: string }) => d.processing_status === "error").length}
+      />
 
       {/* Quick start banner for new users */}
       {!hasData && (

@@ -85,8 +85,9 @@ function LaboratorioContent() {
             Laboratorio de Contenido
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Describí lo que querés comunicar y los 3 agentes arman una propuesta completa
-            (estrategia + copy + evaluación).
+            Los mismos 3 agentes que la Mesa de Diálogo, pero acá ves solo el resultado
+            (estrategia + copy + evaluación), sin el debate turno a turno. Si el Crítico aprueba un post o carrusel,
+            también se agenda y publica solo.
           </p>
         </div>
       </div>

@@ -156,7 +156,8 @@ function MesaDialogoContent() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Mesa de Diálogo</h1>
           <p className="mt-1 text-muted-foreground">
-            Los agentes debaten y crean contenido basado en tu marca.
+            Le das un tema y ves el debate turno a turno (Estratega → Creativo → Crítico). Si el Crítico aprueba un
+            post o carrusel, se agenda y publica solo. Para el resultado sin ver el debate, usá el Laboratorio.
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

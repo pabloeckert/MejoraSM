@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, FileJson, FileSpreadsheet, Loader2 } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Download, FileJson, FileSpreadsheet, Loader2, RefreshCw } from "lucide-react";
 import { proposalsApi, metricsApi, runLogApi } from "@/services/supabase";
 import { downloadCsv, downloadJson } from "@/lib/export";
 import { toast } from "@/hooks/use-toast";
@@ -175,6 +178,90 @@ export default function Auditoria() {
           </Button>
         </CardContent>
       </Card>
+
+      <RunLogTable />
     </div>
+  );
+}
+
+// F11 (auditoría 2026-08-31): darle a /auditoria una vista real de
+// observabilidad, no solo botones de export. "¿Corrió el cron de hoy?" antes
+// solo se veía en GitHub Actions o exportando un CSV.
+interface RunLogRow {
+  id: string;
+  source: string;
+  step: string;
+  status: "success" | "error" | "skipped";
+  duration_ms: number | null;
+  error: string | null;
+  created_at: string;
+}
+
+function RunLogTable() {
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
+    queryKey: ["run-log-recent"],
+    queryFn: async () => {
+      const { data, error } = await runLogApi.recent(100);
+      if (error) throw error;
+      return (data || []) as RunLogRow[];
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-base font-medium">Últimas corridas del pipeline</CardTitle>
+        <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isRefetching}>
+          <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isRefetching ? "animate-spin" : ""}`} />
+          Actualizar
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Cargando…</p>
+        ) : isError ? (
+          <p className="text-sm text-destructive">No se pudo cargar run_log.</p>
+        ) : !data || data.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Todavía no hay corridas registradas.</p>
+        ) : (
+          <div className="max-h-[420px] overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cuándo</TableHead>
+                  <TableHead>Fuente</TableHead>
+                  <TableHead>Paso</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Duración</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                      {new Date(r.created_at).toLocaleString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </TableCell>
+                    <TableCell className="text-xs font-medium">{r.source}</TableCell>
+                    <TableCell className="text-xs">{r.step}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={r.status === "error" ? "destructive" : r.status === "skipped" ? "outline" : "secondary"}
+                        className="text-[10px]"
+                      >
+                        {r.status}
+                      </Badge>
+                      {r.error && <span className="ml-1.5 text-[11px] text-destructive">{r.error.slice(0, 80)}</span>}
+                    </TableCell>
+                    <TableCell className="text-right text-xs tabular-nums text-muted-foreground">
+                      {r.duration_ms != null ? `${(r.duration_ms / 1000).toFixed(1)}s` : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
