@@ -242,12 +242,19 @@ const PLATAFORMAS_DESPUBLICAR: Array<{ value: "instagram" | "facebook"; label: s
   { value: "facebook", label: "Facebook" },
 ];
 
-function GestionPostDeFeed({ post, onDone }: { post: HistorialPost; onDone: () => void }) {
+// Hallazgo real 2026-08-31 (Pablo probando el token nuevo): para una
+// Story/post SIN plataformas fallidas, este es el único bloque de acciones
+// que se muestra (ver el ternario en PostCard más abajo) — pero antes tenía
+// un guard `post.kind !== "post"` que dejaba a las Stories publicadas sin
+// ningún botón, ni siquiera "marcar a mano". manageTarget() ya distinguía
+// bien story/post (workflowFile/inputKey), pero handleAction estaba
+// hardcodeado a manage-post.yml/proposal_id en vez de usarlo — por eso no
+// alcanzaba con sacar el guard sin más, había que usar el target real.
+function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () => void }) {
   const { pending, run } = useWorkflowAction();
   const [markPlatform, setMarkPlatform] = useState<"instagram" | "facebook">("instagram");
 
-  if (post.kind !== "post" || !post.proposalId) return null;
-  const { workflowUrl, idValue } = manageTarget(post);
+  const { workflowFile, workflowUrl, idValue, inputKey } = manageTarget(post);
 
   async function handleAction(platform: "instagram" | "facebook", action: "reintentar" | "despublicar") {
     if (platform === "instagram" && action === "despublicar") {
@@ -266,8 +273,8 @@ function GestionPostDeFeed({ post, onDone }: { post: HistorialPost; onDone: () =
     const key = `${action}-${platform}`;
     const ok = await run(
       key,
-      "manage-post.yml",
-      { proposal_id: post.proposalId as string, platform, action, confirmacion: "CONFIRMO" },
+      workflowFile,
+      { [inputKey]: idValue, platform, action, confirmacion: "CONFIRMO" },
       `${action === "reintentar" ? "Reintentando" : "Despublicando"} en ${platform} — se va a ver en el Monitor en un rato.`
     );
     if (ok) onDone();
@@ -498,7 +505,7 @@ function PostCard({
                   <AccionesFacebookFallido key={i} post={post} onDone={onDone} />
                 )
               )
-            : <GestionPostDeFeed post={post} onDone={onDone} />}
+            : <GestionPublicacion post={post} onDone={onDone} />}
         </div>
       </CardContent>
     </Card>
