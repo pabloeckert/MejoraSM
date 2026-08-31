@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-08-31T13:47:09.474Z",
+  "syncedAt": "2026-08-31T22:10:28.354Z",
   "posts": [
+    {
+      "id": "6a9586886755247010bcb625",
+      "date": "2026-08-31",
+      "status": "published",
+      "content": "Notetaker automático, equipo distribuido, todo prolijo en pantalla. La pregunta real es si el negocio detrás de esa reunión está armado para crecer. Eso es la dimensión Empresarial. Escribinos si querés revisar la tuya.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-08-31-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3975899746261971029"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a9463ce52681b3c372037dd",
       "date": "2026-08-30",
