@@ -38,7 +38,9 @@ export function downloadFile(filename: string, content: string, mimeType: string
 }
 
 export function downloadCsv(filename: string, rows: Record<string, unknown>[]) {
-  downloadFile(filename, toCsv(rows), "text/csv;charset=utf-8;");
+  // B28 (auditoría 2026-08-31): sin BOM, Excel abre un CSV UTF-8 con
+  // tildes/ñ como mojibake.
+  downloadFile(filename, "\uFEFF" + toCsv(rows), "text/csv;charset=utf-8;");
 }
 
 export function downloadJson(filename: string, data: unknown) {

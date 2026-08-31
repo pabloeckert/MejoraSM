@@ -3,17 +3,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Zap, Hand } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Mismo universo real que usa orchestrator (AUTO_PUBLISH_FORMATS) — post y
-// carrusel se agendan y publican solos; el resto (historia, y "video" que
-// ni siquiera está permitido por proposals_format_check) requiere acción
-// manual. Ver CLAUDE.md, "Arquitectura: publicación autónoma de posts de
-// feed" — no confundir con AUTO_PUBLISH_FORMATS del backend, que es la
-// misma lista pero no se puede importar directo del Edge Function.
-export const AUTONOMOUS_FORMATS = ["post", "carrusel"];
-
-export function isAutonomousFormat(format?: string | null): boolean {
-  return AUTONOMOUS_FORMATS.includes(format || "");
-}
+// PM4 (auditoría 2026-08-31): AUTONOMOUS_FORMATS / isAutonomousFormat viven en
+// src/shared/constants.ts — una sola fuente para el frontend.
+import { isAutonomousFormat } from "@/shared/constants";
 
 // Badge compartido entre Propuestas y Calendario — antes esta distinción no
 // se veía en ningún lado, lo que daba la sensación de que "no sirve para

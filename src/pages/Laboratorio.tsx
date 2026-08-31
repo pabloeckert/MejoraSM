@@ -85,7 +85,8 @@ function LaboratorioContent() {
             Laboratorio de Contenido
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Describí lo que querés comunicar y la IA genera 3 propuestas estratégicas.
+            Describí lo que querés comunicar y los 3 agentes arman una propuesta completa
+            (estrategia + copy + evaluación).
           </p>
         </div>
       </div>
@@ -242,6 +243,12 @@ function LaboratorioContent() {
                   <div>
                     <span className="text-xs font-medium text-muted-foreground">HOOK: </span>
                     <span className="text-sm">{generatedContent.proposal.hook}</span>
+                  </div>
+                )}
+                {generatedContent.proposal.body && (
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">BODY: </span>
+                    <span className="whitespace-pre-wrap text-sm">{generatedContent.proposal.body}</span>
                   </div>
                 )}
                 {generatedContent.proposal.cta && (

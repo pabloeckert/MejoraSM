@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 // Mismo límite que supabase/functions/vault-process/index.ts
 // (MAX_FILE_SIZE_BYTES) — validar acá también evita subir un archivo que
@@ -51,26 +52,31 @@ function BovedaContent() {
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+  // UX10 (auditoría 2026-08-31): antes subía de a un archivo, sin drag-and-drop
+  // (la Bóveda es donde volcás todo el brand kit). Ahora acepta varios y los
+  // procesa de a uno (vault-process no está pensado para escrituras en paralelo).
+  const uploadFiles = async (files: File[]) => {
+    const tooBig = files.filter((f) => f.size > MAX_FILE_SIZE_MB * 1024 * 1024);
+    if (tooBig.length) {
       toast({
         variant: "destructive",
-        title: "El archivo es muy grande",
-        description: `"${file.name}" pesa ${(file.size / 1024 / 1024).toFixed(1)}MB — el máximo soportado es ${MAX_FILE_SIZE_MB}MB.`,
+        title: tooBig.length === files.length ? "Los archivos son muy grandes" : "Algunos archivos quedaron afuera",
+        description: `${tooBig.map((f) => f.name).join(", ")} — el máximo es ${MAX_FILE_SIZE_MB}MB por archivo.`,
       });
-      if (fileRef.current) fileRef.current.value = "";
-      return;
     }
-
-    uploadMutation.mutate(file, {
-      onSuccess: () => {
-        if (fileRef.current) fileRef.current.value = "";
-      },
-    });
+    const ok = files.filter((f) => f.size <= MAX_FILE_SIZE_MB * 1024 * 1024);
+    for (const file of ok) {
+      await new Promise<void>((resolve) => uploadMutation.mutate(file, { onSettled: () => resolve() }));
+    }
+    if (fileRef.current) fileRef.current.value = "";
   };
+
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length) void uploadFiles(files);
+  };
+
+  const [dragActive, setDragActive] = useState(false);
 
   const handleDelete = () => {
     if (deleteTarget) {
@@ -99,6 +105,7 @@ function BovedaContent() {
           <input
             ref={fileRef}
             type="file"
+            multiple
             className="hidden"
             accept=".pdf,.docx,.txt,.md"
             onChange={handleUpload}
@@ -112,10 +119,33 @@ function BovedaContent() {
             ) : (
               <Upload className="mr-2 h-4 w-4" />
             )}
-            Subir documento
+            Subir documentos
           </Button>
         </div>
       </div>
+
+      <label
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragActive(false);
+          const files = Array.from(e.dataTransfer.files);
+          if (files.length) void uploadFiles(files);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragActive(true);
+        }}
+        onDragLeave={() => setDragActive(false)}
+        className={cn(
+          "flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border-2 border-dashed p-6 text-center text-sm transition-colors",
+          dragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+        )}
+      >
+        <Upload className="h-6 w-6 text-primary" />
+        Arrastrá varios documentos acá, o tocá para elegir
+        <span className="text-xs text-muted-foreground">PDF, DOCX, TXT, MD — hasta {MAX_FILE_SIZE_MB}MB c/u</span>
+        <input type="file" multiple accept=".pdf,.docx,.txt,.md" className="hidden" onChange={handleUpload} />
+      </label>
 
       {documents && documents.length > 0 && (
         <div className="relative">

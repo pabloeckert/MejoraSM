@@ -1,23 +1,29 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Route, Routes } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Onboarding } from "@/components/Onboarding";
-import Dashboard from "./pages/Dashboard";
-import Boveda from "./pages/Boveda";
-import MesaDialogo from "./pages/MesaDialogo";
-import Laboratorio from "./pages/Laboratorio";
-import Configuracion from "./pages/Configuracion";
-import Calendario from "./pages/Calendario";
-import Propuestas from "./pages/Propuestas";
-import Hub from "./pages/Hub";
-import Monitor from "./pages/Monitor";
-import Biblioteca from "./pages/Biblioteca";
-import Auditoria from "./pages/Auditoria";
-import NotFound from "./pages/NotFound";
+
+// PM6 (auditoría 2026-08-31): antes las 11 páginas se importaban estáticas.
+// El caso de uso más citado del repo (subir una foto del celu) cargaba igual
+// todo Recharts, todos los diálogos, etc. Ahora cada ruta es un chunk aparte.
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Boveda = lazy(() => import("./pages/Boveda"));
+const MesaDialogo = lazy(() => import("./pages/MesaDialogo"));
+const Laboratorio = lazy(() => import("./pages/Laboratorio"));
+const Configuracion = lazy(() => import("./pages/Configuracion"));
+const Calendario = lazy(() => import("./pages/Calendario"));
+const Propuestas = lazy(() => import("./pages/Propuestas"));
+const Hub = lazy(() => import("./pages/Hub"));
+const Monitor = lazy(() => import("./pages/Monitor"));
+const Biblioteca = lazy(() => import("./pages/Biblioteca"));
+const Auditoria = lazy(() => import("./pages/Auditoria"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +38,14 @@ const queryClient = new QueryClient({
   },
 });
 
+function RouteFallback() {
+  return (
+    <div className="flex h-[50vh] items-center justify-center">
+      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -40,22 +54,24 @@ const App = () => (
       <HashRouter>
         <Onboarding />
         <ErrorBoundary>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/boveda" element={<Boveda />} />
-              <Route path="/mesa" element={<MesaDialogo />} />
-              <Route path="/laboratorio" element={<Laboratorio />} />
-              <Route path="/configuracion" element={<Configuracion />} />
-              <Route path="/calendario" element={<Calendario />} />
-              <Route path="/propuestas" element={<Propuestas />} />
-              <Route path="/hub" element={<Hub />} />
-              <Route path="/monitor" element={<Monitor />} />
-              <Route path="/biblioteca" element={<Biblioteca />} />
-              <Route path="/auditoria" element={<Auditoria />} />
-              <Route path="*" element={<NotFound />} />
-            </Route>
-          </Routes>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/boveda" element={<Boveda />} />
+                <Route path="/mesa" element={<MesaDialogo />} />
+                <Route path="/laboratorio" element={<Laboratorio />} />
+                <Route path="/configuracion" element={<Configuracion />} />
+                <Route path="/calendario" element={<Calendario />} />
+                <Route path="/propuestas" element={<Propuestas />} />
+                <Route path="/hub" element={<Hub />} />
+                <Route path="/monitor" element={<Monitor />} />
+                <Route path="/biblioteca" element={<Biblioteca />} />
+                <Route path="/auditoria" element={<Auditoria />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+          </Suspense>
         </ErrorBoundary>
       </HashRouter>
     </TooltipProvider>

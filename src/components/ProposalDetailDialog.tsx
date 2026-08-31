@@ -40,6 +40,7 @@ import {
   useRescheduleProposal,
   useConvertProposalFormat,
 } from "@/hooks/useProposals";
+import { DIMENSIONES, PIPELINE_FORMATS } from "@/shared/constants";
 
 // Hallazgo real 2026-08-26: Pablo reportó que en el detalle de una
 // propuesta (abierto desde Propuestas o desde "Ver propuesta" en Monitor)
@@ -50,26 +51,9 @@ import {
 // Dashboard.tsx para la misma columna.
 const RAW_BASE_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main";
 
-// Mismas 6 dimensiones que content/inbox/ (ver scripts/generate-brief.mjs) —
-// de acá sale la foto que usa render-scheduled-posts.mjs al publicar.
-// "Sociales" agregada 2026-08-17 (Taller de la Oferta).
-const OFERTAS = [
-  { value: "personal", label: "Personal" },
-  { value: "organizacional", label: "Organizacional" },
-  { value: "comercial", label: "Comercial" },
-  { value: "empresarial", label: "Empresarial" },
-  { value: "profesionalizacion", label: "Profesionalización" },
-  { value: "sociales", label: "Sociales" },
-];
-
-// Universo real de proposals.format que el pipeline efectivamente produce y
-// consume — no reel/story (legacy del CHECK constraint) ni video (ni
-// siquiera permitido por proposals_format_check).
-const CONVERTIBLE_FORMATS = [
-  { value: "post", label: "Post Feed" },
-  { value: "carrusel", label: "Carrusel" },
-  { value: "historia", label: "Story" },
-];
+// PM4 (auditoría 2026-08-31): estas listas viven en src/shared/constants.ts.
+const OFERTAS = DIMENSIONES.map((d) => ({ value: d.key, label: d.label }));
+const CONVERTIBLE_FORMATS = PIPELINE_FORMATS.map((f) => ({ value: f.value, label: f.label }));
 
 export interface ProposalDetail {
   id: string;

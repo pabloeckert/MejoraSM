@@ -36,6 +36,7 @@ import { github } from "@/services/github";
 import { useGithubConnection, useDirListing, usePhotoUpload } from "@/hooks/useGithubUpload";
 import { suggestPhotoDimension } from "@/services/ai";
 import { toast } from "@/hooks/use-toast";
+import { DIMENSIONES, dimensionLabel } from "@/shared/constants";
 
 // Rediseño 2026-08-17, a pedido directo de Pablo: "Subir material" dejó de
 // ser 5 links a la UI cruda de upload de GitHub — ahora es una interfaz
@@ -49,16 +50,8 @@ import { toast } from "@/hooks/use-toast";
 //  B10 — la dimensión viaja pegada a cada foto (ver useGithubUpload), no del
 //        estado del componente.
 //  B13 — conectar GitHub ya no hace window.location.reload().
-const OFERTAS = [
-  { key: "personal", kicker: "Personal", title: "Liderazgo y foco" },
-  { key: "organizacional", kicker: "Organizacional", title: "Equipo y cultura" },
-  { key: "comercial", kicker: "Comercial", title: "Ventas y negociación" },
-  { key: "empresarial", kicker: "Empresarial", title: "Modelo de negocio" },
-  { key: "profesionalizacion", kicker: "Profesionalización", title: "Nivel integrador" },
-  { key: "sociales", kicker: "Sociales", title: "Equipo, alianzas y celebraciones" },
-];
-
-const KICKER = (key: string) => OFERTAS.find((o) => o.key === key)?.kicker ?? key;
+const OFERTAS = DIMENSIONES.map((d) => ({ key: d.key, kicker: d.label, title: d.title }));
+const KICKER = dimensionLabel;
 
 // GitHub Contents API corta cerca de los 40MB por archivo; y las fotos del
 // celular en HEIC no las renderiza ni el navegador ni el pipeline (Chromium).

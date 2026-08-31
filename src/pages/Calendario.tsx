@@ -9,7 +9,7 @@ import { useProposals, useRescheduleProposal } from "@/hooks/useProposals";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
-import { isAutonomousFormat } from "@/components/PipelineBadge";
+import { isAutonomousFormat } from "@/shared/constants";
 import { ProposalDetailDialog, type ProposalDetail } from "@/components/ProposalDetailDialog";
 
 const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];

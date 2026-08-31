@@ -43,8 +43,8 @@ const TUTORIAL_STEPS = [
   { screen: "library", title: "Álbumes por evento", body: "\"Taller en Chapadmalal\", \"13 años del primer after\" — un álbum agrupa fotos de un mismo momento, cruzando las etiquetas de arriba. Es otra forma de mirar lo mismo, no una jerarquía." },
   { screen: "library", title: "Cuatro etapas, una sola vista", body: "Filtrá por En biblioteca, Confirmada, Programada o Publicada. Programada y Publicada son datos reales, traídos directo del sistema — En biblioteca y Confirmada todavía son de ejemplo hasta que esas dos etapas tengan su propio catálogo real." },
   { screen: "calendar", title: "Calendario de publicaciones", body: "Mirá de un vistazo lo que ya se publicó (rojo) y lo que está programado (azul) — datos reales del sistema. Tocá cualquier publicación para modificarla, reprogramarla a otra fecha o borrarla." },
-  { screen: "quick", title: "Día a día: carga rápida", body: "Algo te llega por WhatsApp o Drive — lo soltás acá, sin fricción. El sistema propone etiquetas al toque; las confirmás con un toque." },
-  { screen: "batch", title: "En bloque: después de un evento", body: "Subís la tanda entera y el sistema propone álbum y etiquetas para todas. Vos revisás y confirmás rápido — no escribís de cero." },
+  { screen: "quick", title: "Día a día: carga rápida", body: "Algo te llega por WhatsApp o Drive — lo soltás acá, sin fricción. La foto entra sin etiquetar — le ponés la categoría con un toque. (La sugerencia con IA vive en Subir material, en el panel.)" },
+  { screen: "batch", title: "En bloque: después de un evento", body: "Subís la tanda entera y les ponés álbum y etiquetas en bloque. Vos revisás y confirmás rápido." },
   { screen: "batch", title: "Propuesta vs. confirmada", body: "Ese detalle importa: cada corrección tuya queda guardada y ajusta la próxima propuesta. Con el tiempo vas a corregir cada vez menos." },
   { screen: "compose", title: "Tres formas de armar una pieza", body: "Foto con texto para un momento puntual, collage para 2 a 4 fotos de un álbum, cartel para una idea sin foto. La Regla de Oro: mucho blanco, color como puntuación." },
   { screen: "library", title: "Listo para empezar", body: "Cuantas más veces corrijas, menos vas a tener que corregir. Este manual queda siempre a un toque de distancia en el menú." },
@@ -91,7 +91,12 @@ const WEEKDAY_NAMES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
 // ---------- Utilidades ----------
 function escapeAttr(str) {
-  return String(str == null ? "" : str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // B20 (auditoría 2026-08-31): faltaba escapar la comilla simple — hay decenas
+  // de onclick="App.x('${escapeAttr(...)}')" con datos de usuario (nombres de
+  // categoría/álbum editables); un nombre con ' rompía el handler.
+  return String(str == null ? "" : str)
+    .replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
+    .replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 function escapeHtml(str) { return escapeAttr(str); }
 function uid(prefix) { return (prefix || "id") + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
@@ -253,7 +258,11 @@ App.confirmItem = function (e, id) {
 };
 
 // ---------- Carga de archivos ----------
-function randomCategory() { return state.categories[Math.floor(Math.random() * state.categories.length)]; }
+// B33 (auditoría 2026-08-31): esto era literalmente Math.random() — no
+// clasificaba nada, sorteaba, y podía meter una foto de un evento en
+// "Notas periodísticas" por azar sin que nadie se enterara. Ahora una foto
+// recién subida entra SIN categoría (proposed: true la marca como "a
+// etiquetar"); la clasificación real con IA vive en /hub (classify-photo).
 App.setUploadDimension = function (dim) { App.setState({ uploadDimension: dim }); };
 
 // Nombre de archivo único y seguro para el repo: <fecha-hora>-<base>.<ext>
@@ -313,11 +322,10 @@ App.addFiles = function (fileList, targetAlbum) {
   files.forEach((file) => {
     const reader = new FileReader();
     reader.onload = () => {
-      const guess = randomCategory();
       const id = uid("up");
       newIds.push(id);
       state.items = [{
-        id, title: file.name.replace(/\.[a-z0-9]+$/i, ""), categories: guess ? [guess] : [],
+        id, title: file.name.replace(/\.[a-z0-9]+$/i, ""), categories: [],
         album: targetAlbum || null, context: null, proposed: true, date: "hoy", img: reader.result, pos: "50% 50%", stage: "biblioteca", stageMeta: null,
         dimension, filename: safeFilename(file.name), persisted: false, uploadState: connected ? "pending" : null, when: null,
       }, ...state.items];
