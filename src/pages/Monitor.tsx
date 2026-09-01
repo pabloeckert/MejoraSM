@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { historialApi } from "@/services/supabase";
 import { github } from "@/services/github";
 import { useWorkflowAction } from "@/hooks/useGithubUpload";
+import { useConfirm } from "@/hooks/useConfirm";
 import { toast } from "@/hooks/use-toast";
 
 // Fase 5 del plan estratégico 2026-08-16 (Un solo panel) — port fiel de
@@ -147,8 +148,7 @@ function AvisoInstagramFallido({
       <Button
         type="button"
         variant="outline"
-        size="sm"
-        className="w-full text-xs font-semibold"
+        className="h-11 w-full text-xs font-semibold"
         disabled={pending === "mark-manual"}
         onClick={handleMarkManual}
       >
@@ -161,13 +161,17 @@ function AvisoInstagramFallido({
 
 function AccionesFacebookFallido({ post, onDone }: { post: HistorialPost; onDone: () => void }) {
   const { pending, run } = useWorkflowAction();
+  const [confirm, ConfirmUI] = useConfirm();
   const { workflowFile, workflowUrl, idValue, inputKey } = manageTarget(post);
 
   async function handleAction(action: "reintentar" | "despublicar") {
     if (action === "despublicar") {
-      const ok = window.confirm(
-        `¿Despublicar de verdad "facebook" para esta pieza? Esto la baja realmente de Facebook — no se puede deshacer.`
-      );
+      const ok = await confirm({
+        title: "Despublicar de Facebook",
+        description: `Esto baja realmente esta pieza de Facebook — no se puede deshacer.`,
+        confirmText: "Despublicar",
+        variant: "destructive",
+      });
       if (!ok) return;
     }
     const ok = await run(
@@ -183,12 +187,12 @@ function AccionesFacebookFallido({ post, onDone }: { post: HistorialPost; onDone
 
   return (
     <div className="space-y-2 border-t border-border pt-3">
+      {ConfirmUI}
       <div className="flex gap-2">
         <Button
           type="button"
           variant="outline"
-          size="sm"
-          className="flex-1 text-xs font-semibold"
+          className="h-11 flex-1 text-xs font-semibold"
           disabled={!!pending}
           onClick={() => handleAction("reintentar")}
         >
@@ -198,8 +202,7 @@ function AccionesFacebookFallido({ post, onDone }: { post: HistorialPost; onDone
         <Button
           type="button"
           variant="outline"
-          size="sm"
-          className="flex-1 text-xs font-semibold text-destructive"
+          className="h-11 flex-1 text-xs font-semibold text-destructive"
           disabled={!!pending}
           onClick={() => handleAction("despublicar")}
         >
@@ -252,6 +255,7 @@ const PLATAFORMAS_DESPUBLICAR: Array<{ value: "instagram" | "facebook"; label: s
 // alcanzaba con sacar el guard sin más, había que usar el target real.
 function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () => void }) {
   const { pending, run } = useWorkflowAction();
+  const [confirm, ConfirmUI] = useConfirm();
   const [markPlatform, setMarkPlatform] = useState<"instagram" | "facebook">("instagram");
   // UX9 (auditoría 2026-08-31): antes esta caja con 6+ controles destructivos
   // se mostraba siempre abierta en cada tarjeta de una pieza que funciona bien.
@@ -261,9 +265,12 @@ function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () 
 
   async function handleAction(platform: "instagram" | "facebook", action: "reintentar" | "despublicar") {
     if (action === "despublicar") {
-      const ok = window.confirm(
-        `¿Despublicar de verdad "${platform}" para esta pieza? Esto la baja realmente de la red — no se puede deshacer.`
-      );
+      const ok = await confirm({
+        title: `Despublicar de ${NOMBRES_PLATAFORMA[platform] || platform}`,
+        description: "Esto baja realmente esta pieza de la red — no se puede deshacer.",
+        confirmText: "Despublicar",
+        variant: "destructive",
+      });
       if (!ok) return;
     }
     const key = `${action}-${platform}`;
@@ -302,10 +309,11 @@ function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () 
 
   return (
     <div className="space-y-3 border-t border-border pt-3">
+      {ConfirmUI}
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-semibold text-muted-foreground">Reintentar o despublicar de verdad (vía Zernio):</p>
-        <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar" className="text-muted-foreground hover:text-foreground">
-          <X className="h-3.5 w-3.5" />
+        <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar" className="flex h-9 w-9 items-center justify-center text-muted-foreground hover:text-foreground">
+          <X className="h-4 w-4" />
         </button>
       </div>
       <div className="space-y-2">
@@ -313,8 +321,7 @@ function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () 
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            className="text-xs"
+            className="h-11 text-xs"
             disabled={!!pending}
             onClick={() => handleAction("instagram", "reintentar")}
           >
@@ -324,8 +331,7 @@ function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () 
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            className="text-xs"
+            className="h-11 text-xs"
             disabled={!!pending}
             onClick={() => handleAction("facebook", "reintentar")}
           >
@@ -339,8 +345,7 @@ function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () 
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            className="text-xs"
+            className="h-11 text-xs"
             disabled
             title="Instagram no permite despublicar por API — borralo a mano y marcalo abajo"
           >
@@ -349,8 +354,7 @@ function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () 
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            className="text-xs text-destructive"
+            className="h-11 text-xs text-destructive"
             disabled={!!pending}
             onClick={() => handleAction("facebook", "despublicar")}
           >
@@ -366,7 +370,8 @@ function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () 
           <select
             value={markPlatform}
             onChange={(e) => setMarkPlatform(e.target.value as "instagram" | "facebook")}
-            className="rounded-md border border-input bg-background px-2 text-xs"
+            aria-label="Plataforma donde lo gestionaste a mano"
+            className="h-11 rounded-md border border-input bg-background px-2 text-xs"
           >
             {PLATAFORMAS_DESPUBLICAR.map((p) => (
               <option key={p.value} value={p.value}>
@@ -377,8 +382,7 @@ function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () 
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            className="flex-1 text-xs font-semibold"
+            className="h-11 flex-1 text-xs font-semibold"
             disabled={!!pending}
             onClick={handleMarkManual}
           >
@@ -414,6 +418,7 @@ function PostCard({
 }) {
   const fallidas = post.platforms.filter((p) => p.status === "failed");
   const [deleting, setDeleting] = useState(false);
+  const [confirm, ConfirmUI] = useConfirm();
 
   // Hallazgo real 2026-08-27 (Pablo: "no sincroniza correctamente, no
   // esta dando informacion real ni publicado... ni en zernio"): Zernio
@@ -425,9 +430,13 @@ function PostCard({
   // si Zernio la sigue reportando de verdad, puede volver a aparecer en
   // la próxima sincronización (cada 6hs), aviso explícito en el confirm.
   async function handleDelete() {
-    const ok = window.confirm(
-      `¿Sacar esta pieza del Monitor? Esto solo la saca de esta vista, no borra nada de Instagram/Facebook/Zernio. Si Zernio la sigue reportando de verdad, puede volver a aparecer en la próxima sincronización.`
-    );
+    const ok = await confirm({
+      title: "Sacar esta pieza del Monitor",
+      description:
+        "Solo la saca de esta vista — no borra nada de Instagram, Facebook ni Zernio. Si Zernio la sigue reportando de verdad, puede volver a aparecer en la próxima sincronización.",
+      confirmText: "Sacar del Monitor",
+      variant: "destructive",
+    });
     if (!ok) return;
     setDeleting(true);
     try {
@@ -444,6 +453,7 @@ function PostCard({
 
   return (
     <Card className="flex flex-col overflow-hidden">
+      {ConfirmUI}
       {post.imageUrl && (
         <img
           src={post.imageUrl}
@@ -467,10 +477,11 @@ function PostCard({
             )}
             <button
               type="button"
+              aria-label="Sacar del Monitor"
               title="Sacar del Monitor (no toca Instagram/Facebook/Zernio)"
               onClick={handleDelete}
               disabled={deleting}
-              className="text-muted-foreground hover:text-destructive disabled:opacity-50"
+              className="flex h-9 w-9 items-center justify-center text-muted-foreground hover:text-destructive disabled:opacity-50"
             >
               {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
             </button>

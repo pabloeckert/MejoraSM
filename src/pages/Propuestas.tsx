@@ -32,19 +32,18 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 // Filtro por tipo de posteo, sobre el campo proposals.format. "historia" es
 // el valor real que usa el código (extractProposal en orchestrator/index.ts)
-// para lo que acá se etiqueta "Story". "video" todavía no lo genera nada
-// (ni orchestrator ni el pipeline de publicación) — el tab existe igual,
-// a propósito, para no ocultar la categoría aunque hoy esté vacía. No es
-// convertible (proposals_format_check ni siquiera lo permite).
+// para lo que acá se etiqueta "Story". La pestaña "Video" se sacó en Fase D
+// (2026-08-31): nada la genera (ni orchestrator ni el pipeline) y
+// proposals_format_check ni siquiera permite ese valor — era una categoría
+// siempre vacía que solo agregaba ruido.
 const FORMATOS: { value: string; label: string }[] = [
   { value: "all", label: "Todos" },
   { value: "post", label: "Post Feed" },
   { value: "carrusel", label: "Carrusel" },
   { value: "historia", label: "Story" },
-  { value: "video", label: "Video" },
 ];
 
-const TEMPLATE_FORMATS = FORMATOS.filter((f) => f.value !== "all" && f.value !== "video");
+const TEMPLATE_FORMATS = FORMATOS.filter((f) => f.value !== "all");
 
 const STATUS_META: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
   pending: { label: "Pendiente", variant: "secondary" },

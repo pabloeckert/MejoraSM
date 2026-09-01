@@ -2,11 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Brain, Paintbrush, Shield, Save, Loader2, Info } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Brain, Paintbrush, Shield, Save, Loader2, Info, History } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/services/supabase";
+import { dimensionLabel } from "@/shared/constants";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
@@ -298,6 +300,99 @@ function ConfiguracionContent() {
         </Button>
         {isDirty && <span className="text-sm text-amber-600">Hay cambios sin guardar</span>}
       </div>
+
+      <SystemDecisions />
     </div>
+  );
+}
+
+// D4 (auditoría 2026-08-31): la pantalla de Configuración debía volverse
+// también "de supervisión" — ver qué decidió el sistema y por qué, no solo
+// ajustar prompts. Esto lee las últimas sesiones reales de Mesa de Diálogo
+// (dialogue_sessions.metadata, que orchestrator ya escribe) y muestra el
+// veredicto del Crítico + si se autoagendó. El modelo por sesión no se
+// loguea hoy, pero la regla es fija y está arriba (pickModel).
+interface DecisionRow {
+  id: string;
+  topic: string | null;
+  status: string | null;
+  created_at: string;
+  metadata: {
+    evaluacion?: { aprobado?: boolean; feedback?: string };
+    autoPublished?: boolean;
+    oferta?: string | null;
+    autoTopic?: string | null;
+  } | null;
+}
+
+function SystemDecisions() {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["system-decisions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("dialogue_sessions")
+        .select("id, topic, status, created_at, metadata")
+        .order("created_at", { ascending: false })
+        .limit(12);
+      if (error) throw error;
+      return (data || []) as DecisionRow[];
+    },
+    staleTime: 60_000,
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+            <History className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <CardTitle className="text-base">Últimas decisiones del sistema</CardTitle>
+            <CardDescription>Qué resolvió el Crítico en Mesa de Diálogo y qué se agendó solo.</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Cargando…</p>
+        ) : isError ? (
+          <p className="text-sm text-destructive">No se pudieron cargar las decisiones.</p>
+        ) : !data || data.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Todavía no hay sesiones de Mesa de Diálogo.</p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {data.map((d) => {
+              const aprobado = d.metadata?.evaluacion?.aprobado;
+              const veredicto =
+                d.status === "error"
+                  ? { label: "Error", variant: "destructive" as const }
+                  : aprobado === true
+                    ? { label: "Aprobada", variant: "secondary" as const }
+                    : aprobado === false
+                      ? { label: "Frenada", variant: "outline" as const }
+                      : { label: d.status || "En curso", variant: "outline" as const };
+              return (
+                <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm">
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                    {new Date(d.created_at).toLocaleDateString("es-AR", { day: "2-digit", month: "short" })}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {d.topic || "(sin tema)"}
+                    {d.metadata?.autoTopic && <span className="ml-1.5 text-[11px] text-muted-foreground">· tema propuesto por el sistema</span>}
+                  </span>
+                  <Badge variant={veredicto.variant} className="text-[10px]">{veredicto.label}</Badge>
+                  {d.metadata?.autoPublished && (
+                    <span className="text-[11px] font-medium text-primary">
+                      se agendó solo{d.metadata.oferta ? ` · ${dimensionLabel(d.metadata.oferta)}` : ""}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }

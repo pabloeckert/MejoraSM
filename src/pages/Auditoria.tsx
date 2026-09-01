@@ -21,6 +21,8 @@ interface ExportSource {
   key: string;
   label: string;
   description: string;
+  // Campo de fecha por el que se filtra el rango (D3, auditoría 2026-08-31).
+  dateField: string;
   fetch: () => Promise<Record<string, unknown>[]>;
 }
 
@@ -29,6 +31,7 @@ const SOURCES: ExportSource[] = [
     key: "proposals",
     label: "Propuestas",
     description: "Todo el contenido generado — hook, body, cta, formato, estado, fechas.",
+    dateField: "created_at",
     fetch: async () => {
       const { data, error } = await proposalsApi.list();
       if (error) throw error;
@@ -39,6 +42,7 @@ const SOURCES: ExportSource[] = [
     key: "metrics",
     label: "Métricas",
     description: "Likes, comments, reach, impressions, engagement por publicación real.",
+    dateField: "measured_at",
     fetch: async () => {
       const { data, error } = await metricsApi.all();
       if (error) throw error;
@@ -49,6 +53,7 @@ const SOURCES: ExportSource[] = [
     key: "success_rules",
     label: "Reglas aprendidas",
     description: "Lo que rule-engine dedujo de los datos reales — formato, hook, horario, hashtags.",
+    dateField: "updated_at",
     fetch: async () => {
       const { data, error } = await metricsApi.successRules();
       if (error) throw error;
@@ -59,6 +64,7 @@ const SOURCES: ExportSource[] = [
     key: "run_log",
     label: "Registro de corridas (run_log)",
     description: "Últimas 500 corridas de cada script/Edge Function del pipeline, éxito o error.",
+    dateField: "created_at",
     fetch: async () => {
       const { data, error } = await runLogApi.all();
       if (error) throw error;
@@ -67,16 +73,35 @@ const SOURCES: ExportSource[] = [
   },
 ];
 
+// D3 (auditoría 2026-08-31): filtro de rango de fechas para los exports. Si
+// una fila no tiene el campo de fecha esperado, se incluye igual (mejor de
+// más que de menos en un export de auditoría).
+function inRange(rows: Record<string, unknown>[], field: string, from: string, to: string) {
+  if (!from && !to) return rows;
+  const fromMs = from ? new Date(from + "T00:00:00").getTime() : -Infinity;
+  const toMs = to ? new Date(to + "T23:59:59").getTime() : Infinity;
+  return rows.filter((r) => {
+    const raw = r[field];
+    if (typeof raw !== "string") return true;
+    const t = new Date(raw).getTime();
+    if (Number.isNaN(t)) return true;
+    return t >= fromMs && t <= toMs;
+  });
+}
+
 export default function Auditoria() {
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const rangeSuffix = from || to ? `_${from || "inicio"}_a_${to || today()}` : "";
 
   async function handleExport(source: ExportSource, format: "csv" | "json") {
     setLoadingKey(`${source.key}-${format}`);
     setError(null);
     try {
-      const rows = await source.fetch();
-      const filename = `mejorasm-${source.key}-${today()}.${format}`;
+      const rows = inRange(await source.fetch(), source.dateField, from, to);
+      const filename = `mejorasm-${source.key}-${today()}${rangeSuffix}.${format}`;
       if (format === "csv") downloadCsv(filename, rows);
       else downloadJson(filename, rows);
       // Hallazgo real de auditoría 2026-08-25: sin ningún conteo visible,
@@ -97,9 +122,9 @@ export default function Auditoria() {
     setError(null);
     try {
       const entries = await Promise.all(
-        SOURCES.map(async (s) => [s.key, await s.fetch()] as const)
+        SOURCES.map(async (s) => [s.key, inRange(await s.fetch(), s.dateField, from, to)] as const)
       );
-      downloadJson(`mejorasm-auditoria-completa-${today()}.json`, Object.fromEntries(entries));
+      downloadJson(`mejorasm-auditoria-completa-${today()}${rangeSuffix}.json`, Object.fromEntries(entries));
       const resumen = entries.map(([key, rows]) => `${key}: ${rows.length}`).join(" · ");
       toast({ title: "Auditoría completa exportada", description: resumen });
     } catch (e) {
@@ -124,6 +149,44 @@ export default function Auditoria() {
           <CardContent className="p-4 text-sm text-destructive">{error}</CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardContent className="flex flex-wrap items-end gap-4 p-4">
+          <div className="space-y-1">
+            <label htmlFor="audit-from" className="text-xs font-medium text-muted-foreground">Desde</label>
+            <input
+              id="audit-from"
+              type="date"
+              value={from}
+              max={to || today()}
+              onChange={(e) => setFrom(e.target.value)}
+              className="block h-10 rounded-md border border-input bg-background px-2 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="audit-to" className="text-xs font-medium text-muted-foreground">Hasta</label>
+            <input
+              id="audit-to"
+              type="date"
+              value={to}
+              min={from || undefined}
+              max={today()}
+              onChange={(e) => setTo(e.target.value)}
+              className="block h-10 rounded-md border border-input bg-background px-2 text-sm"
+            />
+          </div>
+          {(from || to) && (
+            <Button variant="ghost" size="sm" onClick={() => { setFrom(""); setTo(""); }}>
+              Limpiar
+            </Button>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {from || to
+              ? "Los exports incluyen solo las filas dentro del rango."
+              : "Sin rango: se exporta todo el historial disponible."}
+          </p>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 sm:grid-cols-2">
         {SOURCES.map((source) => (

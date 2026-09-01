@@ -277,9 +277,9 @@ export default function Dashboard() {
 }
 
 function DashboardContent() {
-  const { data: documents } = useDocuments();
-  const { data: sessions } = useDialogueSessions();
-  const { data: proposals } = useProposals();
+  const { data: documents, isLoading: documentsLoading } = useDocuments();
+  const { data: sessions, isLoading: sessionsLoading } = useDialogueSessions();
+  const { data: proposals, isLoading: proposalsLoading } = useProposals();
   const { data: pendingProposals } = usePendingProposals();
   const { data: allMetrics } = useAllMetrics();
 
@@ -575,10 +575,12 @@ function DashboardContent() {
         new Date(a.scheduled_at as string).getTime() - new Date(b.scheduled_at as string).getTime()
     );
 
+  // D5 (auditoría 2026-08-31): mientras la query carga, mostrar "—" en vez de
+  // "0" — un "0" real y un "todavía no sé" se veían idénticos.
   const metricCards = [
     {
       label: "Documentos de marca",
-      value: String(documents?.length ?? 0),
+      value: documentsLoading ? "—" : String(documents?.length ?? 0),
       sub: "Subí fotos para empezar a nutrir Stories.",
       href: "/boveda",
       icon: FileText,
@@ -586,7 +588,7 @@ function DashboardContent() {
     },
     {
       label: "Diálogos creados",
-      value: String(sessions?.length ?? 0),
+      value: sessionsLoading ? "—" : String(sessions?.length ?? 0),
       sub: "Se cuentan cuando abrís una conversación en Mesa de Diálogo.",
       href: "/mesa",
       icon: MessageSquare,
@@ -596,12 +598,14 @@ function DashboardContent() {
       label: "Contenidos generados",
       // B15 (auditoría 2026-08-31): antes mostraba proposals.length (histórico
       // total) con subtítulo "Últimos 30 días".
-      value: String(
-        (proposals || []).filter(
-          (p: { created_at?: string }) =>
-            p.created_at && Date.now() - new Date(p.created_at).getTime() <= 30 * 24 * 60 * 60 * 1000
-        ).length
-      ),
+      value: proposalsLoading
+        ? "—"
+        : String(
+            (proposals || []).filter(
+              (p: { created_at?: string }) =>
+                p.created_at && Date.now() - new Date(p.created_at).getTime() <= 30 * 24 * 60 * 60 * 1000
+            ).length
+          ),
       sub: "Últimos 30 días",
       href: "/mesa",
       icon: Sparkles,
@@ -609,7 +613,7 @@ function DashboardContent() {
     },
     {
       label: "Publicaciones programadas",
-      value: String(scheduledUpcoming.length),
+      value: proposalsLoading ? "—" : String(scheduledUpcoming.length),
       sub: "Vía Zernio, próximos 7 días",
       href: "/calendario",
       icon: Clock,
