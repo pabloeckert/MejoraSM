@@ -167,6 +167,18 @@ export function PublishNowCard({ dimension, connected }: { dimension: string; co
 
   function reset() {
     pollStopRef.current();
+    // Hallazgo real (2026-09-01): "Descartar" solo tocaba el estado local —
+    // el manifiesto seguía "prepared" en el repo, así que una recarga de
+    // página (o el resume al cambiar de pestaña) volvía a mostrar la MISMA
+    // pieza que Pablo ya había descartado. Se marca discarded en el repo
+    // para que el resume no la vuelva a levantar. Best-effort: si falla (sin
+    // red, token vencido), no bloquea volver a idle — el peor caso es que
+    // reaparezca al recargar, no que la app quede trabada.
+    if (manifest && (state === "prepared" || state === "error")) {
+      github
+        .putJsonFile(MANIFEST_PATH, { ...manifest, phase: "discarded", updatedAt: new Date().toISOString() }, "publicar ahora: descartado")
+        .catch(() => {});
+    }
     setState("idle");
     setManifest(null);
     setErrorMsg(null);

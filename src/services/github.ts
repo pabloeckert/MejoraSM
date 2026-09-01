@@ -122,6 +122,21 @@ async function getJsonFile<T = unknown>(path: string): Promise<T | null> {
   return JSON.parse(new TextDecoder("utf-8").decode(bytes)) as T;
 }
 
+// Escribe un JSON directo (sin pasar por un File/base64 a mano) — resuelve
+// el sha actual primero, porque la API de contents lo exige para actualizar
+// un archivo existente. Usado para "descartar" una story preparada: sin
+// esto, un manifiesto "prepared" seguía en el repo y una recarga de página
+// lo volvía a mostrar aunque Pablo ya hubiera dicho que no.
+async function putJsonFile(path: string, obj: unknown, message: string) {
+  const current = await fetch(
+    `${apiBase()}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}?ref=${GH_BRANCH}`,
+    { headers: apiHeaders(true) }
+  );
+  const sha = current.ok ? (await current.json()).sha : undefined;
+  const base64 = btoa(unescape(encodeURIComponent(JSON.stringify(obj, null, 2))));
+  return putFile(path, base64, message, sha);
+}
+
 // Dispara un workflow_dispatch real (manage-post.yml / manage-story.yml /
 // mark-manual.yml) directo desde el navegador — hallazgo real 2026-08-26:
 // Pablo reportó que reintentar/despublicar/marcar a mano lo mandaba a
@@ -223,6 +238,7 @@ export const github = {
   whoami,
   listDir,
   putFile,
+  putJsonFile,
   commitPhoto,
   triggerWorkflow,
   getJsonFile,
