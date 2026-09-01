@@ -105,24 +105,43 @@ async function callLLM(system: string, user: string, maxTokens = 400): Promise<s
   return ((await r.json()).choices?.[0]?.message?.content ?? "").trim();
 }
 
+const VALID_SENT = ["positivo", "neutral", "negativo", "pregunta"];
+
 async function classifyBatch(items: { id: string; text: string }[]): Promise<Record<string, { s: string; n: string }>> {
   if (items.length === 0) return {};
   const system =
     "Clasificás mensajes/comentarios que la gente le deja a una marca de consultoría empresarial (Mejora Continua). " +
-    "Para cada uno devolvés UNA línea con este formato exacto: N | sentimiento | nota corta\n" +
-    "N = el número del mensaje. sentimiento ∈ {positivo, neutral, negativo, pregunta}. " +
+    "Devolvés SOLO un array JSON, un objeto por mensaje: [{\"n\":1,\"s\":\"pregunta\",\"nota\":\"pide info de precios\"}, ...]\n" +
+    "s ∈ {positivo, neutral, negativo, pregunta}. " +
     "'pregunta' = pide info o espera respuesta (aunque el tono sea neutro). " +
     "'negativo' = queja, reclamo, enojo. 'positivo' = elogio, agradecimiento, interés genuino. " +
-    "'neutral' = spam, saludos vacíos, cosas que no requieren acción.\n" +
-    "nota = 3-6 palabras sobre qué quiere. Respondé SOLO las líneas, una por mensaje, sin encabezado ni texto extra.";
-  const user = items.map((i, idx) => `${idx + 1}. ${(i.text || "(sin texto)").slice(0, 400).replace(/\n+/g, " ")}`).join("\n");
-  const out = await callLLM(system, user, 40 + items.length * 30);
+    "'neutral' = spam, publicidad ajena, saludos vacíos, cosas que no requieren acción.\n" +
+    "nota = 3 a 6 palabras sobre qué quiere. Sin texto fuera del array JSON.";
+  const user = items.map((i, idx) => `${idx + 1}. ${(i.text || "(sin texto)").slice(0, 400).replace(/\s+/g, " ")}`).join("\n");
+  const out = await callLLM(system, user, 60 + items.length * 40);
   const map: Record<string, { s: string; n: string }> = {};
-  for (const line of out.split("\n")) {
-    const m = line.match(/^\s*(\d{1,3})\s*[|:.\-]+\s*(positivo|neutral|negativo|pregunta)\s*[|:.\-]+\s*(.+)$/i);
-    if (!m) continue;
-    const item = items[Number(m[1]) - 1];
-    if (item) map[item.id] = { s: m[2].toLowerCase(), n: m[3].trim().slice(0, 120) };
+
+  const jsonMatch = out.match(/\[[\s\S]*\]/);
+  if (jsonMatch) {
+    try {
+      const arr = JSON.parse(jsonMatch[0]) as Array<{ n?: number; s?: string; nota?: string }>;
+      for (const row of arr) {
+        const item = items[Number(row.n) - 1];
+        const s = String(row.s || "").toLowerCase().trim();
+        if (item && VALID_SENT.includes(s)) map[item.id] = { s, n: String(row.nota || "").trim().slice(0, 120) };
+      }
+    } catch {
+      /* cae al parser de líneas abajo */
+    }
+  }
+  if (Object.keys(map).length === 0) {
+    // Fallback tolerante: "1 ... pregunta ... nota" en cualquier separador.
+    for (const line of out.split("\n")) {
+      const m = line.match(/(\d{1,3})\D+(positivo|neutral|negativo|pregunta)\D+(.+)/i);
+      if (!m) continue;
+      const item = items[Number(m[1]) - 1];
+      if (item) map[item.id] = { s: m[2].toLowerCase(), n: m[3].replace(/["\]}]+$/, "").trim().slice(0, 120) };
+    }
   }
   return map;
 }
@@ -299,10 +318,12 @@ async function sync() {
   const toClassify = (pending ?? []).filter((r: { text: string | null }) => (r.text ?? "").trim().length > 0);
 
   let classified = 0;
-  for (let i = 0; i < toClassify.length; i += 15) {
-    const batch = toClassify.slice(i, i + 15) as { id: string; text: string }[];
+  for (let i = 0; i < toClassify.length; i += 10) {
+    const batch = toClassify.slice(i, i + 10) as { id: string; text: string }[];
     try {
       const res = await classifyBatch(batch);
+      const hits = Object.keys(res).length;
+      if (hits === 0) console.warn(`[inbox] batch de ${batch.length} sin clasificar (parse falló)`);
       for (const [id, v] of Object.entries(res)) {
         await supabase.from("inbox_items").update({ sentiment: v.s, sentiment_note: v.n }).eq("id", id);
         classified++;
