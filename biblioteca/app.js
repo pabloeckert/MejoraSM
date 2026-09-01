@@ -104,9 +104,11 @@ function uid(prefix) { return (prefix || "id") + Date.now().toString(36) + Math.
 // ---------- Estado ----------
 const state = {
   screen: "library", viewMode: "thumb",
-  // items arranca con la data de demo (seed-demo.js) si está cargada; en el
-  // Paso 3 se reemplaza por la fuente real y el fallback vuelve a [].
-  items: (typeof window !== "undefined" && window.__SEED_ITEMS) ? window.__SEED_ITEMS() : [],
+  // Sin datos de ejemplo (seed-demo.js borrado 2026-09-01 a pedido de Pablo).
+  // "Programada"/"Publicada" se llenan reales desde Supabase
+  // (loadRealPublishedItems). "En biblioteca"/"Confirmada" no tienen backend
+  // propio todavía — arrancan vacías.
+  items: [],
   categoryFilters: [], albumFilter: null, search: "", stageFilter: "todo",
   categories: [...DEFAULT_CATS], editingCategory: null, editCategoryDraft: "", addingCategory: false, newCategoryDraft: "",
   previewId: null, draft: null, toast: null, lastSnapshot: null,
@@ -1287,7 +1289,6 @@ function calEntryModalHTML() {
           <button type="button" class="overlay-close" onclick="App.closeCalEntry()">${ICONS.x}</button>
         </div>
         <span class="badge-pill ${isPub ? "confirmed" : ""}">${isPub ? "Publicada" : "Programada"}${it.stageMeta ? " · " + escapeHtml(it.stageMeta) : ""}</span>
-        <span class="stepper-sim-badge" style="width:fit-content;">Dato de ejemplo · Monitor</span>
         ${it.album ? `<div class="card-album">${escapeHtml(it.album)}</div>` : ""}
         <label class="field-label">Fecha de publicación
           <input type="date" value="${escapeAttr(state.calDraftWhen)}" oninput="App.updateCalDraftWhen(this.value)">
@@ -1451,14 +1452,32 @@ function isoDateLocal(dateInput) {
   return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
 }
 
+// Token de sesión de MejoraSM — el mismo que guarda el cliente de Supabase
+// del EDA en localStorage (mismo origen, misma sesión para todo el sitio).
+// Desde 2026-08-25 la base está cerrada por RLS: sin sesión, las lecturas
+// devuelven vacío. Si Pablo/Sindy están logueados en MejoraSM, esto lo toma
+// solo.
+function mejorasmAccessToken() {
+  try {
+    var raw = localStorage.getItem("sb-hsglmdarztrshihmzfph-auth-token");
+    if (!raw) return null;
+    var s = JSON.parse(raw);
+    return (s && (s.access_token || (s.currentSession && s.currentSession.access_token))) || null;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function loadRealPublishedItems() {
   try {
+    var token = mejorasmAccessToken();
+    if (!token) return; // sin sesión de MejoraSM no se puede leer la base
     const url =
       SUPABASE_URL +
       "/rest/v1/proposals?select=id,title,hook,oferta,status,scheduled_at,published_at,rendered_image_path" +
       "&status=in.(scheduled,published)&order=created_at.desc&limit=200";
     const res = await fetch(url, {
-      headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + SUPABASE_ANON_KEY },
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + token },
     });
     if (!res.ok) return;
     const rows = await res.json();
