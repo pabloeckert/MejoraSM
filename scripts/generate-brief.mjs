@@ -282,6 +282,10 @@ async function main(elapsed) {
     console.log(
       `Ya se generó contenido para hoy (${today}) — no genero de nuevo para evitar publicaciones duplicadas. Si necesitás reintentar una plataforma que falló parcialmente, hacelo manualmente contra el post existente, no re-corriendo este workflow completo.`
     );
+    // Dejar un briefs.json vacío para que render-story / publish-story no
+    // exploten con ENOENT en un re-dispatch manual (bug real 2026-08-31).
+    await mkdir(WORK_DIR, { recursive: true });
+    await writeFile(path.join(WORK_DIR, BRIEFS_FILE), "[]");
     await logRun({ source: "daily-story", step: "generate-brief", status: "skipped", durationMs: elapsed(), metadata: { reason: "already-generated-today", today } });
     process.exit(0);
   }

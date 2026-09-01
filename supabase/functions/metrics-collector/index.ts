@@ -61,7 +61,18 @@ interface ZernioMetrics {
 
 const ZERNIO_ANALYTICS_URL = "https://zernio.com/api/v1/analytics";
 
-async function getPostAnalytics(postId: string, apiKey: string): Promise<ZernioMetrics> {
+// Después de este tiempo desde publicado, un 202 ("sync pendiente") de Zernio
+// deja de ser algo transitorio — es una anomalía real de Zernio para ese post
+// (documentada: 2 posts trabados >11 días, 2026-08-17). No es un bug nuestro,
+// así que no debe seguir contando como error en run_log corrida tras corrida.
+const STALE_ANALYTICS_DAYS = 7;
+
+// getPostAnalytics devuelve las métricas, o "pending" cuando Zernio todavía no
+// las tiene (202). El caller decide si un 202 es transitorio o ya stale según
+// la antigüedad del post.
+type AnalyticsResult = { ok: true; metrics: ZernioMetrics } | { ok: false; pending: true };
+
+async function getPostAnalytics(postId: string, apiKey: string): Promise<AnalyticsResult> {
   const url = `${ZERNIO_ANALYTICS_URL}?postId=${encodeURIComponent(postId)}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${apiKey}` },
@@ -78,9 +89,7 @@ async function getPostAnalytics(postId: string, apiKey: string): Promise<ZernioM
     );
   }
   if (res.status === 202) {
-    throw new Error(
-      "Zernio Analytics: sync pendiente (202) — todavía no terminó de sincronizar las métricas desde la plataforma, reintentar en la próxima corrida."
-    );
+    return { ok: false, pending: true };
   }
   if (!res.ok) {
     const err = await res.text();
@@ -90,13 +99,16 @@ async function getPostAnalytics(postId: string, apiKey: string): Promise<ZernioM
   const data = await res.json();
   const a = data.analytics || {};
   return {
-    likes: a.likes ?? 0,
-    comments: a.comments ?? 0,
-    shares: a.shares ?? 0,
-    saves: a.saves ?? 0,
-    reach: a.reach ?? 0,
-    impressions: a.impressions ?? 0,
-    clicks: a.clicks ?? 0,
+    ok: true,
+    metrics: {
+      likes: a.likes ?? 0,
+      comments: a.comments ?? 0,
+      shares: a.shares ?? 0,
+      saves: a.saves ?? 0,
+      reach: a.reach ?? 0,
+      impressions: a.impressions ?? 0,
+      clicks: a.clicks ?? 0,
+    },
   };
 }
 
@@ -104,14 +116,27 @@ async function getPostAnalytics(postId: string, apiKey: string): Promise<ZernioM
 // PROCESAMIENTO
 // ═══════════════════════════════════════
 
-async function collectMetrics(proposalId: string, postId: string) {
+async function collectMetrics(proposalId: string, postId: string, publishedAt?: string | null) {
   const apiKey = Deno.env.get("ZERNIO_API_KEY");
   if (!apiKey) {
     throw new Error("ZERNIO_API_KEY no configurado. Configurar en Supabase Secrets.");
   }
 
   // 1. Get analytics from Zernio
-  const metrics = await getPostAnalytics(postId, apiKey);
+  const analytics = await getPostAnalytics(postId, apiKey);
+  if (!analytics.ok) {
+    const ageDays = publishedAt ? (Date.now() - new Date(publishedAt).getTime()) / 86_400_000 : 0;
+    const stale = ageDays >= STALE_ANALYTICS_DAYS;
+    return {
+      postId,
+      pending: true,
+      stale,
+      note: stale
+        ? `Zernio nunca sincronizó las métricas de este post (${Math.round(ageDays)} días publicado). Anomalía conocida de Zernio, no un fallo del pipeline — se deja de reintentar activamente.`
+        : "Zernio todavía está sincronizando las métricas (202) — reintenta la próxima corrida.",
+    };
+  }
+  const metrics = analytics.metrics;
 
   // 2. Save to DB
   const { data: existing } = await supabase
@@ -164,7 +189,7 @@ async function collectAllPending() {
   // legacy del publisher viejo (Graph API directa) y ya no lo escribe nadie.
   const { data: proposals } = await supabase
     .from("proposals")
-    .select("id, zernio_post_id, title")
+    .select("id, zernio_post_id, title, published_at")
     .eq("status", "published")
     .not("zernio_post_id", "is", null);
 
@@ -173,11 +198,22 @@ async function collectAllPending() {
   }
 
   const results = [];
+  let collected = 0;
+  let pending = 0;
+  let stale = 0;
+  let errored = 0;
   for (const proposal of proposals) {
     try {
-      const result = await collectMetrics(proposal.id, proposal.zernio_post_id);
+      const result = await collectMetrics(proposal.id, proposal.zernio_post_id, proposal.published_at);
       results.push({ ...result, title: proposal.title });
+      if ("pending" in result && result.pending) {
+        if (result.stale) stale++;
+        else pending++;
+      } else {
+        collected++;
+      }
     } catch (e: any) {
+      errored++;
       results.push({
         postId: proposal.zernio_post_id,
         title: proposal.title,
@@ -186,7 +222,10 @@ async function collectAllPending() {
     }
   }
 
-  return { count: results.length, results };
+  // count = piezas realmente medidas. Un post en "202 pendiente" o "stale" no
+  // es un error del pipeline — se informa aparte para que el run_log del cron
+  // no quede en rojo permanente por una limitación de Zernio.
+  return { count: collected, pending, stale, errored, results };
 }
 
 async function generateInsights() {
@@ -266,7 +305,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     ({ action } = body);
 
-    let result: { count?: number } | undefined;
+    let result: { count?: number; pending?: number; stale?: number; errored?: number } | undefined;
 
     switch (action) {
       case "collect":
@@ -292,7 +331,10 @@ Deno.serve(async (req) => {
       status: "success",
       proposalId: action === "collect" ? body.proposalId : null,
       durationMs: Date.now() - startedAt,
-      metadata: action === "collect-all" ? { count: result?.count } : {},
+      metadata:
+        action === "collect-all"
+          ? { count: result?.count, pending: result?.pending, stale: result?.stale, errored: result?.errored }
+          : {},
     });
 
     return new Response(JSON.stringify(result), {

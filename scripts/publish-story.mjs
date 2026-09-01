@@ -6,6 +6,7 @@
 // Env: ZERNIO_API_KEY, ZERNIO_INSTAGRAM_ACCOUNT_ID, ZERNIO_FACEBOOK_ACCOUNT_ID, RAW_BASE_URL
 
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { publishStory } from "./lib/zernio.mjs";
 import { logRun, startTimer } from "./lib/run-log.mjs";
@@ -28,7 +29,18 @@ if (!RAW_BASE_URL) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
-  const renders = JSON.parse(await readFile(path.join(WORK_DIR, RENDERS_FILE), "utf8"));
+  const rendersPath = path.join(WORK_DIR, RENDERS_FILE);
+  if (!existsSync(rendersPath)) {
+    console.log(`No hay ${RENDERS_FILE} — nada que publicar (render-story no renderizó nada).`);
+    await logRun({ source: RUN_SOURCE, step: "publish-story", status: "skipped", durationMs: elapsed(), metadata: { reason: "no-renders-file" } });
+    return;
+  }
+  const renders = JSON.parse(await readFile(rendersPath, "utf8"));
+  if (!Array.isArray(renders) || renders.length === 0) {
+    console.log(`${RENDERS_FILE} vacío — nada que publicar.`);
+    await logRun({ source: RUN_SOURCE, step: "publish-story", status: "skipped", durationMs: elapsed(), metadata: { reason: "empty-renders" } });
+    return;
+  }
   let failures = 0;
 
   for (let i = 0; i < renders.length; i++) {

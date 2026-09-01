@@ -42,7 +42,19 @@ function escapeHtml(str = "") {
 }
 
 async function main() {
-  const briefs = JSON.parse(await readFile(path.join(WORK_DIR, BRIEFS_FILE), "utf8"));
+  const briefsPath = path.join(WORK_DIR, BRIEFS_FILE);
+  if (!existsSync(briefsPath)) {
+    console.log(`No hay ${BRIEFS_FILE} — generate-brief no generó nada (ya se publicó hoy, o un re-dispatch manual). Nada que renderizar.`);
+    await logRun({ source: RUN_SOURCE, step: "render-story", status: "skipped", durationMs: elapsed(), metadata: { reason: "no-briefs-file" } });
+    return;
+  }
+  const briefs = JSON.parse(await readFile(briefsPath, "utf8"));
+  if (!Array.isArray(briefs) || briefs.length === 0) {
+    console.log(`${BRIEFS_FILE} vacío — nada que renderizar.`);
+    await writeFile(path.join(WORK_DIR, RENDERS_FILE), "[]");
+    await logRun({ source: RUN_SOURCE, step: "render-story", status: "skipped", durationMs: elapsed(), metadata: { reason: "empty-briefs" } });
+    return;
+  }
   const templateBase = await readFile(TEMPLATE_PATH, "utf8");
 
   const browser = await chromium.launch();
