@@ -25,7 +25,8 @@ Este archivo tiene dos mitades:
 | **Dominio propio** | `mejorasm.mejoraok.com` — CORS de las 8 funciones + canonical ya apuntan ahí. **Falta:** Pablo agrega el registro DNS (`CNAME mejorasm → pabloeckert.github.io`), después se agrega el archivo `CNAME` + se cambia `VITE_BASE_PATH` a `/app/` y se redespliega | preparado 2026-09-01 |
 | **Biblioteca** | **sacada** — no encajaba en el objetivo del proyecto (decisión de Pablo). `/biblioteca` redirige a `/propuestas`. La "línea de tiempo" del ciclo de vida pasó a una pestaña de Propuestas. Carpeta `biblioteca/` borrada (queda en git); fuentes movidas a `templates/fonts/` | 2026-09-01 |
 | **CI (`ci.yml`)** | **lint + tsc bloqueantes de nuevo** — la deuda bajó de 42 errores a 0; ESLint acotado a `src/**` (Deno fuera de scope). test + build siguen corriendo | 2026-08-31 (batch 8 de la auditoría) |
-| **Edge Functions** | 8: `orchestrator`, `vault-process`, `rule-engine`, `metrics-collector`, `copilot`, `classify-photo`, `insights`, `repo`. `publisher` y `ai-gateway` borradas | `repo` agregada 2026-09-01 |
+| **Edge Functions** | 9: `orchestrator`, `vault-process`, `rule-engine`, `metrics-collector`, `copilot`, `classify-photo`, `insights`, `repo`, `inbox`. `publisher` y `ai-gateway` borradas | `inbox` agregada 2026-09-01 (Fase 1) |
+| **Bandeja de conversaciones** | comentarios + DMs de IG/FB traídos de Zernio a `inbox_items`, clasificados por sentimiento (LLM), respondibles desde `/conversaciones` con OK humano. Cron `inbox-sync-cron.yml` cada 3h. Ver "Plan de publicación 2026 — Fase 1" en la bitácora | 2026-09-01 |
 | **Auto-agenda (`pickNextSlot`)** | apunta a bloques horarios reales (12/16/23 UTC ≈ 09/13/20 ART), o a la hora de una `success_rule` de timing si hay una con confianza alta — ya no publica a la hora en que arrancó la primera cadena | 2026-08-31 (batch 2) |
 | **Fallback de IA** | Anthropic (`claude-sonnet-5`/`opus-5`) → Groq `openai/gpt-oss-120b`. `llama-3.3-70b-versatile` se retiró el 2026-08-16, ya migrado en los 3 puntos | 2026-08-18 |
 | **Límite de cuenta Anthropic** | resuelto — Pablo subió el límite de gasto, sin bloqueo | 2026-08-19 |
@@ -373,12 +374,13 @@ Páginas (`src/pages/`):
 | **Propuestas** | `/propuestas` | Desde el overhaul del 2026-08-02, monitor de lo que se agenda/publica solo. Pestañas: Pendientes / Aprobadas / Programadas / Todas / **Línea de tiempo** (ciclo de vida completo agrupado por etapa — 2026-09-01, reemplaza la que vivía en Biblioteca) / Plantillas. |
 | **Subir material** | `/hub` | Rediseñado 2026-08-17. Sin flujo de "Conectar GitHub" desde 2026-09-01 (el token vive en la Edge Function `repo`) — si estás logueado, subir fotos ya funciona. **"Publicar ahora"** (`PublishNowCard`): subís una foto → "Preparar" (dispara `publish-now.yml` mode=prepare → genera copy + renderiza) → ves el preview real → "Publicar ahora" (mode=publish → IG+FB vía Zernio). |
 | **Monitor** | `/monitor` | Fase 5: port React de `dashboard/index.html` — historial real vía `historial_cache` en Supabase, badges por plataforma, acciones de reversión (reintentar/despublicar/marcar a mano se disparan directo, sin links a GitHub Actions desde 2026-09-01), link a la propuesta de cada pieza. |
+| **Conversaciones** | `/conversaciones` | Fase 1 del plan de publicación 2026: comentarios + DMs reales de IG/FB (vía Zernio → `inbox_items`), agrupados en hilos, filtros por plataforma / sentimiento / sin responder. Redacción sugerida en voz de marca (`inbox` acción `draft`) y envío a la red con confirmación (`reply`). |
 | **Auditoría** | `/auditoria` | Fase 6 (parcial): exporta CSV/JSON real de propuestas, métricas, reglas aprendidas y `run_log` — client-side, sin Edge Function nueva. |
 | **Configuración** | `/configuracion` | Por cada uno de los 3 agentes: proveedor de IA, modelo exacto y temperatura, persistido en `agent_config`. |
 
 Hooks custom en `src/hooks/` (`useVault`, `useDialogue`, `useProposals`, `useMetrics`) llaman a `src/services/ai.ts` (invoca Edge Functions) y `src/services/supabase.ts` (CRUD directo). El cliente Supabase vive en `src/integrations/supabase/client.ts` y usa `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` (ver `.env.example`). `src/components/ui/` es el set estándar de shadcn sin modificar; la UI propia está en `src/components/layout/` (AppSidebar, AppLayout).
 
-### Backend — 8 Edge Functions
+### Backend — 9 Edge Functions
 
 Todas en `supabase/functions/` (Deno), cada una con su propia allowlist de CORS (`pabloeckert.github.io`, `mejorasm.mejoraok.com`, localhost) y con el guard de `_shared/auth.ts`:
 
@@ -392,6 +394,7 @@ Todas en `supabase/functions/` (Deno), cada una con su propia allowlist de CORS 
 | `classify-photo` | Sugiere la dimensión de una foto real (Claude con visión) antes de subirla desde `/hub` — el humano confirma o corrige. Sin cron, se llama en vivo. |
 | `insights` | Motor de insights del Dashboard (Fase A): contrasta las 6 semillas contra métricas reales + retro de Pablo. Cron lunes (`insights-cron.yml`). |
 | `repo` | **Proxy server-side a la API de GitHub** (2026-09-01) — lee `GITHUB_TOKEN` de los secrets. Acciones `listDir` / `readFile` / `writeFile` / `dispatchWorkflow`. Lo usa `src/services/github.ts` para subir fotos, leer manifiestos y disparar workflows sin que el navegador toque GitHub. Ver "Sacar GitHub de la vista" en la bitácora. |
+| `inbox` | **Bandeja de conversaciones** (Fase 1 plan de publicación 2026) — `sync` trae comentarios + DMs de IG/FB desde la API de inbox de Zernio a `inbox_items` y clasifica el sentimiento de los entrantes (LLM, JSON, batch 10); `draft` redacta una respuesta sugerida en voz de marca (RAG); `reply` la manda a Zernio + marca `replied_at`. Cron cada 3h (`inbox-sync-cron.yml`). |
 
 Deploy: `.github/workflows/deploy-functions.yml` (push a `supabase/functions/**`, o manual con función específica) — usa `SUPABASE_ACCESS_TOKEN` y `SUPABASE_PROJECT_REF` como secrets del repo.
 
@@ -443,11 +446,13 @@ Tablas en el schema `public`, todas con RLS habilitado (`calendar_events` se dro
 | `run_log` | Observabilidad real (Fase 3 del plan estratégico 2026-08-16): una fila por corrida de cada script/Edge Function del pipeline, éxito o error — ver sección propia más abajo |
 | `copilot_advice` | Copiloto Reflexivo (Fase 4 del plan estratégico 2026-08-16): "consejo del día" cacheado por fecha (`advice_date UNIQUE`) — ver sección propia más abajo |
 | `historial_cache` | Fix de raíz del "Failed to fetch" del Monitor (2026-08-17): fila única con el historial real sincronizado desde Zernio, para no depender de `raw.githubusercontent.com` — ver "Ronda de revisión post-Fase 6" más abajo |
+| `inbox_items` | Comentarios y DMs de IG/FB (`kind`), entrantes y salientes (`direction`), con etiqueta de sentimiento. Migración `024_inbox.sql`. Escrita por `inbox` |
+| `inbox_sync_state` | Fila única: `last_synced_at` / `last_error` de la bandeja. Migración `024` |
 | `app_admins` | Allowlist de emails con acceso (ver sección de auth) |
 
 Función RAG: `match_documents(query_embedding, match_count, similarity_threshold)` — búsqueda por similitud coseno sobre `doc_chunks` vía índice `ivfflat`, con cast `::REAL` (ver bug corregido arriba). Bucket de Storage: `vault` (privado).
 
-`supabase/migrations/`: schema SQL + pgvector, `001` a `016` en orden correlativo con el de ejecución real, todas ya aplicadas contra la base real vía `supabase db query --linked -f <archivo>` (no `db push`, ver "Bug conocido del CLI"). Las primeras siete (`001_initial_schema.sql` a `007_feed_posts_render.sql`) arman el schema base + auth/RLS real; de `008` en adelante cada una es un cambio puntual documentado en su propio comentario de cabecera y, cuando corresponde, en la sección de fase del plan estratégico que la motivó (`011`/`012`/`013`/`014`/`015` → Fases 0/1/2/3/4 del plan 2026-08-16; `016` → fix del Monitor, ver "Ronda de revisión post-Fase 6" más abajo).
+`supabase/migrations/`: schema SQL + pgvector, `001` a `024` en orden correlativo con el de ejecución real, todas ya aplicadas contra la base real vía `supabase db query --linked -f <archivo>` (no `db push`, ver "Bug conocido del CLI"). Las primeras siete (`001_initial_schema.sql` a `007_feed_posts_render.sql`) arman el schema base + auth/RLS real; de `008` en adelante cada una es un cambio puntual documentado en su propio comentario de cabecera y, cuando corresponde, en la sección de fase del plan que la motivó (`011`-`015` → Fases 0-4 del plan 2026-08-16; `016` → fix del Monitor; `020`-`022` → Fases A/C/E del plan de continuación; `023` → reinstauración del login; `024` → bandeja de conversaciones, Fase 1 del plan de publicación 2026).
 
 ### System prompts reales de los 3 agentes (tabla `agent_config`, verificado en vivo)
 
@@ -1462,6 +1467,45 @@ Pablo pidió primero clean slate manteniendo el registro de lo publicado (se bor
 Pablo: *"no encaja en el objetivo del proyecto hoy"*. Se sacó `src/pages/Biblioteca.tsx`, el ítem del sidebar, la ruta (`/biblioteca` → redirige a `/propuestas`), la carpeta `biblioteca/` entera (queda en git), `deploy-biblioteca.yml` y los pasos de copia en los otros 3 workflows de deploy. Las fuentes Bw Modelica `.otf` + `LICENCIA.txt` se movieron a `templates/fonts/` (ya tenían los `.woff2` ahí). Su función ya estaba cubierta: subir/etiquetar fotos → Subir material; ver publicado/programado → Monitor + Calendario. La **"línea de tiempo"** (ciclo de vida de cada pieza) se rehízo como pestaña de Propuestas: En revisión → Aprobadas → Programadas → Publicadas + Frenadas, agrupado por etapa, ordenado por fecha, cada pieza abre su detalle real. Un editor de composición a mano queda para el futuro si Pablo lo pide.
 
 Verificado en cada commit: `tsc` limpio, lint 0 errores, 62/62 tests, build limpio, CI + Deploy EDA verdes.
+
+## Desafío: ¿Zernio y Anthropic son las mejores opciones? — 2026-09-01
+
+Pablo desafió: *"zernio es lo mejor para este trabajo vía api? o quieres investigar profundamente las próximas 12 horas, te desafio si conseguis algo mejor. O Antrophic no es la mejor IA?"*. Investigación real (agentes en background, con fuentes) — conclusión: **las dos elecciones se sostienen, no hay una mejora que justifique migrar.**
+
+- **Zernio**: cubre 16 plataformas, expone publicación + analytics + inbox (comentarios y DMs) + ads en una sola API con un solo token. Las alternativas reales (Ayrshare, Postiz, Mixpost, Blotato) o son más caras para el mismo alcance, o no tienen inbox, o exigen self-hosting. Migrar significaría rehacer `scripts/lib/zernio.mjs`, `metrics-collector`, `sync-history` y ahora `inbox` por un beneficio que no aparece. Se queda.
+- **Anthropic (`claude-sonnet-5`)**: sigue siendo el mejor por seguimiento de criterio de marca en español rioplatense y adherencia a un system prompt largo con reglas duras (el Crítico y el copiloto dependen de eso). Groq `openai/gpt-oss-120b` ya está como fallback en los puntos que importan. GPT/Gemini no aportan una diferencia que pague el cambio. Se queda.
+- Lo que sí salió de la investigación: **el cuello de botella no es el proveedor, es que no se estaba usando todo lo que Zernio ya ofrece** — inbox y ads estaban sin tocar. De ahí salió el plan de fases de abajo.
+
+## Plan de publicación 2026 — orden de ejecución 1 → 2 → 3 → 5 → 4 → 6 → 7
+
+Pablo: *"Aplica 'fuera de este plan' sin prototipado... deploy a producción directo. Respecto del universo Meta todo lo que se pueda hacer es válido"* y después *"Orden de ejecución: 1 → 2 → 3 → 5 → 4 → 6 → 7. Se obsesivo al detalle. Arregla todo. No te detengas hasta terminar... A mí solo me molestas si y solo si necesitas intervención manual humana."*
+
+| Fase | Qué | Estado |
+|---|---|---|
+| **1 — Bandeja de conversaciones** | Comentarios + DMs de IG/FB traídos de Zernio, clasificados por sentimiento, respondibles desde el EDA con OK humano | 🟢 hecho y verificado en prod (2026-09-01) |
+| **2 — Higiene** | Bug de `daily-story.yml` (`ENOENT briefs.json` en re-dispatch); fallback de `metrics-collector` para posts trabados en "202 pending" de Zernio; verificar `pickNextSlot`/dedup del autopilot con corrida real; migración al dominio propio (gated: DNS de Pablo); reactivar `sync-history` (gated: Pablo limpia IG/FB) | ⏳ siguiente |
+| **3 — Reciclado de contenido** | Query "publicadas hace >90d con engagement > promedio" → LLM refresca hook/CTA → reinserta como propuesta `scheduled` + UI para elegir. Mecanismo ahora, dormido hasta que haya datos | ⏳ |
+| **5 — LinkedIn** | Variante de template + adaptación de copy + `linkedin` en el array de plataformas. **Gated:** Pablo conecta la cuenta de LinkedIn en Zernio. Código listo para cuando esté | ⏳ |
+| **4 — Loop de aprendizaje activo** | `success_rules` de alta confianza dirigen el prompt del Estratega de verdad; framework de A/B. Gated: volumen de datos | ⏳ |
+| **6 — Video/Reels** | ffmpeg en el runner, "Reel armado de fotos" (Ken Burns + texto animado → MP4) | ⏳ |
+| **7 — Ads de Facebook** | Leer performance de campañas, cruzar orgánico↔pago, sugerir boosts. Necesita definición con Pablo | ⏳ |
+
+### Fase 1 — Bandeja de conversaciones (completa, 2026-09-01)
+
+El sistema publicaba y medía números pero **nunca veía lo que la gente dice**. Zernio ya expone el inbox (permisos reales confirmados: `instagram_business_manage_comments`/`messages`, `pages_manage_engagement`/`pages_messaging`) — no hizo falta ir a la API de Meta directo.
+
+- **Migración `024_inbox.sql`**: `inbox_items` (una fila por comentario o DM, `kind`; entrantes y salientes, `direction`; `sentiment` ∈ {positivo, neutral, negativo, pregunta} + `sentiment_note`; `UNIQUE (kind, platform, external_id)`) + `inbox_sync_state` (fila única con `last_synced_at`/`last_error`). RLS `is_app_admin()` como el resto. Aplicada y verificada contra la base real.
+- **Edge Function `inbox`** (deployada, en `deploy-functions.yml`):
+  - `sync`: por cada cuenta (IG `6a56405a3ecd8aa344faecae`, FB `6a5640333ecd8aa344fadb4b` — constantes, no secretos) trae DMs (`GET /v1/inbox/conversations` + los últimos ~8 mensajes de cada hilo) y comentarios (`GET /v1/posts?limit=6` → `GET /v1/inbox/comments/{_id}` por post; los posts viejos devuelven "Platform error 100" y se saltean). Upsert idempotente. Después clasifica el sentimiento de **todos** los entrantes sin etiqueta (no solo los nuevos — así los que fallan se reintentan), tope 90/corrida, en tandas de 10, pidiéndole al LLM un array JSON `[{n,s,nota}]` con fallback a un parser de líneas tolerante.
+  - `draft`: `{itemId}` → respuesta sugerida en voz de marca (RAG contra el Manual de Marca), no envía nada.
+  - `reply`: `{itemId, message}` → comentario a `POST /v1/inbox/comments/{thread_id}` `{accountId, commentId, message}`; DM a `POST /v1/inbox/conversations/{thread_id}/messages` `{accountId, message}`. Marca `replied_at` + inserta una fila `outgoing` para que se vea el hilo.
+  - LLM: `claude-sonnet-5` → fallback `openai/gpt-oss-120b`. `logRun` source `"inbox"`.
+- **Cron `inbox-sync-cron.yml`** cada 3h (`0 */3 * * *`).
+- **Frontend**: `/conversaciones` (`src/pages/Conversaciones.tsx`) + `useInbox.ts` (hook con `buildThreads`/`isUnanswered`) + `inboxApi` (`services/supabase.ts`) + `syncInbox`/`draftInboxReply`/`sendInboxReply` (`services/ai.ts`) + ítem "Conversaciones" en el sidebar (grupo "Publicar y gestionar") + ruta en `App.tsx`. Hilos agrupados, filtros por plataforma / sentimiento / sin responder / archivadas, flujo de respuesta: "Redactar" (trae el `draft`) → textarea editable → "Enviar" con `ConfirmDialog`. Dashboard: nueva línea "N conversaciones sin responder" en la franja de atención.
+- **Probado real en producción** (workflow temporal con service-role key, borrado después): `sync` → `HTTP 200`, trajo **173 mensajes reales** (43 DMs entrantes de IG, 77 salientes históricos, comentarios de FB, etc.), clasificó los **50 entrantes con texto** en 3 corridas (40 neutral — mucha publicidad ajena —, 6 positivo, 2 pregunta, 2 negativo; spot-check correcto: "SALE CORTADO LO PUEDEN MEJORAR?" → negativo, "Quiero información" → pregunta, "Buena iniciativa!" → positivo). `draft` sobre un DM real → `HTTP 200`, respuesta en voz de marca que usa el nombre real de la persona y ofrece ayuda sin vender. **`reply` NO se probó contra una persona real** — mandar un mensaje real a alguien solo para testear es exactamente lo que este proyecto viene evitando; quedó verificado por revisión de código (las formas de la API de Zernio ya están confirmadas por los probes de esta sesión).
+- Verificado: `tsc` limpio, lint 0 errores, 62/62 tests, build limpio, CI + Deploy Functions + Deploy EDA verdes.
+
+**Pendiente real de Fase 1, no bloqueante:** ~15% de las tandas de clasificación fallan el parseo en una corrida dada (el LLM a veces no devuelve JSON limpio) — el reintento en cada `sync` las levanta en la corrida siguiente, así que converge a 0 sin fallar; si molesta, subir el determinismo del prompt o bajar el batch a 6.
 
 ## Notas históricas
 
