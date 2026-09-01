@@ -83,9 +83,13 @@ jobs:
           git config user.name "mejora-story-bot"
           git config user.email "actions@users.noreply.github.com"
           git add content/published content/used content/inbox content/work/publish-now.json content/work/publish-now-briefs.json content/work/publish-now-renders.json content/log
-          git diff --cached --quiet || git commit -m "publicar ahora: preparar ($(date -u +%H:%M) UTC)"
-          git pull --rebase --autostash origin main || true
-          git push
+          git diff --cached --quiet && { echo "nada que commitear"; exit 0; }
+          git commit -m "publicar ahora: preparar ($(date -u +%H:%M) UTC)"
+          for i in 1 2 3 4 5; do
+            git pull --rebase --autostash origin main && git push && exit 0
+            echo "push rechazado, reintento $i…"; sleep 5
+          done
+          echo "no se pudo pushear el resultado"; exit 1
 
   publish:
     if: ${{ inputs.mode == 'publish' }}
@@ -121,6 +125,10 @@ jobs:
           git config user.name "mejora-story-bot"
           git config user.email "actions@users.noreply.github.com"
           git add content/work/publish-now.json
-          git diff --cached --quiet || git commit -m "publicar ahora: resultado ($(date -u +%H:%M) UTC)"
-          git pull --rebase --autostash origin main || true
-          git push
+          git diff --cached --quiet && { echo "nada que commitear"; exit 0; }
+          git commit -m "publicar ahora: resultado ($(date -u +%H:%M) UTC)"
+          for i in 1 2 3 4 5; do
+            git pull --rebase --autostash origin main && git push && exit 0
+            echo "push rechazado, reintento $i…"; sleep 5
+          done
+          echo "no se pudo pushear el resultado"; exit 1

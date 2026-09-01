@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Send, RotateCcw, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { github } from "@/services/github";
+import { useDirListing } from "@/hooks/useGithubUpload";
 import { dimensionLabel } from "@/shared/constants";
+
+const IMG_RE = /\.(jpe?g|png|webp)$/i;
 
 // "Publicar ahora" (2026-09-01, pedido de Pablo: "saco una foto y subo al
 // sistema, el sistema trabaja y yo solo apreto publicar ya y listo").
@@ -36,6 +40,11 @@ export function PublishNowCard({ dimension, connected }: { dimension: string; co
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const nonceRef = useRef<string>("");
   const pollStopRef = useRef<() => void>(() => {});
+  const qc = useQueryClient();
+
+  const inboxPath = `content/inbox/${dimension}`;
+  const { data: inboxFiles } = useDirListing(inboxPath, connected);
+  const hasPhoto = (inboxFiles ?? []).some((f) => f.type === "file" && IMG_RE.test(f.name));
 
   useEffect(() => () => pollStopRef.current(), []);
 
@@ -62,6 +71,8 @@ export function PublishNowCard({ dimension, connected }: { dimension: string; co
           if (m.phase === want) {
             setManifest(m);
             setState(want);
+            qc.invalidateQueries({ queryKey: ["gh-dir", inboxPath] });
+            qc.invalidateQueries({ queryKey: ["gh-dir", `content/used/${dimension}`] });
             return;
           }
         }
@@ -76,7 +87,7 @@ export function PublishNowCard({ dimension, connected }: { dimension: string; co
       timer = setTimeout(tick, POLL_MS);
     };
     timer = setTimeout(tick, POLL_MS);
-  }, []);
+  }, [qc, inboxPath, dimension]);
 
   async function handlePrepare() {
     setErrorMsg(null);
@@ -132,9 +143,16 @@ export function PublishNowCard({ dimension, connected }: { dimension: string; co
         )}
 
         {state === "idle" && connected && (
-          <Button onClick={handlePrepare} className="w-full sm:w-auto">
-            Preparar story de {dimensionLabel(dimension)}
-          </Button>
+          <div className="space-y-2">
+            <Button onClick={handlePrepare} disabled={!hasPhoto} className="w-full sm:w-auto">
+              Preparar story de {dimensionLabel(dimension)}
+            </Button>
+            {!hasPhoto && (
+              <p className="text-xs text-muted-foreground">
+                Primero subí una foto de <b>{dimensionLabel(dimension)}</b> arriba.
+              </p>
+            )}
+          </div>
         )}
 
         {state === "preparing" && (
