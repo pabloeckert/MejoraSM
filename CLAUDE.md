@@ -21,13 +21,16 @@ Este archivo tiene dos mitades:
 | **Posts/carruseles de feed** | 100% automáticos (Crítico aprueba → autoagenda → publica), cron `publish-scheduled-posts.yml` cada 15 min. **Elección de tema**: manual (Mesa de Diálogo) **o** autónoma vía `autopilot-cron.yml` (modo libre lun/mié/vie + email de aviso con ventana de veto — ver "Autopilot" en la bitácora; schedule **activo** desde 2026-09-01 (probado end-to-end), `RESEND_API_KEY`) | reactivado 2026-08-24; autopilot agregado 2026-09-01 |
 | **Login / auth del EDA** | **reinstaurado** — usuario/contraseña (Supabase Auth), UNA sola cuenta compartida (`pabloeckert@gmail.com`, la de `app_admins`). Sin alta de cuenta, sin OTP. Blanqueo por email → `/app/reset.html`. `AuthGate` envuelve la app | 2026-08-31 |
 | **RLS de Supabase** | **cerrado de nuevo** (`is_app_admin()`, migración `023` revierte `019`) en las 15 tablas + bucket `vault`. `_shared/auth.ts` volvió a exigir JWT real de `app_admins` o service-role (sin rama anon key) | 2026-08-31 |
+| **GitHub (subir fotos / disparar workflows)** | **del lado del servidor** — Edge Function `repo` con el secret `GITHUB_TOKEN`. El frontend (`src/services/github.ts`) es un cliente liviano de esa función; ya no hay "Conectar GitHub", ni PAT en `localStorage`, ni la palabra "GitHub" en ninguna pantalla. Ver "Sacar GitHub de la vista" en la bitácora | 2026-09-01 |
+| **Dominio propio** | `mejorasm.mejoraok.com` — CORS de las 8 funciones + canonical ya apuntan ahí. **Falta:** Pablo agrega el registro DNS (`CNAME mejorasm → pabloeckert.github.io`), después se agrega el archivo `CNAME` + se cambia `VITE_BASE_PATH` a `/app/` y se redespliega | preparado 2026-09-01 |
+| **Biblioteca** | **sacada** — no encajaba en el objetivo del proyecto (decisión de Pablo). `/biblioteca` redirige a `/propuestas`. La "línea de tiempo" del ciclo de vida pasó a una pestaña de Propuestas. Carpeta `biblioteca/` borrada (queda en git); fuentes movidas a `templates/fonts/` | 2026-09-01 |
 | **CI (`ci.yml`)** | **lint + tsc bloqueantes de nuevo** — la deuda bajó de 42 errores a 0; ESLint acotado a `src/**` (Deno fuera de scope). test + build siguen corriendo | 2026-08-31 (batch 8 de la auditoría) |
-| **Edge Functions** | 6: `orchestrator`, `vault-process`, `rule-engine`, `metrics-collector`, `copilot`, `classify-photo`. `publisher` y `ai-gateway` borradas | `publisher` borrada 2026-08-16 |
+| **Edge Functions** | 8: `orchestrator`, `vault-process`, `rule-engine`, `metrics-collector`, `copilot`, `classify-photo`, `insights`, `repo`. `publisher` y `ai-gateway` borradas | `repo` agregada 2026-09-01 |
 | **Auto-agenda (`pickNextSlot`)** | apunta a bloques horarios reales (12/16/23 UTC ≈ 09/13/20 ART), o a la hora de una `success_rule` de timing si hay una con confianza alta — ya no publica a la hora en que arrancó la primera cadena | 2026-08-31 (batch 2) |
 | **Fallback de IA** | Anthropic (`claude-sonnet-5`/`opus-5`) → Groq `openai/gpt-oss-120b`. `llama-3.3-70b-versatile` se retiró el 2026-08-16, ya migrado en los 3 puntos | 2026-08-18 |
 | **Límite de cuenta Anthropic** | resuelto — Pablo subió el límite de gasto, sin bloqueo | 2026-08-19 |
 | **Multi-tenant (Fase 6)** | pausado a propósito — es decisión de producto de Pablo, no técnica | 2026-08-17 |
-| **Rediseño (brief 2026-08-16) — plan A-E en curso** | Pablo pidió el 2026-08-31 ejecutar A→E de corrido, autónomo. 🟢 Fase A (Motor de insights) y 🟢 Fase B (fusionar Mesa+Laboratorio + modo libre + preview visual) hechas y verificadas en prod. 🟢 Fases A-D hechas y verificadas en prod. 🟢 Fase E: Pablo decidió la puerta de acceso (un solo usuario/contraseña compartido + blanqueo por email, sin rol read-only) — login reinstaurado y RLS cerrado de nuevo (`023`), verificado en prod. Pendiente solo de Pablo: agregar el Redirect URL de blanqueo en Supabase + setear su contraseña. Detalle abajo ("Contraste con Claude Design + plan de continuación") | 2026-08-31 |
+| **Rediseño (brief 2026-08-16) — plan A-E** | 🟢 **completo**. A (Motor de insights), B (fusionar Mesa+Laboratorio + modo libre + preview), C (Bóveda → Manual de Marca + zip + clasificación), D (ajustes finos), E (puerta de acceso: una cuenta compartida + blanqueo por email, sin roles) — todo en prod. Pablo confirmó el login y el blanqueo funcionando (agregó el Redirect URL en Supabase, setea contraseña). Después del plan: autopilot, "Publicar ahora", sacar GitHub de la vista, sacar Biblioteca — ver bitácora | cerrado 2026-09-01 |
 
 ## Fuente de verdad
 
@@ -289,6 +292,8 @@ Hasta 2026-07-28 el EDA no tenía ningún control de acceso: RLS con políticas 
 
 `src/services/ai.ts` arma el header `Authorization` en cada llamada con el `access_token` real de la sesión (`supabase.auth.getSession()`), no con la anon key pelada. `src/services/supabase.ts` comparte la misma sesión persistida en `localStorage` (mismo `VITE_SUPABASE_URL`).
 
+**GitHub del lado del servidor (2026-09-01):** `src/services/github.ts` ya NO habla con la API de GitHub ni guarda un token — es un cliente de la Edge Function `repo`, que lee el secret `GITHUB_TOKEN` (fine-grained PAT de Pablo, Contents + Actions RW sobre `pabloeckert/MejoraSM`, cargado una vez con `supabase secrets set`) y hace las llamadas reales. La función está gateada por el mismo `requireAuth`. Esto sacó de la UI todo el flujo de "Conectar GitHub" (diálogo de PAT, badge, desconectar) y la palabra "GitHub" de todas las pantallas. Si algo del subir-fotos / publicar-ahora / botones del Monitor falla con "GITHUB_TOKEN no configurado", el secret se perdió y hay que volver a cargarlo.
+
 **Confirmado:** `006_real_rls_and_auth.sql` (2026-07-30) y `023_reclose_access_password.sql` (2026-08-31) están aplicados contra la base real — el RLS de admin está vigente en producción, no es un supuesto. `_shared/auth.ts` deployado sin la rama anon key (confirmado: Edge Function con anon key → 401; REST con anon key → `[]`).
 
 **Cuenta de acceso:** UNA sola cuenta compartida, `pabloeckert@gmail.com` (creada 2026-07-30, la única en `app_admins`). Pablo y Sindy usan la misma. **Blanqueo de contraseña**: botón "Olvidé la contraseña" en `Login.tsx` → Supabase manda un email con un link a `https://pabloeckert.github.io/MejoraSM/app/reset.html`. **Para que ese link funcione, esa URL tiene que estar en la allowlist de Redirect URLs del proyecto Supabase** (Authentication → URL Configuration) — si el blanqueo no llega o rebota, es casi seguro eso. Dar de alta a alguien más (no necesario hoy): `INSERT INTO app_admins (email) VALUES ('...')` + esa persona hace "olvidé la contraseña" para setear la suya.
@@ -365,27 +370,28 @@ Páginas (`src/pages/`):
 | **Mesa de Diálogo** | `/mesa` | Le das un tema (elección manual, ver "decisiones explícitas de no automatizar" arriba) y dispara `orchestrator`: Estratega propone → Creativo redacta → Crítico evalúa contra los documentos de la Bóveda (RAG). Si aprueba y el formato tiene pipeline autónomo (`post`/`carrusel`), la propuesta se autoagenda sola — ver overhaul de autonomía arriba. |
 | **Laboratorio de Contenido** | `/laboratorio` | Versión directa: describís qué querés comunicar y te devuelve una propuesta ya armada (estrategia + copy + evaluación + hook/CTA/hashtags) lista para copiar o aprobar. |
 | **Calendario Editorial** | `/calendario` | De solo lectura desde el overhaul del 2026-08-02: refleja `proposals.scheduled_at`, no agenda nada (eso vive en Propuestas). |
-| **Propuestas** | `/propuestas` | Desde el overhaul del 2026-08-02, monitor de lo que se agenda/publica solo (cancelar antes de publicar, reintentar/despublicar después); solo `format='historia'` sigue con aprobación manual real. |
-| **Subir material** | `/hub` | Rediseñado 2026-08-17: selector de oferta, drag-and-drop real (vía `src/services/github.ts`), grillas de pendientes/ya usadas, link a Monitor. **"Publicar ahora"** (2026-09-01, `PublishNowCard`): subís una foto → "Preparar" (dispara `publish-now.yml` mode=prepare → genera copy + renderiza) → ves el preview real (imagen + copy) → "Publicar ahora" (mode=publish → IG+FB vía Zernio). La página estática original (`hub/`, sin login) sigue en paralelo. |
-| **Monitor** | `/monitor` | Fase 5: port React de `dashboard/index.html` — historial real vía `historial_cache` en Supabase (no más `raw.githubusercontent.com`, fix 2026-08-17), badges por plataforma, acciones de reversión, link a la propuesta de cada pieza. La página estática original (`dashboard/`) sigue existiendo en paralelo. |
-| **Biblioteca** | `/biblioteca` | Fase 5: embebe `biblioteca/index.html` sin tocar su código (decisión de diseño, ver Fase 5 más arriba). Ajustado 2026-08-17: botón "Abrir Biblioteca" como acceso primario confiable, el embed queda como opción secundaria con detección de timeout. |
+| **Propuestas** | `/propuestas` | Desde el overhaul del 2026-08-02, monitor de lo que se agenda/publica solo. Pestañas: Pendientes / Aprobadas / Programadas / Todas / **Línea de tiempo** (ciclo de vida completo agrupado por etapa — 2026-09-01, reemplaza la que vivía en Biblioteca) / Plantillas. |
+| **Subir material** | `/hub` | Rediseñado 2026-08-17. Sin flujo de "Conectar GitHub" desde 2026-09-01 (el token vive en la Edge Function `repo`) — si estás logueado, subir fotos ya funciona. **"Publicar ahora"** (`PublishNowCard`): subís una foto → "Preparar" (dispara `publish-now.yml` mode=prepare → genera copy + renderiza) → ves el preview real → "Publicar ahora" (mode=publish → IG+FB vía Zernio). |
+| **Monitor** | `/monitor` | Fase 5: port React de `dashboard/index.html` — historial real vía `historial_cache` en Supabase, badges por plataforma, acciones de reversión (reintentar/despublicar/marcar a mano se disparan directo, sin links a GitHub Actions desde 2026-09-01), link a la propuesta de cada pieza. |
 | **Auditoría** | `/auditoria` | Fase 6 (parcial): exporta CSV/JSON real de propuestas, métricas, reglas aprendidas y `run_log` — client-side, sin Edge Function nueva. |
 | **Configuración** | `/configuracion` | Por cada uno de los 3 agentes: proveedor de IA, modelo exacto y temperatura, persistido en `agent_config`. |
 
 Hooks custom en `src/hooks/` (`useVault`, `useDialogue`, `useProposals`, `useMetrics`) llaman a `src/services/ai.ts` (invoca Edge Functions) y `src/services/supabase.ts` (CRUD directo). El cliente Supabase vive en `src/integrations/supabase/client.ts` y usa `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` (ver `.env.example`). `src/components/ui/` es el set estándar de shadcn sin modificar; la UI propia está en `src/components/layout/` (AppSidebar, AppLayout).
 
-### Backend — 6 Edge Functions
+### Backend — 8 Edge Functions
 
-Todas en `supabase/functions/` (Deno), cada una con su propia allowlist de CORS (`util.mejoraok.com`, `mejorasm.vercel.app`, localhost) y con el guard de `_shared/auth.ts`:
+Todas en `supabase/functions/` (Deno), cada una con su propia allowlist de CORS (`pabloeckert.github.io`, `mejorasm.mejoraok.com`, localhost) y con el guard de `_shared/auth.ts`:
 
 | Función | Rol |
 |---|---|
-| `orchestrator` | Corre el debate Estratega → Creativo → Crítico de Mesa de Diálogo, trayendo contexto de la Bóveda vía `match_documents` (RAG). Autoagenda las propuestas aprobadas (ver overhaul de autonomía). |
+| `orchestrator` | Corre el debate Estratega → Creativo → Crítico de Mesa de Diálogo, trayendo contexto de la Bóveda vía `match_documents` (RAG). Autoagenda las propuestas aprobadas. Acción `start` con `mode:"auto"` = modo libre (`pickAutoTopic`). |
 | `vault-process` | Procesa documentos subidos (extracción, chunking, embeddings), clasifica el tipo de cada uno con un llamado corto al LLM (Fase C, 2026-08-31) y expone la búsqueda semántica. |
-| `rule-engine` | Analiza métricas de posts pasados y genera reglas de éxito (qué formato/hora/tono funciona mejor). Cron diario real desde 2026-08-02 (`rule-engine-cron.yml`). |
-| `metrics-collector` | Trae métricas reales desde la API de analíticas de Zernio (`GET /v1/analytics?postId=`, no Instagram Graph API — cambio 2026-08-04/05, ver "Métricas vía Zernio Analytics" más abajo). Cron real cada 6h desde 2026-08-02 (`metrics-collector-cron.yml`). |
-| `copilot` | Copiloto Reflexivo (Fase 4 del plan estratégico 2026-08-16): consejo del día cacheado (`advice`) + chat stateless sobre datos propios reales (`chat`). Cron diario real desde 2026-08-17 (`copilot-advice-cron.yml`) pre-genera el consejo del día. |
-| `classify-photo` | Taller de la Oferta (2026-08-17): sugiere la dimensión de una foto real (Claude con visión) antes de subirla desde `/hub` — el humano confirma o corrige. Sin cron, se llama en vivo desde el frontend. Bloqueada por el límite de uso de Anthropic hasta 2026-09-01, ver sección propia arriba. |
+| `rule-engine` | Analiza métricas de posts pasados y genera reglas de éxito. Cron diario (`rule-engine-cron.yml`). |
+| `metrics-collector` | Trae métricas reales desde la API de analíticas de Zernio. Cron cada 6h (`metrics-collector-cron.yml`). |
+| `copilot` | Copiloto Reflexivo: consejo del día cacheado (`advice`) + chat stateless sobre datos propios (`chat`). Cron diario (`copilot-advice-cron.yml`). |
+| `classify-photo` | Sugiere la dimensión de una foto real (Claude con visión) antes de subirla desde `/hub` — el humano confirma o corrige. Sin cron, se llama en vivo. |
+| `insights` | Motor de insights del Dashboard (Fase A): contrasta las 6 semillas contra métricas reales + retro de Pablo. Cron lunes (`insights-cron.yml`). |
+| `repo` | **Proxy server-side a la API de GitHub** (2026-09-01) — lee `GITHUB_TOKEN` de los secrets. Acciones `listDir` / `readFile` / `writeFile` / `dispatchWorkflow`. Lo usa `src/services/github.ts` para subir fotos, leer manifiestos y disparar workflows sin que el navegador toque GitHub. Ver "Sacar GitHub de la vista" en la bitácora. |
 
 Deploy: `.github/workflows/deploy-functions.yml` (push a `supabase/functions/**`, o manual con función específica) — usa `SUPABASE_ACCESS_TOKEN` y `SUPABASE_PROJECT_REF` como secrets del repo.
 
@@ -547,38 +553,29 @@ Gestión de posts ya publicados, todo por `workflow_dispatch` (no hay UI propia 
 
 `templates/fonts/` tiene `BwModelica-Medium.woff2` y `BwModelica-Regular.woff2` reales desde el 2026-08-19 (**cerrado** — ver "Ronda de recuperación y hallazgos reales, 2026-08-19/20" más abajo). Convertidos de `biblioteca/fonts/*.otf` (misma fuente ya licenciada) con `fonttools`, cargados con éxito real en los dos templates (`story-template.html`, `post-template.html`), confirmado en vivo con la Font Loading API del navegador. League Spartan ya no es necesario como fallback — sigue declarado en el CSS por las dudas, pero Bw Modelica carga primero.
 
-## Arquitectura: hub, biblioteca, dashboard y EDA (GitHub Pages)
+## Arquitectura: hub, dashboard y EDA (GitHub Pages)
 
-Las cuatro conviven en el **mismo sitio** de GitHub Pages (Pages en modo "workflow" solo sirve un artifact por sitio): `hub/` en la raíz, `dashboard/`, `biblioteca/` y el build del EDA (`dist/`) como subpaths (`/dashboard/`, `/biblioteca/`, `/app/`). Los cuatro workflows (`deploy-hub.yml`, `deploy-biblioteca.yml`, `deploy-dashboard.yml`, `deploy-eda.yml`) arman el mismo `_site/` combinado — cualquiera de los cuatro se dispara por push a su parte y republica el sitio entero. Si se edita la lógica de armado de `_site/` en uno, hay que replicarla en los otros tres o se pisan entre sí.
+Los tres conviven en el **mismo sitio** de GitHub Pages (un artifact por sitio): `hub/` en la raíz, `dashboard/` y el build del EDA (`dist/`) como subpaths (`/dashboard/`, `/app/`). Los tres workflows (`deploy-hub.yml`, `deploy-dashboard.yml`, `deploy-eda.yml`) arman el mismo `_site/` combinado — cualquiera se dispara por push a su parte y republica el sitio entero. Si se edita la lógica de armado de `_site/` en uno, hay que replicarla en los otros dos.
 
-- **`hub/index.html`** — 5 tarjetas, una por oferta, que linkean directo a la UI de upload de GitHub (`github.com/.../upload/main/content/inbox/<oferta>`) para subir fotos sin tocar git a mano. Dispara el flujo de story diaria en la próxima corrida del workflow. No es "autónomo" (es el punto de entrada humano — subir una foto), pero cumple bien su alcance. Deploy activo en **https://pabloeckert.github.io/MejoraSM/**.
+> **Biblioteca (`biblioteca/`) se sacó el 2026-09-01** — no encajaba en el objetivo del proyecto (decisión de Pablo). Era una SPA vanilla JS de ~1500 líneas con su propio flujo de token y datos de ejemplo, embebida vía iframe. Su función (subir/etiquetar fotos, ver el ciclo de vida) ya estaba cubierta por Subir material + Monitor + Calendario; la "línea de tiempo" pasó a una pestaña de Propuestas. Carpeta borrada (queda en git); las fuentes Bw Modelica `.otf` + `LICENCIA.txt` se movieron a `templates/fonts/`. `deploy-biblioteca.yml` borrado.
 
-- **`biblioteca/`** — interfaz para cargar, etiquetar y organizar el contenido que alimenta `content/inbox/`. HTML/JS plano, sin framework ni build — se abre `index.html` directo en el navegador. Deploy en **https://pabloeckert.github.io/MejoraSM/biblioteca/**.
+- **`hub/index.html`** — página estática (sin login), 5 tarjetas que linkean a la UI de upload de GitHub. Sigue existiendo como atajo rápido desde el celular. `hub/CNAME` (a agregar cuando el DNS esté listo) declara el dominio propio para todo el sitio.
 
-  Estado:
-  - **Paso 1 (diseño)** — hecho. Recrea el prototipo aprobado con Pablo.
-  - **Paso 2 (interfaz + interacción)** — hecho. Toda la UI funciona con datos de mentira en memoria (`seed-demo.js`).
-  - **Paso 3 (persistencia real)** — en curso. Hecho: `biblioteca/github.js` (cliente de la API de GitHub — PAT fine-grained guardado SOLO en `localStorage` del navegador, nunca commiteado; `getFile`/`listDir` no necesitan token en repo público, `putFile`/`commitPhoto`/`whoami` sí) y el selector de dimensión + `persistPhoto()` en `app.js`, que commitea cada foto cargada directo a `content/inbox/<dimensión>/`. Todavía sin probar en vivo con un PAT real (necesita la sesión de navegador de Pablo). Pendiente, fuera de esta fase: persistir categorías/álbumes en JSON (hoy en memoria) y el aprendizaje supervisado real (hoy "propone"/"corrige" es de mentira).
+- **`dashboard/index.html`** — monitor estático de solo lectura (lee `content/log/historial.json`).
 
-  Archivos: `index.html` (shell mínimo, carga `github.js`/`seed-demo.js`/`app.js`), `styles.css` (tokens de marca + `@font-face` Bw Modelica), `app.js` (toda la lógica y el render, vanilla JS), `seed-demo.js` (datos de demo, se borra cuando el Paso 3 esté completo), `fonts/` (Bw Modelica Regular/Medium/Bold — licencia de Agencia Dominó en `fonts/LICENCIA.txt`), `assets/` (isotipo y lockup de Mejora Continua).
-
-  Pantallas: **Línea de tiempo** (piezas por etapa: En biblioteca → Confirmada → Programada → Publicada; vistas lista/miniatura/íconos; borrar/confirmar por foto; clic abre detalle para corregir etiquetas/álbum) · **Calendario** (publicado en rojo, programado en azul; clic → modificar/reprogramar/borrar) · **Carga rápida** (sueltas del día, el sistema propone etiquetas) · **Sesión** (tanda de un evento, confirmar en bloque) · **Armar pieza** (4 tipos: Foto con texto, Collage, Foto simple, Frase manual, con preview en vivo) · **Manual** (tutorial interactivo, se reabre con el botón **?**).
-
-  Notas: layout desktop grid 30/70 (menú + apps a la izquierda, contenido a la derecha); Programada/Publicada en el Monitor muestran datos de ejemplo marcados como tales (la publicación real vive en el Monitor real, no acá); fuente Bw Modelica local, League Spartan de fallback.
-
-- **`dashboard/index.html`** — monitor de solo lectura de las stories y posts de feed publicados/programados (lee `content/log/historial.json`). Deploy en **https://pabloeckert.github.io/MejoraSM/dashboard/**.
-
-- **`src/` (EDA)** — deployado en `/app/` (**https://pabloeckert.github.io/MejoraSM/app/**). Requiere login. `vite.config.ts` usa `base: process.env.VITE_BASE_PATH || "/"` — en local es `/`, en GitHub Pages es `/MejoraSM/app/` (seteado por los workflows de deploy).
+- **`src/` (EDA)** — deployado en `/app/`. Requiere login. `vite.config.ts` usa `base: process.env.VITE_BASE_PATH || "/"` — en local `/`, en GitHub Pages `/MejoraSM/app/` (seteado por `deploy-eda.yml`). **Cuando el dominio propio esté activo** (`mejorasm.mejoraok.com`), el subpath del nombre de repo desaparece y hay que cambiar `VITE_BASE_PATH` a `/app/` — ver "Sacar GitHub de la vista" en la bitácora.
 
 ## Deploy
 
-- **`hub/` + `biblioteca/` + `dashboard/` + EDA (`/app/`)**: activo y confirmado en GitHub Pages, sitio combinado (ver arriba). Es el único destino de deploy del EDA verificado end-to-end — no requiere credenciales nuevas (mismo repo + Actions que ya existían) y es totalmente reversible.
-- **EDA en Vercel/Hostinger**: **no confirmado, no usar sin decidirlo con Pablo.** `util.mejoraok.com` no resuelve DNS, `mejorasm.vercel.app` devuelve 404 (ambos mencionados en documentación vieja y todavía en el CORS allowlist de las Edge Functions, pero son residuo), y ningún workflow hace deploy FTP pese a que los secrets `FTP_HOST`/`FTP_USERNAME`/`FTP_PASSWORD` siguen en el repo (también residuo). `vercel.json` tiene config de build correcta por si en algún momento se conecta un proyecto Vercel real.
+- **`hub/` + `dashboard/` + EDA (`/app/`)**: activo en GitHub Pages, sitio combinado (ver arriba). `deploy-eda.yml` / `deploy-hub.yml` / `deploy-dashboard.yml` arman el mismo `_site/`. `deploy-biblioteca.yml` se borró el 2026-09-01.
+- **Dominio propio `mejorasm.mejoraok.com`** (preparado 2026-09-01, no activo): CORS de las 8 Edge Functions + `index.html` canonical ya apuntan ahí. Falta que Pablo agregue `CNAME mejorasm → pabloeckert.github.io` en el DNS de mejoraok.com; después: agregar `hub/CNAME` con `mejorasm.mejoraok.com`, setear el dominio en Pages (`gh api -X PATCH /repos/pabloeckert/MejoraSM/pages -f cname=...`), cambiar `VITE_BASE_PATH` a `/app/` en `deploy-eda.yml`, actualizar `scripts/autopilot.mjs::APP_URL` + `content/log`-linking en el resto, redesplegar, y agregar `https://mejorasm.mejoraok.com/app/reset.html` a los Redirect URLs de Supabase.
 - **`supabase/functions/`**: `deploy-functions.yml` (push a `supabase/functions/**`, o manual).
 - **`supabase/migrations/`**: `deploy-migrations.yml` existe (`supabase db push --linked --yes --debug`, manual) — **probablemente arreglado con la versión actual del CLI** (ver diagnóstico re-hecho 2026-08-05 en "Bug conocido del CLI" más arriba), pero sin confirmación end-to-end real todavía. Hasta esa confirmación, seguir usando `supabase db query --linked "<SQL>"` o el SQL Editor del dashboard para cambios de schema. El schema actual ya está aplicado así contra la base real.
 - **`publish-scheduled-posts.yml`** (cron cada 15 min + manual), **`metrics-collector-cron.yml`** (cada 6h) y **`rule-engine-cron.yml`** (diario): usan el secret de GitHub `SUPABASE_SERVICE_ROLE_KEY`, creado el 2026-08-02. Ojo si hay que regenerarlo: tiene que ser la API key nueva estilo `sb_secret_...` (Settings → API Keys del proyecto Supabase, no la legacy JWT de `service_role`) — la legacy JWT funciona contra PostgREST (`/rest/v1/...`, la usan los scripts) pero el gateway de Edge Functions (`/functions/v1/...`, lo usan los cron de arriba) la rechaza con 401. Reusa el secret `VITE_SUPABASE_URL` que ya existe como base URL.
 
-**Secrets de GitHub Actions usados en total**: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `ZERNIO_API_KEY`, `ZERNIO_FACEBOOK_ACCOUNT_ID`, `ZERNIO_INSTAGRAM_ACCOUNT_ID`.
+**Secrets de GitHub Actions usados en total**: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `ZERNIO_API_KEY`, `ZERNIO_FACEBOOK_ACCOUNT_ID`, `ZERNIO_INSTAGRAM_ACCOUNT_ID`, `RESEND_API_KEY` (autopilot), `ALERT_EMAIL` (opcional, autopilot).
+
+**Secrets de Supabase (Edge Functions)**: `GROQ_API_KEY`, `DEEPSEEK_API_KEY`, `GEMINI_API_KEY`, `HF_API_KEY`, `ANTHROPIC_API_KEY`, `ZERNIO_API_KEY`, `GITHUB_TOKEN` (para la función `repo`, cargado 2026-09-01).
 
 ## Variables de entorno
 
@@ -1431,6 +1428,36 @@ Pablo: *"no tengo opción de publicar ahora en ningún lado, por ejemplo saco un
 - Requiere que el token de GitHub conectado en `/hub` tenga **`Actions: Read and write`** (además de `Contents`). Si falta, `triggerWorkflow` da 403 con mensaje claro.
 
 **Probado real (2026-09-01):** `mode=prepare` disparado con una foto sintética de prueba → workflow verde, `publish-now.json` con `phase: prepared` + headline/subtext/imagePath correctos, imagen renderizada bien (layout de marca, foto compuesta, kicker "DIMENSIÓN PERSONAL", footer). **`mode=publish` NO se probó** — publicaría una story real con copy de prueba; el camino es `publish-story.mjs` ya probado muchas veces, único cambio es el swap de `RENDERS_FILE` (verificado por `node --check`). Artefactos de prueba borrados. `tsc`/lint/tests/build limpios, CI + Deploy EDA verdes.
+
+## Sacar GitHub de la vista + limpieza + sacar Biblioteca — 2026-09-01
+
+Pablo pidió: probar todo de punta a punta como un usuario real, que **en ninguna pantalla se vea "GitHub"** (que todo pase por MejoraSM), revisar frontend + backend, y validar usabilidad. Nota de método: no se pudo hacer el testeo clickeando la app logueada — hay una regla dura que prohíbe escribir contraseñas, incluso las de Pablo en su propio sistema. La validación se hizo por lectura completa del código, pantalla por pantalla, más pruebas reales de las Edge Functions con la service-role key.
+
+**Se identificaron 3 capas de "GitHub visible", cada una atacada distinto:**
+
+### Parte 3 — Token de GitHub del lado del servidor (hecho)
+- **Edge Function `repo`** nueva (`supabase/functions/repo/index.ts`) — proxy a la API de GitHub. Lee el secret `GITHUB_TOKEN` (el fine-grained PAT de Pablo, Contents + Actions RW, cargado con `supabase secrets set` — **una vez, nunca más se toca**). Acciones: `listDir` / `readFile` / `writeFile` (resuelve el sha solo) / `dispatchWorkflow`. Gateada por `requireAuth` como el resto.
+- **`src/services/github.ts` reescrito** de cero: cliente liviano de `repo`. Se borraron `getToken`/`setToken`/`isConnected`/`whoami` — no hay más "conexión" que gestionar.
+- **Hub.tsx**: se sacó todo el diálogo "Conectar con GitHub" (instrucciones de PAT, link a `github.com/settings/tokens`, badge "GitHub conectado", "Desconectar"). Subir fotos y "Publicar ahora" funcionan directo si estás logueado.
+- **useGithubUpload.ts**: `useGithubConnection()` eliminado; `useWorkflowAction` ya no chequea "conectado".
+- **Monitor.tsx**: se sacaron los links "Ver el resultado en GitHub Actions".
+- **ProposalDetailDialog.tsx**: "correr el workflow en GitHub Actions" → "usá Reintentar/Despublicar desde el Monitor".
+- **Probado real**: `repo` con la service-role key → `listDir`/`readFile` devuelven bien contra el repo. Falta que Pablo confirme el flujo completo logueado (subir foto / Publicar ahora).
+
+### Parte 2 — Textos (hecho, fundido en la Parte 3)
+La palabra "GitHub" ya no aparece en ninguna pantalla renderizada. Quedan menciones solo en comentarios de código (invisibles) y en `PiecePreview.tsx` (llamada silenciosa a `api.github.com` para traer el template, sin token, sin UI).
+
+### Parte 1 — Dominio propio `mejorasm.mejoraok.com` (preparado, no activo)
+- CORS de las 8 Edge Functions + `index.html` canonical/og:url ya apuntan al dominio nuevo.
+- **Falta que Pablo agregue el registro DNS** (`CNAME mejorasm → pabloeckert.github.io`). Después: `hub/CNAME`, setear el dominio en Pages, cambiar `VITE_BASE_PATH` a `/app/` (el subpath `/MejoraSM/` desaparece con dominio propio en un project page), actualizar `autopilot.mjs::APP_URL`, redesplegar, y sumar `https://mejorasm.mejoraok.com/app/reset.html` a los Redirect URLs de Supabase. **No se tocó `VITE_BASE_PATH` todavía** — hacerlo antes de que el DNS resuelva rompe el sitio actual.
+
+### Limpieza de datos — "todo en blanco listo para usar"
+Pablo pidió clean slate, manteniendo el Manual de Marca y el registro de lo publicado. Se borró: 24 sesiones de Mesa de Diálogo (+82 mensajes), 515 filas de `run_log`, 16 `copilot_advice`, 1 `insights_cache`, 4 propuestas borrador que nunca tocaron las redes. Se mantuvo: 19 documentos del Manual de Marca + embeddings, `agent_config`, `app_admins`, 4 métricas reales, 12 propuestas publicadas (con `zernio_post_id`), `historial_cache`. Repo: -2 fotos de prueba en `content/used/`, -3 manifiestos colgados en `content/work/`. **Instagram/Facebook/Zernio: no se tocó nada.**
+
+### Biblioteca — sacada
+Pablo: *"no encaja en el objetivo del proyecto hoy"*. Se sacó `src/pages/Biblioteca.tsx`, el ítem del sidebar, la ruta (`/biblioteca` → redirige a `/propuestas`), la carpeta `biblioteca/` entera (queda en git), `deploy-biblioteca.yml` y los pasos de copia en los otros 3 workflows de deploy. Las fuentes Bw Modelica `.otf` + `LICENCIA.txt` se movieron a `templates/fonts/` (ya tenían los `.woff2` ahí). Su función ya estaba cubierta: subir/etiquetar fotos → Subir material; ver publicado/programado → Monitor + Calendario. La **"línea de tiempo"** (ciclo de vida de cada pieza) se rehízo como pestaña de Propuestas: En revisión → Aprobadas → Programadas → Publicadas + Frenadas, agrupado por etapa, ordenado por fecha, cada pieza abre su detalle real. Un editor de composición a mano queda para el futuro si Pablo lo pide.
+
+Verificado en cada commit: `tsc` limpio, lint 0 errores, 62/62 tests, build limpio, CI + Deploy EDA verdes.
 
 ## Notas históricas
 
