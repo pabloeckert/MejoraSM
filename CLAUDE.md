@@ -18,7 +18,7 @@ Este archivo tiene dos mitades:
 | Pieza | Estado | Desde |
 |---|---|---|
 | **Stories diarias** | 100% automáticas, cron `daily-story.yml` 13:00 UTC | producción desde jul-2026 |
-| **Posts/carruseles de feed** | 100% automáticos (Crítico aprueba → autoagenda → publica), cron `publish-scheduled-posts.yml` cada 15 min. **Elección de tema**: manual (Mesa de Diálogo) **o** autónoma vía `autopilot-cron.yml` (modo libre lun/mié/vie + email de aviso con ventana de veto — ver "Autopilot" en la bitácora; schedule **comentado** hasta cargar `RESEND_API_KEY`) | reactivado 2026-08-24; autopilot agregado 2026-09-01 |
+| **Posts/carruseles de feed** | 100% automáticos (Crítico aprueba → autoagenda → publica), cron `publish-scheduled-posts.yml` cada 15 min. **Elección de tema**: manual (Mesa de Diálogo) **o** autónoma vía `autopilot-cron.yml` (modo libre lun/mié/vie + email de aviso con ventana de veto — ver "Autopilot" en la bitácora; schedule **activo** desde 2026-09-01 (probado end-to-end), `RESEND_API_KEY`) | reactivado 2026-08-24; autopilot agregado 2026-09-01 |
 | **Login / auth del EDA** | **reinstaurado** — usuario/contraseña (Supabase Auth), UNA sola cuenta compartida (`pabloeckert@gmail.com`, la de `app_admins`). Sin alta de cuenta, sin OTP. Blanqueo por email → `/app/reset.html`. `AuthGate` envuelve la app | 2026-08-31 |
 | **RLS de Supabase** | **cerrado de nuevo** (`is_app_admin()`, migración `023` revierte `019`) en las 15 tablas + bucket `vault`. `_shared/auth.ts` volvió a exigir JWT real de `app_admins` o service-role (sin rama anon key) | 2026-08-31 |
 | **CI (`ci.yml`)** | **lint + tsc bloqueantes de nuevo** — la deuda bajó de 42 errores a 0; ESLint acotado a `src/**` (Deno fuera de scope). test + build siguen corriendo | 2026-08-31 (batch 8 de la auditoría) |
@@ -1411,14 +1411,7 @@ Al cerrar el plan A-E, se le presentó a Pablo el problema real de fondo: el sis
 - **Salvaguarda dura:** si el email no se puede mandar (`RESEND_API_KEY` sin cargar, o la API de Resend falla), la pieza se baja a `status: pending` + `scheduled_at: null` — el cron de publicación NO la toca. **Nunca se publica algo sin haber avisado.** Queda registrado como `error` en `run_log` (visible en `/auditoria`).
 - El cron de publicación real (`publish-scheduled-posts.yml`, cada 15 min) ya existente se encarga de publicarla a la hora, salvo que Pablo la cancele (status → `rejected`; `isStillScheduled()` la saltea).
 
-**Pendiente de Pablo para activar:**
-1. Registrarse en `resend.com` (gratis, sin tarjeta) con el email donde quiere los avisos.
-2. Crear una API key (empieza con `re_`) y pasarla — se carga como secret de GitHub `RESEND_API_KEY` (y opcionalmente `ALERT_EMAIL` si no es `pabloeckert@gmail.com`).
-3. Nota real del free tier de Resend sin dominio propio: solo se puede mandar **al email del titular de la cuenta**. Como el único destinatario es Pablo, alcanza — pero tiene que registrarse con ESE email.
-
-Después de eso: un `workflow_dispatch` real de prueba, confirmar que llega el mail y que la pieza queda bien agendada, y recién ahí descomentar el `schedule`.
-
-**Verificado hasta acá:** `node --check` limpio; la lógica de `computeVetoSlot()` probada (cron 06:00 UTC → slot 23:00 UTC mismo día, 17h de ventana). El flujo end-to-end (orchestrator real + email) NO se probó todavía — falta la key.
+**Estado: 🟢 activo y probado end-to-end (2026-09-01).** `RESEND_API_KEY` cargada como secret de GitHub. `workflow_dispatch` real de prueba: el sistema eligió el tema *"Por qué la Líder que Necesita Validación confunde pedir opinión con perder autoridad frente a su equipo"*, el Crítico aprobó, se armó un carrusel (dimensión organizacional) agendado para las 23:00 UTC, y **el email llegó de verdad** (Pablo lo confirmó y usó el link para reprogramar la hora — la ventana de veto funcionó). El `schedule` (`0 6 * * 1,3,5`) quedó descomentado. Nota del free tier de Resend sin dominio propio: solo manda al email del titular de la cuenta — como el único destinatario es Pablo, alcanza.
 
 ## Notas históricas
 
