@@ -366,7 +366,7 @@ Páginas (`src/pages/`):
 | **Laboratorio de Contenido** | `/laboratorio` | Versión directa: describís qué querés comunicar y te devuelve una propuesta ya armada (estrategia + copy + evaluación + hook/CTA/hashtags) lista para copiar o aprobar. |
 | **Calendario Editorial** | `/calendario` | De solo lectura desde el overhaul del 2026-08-02: refleja `proposals.scheduled_at`, no agenda nada (eso vive en Propuestas). |
 | **Propuestas** | `/propuestas` | Desde el overhaul del 2026-08-02, monitor de lo que se agenda/publica solo (cancelar antes de publicar, reintentar/despublicar después); solo `format='historia'` sigue con aprobación manual real. |
-| **Subir material** | `/hub` | Rediseñado 2026-08-17 (a pedido de Pablo): ya no redirige a la UI cruda de GitHub — selector de oferta, drag-and-drop real (vía `src/services/github.ts`), grillas de pendientes/ya usadas por oferta, link a Monitor. La página estática original (`hub/`, sin login) sigue existiendo en paralelo. |
+| **Subir material** | `/hub` | Rediseñado 2026-08-17: selector de oferta, drag-and-drop real (vía `src/services/github.ts`), grillas de pendientes/ya usadas, link a Monitor. **"Publicar ahora"** (2026-09-01, `PublishNowCard`): subís una foto → "Preparar" (dispara `publish-now.yml` mode=prepare → genera copy + renderiza) → ves el preview real (imagen + copy) → "Publicar ahora" (mode=publish → IG+FB vía Zernio). La página estática original (`hub/`, sin login) sigue en paralelo. |
 | **Monitor** | `/monitor` | Fase 5: port React de `dashboard/index.html` — historial real vía `historial_cache` en Supabase (no más `raw.githubusercontent.com`, fix 2026-08-17), badges por plataforma, acciones de reversión, link a la propuesta de cada pieza. La página estática original (`dashboard/`) sigue existiendo en paralelo. |
 | **Biblioteca** | `/biblioteca` | Fase 5: embebe `biblioteca/index.html` sin tocar su código (decisión de diseño, ver Fase 5 más arriba). Ajustado 2026-08-17: botón "Abrir Biblioteca" como acceso primario confiable, el embed queda como opción secundaria con detección de timeout. |
 | **Auditoría** | `/auditoria` | Fase 6 (parcial): exporta CSV/JSON real de propuestas, métricas, reglas aprendidas y `run_log` — client-side, sin Edge Function nueva. |
@@ -1412,6 +1412,25 @@ Al cerrar el plan A-E, se le presentó a Pablo el problema real de fondo: el sis
 - El cron de publicación real (`publish-scheduled-posts.yml`, cada 15 min) ya existente se encarga de publicarla a la hora, salvo que Pablo la cancele (status → `rejected`; `isStillScheduled()` la saltea).
 
 **Estado: 🟢 activo y probado end-to-end (2026-09-01).** `RESEND_API_KEY` cargada como secret de GitHub. `workflow_dispatch` real de prueba: el sistema eligió el tema *"Por qué la Líder que Necesita Validación confunde pedir opinión con perder autoridad frente a su equipo"*, el Crítico aprobó, se armó un carrusel (dimensión organizacional) agendado para las 23:00 UTC, y **el email llegó de verdad** (Pablo lo confirmó y usó el link para reprogramar la hora — la ventana de veto funcionó). El `schedule` (`0 6 * * 1,3,5`) quedó descomentado. Nota del free tier de Resend sin dominio propio: solo manda al email del titular de la cuenta — como el único destinatario es Pablo, alcanza.
+
+## "Publicar ahora" — story bajo demanda desde el EDA — 2026-09-01
+
+Pablo: *"no tengo opción de publicar ahora en ningún lado, por ejemplo saco una foto y subo al sistema, el sistema trabaja y yo solo apreto publicar ya y listo"*. Eligió la **Opción 2** (ver antes de publicar) sobre la Opción 1 (un solo tap sin preview).
+
+**Cómo funciona (dos fases, dos `workflow_dispatch` desde `PublishNowCard` en `/hub`):**
+1. Pablo sube la foto (a `content/inbox/<dim>/`, flujo que ya existía) y toca **"Preparar story de {dimensión}"**.
+2. El EDA dispara `publish-now.yml` con `mode=prepare`, `oferta=<dim>`, `nonce=<random>`. El workflow corre los 3 scripts de Stories en modo `PUBLISH_NOW=1`: `generate-brief.mjs` (sin el freno de una-por-día, toma **la foto más reciente** de esa carpeta), `render-story.mjs`, y `publish-now-manifest.mjs prepared` → escribe `content/work/publish-now.json` con `phase: "prepared"`, `headline`, `subtext`, `imagePath` — y commitea.
+3. El EDA pollea `content/work/publish-now.json` (vía `github.getJsonFile`, API de contents — `raw.githubusercontent.com` no está en el CSP) cada 8s hasta que `nonce` coincide y `phase` es `prepared` (o `error`, timeout 6 min).
+4. Muestra el **preview real** (la imagen renderizada vía `github.rawUrl`, + headline/subtext). Botones: **"Publicar ahora en Instagram y Facebook"** / "Descartar".
+5. "Publicar" dispara `publish-now.yml` con `mode=publish`, `nonce`. Corre `publish-story.mjs` (`PUBLISH_NOW=1` → lee `publish-now-renders.json`) → publica vía Zernio → `publish-now-manifest.mjs published`. El EDA pollea hasta `phase: "published"` y ofrece link al Monitor.
+
+**Decisiones técnicas:**
+- **Archivos de trabajo propios** (`publish-now-briefs.json`, `publish-now-renders.json`, imagen `story-now-<date>-N.jpg`) para no pisarse con el cron diario si corren cerca. El nombre `story-now-*` **no** dispara el guard `alreadyGeneratedToday` (que busca prefijo `story-<today>-`), así que "publicar ahora" no bloquea la story diaria ni al revés.
+- `publish-now.yml` comparte `concurrency: { group: daily-story }` con el cron diario → nunca corren a la vez (los dos tocan `content/work/` y `content/published/`).
+- `PUBLISH_NOW` en los 3 scripts es un branch chico y aislado (env read + swap de nombres de archivo + skip guard) — el camino del cron diario no cambió.
+- Requiere que el token de GitHub conectado en `/hub` tenga **`Actions: Read and write`** (además de `Contents`). Si falta, `triggerWorkflow` da 403 con mensaje claro.
+
+**Probado real (2026-09-01):** `mode=prepare` disparado con una foto sintética de prueba → workflow verde, `publish-now.json` con `phase: prepared` + headline/subtext/imagePath correctos, imagen renderizada bien (layout de marca, foto compuesta, kicker "DIMENSIÓN PERSONAL", footer). **`mode=publish` NO se probó** — publicaría una story real con copy de prueba; el camino es `publish-story.mjs` ya probado muchas veces, único cambio es el swap de `RENDERS_FILE` (verificado por `node --check`). Artefactos de prueba borrados. `tsc`/lint/tests/build limpios, CI + Deploy EDA verdes.
 
 ## Notas históricas
 
