@@ -1334,6 +1334,10 @@ Pablo pidió cerrar acá y dejar esto documentado para no perderlo. **Artifact d
 
 **Orden sugerido:** decisión de acceso → A → B → C → D → E. Total ≈ 1,5-2 semanas. Se puede arrancar por A o por B indistinto.
 
+**Ejecución (Pablo pidió el 2026-08-31: "arranca plan → A → B → C → D → E y no te detengas hasta terminar... solo me molestas si necesitás intervención manual humana"):**
+
+- **Fase A — Motor de insights — 🟢 hecha y verificada en producción (2026-08-31).** Migración `020_insights.sql` (`insights_cache` + `insight_feedback`) aplicada contra la base real (`supabase db query --linked -f`, verificada). Edge Function `insights` deployada (`deploy-functions.yml` verde — de paso se completó la lista "deploy all" del workflow, que no incluía `copilot` ni `classify-photo`). Cron `insights-cron.yml` (lunes 11:30 UTC) disparado a mano: `HTTP 200`, generó y cacheó los insights de la semana `2026-08-31` (`model: groq` — Anthropic cayó a Groq, fallback funcionando). Con solo 4 métricas reales (`avgEngagement: 0`), el LLM mantuvo las 6 semillas como `seed_unchanged` con confianza 50 — el guardrail de "no inventar sin dato" funcionando como corresponde; cuando haya más historial real, empieza a refinar. Frontend: `<InsightsSection>` reemplaza el `SEED_INSIGHTS` estático (badges de confianza, status por semana, botones Útil/No aplica que alimentan el recálculo siguiente) + `<ReportDialog>` ("Generar informe" del brief — vista imprimible con checkboxes de qué incluir, `window.print` → PDF, sin dependencias nuevas).
+
 ### Fuera de este plan — features grandes, cada una con su decisión + qué las bloquea hoy
 
 Todo lo social pasa por **Zernio** (`scripts/lib/zernio.mjs`), la única integración de publicación y métricas. Hoy solo se le pide: publicar imágenes y traer números agregados (nunca el texto de un comentario).
