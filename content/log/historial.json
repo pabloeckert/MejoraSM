@@ -1,6 +1,54 @@
 {
-  "syncedAt": "2026-09-01T15:44:57.318Z",
+  "syncedAt": "2026-09-01T20:17:45.670Z",
   "posts": [
+    {
+      "id": "6a9706840ecbefef878962fe",
+      "date": "2026-09-01",
+      "status": "published",
+      "content": "La confianza al vender no viene de bajar el precio, viene de que el otro sepa exactamente qué está pagando. Si tu propuesta comercial deja huecos, los vas a estar negociando después — con menos margen. ¿Tu pricing está así de claro?",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-01-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3976724361846981354"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
+    {
+      "id": "6a9701aa5ab902c3b6944053",
+      "date": "2026-09-01",
+      "status": "published",
+      "content": "Tu equipo no te dejó de respetar el día que preguntaste. Te dejó de respetar el día que decidiste sola sin tener ni idea.\n¿Cuándo fue la última vez que decidiste sola por miedo a preguntar? Contámelo en los comentarios.\n#Liderazgo\n#LiderazgoFemenino\n#MejoraOK\n#DecisionesDificiles\n#LiderazgoConCriterio\n#GestionDeEquipos\n#CulturaOrganizacional\n#AutoridadReal",
+      "kind": "post",
+      "proposalId": "ee1d32e5-9949-4579-8cf8-0ba212bbbf92",
+      "headline": "Tu equipo no te dejó de respetar el día que preguntaste. Te dejó de respetar el día que decidiste sola sin tener ni idea.",
+      "kicker": null,
+      "oferta": "organizacional",
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-09-01-ee1d32e5-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DcwIKlMAt01/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1358053763080772"
+        }
+      ]
+    },
     {
       "id": "6a9586886755247010bcb625",
       "date": "2026-08-31",
