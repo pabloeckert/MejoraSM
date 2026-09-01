@@ -112,6 +112,9 @@ export interface DialogueResult {
   autoPublished: boolean;
   scheduledAt: string | null;
   oferta: string | null;
+  // Fase B (2026-08-31): si la sesión arrancó en "modo libre", el tema que
+  // eligió el sistema.
+  autoTopic?: string | null;
 }
 
 export interface ContinueResult {
@@ -120,13 +123,13 @@ export interface ContinueResult {
   aprobado: boolean;
 }
 
-export async function startDialogue(topic: string): Promise<DialogueResult> {
+export async function startDialogue(topic: string, mode: "dirigido" | "auto" = "dirigido"): Promise<DialogueResult> {
   const res = await fetchWithTimeout(
     `${SUPABASE_URL}/functions/v1/orchestrator`,
     {
       method: "POST",
       headers: await buildHeaders(),
-      body: JSON.stringify({ action: "start", topic }),
+      body: JSON.stringify({ action: "start", topic, mode }),
     },
     DIALOGUE_TIMEOUT_MS
   );

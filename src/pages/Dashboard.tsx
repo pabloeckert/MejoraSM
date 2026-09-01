@@ -603,7 +603,7 @@ function DashboardContent() {
         ).length
       ),
       sub: "Últimos 30 días",
-      href: "/laboratorio",
+      href: "/mesa",
       icon: Sparkles,
       accentClassName: "text-[#c9a30d]",
     },
@@ -1012,7 +1012,7 @@ function DashboardContent() {
               {(pendingProposals as ProposalRow[]).slice(0, 5).map((p) => (
                 <Link
                   key={p.id}
-                  to="/laboratorio"
+                  to="/mesa"
                   className="-mx-1 flex items-center gap-3.5 rounded-md border-b border-border px-1 py-3 transition-colors last:border-0 hover:bg-muted/40"
                 >
                   <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-muted">
@@ -1028,7 +1028,7 @@ function DashboardContent() {
                 </Link>
               ))}
               {pendingProposals.length > 5 && (
-                <Link to="/laboratorio" className="mt-2 text-center text-sm font-medium text-primary hover:underline">
+                <Link to="/mesa" className="mt-2 text-center text-sm font-medium text-primary hover:underline">
                   Ver todas ({pendingProposals.length})
                 </Link>
               )}

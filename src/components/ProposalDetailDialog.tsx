@@ -41,6 +41,7 @@ import {
   useConvertProposalFormat,
 } from "@/hooks/useProposals";
 import { DIMENSIONES, PIPELINE_FORMATS } from "@/shared/constants";
+import { PiecePreview } from "@/components/PiecePreview";
 
 // Hallazgo real 2026-08-26: Pablo reportó que en el detalle de una
 // propuesta (abierto desde Propuestas o desde "Ver propuesta" en Monitor)
@@ -355,12 +356,11 @@ export function ProposalDetailDialog({
               />
             </div>
           ) : (
-            (isScheduled || isApproved || isPublished) &&
-            proposal.format !== "historia" && (
-              <p className="rounded-md border border-dashed border-border bg-muted/30 p-2.5 text-xs text-muted-foreground">
-                Todavía no se renderizó la imagen final — se genera cuando corre el pipeline de publicación
-                (`render-scheduled-posts.mjs`), no al aprobar.
-              </p>
+            !isRejected && (
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground">Cómo va a quedar la pieza</p>
+                <PiecePreview format={proposal.format} oferta={proposal.oferta} hook={proposal.hook} body={proposal.body} />
+              </div>
             )
           )}
 

@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { HashRouter, Route, Routes } from "react-router-dom";
+import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -15,7 +15,6 @@ import { Onboarding } from "@/components/Onboarding";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Boveda = lazy(() => import("./pages/Boveda"));
 const MesaDialogo = lazy(() => import("./pages/MesaDialogo"));
-const Laboratorio = lazy(() => import("./pages/Laboratorio"));
 const Configuracion = lazy(() => import("./pages/Configuracion"));
 const Calendario = lazy(() => import("./pages/Calendario"));
 const Propuestas = lazy(() => import("./pages/Propuestas"));
@@ -60,7 +59,8 @@ const App = () => (
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/boveda" element={<Boveda />} />
                 <Route path="/mesa" element={<MesaDialogo />} />
-                <Route path="/laboratorio" element={<Laboratorio />} />
+                {/* Fase B (2026-08-31): Laboratorio se fusionó con Mesa de Diálogo (brief 2026-08-16). */}
+                <Route path="/laboratorio" element={<Navigate to="/mesa" replace />} />
                 <Route path="/configuracion" element={<Configuracion />} />
                 <Route path="/calendario" element={<Calendario />} />
                 <Route path="/propuestas" element={<Propuestas />} />

@@ -867,6 +867,55 @@ async function continueSession(sessionId: string, feedback: string) {
 }
 
 // ═══════════════════════════════════════
+// MODO LIBRE — Fase B del plan de continuación (2026-08-31)
+//
+// "Proponeme un tema": el sistema elige un tema para la sesión desde lo que
+// ya funcionó (success_rules), el contexto de marca / buyer personas (RAG) y
+// qué se debatió hace poco (para no repetir). Un solo llamado corto al LLM,
+// mismo par anthropic→groq.
+// ═══════════════════════════════════════
+
+async function pickAutoTopic(): Promise<string> {
+  const [learnedRules, brandCtx, recentRes] = await Promise.all([
+    getLearnedRulesBlock(),
+    getContextDocs("buyer personas, pilares de contenido y temas de liderazgo para Mejora Continua"),
+    supabase
+      .from("dialogue_sessions")
+      .select("topic")
+      .order("created_at", { ascending: false })
+      .limit(15),
+  ]);
+
+  const recientes = ((recentRes.data as { topic: string | null }[] | null) || [])
+    .map((r) => r.topic)
+    .filter(Boolean)
+    .join(" | ");
+
+  const system = `Sos el Estratega de contenido de MejoraOK. Elegís UN tema concreto para el próximo posteo de Instagram/Facebook, alineado con la marca y con lo que ya funcionó. Tono argentino, directo. Respondé ÚNICAMENTE con el tema, en una frase — sin comillas, sin "Tema:", sin explicación.`;
+
+  const user = `CONTEXTO DE MARCA Y BUYER PERSONAS:
+${brandCtx}
+${learnedRules}
+
+TEMAS YA DEBATIDOS HACE POCO (NO repitas ni des una variación mínima de estos):
+${recientes || "(ninguno todavía)"}
+
+Proponé un tema nuevo, específico y accionable para el próximo posteo.`;
+
+  let topic: string;
+  try {
+    topic = await withRetry(() => callAI("anthropic", pickModel("estratega", false), system, [{ role: "user", content: user }], 0.9));
+  } catch (e: any) {
+    console.warn(`[orchestrator] pickAutoTopic Anthropic falló (${e.message}), fallback a Groq`);
+    topic = await withRetry(() => callAI("groq", "openai/gpt-oss-120b", system, [{ role: "user", content: user }], 0.9));
+  }
+
+  topic = topic.trim().replace(/^["'\s]+|["'\s]+$/g, "").replace(/^tema:\s*/i, "").split("\n")[0].slice(0, 300);
+  if (!topic) throw new Error("El modo libre no pudo proponer un tema — probá con un tema propio.");
+  return topic;
+}
+
+// ═══════════════════════════════════════
 // HANDLER
 // ═══════════════════════════════════════
 
@@ -886,15 +935,25 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     ({ action } = body);
-    const { topic, sessionId, feedback } = body;
+    const { topic, sessionId, feedback, mode } = body;
 
-    let result: { sessionId?: string; proposalId?: string | null; aprobado?: boolean } | undefined;
+    let result: { sessionId?: string; proposalId?: string | null; aprobado?: boolean; autoTopic?: string } | undefined;
 
     switch (action) {
-      case "start":
-        validateBody(body, ["topic"]);
-        result = await startSession(topic);
+      case "start": {
+        // Fase B del plan de continuación (2026-08-31): dos entradas al mismo
+        // flujo — "dirigido" (topic explícito) y "libre" (mode: "auto", el
+        // sistema propone el tema desde lo que funcionó + buyer personas +
+        // qué se publicó hace poco, para no repetir).
+        let effectiveTopic = typeof topic === "string" ? topic.trim() : "";
+        let autoTopic: string | undefined;
+        if (mode === "auto" || !effectiveTopic) {
+          effectiveTopic = await pickAutoTopic();
+          autoTopic = effectiveTopic;
+        }
+        result = { ...(await startSession(effectiveTopic)), autoTopic };
         break;
+      }
 
       case "continue":
         validateBody(body, ["sessionId", "feedback"]);

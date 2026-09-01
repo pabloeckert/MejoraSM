@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   BookOpen,
   MessageSquare,
-  FlaskConical,
   Settings,
   CalendarDays,
   FileCheck,
@@ -33,7 +32,6 @@ const navGroups: { label: string; items: { label: string; icon: typeof LayoutDas
       { label: "Subir material", icon: Upload, path: "/hub" },
       { label: "Bóveda", icon: BookOpen, path: "/boveda" },
       { label: "Mesa de Diálogo", icon: MessageSquare, path: "/mesa" },
-      { label: "Laboratorio", icon: FlaskConical, path: "/laboratorio" },
     ],
   },
   {

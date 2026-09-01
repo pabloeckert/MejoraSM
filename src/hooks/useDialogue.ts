@@ -58,7 +58,10 @@ export function useDialogueMessages(sessionId: string, options?: { enabled?: boo
 export function useStartDialogue() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (topic: string) => startDialogue(topic),
+    // Fase B (2026-08-31): acepta string (modo dirigido, retrocompat) o
+    // { topic, mode } — mode "auto" = modo libre, el sistema propone el tema.
+    mutationFn: (arg: string | { topic: string; mode: "dirigido" | "auto" }) =>
+      typeof arg === "string" ? startDialogue(arg) : startDialogue(arg.topic, arg.mode),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["dialogue-sessions"] });
       // Hallazgo real 2026-08-26: si el Crítico aprueba y autoagenda

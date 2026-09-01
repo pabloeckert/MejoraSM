@@ -70,47 +70,6 @@ describe("ConfirmDialog Component", () => {
   });
 });
 
-// ═══════════════════════════════════════
-// Laboratorio Page Tests
-// ═══════════════════════════════════════
-
-describe("Laboratorio Page", () => {
-  function renderWithProviders(ui: React.ReactElement) {
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    return render(
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>{ui}</BrowserRouter>
-      </QueryClientProvider>
-    );
-  }
-
-  it("renders the heading", async () => {
-    const { default: Laboratorio } = await import("@/pages/Laboratorio");
-    renderWithProviders(<Laboratorio />);
-    expect(screen.getByText("Laboratorio de Contenido")).toBeInTheDocument();
-  });
-
-  it("renders empty state initially", async () => {
-    const { default: Laboratorio } = await import("@/pages/Laboratorio");
-    renderWithProviders(<Laboratorio />);
-    expect(screen.getByText("Laboratorio vacío")).toBeInTheDocument();
-  });
-
-  it("has idea textarea", async () => {
-    const { default: Laboratorio } = await import("@/pages/Laboratorio");
-    renderWithProviders(<Laboratorio />);
-    const textarea = screen.getByPlaceholderText(/Quiero compartir tips/);
-    expect(textarea).toBeInTheDocument();
-  });
-
-  it("has generate button", async () => {
-    const { default: Laboratorio } = await import("@/pages/Laboratorio");
-    renderWithProviders(<Laboratorio />);
-    expect(screen.getByText("Generar contenido")).toBeInTheDocument();
-  });
-});
 
 // ═══════════════════════════════════════
 // AI Service Additional Tests

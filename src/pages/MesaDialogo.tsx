@@ -31,6 +31,7 @@ import {
   useContinueDialogue,
 } from "@/hooks/useDialogue";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { PiecePreview } from "@/components/PiecePreview";
 import { toast } from "@/hooks/use-toast";
 
 function formatScheduledAt(iso: string) {
@@ -69,6 +70,8 @@ interface DialogueSession {
     autoPublished?: boolean;
     scheduledAt?: string | null;
     proposalId?: string | null;
+    oferta?: string | null;
+    proposal?: { hook?: string; body?: string; cta?: string; format?: string } | null;
   } | null;
 }
 
@@ -96,12 +99,17 @@ function MesaDialogoContent() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
 
-  const handleStart = () => {
-    if (!newTopic.trim()) return;
-    startMutation.mutate(newTopic, {
+  // Fase B (2026-08-31): dos entradas al mismo flujo. "dirigido" = escribís el
+  // tema; "auto" = el sistema lo propone (mode: "auto", topic vacío).
+  const handleStart = (mode: "dirigido" | "auto") => {
+    if (mode === "dirigido" && !newTopic.trim()) return;
+    startMutation.mutate({ topic: mode === "dirigido" ? newTopic : "", mode }, {
       onSuccess: (result) => {
         setNewTopic("");
         setDialogOpen(false);
+        if (mode === "auto" && result.autoTopic) {
+          toast({ title: "Tema elegido por el sistema", description: `"${result.autoTopic}"` });
+        }
         // Hallazgo real de auditoría 2026-08-25: si el Crítico aprueba un
         // post/carrusel acá mismo, el sistema lo agenda solo para publicar
         // sin que nadie lo revise — sin este aviso, no había forma de
@@ -156,8 +164,8 @@ function MesaDialogoContent() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Mesa de Diálogo</h1>
           <p className="mt-1 text-muted-foreground">
-            Le das un tema y ves el debate turno a turno (Estratega → Creativo → Crítico). Si el Crítico aprueba un
-            post o carrusel, se agenda y publica solo. Para el resultado sin ver el debate, usá el Laboratorio.
+            Le das un tema (o el sistema te propone uno) y los 3 agentes debatan turno a turno
+            (Estratega → Creativo → Crítico). Si el Crítico aprueba un post o carrusel, se agenda y publica solo.
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -173,27 +181,38 @@ function MesaDialogoContent() {
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>¿Sobre qué tema querés que debatan los agentes?</Label>
+                <Label>Tengo un tema</Label>
                 <Textarea
                   placeholder="Ej: Cómo delegar sin perder control, tips para emprendedores que están creciendo..."
                   value={newTopic}
                   onChange={(e) => setNewTopic(e.target.value)}
                   rows={3}
                 />
+                <div className="flex justify-end">
+                  <Button onClick={() => handleStart("dirigido")} disabled={!newTopic.trim() || startMutation.isPending}>
+                    {startMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Iniciar con este tema
+                  </Button>
+                </div>
               </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleStart}
-                  disabled={!newTopic.trim() || startMutation.isPending}
-                >
-                  {startMutation.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Iniciar diálogo
-                </Button>
+
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground">o</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              <div className="rounded-lg border border-border p-3">
+                <p className="text-sm font-medium">Proponeme un tema</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  El sistema elige un tema desde lo que ya funcionó, los buyer personas y lo que no se tocó hace poco.
+                </p>
+                <div className="mt-2 flex justify-end">
+                  <Button variant="outline" onClick={() => handleStart("auto")} disabled={startMutation.isPending}>
+                    {startMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Que elija el sistema
+                  </Button>
+                </div>
               </div>
             </div>
           </DialogContent>
@@ -392,23 +411,50 @@ function SessionCard({
             </Card>
           )}
 
-          {/* Evaluation result */}
+          {/* Evaluation result — Fase B (2026-08-31): + valoración de "vale la
+              pena" y preview visual real de la pieza. */}
           {session.metadata?.evaluacion && (
             <Card className={session.metadata.evaluacion.aprobado ? "border-green-500/50" : "border-amber-500/50"}>
-              <CardContent className="flex items-center gap-3 p-3">
-                {session.metadata.evaluacion.aprobado ? (
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-amber-500" />
-                )}
-                <div>
-                  <p className="text-sm font-medium">
-                    {session.metadata.evaluacion.aprobado ? "Aprobado por el Crítico" : "Necesita revisión"}
-                  </p>
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {session.metadata.evaluacion.feedback}
-                  </p>
+              <CardContent className="space-y-3 p-3">
+                <div className="flex items-start gap-3">
+                  {session.metadata.evaluacion.aprobado ? (
+                    <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-green-500" />
+                  ) : (
+                    <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium">
+                      {session.metadata.evaluacion.aprobado
+                        ? "El Crítico la aprobó — vale la pena mandarla"
+                        : "El Crítico la frenó — todavía no vale la pena"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{session.metadata.evaluacion.feedback}</p>
+                  </div>
                 </div>
+
+                {session.metadata.proposal && (
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,220px)_1fr]">
+                    <PiecePreview
+                      format={session.metadata.proposal.format}
+                      oferta={session.metadata.oferta}
+                      hook={session.metadata.proposal.hook}
+                      body={session.metadata.proposal.body}
+                    />
+                    <div className="space-y-1.5 text-sm">
+                      {session.metadata.proposal.hook && (
+                        <p><span className="text-[11px] font-semibold text-muted-foreground">HOOK</span><br />{session.metadata.proposal.hook}</p>
+                      )}
+                      {session.metadata.proposal.cta && (
+                        <p><span className="text-[11px] font-semibold text-muted-foreground">CTA</span><br />{session.metadata.proposal.cta}</p>
+                      )}
+                      {session.metadata.scheduledAt && (
+                        <p className="text-xs text-muted-foreground">
+                          Sugerencia de horario: {formatScheduledAt(session.metadata.scheduledAt)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
