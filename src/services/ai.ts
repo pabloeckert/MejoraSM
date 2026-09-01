@@ -272,7 +272,7 @@ export async function suggestPhotoDimension(imageBase64: string, mimeType: strin
 
 const INBOX_SYNC_TIMEOUT_MS = 120_000; // trae comentarios + DMs de 2 cuentas + clasifica
 
-export async function syncInbox(): Promise<{ pulled: number; new: number; classified: number }> {
+export async function syncInbox(): Promise<{ pulled: number; upserted: number; classified: number }> {
   const res = await fetchWithTimeout(
     `${SUPABASE_URL}/functions/v1/inbox`,
     { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "sync" }) },

@@ -109,18 +109,20 @@ async function classifyBatch(items: { id: string; text: string }[]): Promise<Rec
   if (items.length === 0) return {};
   const system =
     "Clasificás mensajes/comentarios que la gente le deja a una marca de consultoría empresarial (Mejora Continua). " +
-    "Para cada uno devolvés UNA línea con: id | sentimiento | nota corta.\n" +
-    "sentimiento ∈ {positivo, neutral, negativo, pregunta}. " +
+    "Para cada uno devolvés UNA línea con este formato exacto: N | sentimiento | nota corta\n" +
+    "N = el número del mensaje. sentimiento ∈ {positivo, neutral, negativo, pregunta}. " +
     "'pregunta' = pide info o espera respuesta (aunque el tono sea neutro). " +
     "'negativo' = queja, reclamo, enojo. 'positivo' = elogio, agradecimiento, interés genuino. " +
     "'neutral' = spam, saludos vacíos, cosas que no requieren acción.\n" +
-    "nota = 3-6 palabras sobre qué quiere. Respondé SOLO las líneas, sin encabezado.";
-  const user = items.map((i) => `${i.id} :: ${(i.text || "").slice(0, 400)}`).join("\n");
-  const out = await callLLM(system, user, 60 + items.length * 25);
+    "nota = 3-6 palabras sobre qué quiere. Respondé SOLO las líneas, una por mensaje, sin encabezado ni texto extra.";
+  const user = items.map((i, idx) => `${idx + 1}. ${(i.text || "(sin texto)").slice(0, 400).replace(/\n+/g, " ")}`).join("\n");
+  const out = await callLLM(system, user, 40 + items.length * 30);
   const map: Record<string, { s: string; n: string }> = {};
   for (const line of out.split("\n")) {
-    const m = line.match(/^\s*([0-9a-f-]{6,})\s*[|:]+\s*(positivo|neutral|negativo|pregunta)\s*[|:]+\s*(.+)$/i);
-    if (m) map[m[1]] = { s: m[2].toLowerCase(), n: m[3].trim().slice(0, 120) };
+    const m = line.match(/^\s*(\d{1,3})\s*[|:.\-]+\s*(positivo|neutral|negativo|pregunta)\s*[|:.\-]+\s*(.+)$/i);
+    if (!m) continue;
+    const item = items[Number(m[1]) - 1];
+    if (item) map[item.id] = { s: m[2].toLowerCase(), n: m[3].trim().slice(0, 120) };
   }
   return map;
 }
@@ -257,41 +259,48 @@ async function sync() {
   const [dms, comments] = await Promise.all([collectDMs(), collectComments()]);
   const all = [...dms, ...comments];
 
-  // Upsert todo (ignora duplicados por el UNIQUE). Guardamos los ids nuevos
-  // para clasificar solo esos.
-  const newIncoming: { id: string; text: string }[] = [];
+  // Upsert todo (ignora duplicados por el UNIQUE).
+  let upserted = 0;
   for (const it of all) {
-    const { data, error } = await supabase
-      .from("inbox_items")
-      .upsert(
-        {
-          kind: it.kind,
-          platform: it.platform,
-          account_id: it.account_id,
-          thread_id: it.thread_id,
-          external_id: it.external_id,
-          author_name: it.author_name,
-          author_username: it.author_username,
-          author_is_follower: it.author_is_follower,
-          text: it.text,
-          attachment_url: it.attachment_url,
-          direction: it.direction,
-          item_time: it.item_time,
-          synced_at: new Date().toISOString(),
-        },
-        { onConflict: "kind,platform,external_id", ignoreDuplicates: false }
-      )
-      .select("id, sentiment, direction")
-      .single();
-    if (!error && data && data.direction === "incoming" && !data.sentiment && it.text) {
-      newIncoming.push({ id: data.id, text: it.text });
-    }
+    const { error } = await supabase.from("inbox_items").upsert(
+      {
+        kind: it.kind,
+        platform: it.platform,
+        account_id: it.account_id,
+        thread_id: it.thread_id,
+        external_id: it.external_id,
+        author_name: it.author_name,
+        author_username: it.author_username,
+        author_is_follower: it.author_is_follower,
+        text: it.text,
+        attachment_url: it.attachment_url,
+        direction: it.direction,
+        item_time: it.item_time,
+        synced_at: new Date().toISOString(),
+      },
+      { onConflict: "kind,platform,external_id", ignoreDuplicates: false }
+    );
+    if (!error) upserted++;
   }
 
-  // Clasificar sentimiento en tandas de 15.
+  // Clasificar sentimiento: todos los entrantes con texto que todavía no
+  // tienen etiqueta (no solo los de esta corrida — así los que fallaron
+  // antes se reintentan). Tope de 90 por corrida para no comerse el
+  // presupuesto de LLM.
+  const { data: pending } = await supabase
+    .from("inbox_items")
+    .select("id, text")
+    .eq("direction", "incoming")
+    .is("sentiment", null)
+    .not("text", "is", null)
+    .neq("text", "")
+    .order("item_time", { ascending: false })
+    .limit(90);
+  const toClassify = (pending ?? []).filter((r: { text: string | null }) => (r.text ?? "").trim().length > 0);
+
   let classified = 0;
-  for (let i = 0; i < newIncoming.length; i += 15) {
-    const batch = newIncoming.slice(i, i + 15);
+  for (let i = 0; i < toClassify.length; i += 15) {
+    const batch = toClassify.slice(i, i + 15) as { id: string; text: string }[];
     try {
       const res = await classifyBatch(batch);
       for (const [id, v] of Object.entries(res)) {
@@ -304,7 +313,7 @@ async function sync() {
   }
 
   await supabase.from("inbox_sync_state").update({ last_synced_at: new Date().toISOString(), last_error: null }).eq("id", 1);
-  return { pulled: all.length, new: newIncoming.length, classified };
+  return { pulled: all.length, upserted, classified };
 }
 
 // ═══════════════════════════════════════

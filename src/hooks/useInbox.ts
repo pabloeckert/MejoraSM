@@ -49,7 +49,7 @@ export function useSyncInbox() {
       qc.invalidateQueries({ queryKey: ["inbox-sync-state"] });
       toast({
         title: "Bandeja actualizada",
-        description: `${r.pulled} mensajes revisados · ${r.new} nuevos · ${r.classified} clasificados`,
+        description: `${r.pulled} mensajes revisados · ${r.classified} clasificados`,
       });
     },
     onError: (err: Error) =>
