@@ -20,6 +20,7 @@ import { logRun } from "../_shared/runLog.ts";
 
 const ALLOWED_ORIGINS = [
   "https://pabloeckert.github.io",
+  "https://mejorasm.mejoraok.com",
   "https://mejorasm-*.vercel.app",
   "http://localhost:8080",
   "http://localhost:5173",
