@@ -1,0 +1,16 @@
+name: _tmp zernio accounts
+on: { workflow_dispatch: {} }
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - name: list accounts
+        run: |
+          curl -s "https://zernio.com/api/v1/accounts" \
+            -H "Authorization: Bearer ${{ secrets.ZERNIO_API_KEY }}"
+          echo
+      - name: list profiles
+        run: |
+          curl -s "https://zernio.com/api/v1/profiles" \
+            -H "Authorization: Bearer ${{ secrets.ZERNIO_API_KEY }}"
+          echo
