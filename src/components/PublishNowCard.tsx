@@ -9,6 +9,7 @@ import { useDirListing } from "@/hooks/useGithubUpload";
 import { dimensionLabel } from "@/shared/constants";
 
 const IMG_RE = /\.(jpe?g|png|webp)$/i;
+const MANIFEST_PATH = "content/work/publish-now.json";
 
 // "Publicar ahora" (2026-09-01, pedido de Pablo: "saco una foto y subo al
 // sistema, el sistema trabaja y yo solo apreto publicar ya y listo").
@@ -27,19 +28,29 @@ interface Manifest {
   subtext?: string;
   imagePath?: string | null;
   error?: string | null;
+  updatedAt?: string;
 }
 
 type UiState = "idle" | "preparing" | "prepared" | "publishing" | "published" | "error";
 
-const POLL_MS = 8000;
-const POLL_TIMEOUT_MS = 6 * 60 * 1000;
+const POLL_MS = 6000;
+const POLL_TIMEOUT_MS = 8 * 60 * 1000;
+const FRESH_MS = 30 * 60 * 1000; // un manifiesto más viejo que esto no se "resume"
+
+function ts(iso?: string) {
+  const t = iso ? Date.parse(iso) : NaN;
+  return Number.isNaN(t) ? 0 : t;
+}
 
 export function PublishNowCard({ dimension, connected }: { dimension: string; connected: boolean }) {
   const [state, setState] = useState<UiState>("idle");
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const nonceRef = useRef<string>("");
+  const startedRef = useRef<number>(0); // cuándo se disparó la fase actual
   const pollStopRef = useRef<() => void>(() => {});
+  const stateRef = useRef<UiState>("idle");
+  stateRef.current = state;
   const qc = useQueryClient();
 
   const inboxPath = `content/inbox/${dimension}`;
@@ -48,46 +59,79 @@ export function PublishNowCard({ dimension, connected }: { dimension: string; co
 
   useEffect(() => () => pollStopRef.current(), []);
 
-  const poll = useCallback((want: "prepared" | "published") => {
-    const started = Date.now();
-    let timer: ReturnType<typeof setTimeout>;
-    let stopped = false;
-    pollStopRef.current = () => {
-      stopped = true;
-      clearTimeout(timer);
-    };
-
-    const tick = async () => {
-      if (stopped) return;
+  // Al montar / reconectar: si ya hay un manifiesto "prepared" reciente de
+  // esta dimensión, mostrarlo (para no perder el trabajo si la pestaña se
+  // recargó o el polling se cortó). No pisa un flujo en curso.
+  useEffect(() => {
+    if (!connected) return;
+    let cancelled = false;
+    (async () => {
       try {
-        const m = await github.getJsonFile<Manifest>("content/work/publish-now.json");
-        if (m && m.nonce === nonceRef.current) {
-          if (m.phase === "error") {
-            setManifest(m);
-            setErrorMsg(m.error || "Algo falló en el proceso.");
-            setState("error");
-            return;
-          }
-          if (m.phase === want) {
-            setManifest(m);
-            setState(want);
-            qc.invalidateQueries({ queryKey: ["gh-dir", inboxPath] });
-            qc.invalidateQueries({ queryKey: ["gh-dir", `content/used/${dimension}`] });
-            return;
-          }
+        const m = await github.getJsonFile<Manifest>(MANIFEST_PATH);
+        if (cancelled || !m) return;
+        const fresh = Date.now() - ts(m.updatedAt) < FRESH_MS;
+        const resumable = m.phase === "prepared" || m.phase === "published";
+        if (fresh && m.oferta === dimension && resumable && stateRef.current === "idle") {
+          nonceRef.current = m.nonce || "";
+          setManifest(m);
+          setState(m.phase);
         }
       } catch {
-        /* la API de contents puede tardar en reflejar el commit — se reintenta */
+        /* si falla, arranca en idle nomás */
       }
-      if (Date.now() - started > POLL_TIMEOUT_MS) {
-        setErrorMsg("Está tardando más de lo normal. Mirá el detalle en GitHub Actions.");
-        setState("error");
-        return;
-      }
-      timer = setTimeout(tick, POLL_MS);
+    })();
+    return () => {
+      cancelled = true;
     };
-    timer = setTimeout(tick, POLL_MS);
-  }, [qc, inboxPath, dimension]);
+  }, [connected, dimension]);
+
+  const poll = useCallback(
+    (want: "prepared" | "published") => {
+      const started = Date.now();
+      startedRef.current = started;
+      let timer: ReturnType<typeof setTimeout>;
+      let stopped = false;
+      pollStopRef.current = () => {
+        stopped = true;
+        clearTimeout(timer);
+      };
+
+      const tick = async () => {
+        if (stopped) return;
+        try {
+          const m = await github.getJsonFile<Manifest>(MANIFEST_PATH);
+          // Un usuario solo: un manifiesto que llegó DESPUÉS de disparar esta
+          // fase (o cuyo nonce coincide) es el nuestro.
+          const mine = m && (m.nonce === nonceRef.current || ts(m.updatedAt) >= started - 5000);
+          if (m && mine) {
+            if (m.phase === "error") {
+              setManifest(m);
+              setErrorMsg(m.error || "Algo falló en el proceso.");
+              setState("error");
+              return;
+            }
+            if (m.phase === want) {
+              setManifest(m);
+              setState(want);
+              qc.invalidateQueries({ queryKey: ["gh-dir", inboxPath] });
+              qc.invalidateQueries({ queryKey: ["gh-dir", `content/used/${dimension}`] });
+              return;
+            }
+          }
+        } catch {
+          /* la API de contents puede tardar en reflejar el commit — se reintenta */
+        }
+        if (Date.now() - started > POLL_TIMEOUT_MS) {
+          setErrorMsg("Está tardando más de lo normal. Mirá el detalle en GitHub Actions, o recargá esta página en un rato.");
+          setState("error");
+          return;
+        }
+        timer = setTimeout(tick, POLL_MS);
+      };
+      timer = setTimeout(tick, 3000);
+    },
+    [qc, inboxPath, dimension]
+  );
 
   async function handlePrepare() {
     setErrorMsg(null);
@@ -156,10 +200,15 @@ export function PublishNowCard({ dimension, connected }: { dimension: string; co
         )}
 
         {state === "preparing" && (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Generando copy y armando la imagen… (~1-2 min)
-          </p>
+          <div className="space-y-1">
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Generando copy y armando la imagen… (~1-2 min)
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Si tarda mucho, podés recargar la página — cuando esté lista, la vas a ver acá igual.
+            </p>
+          </div>
         )}
 
         {(state === "prepared" || state === "publishing" || state === "published") && manifest && (

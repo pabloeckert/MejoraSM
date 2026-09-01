@@ -104,11 +104,15 @@ async function listDir(path: string): Promise<GhFileEntry[]> {
 // pollear content/work/publish-now.json en el flujo "Publicar ahora".
 async function getJsonFile<T = unknown>(path: string): Promise<T | null> {
   const url = `${apiBase()}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}?ref=${GH_BRANCH}&t=${Date.now()}`;
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 12_000);
   let res: Response;
   try {
-    res = await fetch(url, { headers: { ...apiHeaders(isConnected()), "Cache-Control": "no-cache" } });
+    res = await fetch(url, { headers: { ...apiHeaders(isConnected()), "Cache-Control": "no-cache" }, signal: ctrl.signal });
   } catch {
     throw new Error("No se pudo contactar GitHub — probá de nuevo.");
+  } finally {
+    clearTimeout(to);
   }
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`GitHub ${res.status}`);
