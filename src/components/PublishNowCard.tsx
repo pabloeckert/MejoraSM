@@ -35,7 +35,7 @@ type UiState = "idle" | "preparing" | "prepared" | "publishing" | "published" | 
 
 const POLL_MS = 6000;
 const POLL_TIMEOUT_MS = 8 * 60 * 1000;
-const FRESH_MS = 30 * 60 * 1000; // un manifiesto más viejo que esto no se "resume"
+const FRESH_MS = 2 * 60 * 60 * 1000; // un manifiesto más viejo que esto no se "resume"
 
 function ts(iso?: string) {
   const t = iso ? Date.parse(iso) : NaN;
