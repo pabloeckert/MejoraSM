@@ -394,30 +394,54 @@ function PostCard({
   const fallidas = post.platforms.filter((p) => p.status === "failed");
   const [deleting, setDeleting] = useState(false);
   const [confirm, ConfirmUI] = useConfirm();
+  const { run: runWorkflow } = useWorkflowAction();
 
   // Hallazgo real 2026-08-27 (Pablo: "no sincroniza correctamente, no
   // esta dando informacion real ni publicado... ni en zernio"): Zernio
-  // puede seguir reportando una pieza que en la práctica ya no es real
-  // (borrada a mano en la red, o un dato viejo/duplicado sin ninguna
-  // propuesta real detrás) — sync-history.mjs solo refleja lo que Zernio
-  // devuelve, no hay forma de sacarla del Monitor. Esto borra la fila
-  // SOLO de esta caché de lectura (no toca Zernio/Instagram/Facebook) —
-  // si Zernio la sigue reportando de verdad, puede volver a aparecer en
-  // la próxima sincronización (cada 6hs), aviso explícito en el confirm.
+  // "Borrar esta pieza" — pedido de Pablo 2026-09-01: que borrar en MejoraSM
+  // borre también en Zernio. Hace, en un solo gesto:
+  //   1. Facebook publicado → despublica de verdad vía Zernio (manage-*.yml).
+  //   2. Instagram publicado → lo registra como "gestionado a mano"
+  //      (mark-manual.yml) — Meta NO permite despublicar IG por API, así que
+  //      ese hay que borrarlo también desde la app de Instagram.
+  //   3. Saca la fila del Monitor (historial_cache).
+  const publishedPlatforms = post.platforms
+    .filter((p) => p.status === "published")
+    .map((p) => p.platform);
+  const onIG = publishedPlatforms.includes("instagram");
+  const onFB = publishedPlatforms.includes("facebook");
+
   async function handleDelete() {
     const ok = await confirm({
-      title: "Sacar esta pieza del Monitor",
+      title: "Borrar esta pieza",
       description:
-        "Solo la saca de esta vista — no borra nada de Instagram, Facebook ni Zernio. Si Zernio la sigue reportando de verdad, puede volver a aparecer en la próxima sincronización.",
-      confirmText: "Sacar del Monitor",
+        (onFB ? "Se despublica de Facebook de verdad. " : "") +
+        (onIG ? "Instagram NO se puede despublicar por API — tenés que borrarlo también desde la app de Instagram (queda marcado acá). " : "") +
+        "Y se saca del Monitor. No se puede deshacer.",
+      confirmText: "Borrar",
       variant: "destructive",
     });
     if (!ok) return;
     setDeleting(true);
     try {
+      const { workflowFile, idValue, inputKey } = manageTarget(post);
+      if (onFB) {
+        await runWorkflow(
+          "borrar-fb",
+          workflowFile,
+          { [inputKey]: idValue, platform: "facebook", action: "despublicar", confirmacion: "CONFIRMO" },
+          "Despublicando de Facebook…"
+        );
+      }
+      if (onIG) {
+        await runWorkflow("borrar-ig", "mark-manual.yml", { post_id: post.id, platform: "instagram" }, "Instagram marcado — borralo también desde la app.");
+      }
       const { error } = await historialApi.removePost(post.id);
       if (error) throw error;
-      toast({ title: "Sacada del Monitor" });
+      toast({
+        title: "Pieza borrada",
+        description: onIG ? "Acordate de borrarla también desde la app de Instagram." : "Lista.",
+      });
       onDeleted();
     } catch (e) {
       toast({ title: "Error", description: e instanceof Error ? e.message : "Error desconocido", variant: "destructive" });
@@ -452,8 +476,8 @@ function PostCard({
             )}
             <button
               type="button"
-              aria-label="Sacar del Monitor"
-              title="Sacar del Monitor (no toca Instagram/Facebook/Zernio)"
+              aria-label="Borrar esta pieza"
+              title={onFB ? "Borrar (despublica de Facebook + saca del Monitor)" : "Borrar del Monitor"}
               onClick={handleDelete}
               disabled={deleting}
               className="flex h-9 w-9 items-center justify-center text-muted-foreground hover:text-destructive disabled:opacity-50"
