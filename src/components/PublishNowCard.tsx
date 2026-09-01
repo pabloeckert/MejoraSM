@@ -70,11 +70,16 @@ export function PublishNowCard({ dimension, connected }: { dimension: string; co
         const m = await github.getJsonFile<Manifest>(MANIFEST_PATH);
         if (cancelled || !m) return;
         const fresh = Date.now() - ts(m.updatedAt) < FRESH_MS;
-        const resumable = m.phase === "prepared" || m.phase === "published";
+        const resumable = m.phase === "prepared" || m.phase === "published" || m.phase === "error";
         if (fresh && m.oferta === dimension && resumable && stateRef.current === "idle") {
           nonceRef.current = m.nonce || "";
           setManifest(m);
-          setState(m.phase);
+          if (m.phase === "error") {
+            setErrorMsg(m.error || "La preparación anterior falló. Probá de nuevo.");
+            setState("error");
+          } else {
+            setState(m.phase);
+          }
         }
       } catch {
         /* si falla, arranca en idle nomás */
@@ -281,9 +286,25 @@ export function PublishNowCard({ dimension, connected }: { dimension: string; co
         {state === "error" && (
           <div className="space-y-2">
             <p className="text-sm text-destructive">{errorMsg}</p>
-            <Button variant="outline" size="sm" onClick={reset}>
-              Volver a empezar
-            </Button>
+            {errorMsg?.includes("JSON") || errorMsg?.includes("brief") ? (
+              <p className="text-xs text-muted-foreground">
+                Fue un hipo del generador de texto, no un problema de la foto. Suele andar al reintentar.
+              </p>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              {hasPhoto ? (
+                <Button size="sm" onClick={handlePrepare}>
+                  Reintentar
+                </Button>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Subí de nuevo una foto de <b>{dimensionLabel(dimension)}</b> arriba para reintentar.
+                </p>
+              )}
+              <Button variant="outline" size="sm" onClick={reset}>
+                Volver a empezar
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>

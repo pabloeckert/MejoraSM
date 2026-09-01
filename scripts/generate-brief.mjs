@@ -178,13 +178,48 @@ function extractJson(text) {
   } catch (e) {
     const match = cleaned.match(/\{[\s\S]*\}/);
     if (match) {
-      return JSON.parse(match[0]);
+      try {
+        return JSON.parse(match[0]);
+      } catch {
+        /* sigue roto — probamos reparar un string sin cerrar */
+      }
     }
+    // Reparación best-effort: si la respuesta se cortó a mitad de un valor
+    // string (caso real 2026-09-01: "Unterminated string in JSON"), intentamos
+    // cerrar el string y el objeto y quedarnos con lo que llegó. Mejor eso que
+    // fallar toda la corrida por un token de más.
+    const repaired = tryRepairTruncatedJson(cleaned);
+    if (repaired) return repaired;
     throw e;
   }
 }
 
-const BRIEF_ATTEMPTS = 3;
+function tryRepairTruncatedJson(s) {
+  const start = s.indexOf("{");
+  if (start < 0) return null;
+  let body = s.slice(start);
+  // cortar cualquier basura después del último caracter "válido" razonable
+  const lastQuote = body.lastIndexOf('"');
+  if (lastQuote < 0) return null;
+  // si hay un número impar de comillas sin escapar, cerramos el string
+  const quotes = (body.match(/(?<!\\)"/g) || []).length;
+  if (quotes % 2 !== 0) body += '"';
+  // cerrar llaves faltantes
+  const opens = (body.match(/\{/g) || []).length;
+  const closes = (body.match(/\}/g) || []).length;
+  body += "}".repeat(Math.max(0, opens - closes));
+  // sacar una coma colgante antes del cierre
+  body = body.replace(/,\s*\}/g, "}");
+  try {
+    const obj = JSON.parse(body);
+    return obj && obj.headline ? obj : null;
+  } catch {
+    return null;
+  }
+}
+
+const BRIEF_ATTEMPTS = 5;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function briefFor(item, avoidHeadlines, systemPrompt) {
   const avoid =
@@ -210,14 +245,20 @@ async function briefFor(item, avoidHeadlines, systemPrompt) {
 
   let lastError;
   for (let attempt = 1; attempt <= BRIEF_ATTEMPTS; attempt++) {
-    const text = await askClaude({ system: systemPrompt, userText, image });
+    let text = "";
     try {
+      // max_tokens holgado (el brief son ~150 palabras, pero Anthropic a veces
+      // devuelve la respuesta cortada — subir el techo baja la probabilidad).
+      text = await askClaude({ system: systemPrompt, userText, image, maxTokens: 1600 });
       return extractJson(text);
     } catch (e) {
       lastError = e;
       console.error(
-        `Intento ${attempt}/${BRIEF_ATTEMPTS}: no se pudo parsear el JSON de Claude (${e.message}). Respuesta cruda:\n---\n${text}\n---`
+        `Intento ${attempt}/${BRIEF_ATTEMPTS}: ${e.message}. Respuesta cruda:\n---\n${text}\n---`
       );
+      // Pausa creciente entre intentos — un hipo transitorio de Anthropic
+      // (respuestas truncadas, 529) suele despejarse en unos segundos.
+      if (attempt < BRIEF_ATTEMPTS) await sleep(2000 * attempt);
     }
   }
   throw new Error(`No se pudo generar un brief válido tras ${BRIEF_ATTEMPTS} intentos: ${lastError.message}`);

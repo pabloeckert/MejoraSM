@@ -32,29 +32,44 @@ async function askAnthropic({ system, userText, image, maxTokens }) {
   }
   content.push({ type: "text", text: userText });
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: "user", content }],
-    }),
+  const body = JSON.stringify({
+    model: MODEL,
+    max_tokens: maxTokens,
+    system,
+    messages: [{ role: "user", content }],
   });
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Anthropic respondió ${res.status}: ${err.slice(0, 300)}`);
-  }
+  // Reintento a nivel red para errores transitorios (429 rate limit, 500,
+  // 529 overloaded) — hallazgo real 2026-09-01: Anthropic devolvió respuestas
+  // truncadas/erróneas varias veces seguidas en "publicar ahora".
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body,
+    });
 
-  const data = await res.json();
-  const textBlock = data.content?.find((b) => b.type === "text");
-  return textBlock?.text ?? "";
+    if (res.ok) {
+      const data = await res.json();
+      if (data.stop_reason && data.stop_reason !== "end_turn") {
+        console.warn(`[claude.mjs] stop_reason=${data.stop_reason} (respuesta posiblemente incompleta)`);
+      }
+      const textBlock = data.content?.find((b) => b.type === "text");
+      return textBlock?.text ?? "";
+    }
+
+    const errText = await res.text();
+    lastErr = new Error(`Anthropic respondió ${res.status}: ${errText.slice(0, 300)}`);
+    if (![429, 500, 502, 503, 529].includes(res.status) || attempt === 3) throw lastErr;
+    console.warn(`[claude.mjs] ${res.status} transitorio, reintento ${attempt}/3 en ${attempt * 3}s`);
+    await new Promise((r) => setTimeout(r, attempt * 3000));
+  }
+  throw lastErr;
 }
 
 async function askGroqTextOnly({ system, userText, maxTokens }) {
