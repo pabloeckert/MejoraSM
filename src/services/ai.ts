@@ -212,6 +212,46 @@ export interface DimensionSuggestion {
   reason: string;
 }
 
+// ═══════════════════════════════════════
+// INSIGHTS (Fase A del plan de continuación 2026-08-31 — motor de insights
+// del Dashboard, cierra el punto 3 del brief de rediseño)
+// ═══════════════════════════════════════
+
+export interface Insight {
+  id: string;
+  title: string;
+  body: string;
+  evidence: string;
+  confidence: number;
+  status: "seed_unchanged" | "refined" | "updated" | "new" | string;
+}
+
+export interface InsightsResult {
+  week_start: string;
+  insights: Insight[];
+  model: string | null;
+  generated_at: string;
+  cached: boolean;
+}
+
+export async function getInsights(): Promise<InsightsResult> {
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/insights`,
+    { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "get" }) },
+    VAULT_TIMEOUT_MS
+  );
+  return handleResponse(res, "Error generando los insights");
+}
+
+export async function sendInsightFeedback(insightId: string, weekStart: string, useful: boolean): Promise<{ ok: boolean }> {
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/insights`,
+    { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "feedback", insightId, weekStart, useful }) },
+    QUICK_TIMEOUT_MS
+  );
+  return handleResponse(res, "Error guardando la valoración");
+}
+
 export async function suggestPhotoDimension(imageBase64: string, mimeType: string): Promise<DimensionSuggestion> {
   const res = await fetchWithTimeout(
     `${SUPABASE_URL}/functions/v1/classify-photo`,

@@ -32,8 +32,11 @@ import { useDocuments } from "@/hooks/useVault";
 import { useDialogueSessions } from "@/hooks/useDialogue";
 import { usePendingProposals, useProposals } from "@/hooks/useProposals";
 import { useAllMetrics } from "@/hooks/useMetrics";
+import { useInsights } from "@/hooks/useInsights";
 import { historialApi } from "@/services/supabase";
 import { CopilotCard } from "@/components/CopilotCard";
+import { InsightsSection } from "@/components/InsightsSection";
+import { ReportDialog, type ReportData } from "@/components/ReportDialog";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -111,48 +114,9 @@ const NO_SOURCE_KPIS = [
   },
 ];
 
-// Insights validados con datos reales (Data/analisis-redes-mejora-continua.md,
-// agosto 2026) — semilla de arranque para el motor de insights con IA que
-// viene en un commit futuro (no se construye acá). La capa de IA puede
-// reemplazar o contrastar cada uno de estos; no se generan dinámicamente.
-const SEED_INSIGHTS: { id: string; title: string; body: string; evidence: string }[] = [
-  {
-    id: "reel-retencion",
-    title: "El Reel gana alcance, pero se pierde el mensaje",
-    body: "Reel es el formato con mejor alcance (461 promedio) y mejor engagement (3.26% ER) de los tres, pero el tiempo promedio de reproducción es de apenas ~6.9 segundos y casi nadie lo mira completo.",
-    evidence: "44 Reels analizados en el año — reach medio 461, ER medio 3.26%, ~6.9s de reproducción promedio, 0.81 full views promedio.",
-  },
-  {
-    id: "hook-primera-persona",
-    title: "El gancho directo en primera persona convierte mejor que cualquier Reel",
-    body: "Los posts estáticos o carousel con gancho directo en primera persona sobre liderazgo y decisiones dieron el engagement más alto del período — el mejor conversor de audiencia ya instalada, aunque lleguen a menos gente nueva.",
-    evidence: '"WhatsApp no es decoración..." ER 27.9% · "Equivocarse no te resta liderazgo..." ER 22.0%.',
-  },
-  {
-    id: "testimonios-series",
-    title: 'Testimonios con nombre y series "Parte 1/2/3" generan la señal más fuerte',
-    body: "Concentran los guardados y compartidos más altos del año — en una cuenta B2B esa es la señal de intención más fuerte, más que el like.",
-    evidence: "Serie sobre negociación: reach 520 / 436 / 237 en publicaciones consecutivas.",
-  },
-  {
-    id: "geo-nea-paraguay",
-    title: "La audiencia está concentrada en NEA + Paraguay, no dispersa a nivel nacional",
-    body: "Posadas es la ciudad top en ambas redes, seguida de Encarnación y el resto del NEA argentino y Paraguay.",
-    evidence: "Posadas 30.9% (Facebook) / 45.7% (Instagram) · Paraguay 19.7-20.2% del total.",
-  },
-  {
-    id: "meseta-horaria",
-    title: "No hay un horario mágico único — la audiencia está online de 11h a 23h todos los días",
-    body: "Conviene testear franja de mediodía (lunes a miércoles) contra tarde-noche en vez de fijarse en un solo bloque horario.",
-    evidence: "Meseta amplia 11h-23h todos los días, con pico puntual lunes 21h (IconSquare).",
-  },
-  {
-    id: "facebook-sin-pulso",
-    title: "Facebook va al mismo nivel de detalle que Instagram, pero hoy no tiene pulso propio",
-    body: "El bajo rendimiento de Facebook es por falta de trabajo puesto ahí, no por el canal en sí — con el sistema funcionando se espera que se mueva.",
-    evidence: "Ventana jul-ago 2026: 0 visitas, 0 interacciones y 0 clics en enlace en casi todos los días. ER del año 1.28% vs. 2.44% de Instagram.",
-  },
-];
+// SEED_INSIGHTS se movió a src/components/InsightsSection.tsx (fallback de
+// render) y a supabase/functions/insights/index.ts (semilla del motor).
+
 
 type DetailContent = { title: string; description?: string; content: React.ReactNode };
 
@@ -321,6 +285,8 @@ function DashboardContent() {
 
   const [showTestRows, setShowTestRows] = useState(false);
   const [detail, setDetail] = useState<DetailContent | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const { data: insightsData } = useInsights();
 
   // Desglose por red: solo dato real disponible es status/URL por
   // plataforma. Hasta el 2026-08-17 se traía directo de
@@ -1014,28 +980,8 @@ function DashboardContent() {
         </CardContent>
       </Card>
 
-      {/* Insights semilla */}
-      <div>
-        <h2 className="mb-1 text-[17px] font-medium">Insights</h2>
-        <p className="mb-3 text-xs text-muted-foreground">
-          Análisis validado con datos reales (Meta Business Suite + IconSquare, agosto 2026) — semilla de arranque
-          hasta que el motor de insights con IA se conecte.
-        </p>
-        <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-          {SEED_INSIGHTS.map((insight) => (
-            <Card key={insight.id}>
-              <CardContent className="flex h-full flex-col gap-2 p-4">
-                <Badge variant="secondary" className="w-fit text-[10px]">
-                  Validado con datos reales
-                </Badge>
-                <p className="text-[13.5px] font-semibold leading-snug">{insight.title}</p>
-                <p className="flex-1 text-[12.5px] text-muted-foreground">{insight.body}</p>
-                <p className="border-t border-border pt-2 text-[11px] text-muted-foreground/80">{insight.evidence}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
+      {/* Motor de insights con IA (Fase A del plan de continuación 2026-08-31) */}
+      <InsightsSection onOpenReport={() => setReportOpen(true)} />
 
       {/* Pending approvals */}
       <Card>
@@ -1193,6 +1139,25 @@ function DashboardContent() {
           {detail?.content}
         </DialogContent>
       </Dialog>
+
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        data={{
+          kpis: kpiTiles.map((t) => ({ label: t.label, value: t.value, sub: t.sub })),
+          formatPerf: formatPerf.map((f) => ({ format: f.format, count: f.count, avgReach: f.avgReach, avgEngagement: f.avgEngagement })),
+          ranking: ranking.map((m) => ({
+            title: m.proposals?.hook || m.proposals?.title || "Post sin título",
+            format: m.proposals?.format || "post",
+            reach: m.reach ?? 0,
+            engagement: m.engagement_rate ?? 0,
+            isTest: m.isTest,
+          })),
+          insights: insightsData?.insights ?? [],
+          piecesWithMetrics: visibleMetrics.length,
+          lastSync,
+        } satisfies ReportData}
+      />
     </div>
   );
 }

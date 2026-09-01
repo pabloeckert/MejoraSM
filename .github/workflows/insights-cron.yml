@@ -1,0 +1,30 @@
+# Motor de insights del Dashboard (Fase A del plan de continuación, 2026-08-31).
+# Una vez por semana recalcula los insights contrastándolos contra las
+# métricas reales de las últimas 6 semanas + la retro de Pablo. La Edge
+# Function cachea por semana (insights_cache.week_start UNIQUE) — si esto
+# corre de más el mismo lunes con force=false devuelve la fila cacheada sin
+# volver a llamar al LLM. Acá se manda force=true para forzar el recálculo
+# semanal aunque ya haya una fila (ej. generada por un get del Dashboard).
+name: Insights Cron
+
+on:
+  schedule:
+    - cron: "30 11 * * 1" # lunes 11:30 UTC = 08:30 ART
+  workflow_dispatch: {}
+
+jobs:
+  insights:
+    name: Recalcular insights de la semana
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invocar insights (get, force)
+        run: |
+          code=$(curl -s -o /tmp/response.json -w "%{http_code}" -X POST \
+            "${{ secrets.VITE_SUPABASE_URL }}/functions/v1/insights" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"get","force":true}')
+          echo "HTTP $code"
+          cat /tmp/response.json
+          if [ "$code" -ge 300 ]; then exit 1; fi

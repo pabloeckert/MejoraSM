@@ -93,6 +93,25 @@ vi.mock("@/hooks/useMetrics", () => ({
   useAllMetrics: () => ({ data: [realMetric, testMetric] }),
 }));
 
+vi.mock("@/hooks/useInsights", () => ({
+  useInsights: () => ({
+    data: {
+      week_start: "2026-08-31",
+      model: "anthropic",
+      generated_at: "2026-08-31T00:00:00Z",
+      cached: true,
+      insights: [
+        { id: "reel-retencion", title: "El Reel gana alcance, pero se pierde el mensaje", body: "…", evidence: "…", confidence: 88, status: "refined" },
+      ],
+    },
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    refetch: () => {},
+  }),
+  useInsightFeedback: () => ({ mutate: () => {}, isPending: false }),
+}));
+
 // Mock recharts to avoid SVG rendering issues in tests
 vi.mock("recharts", () => ({
   BarChart: ({ children }: { children?: React.ReactNode }) => <div data-testid="bar-chart">{children}</div>,
@@ -199,11 +218,12 @@ describe("Dashboard Page", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("renders seed insights marked as validated", async () => {
+  it("renders the insights engine with the weekly recalculated insight", async () => {
     const { default: Dashboard } = await import("@/pages/Dashboard");
     renderWithProviders(<Dashboard />);
+    expect(screen.getByText("Motor de insights")).toBeInTheDocument();
     expect(screen.getByText("El Reel gana alcance, pero se pierde el mensaje")).toBeInTheDocument();
-    expect(screen.getAllByText("Validado con datos reales").length).toBeGreaterThan(0);
+    expect(screen.getByText("88% confianza")).toBeInTheDocument();
   });
 
   it("renders pending approvals section", async () => {

@@ -60,7 +60,10 @@ jobs:
         if: ${{ github.event.inputs.function_name == '' }}
         run: |
           echo "🚀 Deploying all Edge Functions..."
-          FUNCTIONS=("orchestrator" "vault-process" "metrics-collector" "rule-engine")
+          # Lista completa (2026-08-31): antes faltaban copilot y classify-photo,
+          # que se venían deployando a mano. + insights (Fase A del plan de
+          # continuación).
+          FUNCTIONS=("orchestrator" "vault-process" "metrics-collector" "rule-engine" "copilot" "classify-photo" "insights")
           
           FAILED=0
           for fn in "${FUNCTIONS[@]}"; do
