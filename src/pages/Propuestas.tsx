@@ -22,6 +22,9 @@ import {
   Plus,
   Pencil,
   Trash2,
+  GitBranch,
+  Send,
+  XCircle,
 } from "lucide-react";
 import { useProposals, usePendingProposals, useTemplates, useCreateTemplate, useUpdateTemplate, useDeleteTemplate } from "@/hooks/useProposals";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -150,6 +153,10 @@ function PropuestasContent() {
             Programadas
           </TabsTrigger>
           <TabsTrigger value="all">Todas</TabsTrigger>
+          <TabsTrigger value="timeline" className="gap-1.5">
+            <GitBranch className="h-3.5 w-3.5" />
+            Línea de tiempo
+          </TabsTrigger>
           <TabsTrigger value="templates" className="gap-1.5">
             <LayoutTemplate className="h-3.5 w-3.5" />
             Plantillas
@@ -251,6 +258,16 @@ function PropuestasContent() {
           )}
         </TabsContent>
 
+        <TabsContent value="timeline" className="mt-6">
+          <TimelineView
+            proposals={filteredProposals}
+            isLoading={isLoading}
+            onOpen={(id) => setSelectedProposalId(id)}
+            onCopy={handleCopy}
+            copiedId={copiedId}
+          />
+        </TabsContent>
+
         <TabsContent value="templates" className="mt-6">
           <TemplatesSection />
         </TabsContent>
@@ -261,6 +278,110 @@ function PropuestasContent() {
         open={!!selectedProposal}
         onOpenChange={(open) => !open && setSelectedProposalId(null)}
       />
+    </div>
+  );
+}
+
+// Línea de tiempo — el ciclo de vida completo de cada pieza en una sola
+// vista, agrupado por etapa (reemplaza la "línea de tiempo" que vivía en la
+// Biblioteca, sacada el 2026-09-01). Cada pieza abre su detalle real.
+const TIMELINE_STAGES: {
+  key: string;
+  label: string;
+  icon: typeof FileText;
+  match: (s: string | null | undefined) => boolean;
+  dateOf: (p: ProposalDetail) => string | null;
+}[] = [
+  {
+    key: "revision",
+    label: "En revisión",
+    icon: Clock,
+    match: (s) => s === "pending" || s === "needs_review" || !s,
+    dateOf: (p) => p.created_at ?? null,
+  },
+  {
+    key: "aprobada",
+    label: "Aprobadas — esperando agenda",
+    icon: CheckCircle,
+    match: (s) => s === "approved",
+    dateOf: (p) => p.created_at ?? null,
+  },
+  {
+    key: "programada",
+    label: "Programadas",
+    icon: Calendar,
+    match: (s) => s === "scheduled",
+    dateOf: (p) => p.scheduled_at ?? p.created_at ?? null,
+  },
+  {
+    key: "publicada",
+    label: "Publicadas",
+    icon: Send,
+    match: (s) => s === "published",
+    dateOf: (p) => p.published_at ?? p.scheduled_at ?? p.created_at ?? null,
+  },
+  {
+    key: "frenada",
+    label: "Frenadas",
+    icon: XCircle,
+    match: (s) => s === "rejected",
+    dateOf: (p) => p.created_at ?? null,
+  },
+];
+
+function TimelineView({
+  proposals,
+  isLoading,
+  onOpen,
+  onCopy,
+  copiedId,
+}: {
+  proposals: ProposalDetail[];
+  isLoading: boolean;
+  onOpen: (id: string) => void;
+  onCopy: (p: ProposalDetail) => void;
+  copiedId: string | null;
+}) {
+  if (isLoading) {
+    return (
+      <div className="flex h-48 items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  if (proposals.length === 0) {
+    return <EmptyState icon={GitBranch} text="Todavía no hay piezas para mostrar." />;
+  }
+
+  const groups = TIMELINE_STAGES.map((stage) => ({
+    stage,
+    items: proposals
+      .filter((p) => stage.match(p.status))
+      .sort((a, b) => new Date(stage.dateOf(b) ?? 0).getTime() - new Date(stage.dateOf(a) ?? 0).getTime()),
+  })).filter((g) => g.items.length > 0);
+
+  return (
+    <div className="space-y-8">
+      {groups.map(({ stage, items }) => (
+        <div key={stage.key}>
+          <div className="mb-3 flex items-center gap-2">
+            <stage.icon className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{stage.label}</h2>
+            <span className="text-xs text-muted-foreground/60">{items.length}</span>
+          </div>
+          <div className="space-y-3 border-l-2 border-border pl-4">
+            {items.map((p) => (
+              <ProposalListItem
+                key={p.id}
+                proposal={p}
+                onOpen={() => onOpen(p.id)}
+                onCopy={() => onCopy(p)}
+                copied={copiedId === p.id}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

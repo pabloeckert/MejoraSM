@@ -1,6 +1,6 @@
 // PM4 (auditoría 2026-08-31): estas listas estaban duplicadas a mano en
-// PipelineBadge, Hub, ProposalDetailDialog, generate-brief.mjs,
-// render-scheduled-posts.mjs y biblioteca/app.js. Si el backend cambiaba
+// PipelineBadge, Hub, ProposalDetailDialog, generate-brief.mjs y
+// render-scheduled-posts.mjs. Si el backend cambiaba
 // AUTO_PUBLISH_FORMATS, el badge más importante del producto ("Se publica
 // solo") empezaba a mentir. Esta es la fuente única para el frontend.
 //

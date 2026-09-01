@@ -2,8 +2,8 @@
 #
 # GitHub Pages en modo "workflow" sirve UN solo artifact por sitio — por eso
 # este workflow arma un _site/ que combina hub/ (raíz) + dashboard/ (subpath) +
-# biblioteca/ (subpath) + dist/ del EDA (subpath /app/), igual que
-# deploy-hub.yml, deploy-biblioteca.yml y deploy-eda.yml. Si cualquiera de los
+# dist/ del EDA (subpath /app/), igual que
+# deploy-hub.yml y deploy-eda.yml. Si cualquiera de los
 # cuatro solo subiera su propia parte, se pisarían entre sí en cada corrida —
 # así conviven en el mismo sitio sin que uno borre al otro.
 name: Deploy Dashboard
@@ -52,7 +52,7 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Armar sitio combinado (hub/ + dashboard/ + biblioteca/ + app/)
+      - name: Armar sitio combinado (hub/ + dashboard/ + app/)
         run: |
           mkdir -p _site
           if [ -d hub ]; then
@@ -60,10 +60,6 @@ jobs:
           fi
           mkdir -p _site/dashboard
           cp -r dashboard/. _site/dashboard/
-          if [ -d biblioteca ]; then
-            mkdir -p _site/biblioteca
-            cp -r biblioteca/. _site/biblioteca/
-          fi
           mkdir -p _site/app
           cp -r dist/. _site/app/
 
