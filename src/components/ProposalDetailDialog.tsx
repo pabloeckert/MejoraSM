@@ -42,6 +42,7 @@ import {
 } from "@/hooks/useProposals";
 import { DIMENSIONES, PIPELINE_FORMATS } from "@/shared/constants";
 import { PiecePreview } from "@/components/PiecePreview";
+import { ProposalComments } from "@/components/ProposalComments";
 
 // Hallazgo real 2026-08-26: Pablo reportó que en el detalle de una
 // propuesta (abierto desde Propuestas o desde "Ver propuesta" en Monitor)
@@ -613,6 +614,8 @@ export function ProposalDetailDialog({
               </div>
             </div>
           )}
+
+          <ProposalComments proposalId={proposal.id} />
         </DialogContent>
       </Dialog>
 

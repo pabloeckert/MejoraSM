@@ -112,6 +112,22 @@ export const documentsApi = {
 };
 
 // ═══════════════════════════════════════
+// COMENTARIOS DE PROPUESTA (Fase E, 2026-08-31)
+// ═══════════════════════════════════════
+
+export const commentsApi = {
+  list: (proposalId: string) =>
+    supabase
+      .from("proposal_comments")
+      .select("*")
+      .eq("proposal_id", proposalId)
+      .order("created_at", { ascending: true }),
+
+  add: (proposalId: string, author: string, body: string) =>
+    supabase.from("proposal_comments").insert({ proposal_id: proposalId, author, body }).select().single(),
+};
+
+// ═══════════════════════════════════════
 // SESIONES DE DIÁLOGO
 // ═══════════════════════════════════════
 
