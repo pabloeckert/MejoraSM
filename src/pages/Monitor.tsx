@@ -18,21 +18,17 @@ import { toast } from "@/hooks/use-toast";
 //
 // Hallazgo real 2026-08-26 (Pablo: "por qué tengo que ir a GitHub para
 // completar" al reintentar/republicar): hasta acá, cada acción armaba un
-// link a GitHub Actions y pedía copiar el ID + tipear CONFIRMO a mano en
-// esa pantalla. Ahora dispara el mismo workflow_dispatch directo desde acá
-// (github.triggerWorkflow, mismo token ya conectado en Subir material) — el
-// gesto de confirmación explícita para lo irreversible (despublicar) sigue
-// existiendo, pero como un confirm() nativo en vez de tipear en GitHub. El
-// link a GitHub Actions queda como respaldo, no como único camino.
+// link a completar a mano en otra pantalla, con copiar el ID y tipear
+// CONFIRMO. Ahora dispara la acción directo desde acá (github.triggerWorkflow,
+// que habla server-side con el repo — ver src/services/github.ts) — el gesto
+// de confirmación explícita para lo irreversible (despublicar) sigue
+// existiendo, pero como un confirm() nativo en la propia pantalla.
 //
 // Fix de raíz 2026-08-17 (Pablo reportó "Failed to fetch"): el historial
 // ya NO se trae de raw.githubusercontent.com — ese CDN tiene caídas reales
-// y documentadas (confirmado en vivo contra githubstatus.com, y contra
-// investigación de mercado: 257 incidentes de GitHub en 12 meses). Ahora
-// se lee de historial_cache en Supabase, mucho más confiable, cacheado por
-// sync-history.mjs/mark-manual.mjs — ver migración 016_historial_cache.sql.
-const MANAGE_STORY_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/manage-story.yml";
-const MANAGE_POST_WORKFLOW_URL = "https://github.com/pabloeckert/MejoraSM/actions/workflows/manage-post.yml";
+// y documentadas. Ahora se lee de historial_cache en Supabase, mucho más
+// confiable, cacheado por sync-history.mjs/mark-manual.mjs — ver migración
+// 016_historial_cache.sql.
 
 const NOMBRES_PLATAFORMA: Record<string, string> = { instagram: "Instagram", facebook: "Facebook" };
 
@@ -86,7 +82,6 @@ function manageTarget(post: HistorialPost) {
   if (post.kind === "post" && post.proposalId) {
     return {
       workflowFile: "manage-post.yml",
-      workflowUrl: MANAGE_POST_WORKFLOW_URL,
       idLabel: "ID de propuesta",
       idValue: post.proposalId,
       inputKey: "proposal_id" as const,
@@ -94,7 +89,6 @@ function manageTarget(post: HistorialPost) {
   }
   return {
     workflowFile: "manage-story.yml",
-    workflowUrl: MANAGE_STORY_WORKFLOW_URL,
     idLabel: "Post ID",
     idValue: post.id,
     inputKey: "post_id" as const,
@@ -162,7 +156,7 @@ function AvisoInstagramFallido({
 function AccionesFacebookFallido({ post, onDone }: { post: HistorialPost; onDone: () => void }) {
   const { pending, run } = useWorkflowAction();
   const [confirm, ConfirmUI] = useConfirm();
-  const { workflowFile, workflowUrl, idValue, inputKey } = manageTarget(post);
+  const { workflowFile, idValue, inputKey } = manageTarget(post);
 
   async function handleAction(action: "reintentar" | "despublicar") {
     if (action === "despublicar") {
@@ -210,15 +204,6 @@ function AccionesFacebookFallido({ post, onDone }: { post: HistorialPost; onDone
           Despublicar
         </Button>
       </div>
-      <a
-        href={workflowUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-primary hover:underline"
-      >
-        <ExternalLink className="h-3 w-3" />
-        Ver el resultado en GitHub Actions
-      </a>
     </div>
   );
 }
@@ -261,7 +246,7 @@ function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () 
   // se mostraba siempre abierta en cada tarjeta de una pieza que funciona bien.
   const [open, setOpen] = useState(false);
 
-  const { workflowFile, workflowUrl, idValue, inputKey } = manageTarget(post);
+  const { workflowFile, idValue, inputKey } = manageTarget(post);
 
   async function handleAction(platform: "instagram" | "facebook", action: "reintentar" | "despublicar") {
     if (action === "despublicar") {
@@ -391,16 +376,6 @@ function GestionPublicacion({ post, onDone }: { post: HistorialPost; onDone: () 
           </Button>
         </div>
       </div>
-
-      <a
-        href={workflowUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-primary hover:underline"
-      >
-        <ExternalLink className="h-3 w-3" />
-        Ver el resultado en GitHub Actions ({idValue})
-      </a>
     </div>
   );
 }
@@ -563,11 +538,9 @@ export default function Monitor() {
   function refreshAfterAction() {
     setSyncing(true);
     setTimeout(() => {
-      if (github.isConnected()) {
-        github.triggerWorkflow("sync-history.yml", {}).catch(() => {
-          // best-effort — el link a GitHub Actions sigue disponible como respaldo
-        });
-      }
+      github.triggerWorkflow("sync-history.yml", {}).catch(() => {
+        // best-effort — el botón "Actualizar" de arriba sigue disponible como respaldo
+      });
       setTimeout(async () => {
         await refetch();
         setSyncing(false);
@@ -646,8 +619,7 @@ export default function Monitor() {
       {posts.length > 0 && (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <ExternalLink className="h-3 w-3" />
-          Reintentar/despublicar/marcar a mano se disparan directo desde acá — el link a GitHub Actions de cada pieza
-          es solo para ver el detalle de la corrida si hace falta.
+          Reintentar/despublicar/marcar a mano se disparan directo desde acá.
         </p>
       )}
     </div>

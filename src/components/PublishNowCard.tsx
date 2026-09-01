@@ -42,7 +42,7 @@ function ts(iso?: string) {
   return Number.isNaN(t) ? 0 : t;
 }
 
-export function PublishNowCard({ dimension, connected }: { dimension: string; connected: boolean }) {
+export function PublishNowCard({ dimension }: { dimension: string }) {
   const [state, setState] = useState<UiState>("idle");
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -54,16 +54,15 @@ export function PublishNowCard({ dimension, connected }: { dimension: string; co
   const qc = useQueryClient();
 
   const inboxPath = `content/inbox/${dimension}`;
-  const { data: inboxFiles } = useDirListing(inboxPath, connected);
+  const { data: inboxFiles } = useDirListing(inboxPath);
   const hasPhoto = (inboxFiles ?? []).some((f) => f.type === "file" && IMG_RE.test(f.name));
 
   useEffect(() => () => pollStopRef.current(), []);
 
-  // Al montar / reconectar: si ya hay un manifiesto "prepared" reciente de
-  // esta dimensión, mostrarlo (para no perder el trabajo si la pestaña se
-  // recargó o el polling se cortó). No pisa un flujo en curso.
+  // Al montar / cambiar de dimensión: si ya hay un manifiesto "prepared"
+  // reciente de esta dimensión, mostrarlo (para no perder el trabajo si la
+  // pestaña se recargó o el polling se cortó). No pisa un flujo en curso.
   useEffect(() => {
-    if (!connected) return;
     let cancelled = false;
     (async () => {
       try {
@@ -88,7 +87,7 @@ export function PublishNowCard({ dimension, connected }: { dimension: string; co
     return () => {
       cancelled = true;
     };
-  }, [connected, dimension]);
+  }, [dimension]);
 
   const poll = useCallback(
     (want: "prepared" | "published") => {
@@ -127,7 +126,7 @@ export function PublishNowCard({ dimension, connected }: { dimension: string; co
           /* la API de contents puede tardar en reflejar el commit — se reintenta */
         }
         if (Date.now() - started > POLL_TIMEOUT_MS) {
-          setErrorMsg("Está tardando más de lo normal. Mirá el detalle en GitHub Actions, o recargá esta página en un rato.");
+          setErrorMsg("Está tardando más de lo normal — recargá esta página en un rato, puede que ya esté lista.");
           setState("error");
           return;
         }
@@ -197,13 +196,7 @@ export function PublishNowCard({ dimension, connected }: { dimension: string; co
           </p>
         </div>
 
-        {!connected && (
-          <p className="rounded-md border border-dashed border-border bg-muted/30 p-2.5 text-xs text-muted-foreground">
-            Conectá GitHub arriba para usar esto.
-          </p>
-        )}
-
-        {state === "idle" && connected && (
+        {state === "idle" && (
           <div className="space-y-2">
             <Button onClick={handlePrepare} disabled={!hasPhoto} className="w-full sm:w-auto">
               Preparar story de {dimensionLabel(dimension)}

@@ -1,69 +1,21 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { github, type GhWhoami } from "@/services/github";
+import { github } from "@/services/github";
 import { toast } from "@/hooks/use-toast";
-
-export function useGithubConnection() {
-  const queryClient = useQueryClient();
-  const [connected, setConnected] = useState(github.isConnected());
-  const [checking, setChecking] = useState(false);
-  const [user, setUser] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function connect(token: string): Promise<GhWhoami> {
-    setChecking(true);
-    setError(null);
-    github.setToken(token);
-    const r = await github.whoami();
-    if (r.ok && r.canWrite) {
-      setConnected(true);
-      setUser(r.login ?? null);
-      // B13 (auditoría 2026-08-31): antes esto forzaba window.location.reload()
-      // para "refrescar el estado en toda la pantalla" — tiraba scroll, estado
-      // y trabajo en vuelo. Alcanza con re-consultar los listados de GitHub.
-      queryClient.invalidateQueries({ queryKey: ["gh-dir"] });
-    } else if (r.ok && !r.canWrite) {
-      // Hallazgo real de auditoría 2026-08-25: un token válido pero de solo
-      // lectura (permiso "Contents" en Read-only, un error fácil de cometer
-      // siguiendo las propias instrucciones del modal) se aceptaba igual —
-      // el badge quedaba en verde y cada foto fallaba después sin que la UI
-      // dijera por qué. biblioteca/app.js ya distinguía este caso, acá no.
-      github.setToken("");
-      setConnected(false);
-      setError(`Conectado como ${r.login}, pero el token no tiene permiso de escritura — generá uno nuevo con Contents en "Read and write".`);
-    } else {
-      github.setToken("");
-      setConnected(false);
-      setError(r.error ?? "Error desconocido");
-    }
-    setChecking(false);
-    return r;
-  }
-
-  function disconnect() {
-    github.setToken("");
-    setConnected(false);
-    setUser(null);
-    setError(null);
-    queryClient.invalidateQueries({ queryKey: ["gh-dir"] });
-  }
-
-  return { connected, checking, user, error, connect, disconnect };
-}
 
 // Dispara manage-post.yml/manage-story.yml/mark-manual.yml directo desde la
 // app — hallazgo real de auditoría 2026-08-26 (Pablo: "por qué tengo que ir
 // a GitHub para completar" al reintentar/republicar desde el Monitor). Un
 // solo pending global (no por acción) porque en la práctica nunca se
 // disparan dos acciones a la vez desde la misma pantalla.
+//
+// 2026-09-01: ya no hay "conectar" — la Edge Function `repo` guarda la
+// credencial del lado del servidor (ver src/services/github.ts). Cualquiera
+// logueado en MejoraSM ya puede disparar esto.
 export function useWorkflowAction() {
   const [pending, setPending] = useState<string | null>(null);
 
   async function run(key: string, workflowFile: string, inputs: Record<string, string>, successMessage: string): Promise<boolean> {
-    if (!github.isConnected()) {
-      toast({ title: "No conectado a GitHub", description: "Conectá GitHub desde Subir material primero.", variant: "destructive" });
-      return false;
-    }
     setPending(key);
     try {
       await github.triggerWorkflow(workflowFile, inputs);

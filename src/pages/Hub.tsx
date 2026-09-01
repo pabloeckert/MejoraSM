@@ -2,47 +2,34 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
 import {
   Upload,
-  Plug,
   Check,
   Loader2,
-  AlertCircle,
   ImageOff,
   MonitorPlay,
   ExternalLink,
   Sparkles,
   X,
   RotateCw,
-  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { github } from "@/services/github";
-import { useGithubConnection, useDirListing, usePhotoUpload } from "@/hooks/useGithubUpload";
+import { useDirListing, usePhotoUpload } from "@/hooks/useGithubUpload";
 import { suggestPhotoDimension } from "@/services/ai";
 import { toast } from "@/hooks/use-toast";
 import { DIMENSIONES, dimensionLabel } from "@/shared/constants";
 import { PublishNowCard } from "@/components/PublishNowCard";
 
-// Rediseño 2026-08-17, a pedido directo de Pablo: "Subir material" dejó de
-// ser 5 links a la UI cruda de upload de GitHub — ahora es una interfaz
-// propia. Usa el mismo cliente de GitHub y la MISMA clave de localStorage
-// que la Biblioteca (src/services/github.ts).
+// Rediseño 2026-08-17: "Subir material" dejó de ser 5 links a la UI cruda de
+// upload de GitHub — interfaz propia.
+//
+// 2026-09-01, pedido explícito de Pablo ("que en ninguna [pantalla] se vea
+// github, que todo pase por MejoraSM"): se sacó el flujo de "Conectar con
+// GitHub" (pegar un token personal a mano) — src/services/github.ts ahora
+// habla con la Edge Function `repo`, que guarda el token del lado del
+// servidor. Ya no hay nada que conectar ni reconectar: si estás logueado en
+// MejoraSM, subir fotos y usar "Publicar ahora" ya funciona.
 //
 // Auditoría 2026-08-31:
 //  B9  — antes classify-photo miraba solo la 1ra foto del lote y la dimensión
@@ -50,88 +37,14 @@ import { PublishNowCard } from "@/components/PublishNowCard";
 //        de dimensión por foto en el paso de confirmación, con thumbnail.
 //  B10 — la dimensión viaja pegada a cada foto (ver useGithubUpload), no del
 //        estado del componente.
-//  B13 — conectar GitHub ya no hace window.location.reload().
 const OFERTAS = DIMENSIONES.map((d) => ({ key: d.key, kicker: d.label, title: d.title }));
 const KICKER = dimensionLabel;
 
-// GitHub Contents API corta cerca de los 40MB por archivo; y las fotos del
-// celular en HEIC no las renderiza ni el navegador ni el pipeline (Chromium).
+// El límite real hoy es el tamaño de request que acepta la Edge Function
+// (algunos MB de sobra para una foto de celular); y las fotos en HEIC no las
+// renderiza ni el navegador ni el pipeline (Chromium).
 const MAX_FILE_MB = 25;
 const HEIC_RE = /\.(heic|heif)$/i;
-
-function ConnectGithubDialog({
-  open,
-  onOpenChange,
-  connect,
-  checking,
-  error,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  connect: (token: string) => Promise<{ ok: boolean }>;
-  checking: boolean;
-  error: string | null;
-}) {
-  const [token, setToken] = useState("");
-
-  async function handleConnect() {
-    const r = await connect(token.trim());
-    if (r.ok) {
-      setToken("");
-      onOpenChange(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Conectar con GitHub</DialogTitle>
-          <DialogDescription>
-            Para guardar fotos de verdad en el repo hace falta un token personal tuyo de GitHub. Queda solo en este
-            navegador — nunca se sube ni se comparte.
-          </DialogDescription>
-        </DialogHeader>
-        <ol className="list-decimal space-y-1.5 pl-4 text-sm text-muted-foreground">
-          <li>
-            Abrí{" "}
-            <a
-              href="https://github.com/settings/tokens?type=beta"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary underline"
-            >
-              github.com/settings/tokens
-            </a>{" "}
-            → Generate new token (fine-grained).
-          </li>
-          <li>
-            En Repository access elegí Only select repositories → {github.owner}/{github.repo}.
-          </li>
-          <li>En Permissions → Repository → Contents ponelo en Read and write.</li>
-          <li>
-            En Permissions → Repository → Actions ponelo también en Read and write (hace falta para reintentar/
-            despublicar/marcar a mano desde Monitor).
-          </li>
-          <li>Generá el token, copialo y pegalo acá abajo.</li>
-        </ol>
-        <Input
-          type="password"
-          autoComplete="off"
-          placeholder="github_pat_..."
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleConnect()}
-        />
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button onClick={handleConnect} disabled={checking || !token.trim()}>
-          {checking && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-          Conectar
-        </Button>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function PhotoGrid({ dimension, folder, emptyLabel }: { dimension: string; folder: "inbox" | "used"; emptyLabel: string }) {
   const path = `content/${folder}/${dimension}`;
@@ -156,9 +69,10 @@ function PhotoGrid({ dimension, folder, emptyLabel }: { dimension: string; folde
   return (
     <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
       {photos.map((p) => (
+        // Abre la imagen directa (raw), no una página de GitHub — solo la foto.
         <a
           key={p.path}
-          href={`https://github.com/${github.owner}/${github.repo}/blob/main/${p.path}`}
+          href={github.rawUrl(p.path)}
           target="_blank"
           rel="noopener noreferrer"
           className="group relative aspect-square overflow-hidden rounded-md bg-muted"
@@ -232,9 +146,7 @@ interface PendingPhoto {
 }
 
 export default function Hub() {
-  const [connectOpen, setConnectOpen] = useState(false);
   const [selectedDim, setSelectedDim] = useState("personal");
-  const { connected, checking, error, connect, disconnect, user } = useGithubConnection();
   const { uploads, uploadFiles, retryUpload, clearUploads } = usePhotoUpload(() => setTimeout(clearUploads, 2500));
   const [dragActive, setDragActive] = useState(false);
 
@@ -321,57 +233,14 @@ export default function Hub() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-primary">Subir material</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Elegí la dimensión del servicio, subí la foto y quedá guardada de verdad en el repo — sin salir del panel.
+            Elegí la dimensión del servicio, subí la foto y quedá guardada de verdad — sin salir del panel.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link to="/monitor" className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary">
-            <MonitorPlay className="h-4 w-4" />
-            Ver historial en el Monitor
-          </Link>
-          {connected ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  title="GitHub conectado"
-                  className="rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                >
-                  <Badge variant="secondary" className="gap-1.5 cursor-pointer hover:bg-secondary/70">
-                    <Check className="h-3 w-3" /> GitHub conectado
-                    <ChevronDown className="h-3 w-3" />
-                  </Badge>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {user && <DropdownMenuItem disabled className="text-xs">{user}</DropdownMenuItem>}
-                <DropdownMenuItem onClick={() => setConnectOpen(true)}>Cambiar / reconectar token</DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    disconnect();
-                    toast({ title: "GitHub desconectado", description: "El token se borró de este navegador." });
-                  }}
-                  className="text-destructive"
-                >
-                  Desconectar GitHub
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Button variant="outline" size="sm" onClick={() => setConnectOpen(true)}>
-              <Plug className="mr-1.5 h-3.5 w-3.5" />
-              Conectar GitHub
-            </Button>
-          )}
-        </div>
+        <Link to="/monitor" className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary">
+          <MonitorPlay className="h-4 w-4" />
+          Ver historial en el Monitor
+        </Link>
       </div>
-
-      <ConnectGithubDialog
-        open={connectOpen}
-        onOpenChange={setConnectOpen}
-        connect={connect}
-        checking={checking}
-        error={error}
-      />
 
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Dimensión del servicio">
         {OFERTAS.map((o) => (
@@ -399,16 +268,7 @@ export default function Hub() {
             foto se guarda en <code className="rounded bg-muted px-1 py-0.5 text-xs">content/inbox/{selectedDim}/</code>.
           </p>
 
-          {!connected ? (
-            <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border p-8 text-center">
-              <AlertCircle className="h-8 w-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Conectá GitHub para poder subir fotos de verdad al repo.</p>
-              <Button size="sm" onClick={() => setConnectOpen(true)}>
-                <Plug className="mr-1.5 h-3.5 w-3.5" />
-                Conectar GitHub
-              </Button>
-            </div>
-          ) : pending ? (
+          {pending ? (
             <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
               <div className="flex items-center gap-2 text-sm">
                 <Sparkles className="h-4 w-4 shrink-0 text-primary" />
@@ -529,7 +389,7 @@ export default function Hub() {
         </CardContent>
       </Card>
 
-      <PublishNowCard dimension={selectedDim} connected={connected} />
+      <PublishNowCard dimension={selectedDim} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

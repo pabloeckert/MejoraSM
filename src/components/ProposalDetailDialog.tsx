@@ -377,8 +377,7 @@ export function ProposalDetailDialog({
               <span>
                 Ya está publicada{proposal.zernio_post_id ? ` (Zernio: ${proposal.zernio_post_id})` : ""} — no se
                 edita ni se borra desde acá para no desincronizar lo que ya salió en Instagram/Facebook. Para
-                corregirla o bajarla, correr manualmente el workflow "Manage Post" en GitHub Actions (reintenta o
-                despublica según la plataforma).
+                corregirla o bajarla, usá "Reintentar"/"Despublicar" desde el Monitor.
               </span>
             </div>
           )}
