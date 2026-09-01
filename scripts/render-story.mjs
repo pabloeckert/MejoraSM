@@ -18,6 +18,14 @@ const LOG_DIR = path.join(ROOT, "content/log");
 const LOCAL_BRIEFS_PATH = path.join(LOG_DIR, "local-briefs.json");
 const TEMPLATE_PATH = path.join(ROOT, "templates/story-template.html");
 
+// "Publicar ahora" (2026-09-01) — archivos e imagen propios para no pisarse
+// con el cron diario si corren cerca. Ver generate-brief.mjs.
+const PUBLISH_NOW = process.env.PUBLISH_NOW === "1";
+const BRIEFS_FILE = PUBLISH_NOW ? "publish-now-briefs.json" : "briefs.json";
+const RENDERS_FILE = PUBLISH_NOW ? "publish-now-renders.json" : "renders.json";
+const IMG_PREFIX = PUBLISH_NOW ? "story-now" : "story";
+const RUN_SOURCE = PUBLISH_NOW ? "publish-now" : "daily-story";
+
 const EXT_TO_MIME = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
@@ -34,7 +42,7 @@ function escapeHtml(str = "") {
 }
 
 async function main() {
-  const briefs = JSON.parse(await readFile(path.join(WORK_DIR, "briefs.json"), "utf8"));
+  const briefs = JSON.parse(await readFile(path.join(WORK_DIR, BRIEFS_FILE), "utf8"));
   const templateBase = await readFile(TEMPLATE_PATH, "utf8");
 
   const browser = await chromium.launch();
@@ -66,7 +74,7 @@ async function main() {
       .replace("{{SUBTEXT}}", escapeHtml(brief.subtext || ""));
 
     await page.setContent(template, { waitUntil: "networkidle" });
-    const outputPath = path.join(PUBLISHED_DIR, `story-${date}-${i + 1}.jpg`);
+    const outputPath = path.join(PUBLISHED_DIR, `${IMG_PREFIX}-${date}-${i + 1}.jpg`);
     await page.screenshot({ path: outputPath, type: "jpeg", quality: 92 });
 
     outputs.push({
@@ -80,7 +88,7 @@ async function main() {
   }
 
   await browser.close();
-  await writeFile(path.join(WORK_DIR, "renders.json"), JSON.stringify(outputs, null, 2));
+  await writeFile(path.join(WORK_DIR, RENDERS_FILE), JSON.stringify(outputs, null, 2));
 
   // renders.json se pisa cada día — este log en cambio es permanente, para
   // que sync-history.mjs pueda mostrar el headline/oferta real de cada story
@@ -101,12 +109,12 @@ async function main() {
   );
   await writeFile(LOCAL_BRIEFS_PATH, JSON.stringify(localBriefs, null, 2));
 
-  await logRun({ source: "daily-story", step: "render-story", status: "success", durationMs: elapsed(), metadata: { count: outputs.length } });
+  await logRun({ source: RUN_SOURCE, step: "render-story", status: "success", durationMs: elapsed(), metadata: { count: outputs.length } });
 }
 
 const elapsed = startTimer();
 main().catch(async (e) => {
   console.error(e);
-  await logRun({ source: "daily-story", step: "render-story", status: "error", durationMs: elapsed(), error: String(e?.message || e) });
+  await logRun({ source: RUN_SOURCE, step: "render-story", status: "error", durationMs: elapsed(), error: String(e?.message || e) });
   process.exit(1);
 });

@@ -1,0 +1,126 @@
+# "Publicar ahora" — story bajo demanda desde el EDA (pedido de Pablo,
+# 2026-09-01). Dos fases, cada una un workflow_dispatch separado desde la app:
+#
+#   mode=prepare : genera el copy (Claude) + renderiza la imagen de marca, la
+#                  commitea, y escribe content/work/publish-now.json con
+#                  phase=prepared para que el EDA muestre el preview. NO publica.
+#   mode=publish : publica en Instagram + Facebook (Zernio) la pieza ya
+#                  preparada, y marca el manifiesto phase=published.
+#
+# La app pasa un `nonce` para distinguir su corrida. Ver scripts/autopilot
+# no aplica acá — esto es 100% manual, iniciado por Pablo.
+name: Publicar ahora (story)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "prepare | publish"
+        required: true
+        default: "prepare"
+      oferta:
+        description: "Dimensión (personal, organizacional, comercial, empresarial, profesionalizacion, sociales)"
+        required: false
+        default: ""
+      nonce:
+        description: "Identificador de la corrida (lo pone el EDA)"
+        required: false
+        default: "manual"
+
+# Comparte grupo con daily-story para que nunca corran a la vez (los dos
+# tocan content/work/ y content/published/).
+concurrency:
+  group: daily-story
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: ${{ inputs.mode == 'prepare' }}
+    name: Preparar (generar + renderizar, sin publicar)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar Playwright
+        run: npm install playwright
+
+      - name: Instalar Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Generar copy (Claude)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PUBLISH_NOW: "1"
+          PUBLISH_NOW_OFERTA: ${{ inputs.oferta }}
+        run: node scripts/generate-brief.mjs
+
+      - name: Renderizar imagen
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PUBLISH_NOW: "1"
+        run: node scripts/render-story.mjs
+
+      - name: Marcar manifiesto = prepared
+        run: node scripts/publish-now-manifest.mjs prepared "${{ inputs.nonce }}"
+
+      - name: Marcar manifiesto = error (si algo falló)
+        if: failure()
+        run: node scripts/publish-now-manifest.mjs error "${{ inputs.nonce }}" "Falló la preparación — revisá el log de esta corrida en GitHub Actions."
+
+      - name: Commitear
+        if: always()
+        run: |
+          git config user.name "mejora-story-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add content/published content/used content/inbox content/work/publish-now.json content/work/publish-now-briefs.json content/work/publish-now-renders.json content/log
+          git diff --cached --quiet || git commit -m "publicar ahora: preparar ($(date -u +%H:%M) UTC)"
+          git pull --rebase --autostash origin main || true
+          git push
+
+  publish:
+    if: ${{ inputs.mode == 'publish' }}
+    name: Publicar en Instagram y Facebook
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Publicar (Zernio)
+        env:
+          ZERNIO_API_KEY: ${{ secrets.ZERNIO_API_KEY }}
+          ZERNIO_INSTAGRAM_ACCOUNT_ID: ${{ secrets.ZERNIO_INSTAGRAM_ACCOUNT_ID }}
+          ZERNIO_FACEBOOK_ACCOUNT_ID: ${{ secrets.ZERNIO_FACEBOOK_ACCOUNT_ID }}
+          RAW_BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/main
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PUBLISH_NOW: "1"
+        run: node scripts/publish-story.mjs
+
+      - name: Marcar manifiesto = published
+        run: node scripts/publish-now-manifest.mjs published "${{ inputs.nonce }}"
+
+      - name: Marcar manifiesto = error (si falló)
+        if: failure()
+        run: node scripts/publish-now-manifest.mjs error "${{ inputs.nonce }}" "Falló la publicación en Zernio — revisá el log de esta corrida."
+
+      - name: Commitear manifiesto
+        if: always()
+        run: |
+          git config user.name "mejora-story-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add content/work/publish-now.json
+          git diff --cached --quiet || git commit -m "publicar ahora: resultado ($(date -u +%H:%M) UTC)"
+          git pull --rebase --autostash origin main || true
+          git push

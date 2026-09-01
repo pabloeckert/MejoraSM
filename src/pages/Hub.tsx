@@ -37,6 +37,7 @@ import { useGithubConnection, useDirListing, usePhotoUpload } from "@/hooks/useG
 import { suggestPhotoDimension } from "@/services/ai";
 import { toast } from "@/hooks/use-toast";
 import { DIMENSIONES, dimensionLabel } from "@/shared/constants";
+import { PublishNowCard } from "@/components/PublishNowCard";
 
 // Rediseño 2026-08-17, a pedido directo de Pablo: "Subir material" dejó de
 // ser 5 links a la UI cruda de upload de GitHub — ahora es una interfaz
@@ -527,6 +528,8 @@ export default function Hub() {
           )}
         </CardContent>
       </Card>
+
+      <PublishNowCard dimension={selectedDim} connected={connected} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

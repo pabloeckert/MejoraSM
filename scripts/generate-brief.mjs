@@ -28,7 +28,16 @@ const USED_DIR = path.join(ROOT, "content/used");
 const WORK_DIR = path.join(ROOT, "content/work");
 const PUBLISHED_DIR = path.join(ROOT, "content/published");
 const IDENTIDAD_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraIdentidad/main/SKILL.md";
-const MAX_STORIES = 2;
+
+// "Publicar ahora" (2026-09-01, pedido de Pablo) — modo bajo demanda desde el
+// EDA: una foto puntual, sin el freno de una-por-día, y con archivos de
+// trabajo propios (publish-now-*.json) para no pisarse con el cron diario si
+// los dos corren cerca. PUBLISH_NOW_OFERTA fija de qué carpeta sale.
+const PUBLISH_NOW = process.env.PUBLISH_NOW === "1";
+const PN_OFERTA = (process.env.PUBLISH_NOW_OFERTA || "").trim();
+const MAX_STORIES = PUBLISH_NOW ? 1 : 2;
+const BRIEFS_FILE = PUBLISH_NOW ? "publish-now-briefs.json" : "briefs.json";
+const RUN_SOURCE = PUBLISH_NOW ? "publish-now" : "daily-story";
 
 const EXT_TO_MIME = {
   ".jpg": "image/jpeg",
@@ -134,14 +143,15 @@ Respondé ÚNICAMENTE con JSON válido, sin nada antes ni después:
 async function findInboxItems() {
   if (!existsSync(INBOX_DIR)) return { photos: [], videosSkipped: [] };
 
-  const ofertaDirs = Object.keys(OFERTAS);
+  // En modo "publicar ahora" solo miramos la carpeta de la dimensión pedida.
+  const ofertaDirs = PUBLISH_NOW && PN_OFERTA ? [PN_OFERTA] : Object.keys(OFERTAS);
   const photos = [];
   const videosSkipped = [];
 
   for (const oferta of ofertaDirs) {
     const dir = path.join(INBOX_DIR, oferta);
     if (!existsSync(dir)) continue;
-    const files = (await readdir(dir)).sort();
+    const files = (await readdir(dir)).sort(); // nombre = YYYYMMDD-HHMMSS-... → orden cronológico
     for (const f of files) {
       const ext = path.extname(f).toLowerCase();
       if (Object.keys(EXT_TO_MIME).includes(ext)) {
@@ -152,7 +162,10 @@ async function findInboxItems() {
     }
   }
 
-  return { photos: photos.slice(0, MAX_STORIES), videosSkipped };
+  // Diario: las primeras N. Publicar ahora: la MÁS reciente (la que Pablo
+  // acaba de subir), no la primera de la carpeta.
+  const picked = PUBLISH_NOW ? photos.slice(-MAX_STORIES) : photos.slice(0, MAX_STORIES);
+  return { photos: picked, videosSkipped };
 }
 
 // Tolera que el modelo agregue texto antes/después del JSON pese a la
@@ -222,12 +235,18 @@ async function alreadyGeneratedToday(today) {
 
 async function main(elapsed) {
   const today = new Date().toISOString().slice(0, 10);
-  if (await alreadyGeneratedToday(today)) {
+  // El freno de una-por-día NO aplica a "publicar ahora" — es una acción
+  // manual y puntual de Pablo, no el cron.
+  if (!PUBLISH_NOW && (await alreadyGeneratedToday(today))) {
     console.log(
       `Ya se generó contenido para hoy (${today}) — no genero de nuevo para evitar publicaciones duplicadas. Si necesitás reintentar una plataforma que falló parcialmente, hacelo manualmente contra el post existente, no re-corriendo este workflow completo.`
     );
     await logRun({ source: "daily-story", step: "generate-brief", status: "skipped", durationMs: elapsed(), metadata: { reason: "already-generated-today", today } });
     process.exit(0);
+  }
+
+  if (PUBLISH_NOW && !PN_OFERTA) {
+    throw new Error("PUBLISH_NOW sin PUBLISH_NOW_OFERTA — falta la dimensión.");
   }
 
   await mkdir(WORK_DIR, { recursive: true });
@@ -240,6 +259,10 @@ async function main(elapsed) {
   if (videosSkipped.length > 0) {
     console.log(`Videos detectados pero NO procesados (soporte de video aún no construido):`);
     videosSkipped.forEach((v) => console.log(`  - ${v.oferta}/${v.name}`));
+  }
+
+  if (PUBLISH_NOW && photos.length === 0) {
+    throw new Error(`No hay ninguna foto en content/inbox/${PN_OFERTA}/ para publicar ahora.`);
   }
 
   const briefs = [];
@@ -264,7 +287,7 @@ async function main(elapsed) {
     }
   }
 
-  await writeFile(path.join(WORK_DIR, "briefs.json"), JSON.stringify(briefs, null, 2));
+  await writeFile(path.join(WORK_DIR, BRIEFS_FILE), JSON.stringify(briefs, null, 2));
   console.log(`${briefs.length} brief(s) generado(s):`);
   briefs.forEach((b, i) => console.log(`  ${i + 1}. [${b.mode}${b.oferta ? "/" + b.oferta : ""}] ${b.headline}`));
 
@@ -272,12 +295,12 @@ async function main(elapsed) {
     await rename(item.path, path.join(USED_DIR, item.oferta, item.name));
   }
 
-  await logRun({ source: "daily-story", step: "generate-brief", status: "success", durationMs: elapsed(), metadata: { briefsCount: briefs.length, videosSkipped: videosSkipped.length } });
+  await logRun({ source: RUN_SOURCE, step: "generate-brief", status: "success", durationMs: elapsed(), metadata: { briefsCount: briefs.length, videosSkipped: videosSkipped.length } });
 }
 
 const elapsed = startTimer();
 main(elapsed).catch(async (e) => {
   console.error(e);
-  await logRun({ source: "daily-story", step: "generate-brief", status: "error", durationMs: elapsed(), error: String(e?.message || e) });
+  await logRun({ source: RUN_SOURCE, step: "generate-brief", status: "error", durationMs: elapsed(), error: String(e?.message || e) });
   process.exit(1);
 });

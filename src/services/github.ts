@@ -99,6 +99,25 @@ async function listDir(path: string): Promise<GhFileEntry[]> {
   }));
 }
 
+// Lee un archivo JSON del repo vía la API de contents (api.github.com está
+// en el connect-src del CSP; raw.githubusercontent.com no). Usado para
+// pollear content/work/publish-now.json en el flujo "Publicar ahora".
+async function getJsonFile<T = unknown>(path: string): Promise<T | null> {
+  const url = `${apiBase()}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}?ref=${GH_BRANCH}&t=${Date.now()}`;
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: { ...apiHeaders(isConnected()), "Cache-Control": "no-cache" } });
+  } catch {
+    throw new Error("No se pudo contactar GitHub — probá de nuevo.");
+  }
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GitHub ${res.status}`);
+  const data = await res.json();
+  if (data.encoding !== "base64" || !data.content) return null;
+  const bytes = Uint8Array.from(atob(data.content.replace(/\n/g, "")), (c) => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder("utf-8").decode(bytes)) as T;
+}
+
 // Dispara un workflow_dispatch real (manage-post.yml / manage-story.yml /
 // mark-manual.yml) directo desde el navegador — hallazgo real 2026-08-26:
 // Pablo reportó que reintentar/despublicar/marcar a mano lo mandaba a
@@ -202,5 +221,6 @@ export const github = {
   putFile,
   commitPhoto,
   triggerWorkflow,
+  getJsonFile,
   rawUrl,
 };
