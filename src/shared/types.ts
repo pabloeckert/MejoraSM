@@ -29,4 +29,5 @@ export interface DocRow {
   content?: string | null;
   processing_status?: string | null;
   processing_error?: string | null;
+  category?: string | null;
 }

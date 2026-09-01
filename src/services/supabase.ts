@@ -87,6 +87,10 @@ export const documentsApi = {
     return doc;
   },
 
+  // Fase C (2026-08-31): corregir a mano la categoría que propuso vault-process.
+  setCategory: (id: string, category: string) =>
+    supabase.from("documents").update({ category }).eq("id", id),
+
   delete: async (id: string) => {
     // Obtener path
     const { data: doc } = await supabase

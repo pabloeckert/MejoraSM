@@ -128,6 +128,86 @@ function chunkText(text: string, maxTokens = 500, overlap = 50): string[] {
 }
 
 // ═══════════════════════════════════════
+// CLASIFICACIÓN DE TIPO DE DOCUMENTO — Fase C (2026-08-31)
+//
+// El brief de rediseño pide que la Bóveda ("Manual de Identidad de Marca")
+// organice los documentos por tipo y que el sistema lo proponga solo. Un
+// llamado corto al LLM (mismo par anthropic→groq que el resto del stack)
+// sobre el título + los primeros ~2500 chars del texto ya extraído.
+// ═══════════════════════════════════════
+
+const DOC_CATEGORIES = ["manual", "buyer_persona", "tono", "ejemplo", "otro"] as const;
+type DocCategory = (typeof DOC_CATEGORIES)[number];
+
+async function callLLM(system: string, user: string): Promise<string> {
+  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (anthropicKey) {
+    try {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-5",
+          max_tokens: 64,
+          system,
+          messages: [{ role: "user", content: user }],
+        }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        return (data.content?.[0]?.text ?? "").trim();
+      }
+      console.warn(`[vault-process] Anthropic clasificación ${r.status}, fallback a Groq`);
+    } catch (e: any) {
+      console.warn(`[vault-process] Anthropic clasificación falló (${e.message}), fallback a Groq`);
+    }
+  }
+
+  const groqKey = Deno.env.get("GROQ_API_KEY");
+  if (!groqKey) throw new Error("Sin ANTHROPIC_API_KEY ni GROQ_API_KEY para clasificar");
+  const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "openai/gpt-oss-120b",
+      max_tokens: 64,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    }),
+  });
+  if (!r.ok) throw new Error(`Groq clasificación error ${r.status}`);
+  const data = await r.json();
+  return (data.choices?.[0]?.message?.content ?? "").trim();
+}
+
+async function classifyDocument(title: string, content: string): Promise<DocCategory> {
+  const system =
+    "Clasificás documentos de identidad de marca en UNA de estas categorías, respondiendo SOLO con la palabra exacta:\n" +
+    "- manual: manual de marca, guía de estilo, criterio medular, arquitectura de contenido, valores, lineamientos generales\n" +
+    "- buyer_persona: descripción de un público / cliente ideal / arquetipo de audiencia\n" +
+    "- tono: guía de tono y voz, cómo se escribe, qué decir y qué no\n" +
+    "- ejemplo: una pieza de ejemplo, un post modelo, un caso concreto de contenido ya hecho\n" +
+    "- otro: no encaja claramente en las anteriores\n" +
+    "Respondé únicamente con: manual, buyer_persona, tono, ejemplo u otro.";
+  const user = `TÍTULO: ${title}\n\nTEXTO (recorte):\n${content.slice(0, 2500)}`;
+
+  try {
+    const raw = (await callLLM(system, user)).toLowerCase().replace(/[^a-z_]/g, "");
+    const match = DOC_CATEGORIES.find((c) => raw === c || raw.includes(c));
+    return match ?? "otro";
+  } catch (e: any) {
+    console.warn(`[vault-process] Clasificación falló, category=otro: ${e.message}`);
+    return "otro";
+  }
+}
+
+// ═══════════════════════════════════════
 // EMBEDDINGS (llamada directa a HF)
 // ═══════════════════════════════════════
 
@@ -271,6 +351,14 @@ async function processDocumentInner(documentId: string) {
       .eq("id", documentId);
 
     if (updateError) throw new Error(`Error guardando contenido: ${updateError.message}`);
+  }
+
+  // 2b. Clasificar el tipo de documento (Fase C 2026-08-31) — solo si no
+  // tiene categoría todavía (el humano pudo haberla fijado a mano desde la
+  // UI, en cuyo caso se respeta). No frena el procesamiento si falla.
+  if (!doc.category) {
+    const category = await classifyDocument(doc.title || doc.file_path, content);
+    await supabase.from("documents").update({ category }).eq("id", documentId);
   }
 
   // 3. Chunking

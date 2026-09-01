@@ -79,7 +79,7 @@ export function Onboarding() {
       ),
     },
     {
-      title: "Paso 1: Bóveda de Conocimiento",
+      title: "Paso 1: Manual de Marca",
       description: "Subí tus documentos de marca para que los agentes aprendan tu tono y estilo.",
       icon: Upload,
       content: (

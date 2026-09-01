@@ -80,6 +80,19 @@ export function useDeleteDocument() {
   });
 }
 
+export function useSetDocumentCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, category }: { id: string; category: string }) => {
+      const { error } = await documentsApi.setCategory(id, category);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["documents"] }),
+    onError: (err: Error) =>
+      toast({ variant: "destructive", title: "No se pudo cambiar la categoría", description: err.message }),
+  });
+}
+
 export function useProcessDocument() {
   const qc = useQueryClient();
   return useMutation({

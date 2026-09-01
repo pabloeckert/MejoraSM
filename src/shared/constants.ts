@@ -44,3 +44,18 @@ export const AUTO_AGENDA_DIMENSIONES = DIMENSIONES.filter((d) => d.key !== "soci
 
 export const dimensionLabel = (key?: string | null) =>
   DIMENSIONES.find((d) => d.key === key)?.label ?? key ?? "";
+
+// Fase C (2026-08-31): tipos de documento de la Bóveda / "Manual de Identidad
+// de Marca". vault-process propone la categoría al procesar (LLM); el humano
+// la corrige desde /boveda. Espejo del lado servidor: DOC_CATEGORIES en
+// supabase/functions/vault-process/index.ts.
+export const DOC_CATEGORIES = [
+  { key: "manual", label: "Manual y criterio" },
+  { key: "buyer_persona", label: "Buyer personas" },
+  { key: "tono", label: "Tono y voz" },
+  { key: "ejemplo", label: "Ejemplos de piezas" },
+  { key: "otro", label: "Otros" },
+] as const;
+
+export const docCategoryLabel = (key?: string | null) =>
+  DOC_CATEGORIES.find((c) => c.key === key)?.label ?? "Sin clasificar";

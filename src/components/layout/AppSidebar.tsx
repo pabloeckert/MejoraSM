@@ -30,7 +30,7 @@ const navGroups: { label: string; items: { label: string; icon: typeof LayoutDas
     label: "Crear contenido",
     items: [
       { label: "Subir material", icon: Upload, path: "/hub" },
-      { label: "Bóveda", icon: BookOpen, path: "/boveda" },
+      { label: "Manual de Marca", icon: BookOpen, path: "/boveda" },
       { label: "Mesa de Diálogo", icon: MessageSquare, path: "/mesa" },
     ],
   },

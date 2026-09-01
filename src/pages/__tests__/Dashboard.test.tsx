@@ -169,7 +169,7 @@ describe("Dashboard Page", () => {
   it("renders operational stat cards with correct counts", async () => {
     const { default: Dashboard } = await import("@/pages/Dashboard");
     renderWithProviders(<Dashboard />);
-    expect(screen.getByText("Documentos en Bóveda")).toBeInTheDocument();
+    expect(screen.getByText("Documentos de marca")).toBeInTheDocument();
     expect(screen.getByText("Diálogos creados")).toBeInTheDocument();
     expect(screen.getByText("Contenidos generados")).toBeInTheDocument();
     expect(screen.getByText("Publicaciones programadas")).toBeInTheDocument();

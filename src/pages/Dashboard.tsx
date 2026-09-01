@@ -212,7 +212,7 @@ function AttentionStrip({
   if (soon > 0)
     items.push({ text: `${soon} ${soon === 1 ? "pieza se publica" : "piezas se publican"} en las próximas 2 h`, href: "/calendario" });
   if (failedDocs > 0)
-    items.push({ text: `${failedDocs} ${failedDocs === 1 ? "documento" : "documentos"} sin procesar en la Bóveda`, href: "/boveda" });
+    items.push({ text: `${failedDocs} ${failedDocs === 1 ? "documento" : "documentos"} sin procesar en el Manual de Marca`, href: "/boveda" });
 
   if (items.length === 0) return null;
 
@@ -577,7 +577,7 @@ function DashboardContent() {
 
   const metricCards = [
     {
-      label: "Documentos en Bóveda",
+      label: "Documentos de marca",
       value: String(documents?.length ?? 0),
       sub: "Subí fotos para empezar a nutrir Stories.",
       href: "/boveda",
@@ -882,7 +882,7 @@ function DashboardContent() {
               <div className="flex h-[220px] flex-col items-center justify-center px-6 text-center">
                 <p className="text-[13.5px] font-semibold">Sin piezas generadas todavía.</p>
                 <p className="mt-1 text-[12.5px] text-muted-foreground">
-                  Subí material a la Bóveda o armá una pieza para empezar a ver la mezcla de formatos.
+                  Subí material al Manual de Marca o armá una pieza para empezar a ver la mezcla de formatos.
                 </p>
               </div>
             )}

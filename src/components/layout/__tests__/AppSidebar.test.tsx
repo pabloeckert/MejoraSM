@@ -13,7 +13,7 @@ describe("AppSidebar", () => {
 
     // Se renderiza dos veces (barra mobile con Sheet cerrado + aside de escritorio),
     // pero el aside de escritorio siempre está en el DOM (solo oculto por CSS).
-    const bovedaLinks = screen.getAllByRole("link", { name: /Bóveda/i });
+    const bovedaLinks = screen.getAllByRole("link", { name: /Manual de Marca/i });
     expect(bovedaLinks.length).toBeGreaterThan(0);
     const activeLink = bovedaLinks.find((el) => el.getAttribute("aria-current") === "page");
     expect(activeLink).toBeTruthy();
