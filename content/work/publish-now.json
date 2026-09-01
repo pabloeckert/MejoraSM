@@ -1,8 +1,8 @@
 {
-  "nonce": "1788270278215-16amy9",
-  "phase": "prepared",
-  "error": null,
-  "updatedAt": "2026-09-01T13:45:54.307Z",
+  "nonce": "1788271816783-lq8wow",
+  "phase": "error",
+  "error": "Falló la preparación — revisá el log de esta corrida en GitHub Actions.",
+  "updatedAt": "2026-09-01T14:11:53.358Z",
   "oferta": "organizacional",
   "headline": "Una reunión sin registro es una reunión que se repite",
   "subtext": "No es falta de memoria, es falta de proceso. Documentar decisiones libera al equipo, no lo burocratiza.",
