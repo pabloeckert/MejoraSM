@@ -33,6 +33,7 @@ import { useDialogueSessions } from "@/hooks/useDialogue";
 import { usePendingProposals, useProposals } from "@/hooks/useProposals";
 import { useAllMetrics } from "@/hooks/useMetrics";
 import { useInsights } from "@/hooks/useInsights";
+import { useInbox, buildThreads, isUnanswered } from "@/hooks/useInbox";
 import { historialApi } from "@/services/supabase";
 import { CopilotCard } from "@/components/CopilotCard";
 import { InsightsSection } from "@/components/InsightsSection";
@@ -198,10 +199,12 @@ function AttentionStrip({
   pendingHistorias,
   soon,
   failedDocs,
+  unanswered,
 }: {
   pendingHistorias: number;
   soon: number;
   failedDocs: number;
+  unanswered: number;
 }) {
   const items: { text: string; href: string }[] = [];
   if (pendingHistorias > 0)
@@ -211,6 +214,11 @@ function AttentionStrip({
     });
   if (soon > 0)
     items.push({ text: `${soon} ${soon === 1 ? "pieza se publica" : "piezas se publican"} en las próximas 2 h`, href: "/calendario" });
+  if (unanswered > 0)
+    items.push({
+      text: `${unanswered} ${unanswered === 1 ? "conversación sin responder" : "conversaciones sin responder"}`,
+      href: "/conversaciones",
+    });
   if (failedDocs > 0)
     items.push({ text: `${failedDocs} ${failedDocs === 1 ? "documento" : "documentos"} sin procesar en el Manual de Marca`, href: "/boveda" });
 
@@ -282,6 +290,11 @@ function DashboardContent() {
   const { data: proposals, isLoading: proposalsLoading } = useProposals();
   const { data: pendingProposals } = usePendingProposals();
   const { data: allMetrics } = useAllMetrics();
+  const { data: inboxItems } = useInbox();
+  const unansweredConversations = useMemo(
+    () => buildThreads(inboxItems || []).filter(isUnanswered).length,
+    [inboxItems]
+  );
 
   const [showTestRows, setShowTestRows] = useState(false);
   const [detail, setDetail] = useState<DetailContent | null>(null);
@@ -678,6 +691,7 @@ function DashboardContent() {
         pendingHistorias={(pendingProposals || []).filter((p: { format?: string }) => p.format === "historia").length}
         soon={scheduledUpcoming.filter((p) => new Date(p.scheduled_at as string).getTime() - Date.now() < 2 * 60 * 60 * 1000).length}
         failedDocs={(documents || []).filter((d: { processing_status?: string }) => d.processing_status === "error").length}
+        unanswered={unansweredConversations}
       />
 
       {/* Quick start banner for new users */}

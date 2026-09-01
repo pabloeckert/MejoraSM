@@ -9,6 +9,7 @@ import {
   FileCheck,
   Upload,
   MonitorPlay,
+  MessagesSquare,
   ShieldCheck,
   Menu,
   LogOut,
@@ -41,6 +42,7 @@ const navGroups: { label: string; items: { label: string; icon: typeof LayoutDas
       { label: "Propuestas", icon: FileCheck, path: "/propuestas" },
       { label: "Calendario", icon: CalendarDays, path: "/calendario" },
       { label: "Monitor", icon: MonitorPlay, path: "/monitor" },
+      { label: "Conversaciones", icon: MessagesSquare, path: "/conversaciones" },
     ],
   },
   {

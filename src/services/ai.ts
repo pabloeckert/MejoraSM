@@ -265,3 +265,36 @@ export async function suggestPhotoDimension(imageBase64: string, mimeType: strin
   );
   return handleResponse(res, "Error sugiriendo la dimensión de la foto");
 }
+
+// ═══════════════════════════════════════
+// INBOX (Bandeja de conversaciones — Fase 1 del plan de publicación 2026)
+// ═══════════════════════════════════════
+
+const INBOX_SYNC_TIMEOUT_MS = 120_000; // trae comentarios + DMs de 2 cuentas + clasifica
+
+export async function syncInbox(): Promise<{ pulled: number; new: number; classified: number }> {
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/inbox`,
+    { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "sync" }) },
+    INBOX_SYNC_TIMEOUT_MS
+  );
+  return handleResponse(res, "Error sincronizando la bandeja");
+}
+
+export async function draftInboxReply(itemId: string): Promise<{ draft: string }> {
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/inbox`,
+    { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "draft", itemId }) },
+    QUICK_TIMEOUT_MS
+  );
+  return handleResponse(res, "Error redactando la respuesta sugerida");
+}
+
+export async function sendInboxReply(itemId: string, message: string): Promise<{ ok: boolean }> {
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/inbox`,
+    { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "reply", itemId, message }) },
+    QUICK_TIMEOUT_MS
+  );
+  return handleResponse(res, "Error enviando la respuesta");
+}

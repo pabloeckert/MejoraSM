@@ -361,3 +361,47 @@ export const historialApi = {
       .eq("id", 1);
   },
 };
+
+// ═══════════════════════════════════════
+// BANDEJA DE CONVERSACIONES (Fase 1 plan de publicación 2026)
+// ═══════════════════════════════════════
+
+export interface InboxItem {
+  id: string;
+  kind: "comment" | "dm";
+  platform: string;
+  thread_id: string;
+  external_id: string;
+  author_name: string | null;
+  author_username: string | null;
+  author_is_follower: boolean | null;
+  text: string | null;
+  attachment_url: string | null;
+  direction: "incoming" | "outgoing";
+  sentiment: "positivo" | "neutral" | "negativo" | "pregunta" | null;
+  sentiment_note: string | null;
+  item_time: string | null;
+  replied_at: string | null;
+  archived: boolean;
+}
+
+export const inboxApi = {
+  // Trae los hilos entrantes (los outgoing se muestran anidados por thread).
+  list: () =>
+    fetchAllPages<InboxItem>((from, to) =>
+      supabase
+        .from("inbox_items")
+        .select("*")
+        .order("item_time", { ascending: false, nullsFirst: false })
+        .range(from, to)
+    ),
+
+  syncState: () =>
+    supabase.from("inbox_sync_state").select("last_synced_at, last_error").eq("id", 1).maybeSingle(),
+
+  setArchived: (id: string, archived: boolean) =>
+    supabase.from("inbox_items").update({ archived }).eq("id", id),
+
+  markReplied: (id: string) =>
+    supabase.from("inbox_items").update({ replied_at: new Date().toISOString() }).eq("id", id),
+};
