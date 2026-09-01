@@ -2,22 +2,17 @@
 //
 // Guard de autorización compartido por todas las Edge Functions del EDA.
 //
-// 2026-08-25 — DESACTIVADO A PROPÓSITO, decisión explícita de Pablo, no un
-// descuido: "es para uso personal, saca el login... que sea sin login". Se
-// le explicó el riesgo real antes de tocar nada (sitio en URL pública de
-// GitHub Pages, sin login cualquiera con el link podría publicar en
-// Instagram/Facebook real, borrar datos, gastar créditos de IA, o leer la
-// Bóveda de marca) y confirmó igual: "Nada, es para uso interno entonces
-// quiero abrir como cualquier cosa... doble click y listo". Ver también
-// 019_open_access_personal_use.sql (revierte el RLS real a "Allow all") y
-// CLAUDE.md, sección "Remoción deliberada del login — uso personal,
-// 2026-08-25" para el detalle completo.
+// Cada función exige UNA de estas dos cosas:
+//   1. Un JWT de Supabase Auth cuyo email esté en app_admins (llamadas del
+//      frontend, con sesión iniciada — una sola cuenta compartida).
+//   2. La SUPABASE_SERVICE_ROLE_KEY como Bearer token (server-to-server:
+//      cron de GitHub Actions, otra Edge Function).
 //
-// Ahora acepta también la anon key pelada como credencial válida — es la
-// única que el frontend manda desde que no hay sesión de Supabase Auth.
-// Se deja intacta la validación de JWT de admin y de service-role por si en
-// algún momento se quiere volver a cerrar el acceso (alcanza con sacar la
-// rama de la anon key de acá abajo y reaplicar 006_real_rls_and_auth.sql).
+// 2026-08-31 — se sacó la rama que aceptaba la anon key pelada (agregada el
+// 2026-08-25 cuando el EDA quedó abierto). Pablo pidió volver a cerrar el
+// acceso con usuario/contraseña — ver 023_reclose_access_password.sql y
+// CLAUDE.md, sección "Reinstauración del login — usuario/contraseña,
+// 2026-08-31".
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 export interface AuthResult {
@@ -46,8 +41,10 @@ export async function requireAuth(req: Request): Promise<AuthResult> {
     return { ok: false, status: 500, error: "Config de Supabase incompleta en la función" };
   }
 
+  // La anon key pelada ya NO alcanza (rama sacada el 2026-08-31) — hace
+  // falta un JWT real de un usuario en app_admins, o el service role.
   if (token === anonKey) {
-    return { ok: true, email: "anon-sin-login" };
+    return { ok: false, status: 401, error: "Necesitás iniciar sesión" };
   }
 
   const client = createClient(supabaseUrl, anonKey);

@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Onboarding } from "@/components/Onboarding";
+import { AuthGate } from "@/components/AuthGate";
 
 // PM6 (auditoría 2026-08-31): antes las 11 páginas se importaban estáticas.
 // El caso de uso más citado del repo (subir una foto del celu) cargaba igual
@@ -51,28 +52,30 @@ const App = () => (
       <Toaster />
       <Sonner />
       <HashRouter>
-        <Onboarding />
-        <ErrorBoundary>
-          <Suspense fallback={<RouteFallback />}>
-            <Routes>
-              <Route element={<AppLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/boveda" element={<Boveda />} />
-                <Route path="/mesa" element={<MesaDialogo />} />
-                {/* Fase B (2026-08-31): Laboratorio se fusionó con Mesa de Diálogo (brief 2026-08-16). */}
-                <Route path="/laboratorio" element={<Navigate to="/mesa" replace />} />
-                <Route path="/configuracion" element={<Configuracion />} />
-                <Route path="/calendario" element={<Calendario />} />
-                <Route path="/propuestas" element={<Propuestas />} />
-                <Route path="/hub" element={<Hub />} />
-                <Route path="/monitor" element={<Monitor />} />
-                <Route path="/biblioteca" element={<Biblioteca />} />
-                <Route path="/auditoria" element={<Auditoria />} />
-                <Route path="*" element={<NotFound />} />
-              </Route>
-            </Routes>
-          </Suspense>
-        </ErrorBoundary>
+        <AuthGate>
+          <Onboarding />
+          <ErrorBoundary>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route element={<AppLayout />}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/boveda" element={<Boveda />} />
+                  <Route path="/mesa" element={<MesaDialogo />} />
+                  {/* Fase B (2026-08-31): Laboratorio se fusionó con Mesa de Diálogo (brief 2026-08-16). */}
+                  <Route path="/laboratorio" element={<Navigate to="/mesa" replace />} />
+                  <Route path="/configuracion" element={<Configuracion />} />
+                  <Route path="/calendario" element={<Calendario />} />
+                  <Route path="/propuestas" element={<Propuestas />} />
+                  <Route path="/hub" element={<Hub />} />
+                  <Route path="/monitor" element={<Monitor />} />
+                  <Route path="/biblioteca" element={<Biblioteca />} />
+                  <Route path="/auditoria" element={<Auditoria />} />
+                  <Route path="*" element={<NotFound />} />
+                </Route>
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
+        </AuthGate>
       </HashRouter>
     </TooltipProvider>
   </QueryClientProvider>

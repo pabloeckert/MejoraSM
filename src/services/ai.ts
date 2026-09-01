@@ -10,10 +10,12 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.warn("[ai.ts] Variables de entorno de Supabase no configuradas. Las funciones de IA no funcionarán.");
 }
 
-// 2026-08-25: sin login (decisión explícita de Pablo, ver CLAUDE.md), nunca
-// hay sesión real — accessToken siempre cae al anon key, que
-// supabase/functions/_shared/auth.ts acepta ahora como credencial válida.
-// `apikey` sigue siendo el anon key (lo exige el gateway de Supabase).
+// 2026-08-31: el EDA volvió a tener login (usuario/contraseña, una sola
+// cuenta) — las Edge Functions exigen de nuevo el JWT real del usuario
+// (ver supabase/functions/_shared/auth.ts). `Authorization` lleva el
+// access_token de la sesión; `apikey` sigue siendo el anon key (lo exige
+// el gateway de Supabase). Sin sesión no hay llamada válida — el AuthGate
+// no deja llegar acá sin login.
 async function buildHeaders() {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token ?? SUPABASE_ANON_KEY;
