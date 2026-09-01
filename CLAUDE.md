@@ -18,7 +18,7 @@ Este archivo tiene dos mitades:
 | Pieza | Estado | Desde |
 |---|---|---|
 | **Stories diarias** | 100% automáticas, cron `daily-story.yml` 13:00 UTC | producción desde jul-2026 |
-| **Posts/carruseles de feed** | 100% automáticos (Crítico aprueba → autoagenda → publica), cron `publish-scheduled-posts.yml` cada 15 min | reactivado 2026-08-24 (estuvo pausado 2026-08-05 → 08-24) |
+| **Posts/carruseles de feed** | 100% automáticos (Crítico aprueba → autoagenda → publica), cron `publish-scheduled-posts.yml` cada 15 min. **Elección de tema**: manual (Mesa de Diálogo) **o** autónoma vía `autopilot-cron.yml` (modo libre lun/mié/vie + email de aviso con ventana de veto — ver "Autopilot" en la bitácora; schedule **comentado** hasta cargar `RESEND_API_KEY`) | reactivado 2026-08-24; autopilot agregado 2026-09-01 |
 | **Login / auth del EDA** | **reinstaurado** — usuario/contraseña (Supabase Auth), UNA sola cuenta compartida (`pabloeckert@gmail.com`, la de `app_admins`). Sin alta de cuenta, sin OTP. Blanqueo por email → `/app/reset.html`. `AuthGate` envuelve la app | 2026-08-31 |
 | **RLS de Supabase** | **cerrado de nuevo** (`is_app_admin()`, migración `023` revierte `019`) en las 15 tablas + bucket `vault`. `_shared/auth.ts` volvió a exigir JWT real de `app_admins` o service-role (sin rama anon key) | 2026-08-31 |
 | **CI (`ci.yml`)** | **lint + tsc bloqueantes de nuevo** — la deuda bajó de 42 errores a 0; ESLint acotado a `src/**` (Deno fuera de scope). test + build siguen corriendo | 2026-08-31 (batch 8 de la auditoría) |
@@ -198,7 +198,7 @@ Esta es la vara contra la que se midió cada pieza del repo (registro completo e
 
 **Decisiones explícitas de no automatizar (siguen vigentes):**
 - **No se renombra "EDA" en código/rutas/Edge Functions.** El nombre del producto es MejoraSM; "EDA" es el nombre interno del módulo de estrategia con IA (como "Stories" es el nombre del módulo de historias) — tocar rutas, funciones y el proyecto de Supabase por naming es riesgo real por beneficio cosmético.
-- **La elección del tema en Mesa de Diálogo sigue siendo manual.** Pablo mantiene el criterio sobre qué tema vale la pena convertir en propuesta — lo que se automatizó (2026-08-02) es todo lo que pasa *después* de que el Crítico aprueba, no la elección inicial del tema. Sacar ese gate sería una decisión de negocio aparte, no técnica.
+- **La elección del tema puede ser manual (Mesa de Diálogo) o autónoma (`autopilot`).** Hasta el 2026-09-01 la elección del tema era el único gate humano. Pablo decidió agregar una vía autónoma (modo libre lun/mié/vie) pero **con aviso previo y ventana de veto** — no un gate bloqueante: la pieza se agenda para horas después y le llega un email; si no la cancela desde `/propuestas`, sale. Ver "Autopilot" en la bitácora. La vía manual sigue intacta.
 
 ## Estado del EDA y overhaul de autonomía — actualizado 2026-08-02
 
@@ -1398,6 +1398,27 @@ Cerrado el plan A-E, Pablo definió la puerta de acceso que la Fase E había dej
 2. Tener/setear la contraseña de `pabloeckert@gmail.com`. Si no la recuerda: "Olvidé la contraseña" en el login (después del punto 1).
 
 **El "rol read-only para Sindy" queda descartado a pedido de Pablo** — la parte de `proposal_comments` (Fase E) se mantiene porque sirve igual con una cuenta compartida (deja notas ancladas a una pieza).
+
+## Autopilot — modo libre autónomo con aviso previo — 2026-09-01
+
+Al cerrar el plan A-E, se le presentó a Pablo el problema real de fondo: el sistema no tiene datos (`metrics` ~3-4 filas reales, `success_rules` vacía, `rule-engine`/insights sin señal) porque no se publica con volumen, y el cuello de botella es que elegir el tema de un post/carrusel todavía es manual. Se le ofreció automatizarlo. Eligió: **modo libre automático 3x por semana (lun/mié/vie), con aviso por email antes de cada publicación, en modo veto** (se publica salvo que cancele) — no aprobación bloqueante.
+
+**Implementación:**
+- `scripts/autopilot.mjs` + `.github/workflows/autopilot-cron.yml` (schedule `0 6 * * 1,3,5`, **comentado** hasta probar el email real — solo `workflow_dispatch` por ahora).
+- Cada corrida: `POST /functions/v1/orchestrator { action: "start", mode: "auto" }` con la service-role key (el EDA está cerrado desde `023`). `orchestrator` ya hace todo: `pickAutoTopic()` elige tema (sin repetir los últimos 15), debate, y si el Crítico aprueba un post/carrusel lo auto-agenda.
+- Si el Crítico **no** aprueba → `run_log` `skipped`, nada más (sin feedback humano, no hay reintento en la misma corrida — se reintenta el lun/mié/vie siguiente). En las pruebas el Crítico rechaza ~50% en primera ronda, así que el ritmo real esperado es ~1-2 piezas publicadas por semana.
+- Si aprueba → se empuja `scheduled_at` a las **23:00 UTC (~20:00 ART)** del mismo día (ventana de veto de ~17h desde el cron de las 06:00) y se manda un email vía **Resend** (`onboarding@resend.dev` → `ALERT_EMAIL`, default `pabloeckert@gmail.com`) con el tema, la dimensión, hook/body/cta/hashtags, la hora de publicación y un link a `/#/propuestas?id=<id>` para revisar o cancelar.
+- **Salvaguarda dura:** si el email no se puede mandar (`RESEND_API_KEY` sin cargar, o la API de Resend falla), la pieza se baja a `status: pending` + `scheduled_at: null` — el cron de publicación NO la toca. **Nunca se publica algo sin haber avisado.** Queda registrado como `error` en `run_log` (visible en `/auditoria`).
+- El cron de publicación real (`publish-scheduled-posts.yml`, cada 15 min) ya existente se encarga de publicarla a la hora, salvo que Pablo la cancele (status → `rejected`; `isStillScheduled()` la saltea).
+
+**Pendiente de Pablo para activar:**
+1. Registrarse en `resend.com` (gratis, sin tarjeta) con el email donde quiere los avisos.
+2. Crear una API key (empieza con `re_`) y pasarla — se carga como secret de GitHub `RESEND_API_KEY` (y opcionalmente `ALERT_EMAIL` si no es `pabloeckert@gmail.com`).
+3. Nota real del free tier de Resend sin dominio propio: solo se puede mandar **al email del titular de la cuenta**. Como el único destinatario es Pablo, alcanza — pero tiene que registrarse con ESE email.
+
+Después de eso: un `workflow_dispatch` real de prueba, confirmar que llega el mail y que la pieza queda bien agendada, y recién ahí descomentar el `schedule`.
+
+**Verificado hasta acá:** `node --check` limpio; la lógica de `computeVetoSlot()` probada (cron 06:00 UTC → slot 23:00 UTC mismo día, 17h de ventana). El flujo end-to-end (orchestrator real + email) NO se probó todavía — falta la key.
 
 ## Notas históricas
 

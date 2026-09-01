@@ -1,0 +1,39 @@
+# Modo libre autónomo con aviso previo — decisión de Pablo (2026-09-01):
+# "Opción A, pero avisame antes de cada publicación autónoma".
+#
+# Lun/Mié/Vie 06:00 UTC (03:00 ART): el sistema propone un tema, debate, y si
+# el Crítico aprueba, agenda la pieza para las 23:00 UTC (~20:00 ART) del
+# mismo día y le manda un email a Pablo. Si no cancela desde /propuestas
+# antes de esa hora, publish-scheduled-posts.yml la publica.
+#
+# Ver scripts/autopilot.mjs para el detalle.
+name: Autopilot (modo libre + aviso)
+
+on:
+  # Schedule comentado hasta confirmar el flujo completo (incl. el email de
+  # aviso) con un workflow_dispatch real. Descomentar cuando RESEND_API_KEY
+  # esté cargada y probada. Lun/Mié/Vie 06:00 UTC (03:00 ART).
+  # schedule:
+  #   - cron: "0 6 * * 1,3,5"
+  workflow_dispatch: {}
+
+jobs:
+  autopilot:
+    name: Proponer, debatir y avisar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Correr autopilot
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: node scripts/autopilot.mjs
