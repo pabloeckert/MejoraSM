@@ -5,14 +5,14 @@ jobs:
   t:
     runs-on: ubuntu-latest
     steps:
-      - name: sync
+      - name: draft
         run: |
           code=$(curl -s -o /tmp/r.json -w "%{http_code}" -X POST \
             "${{ secrets.VITE_SUPABASE_URL }}/functions/v1/inbox" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{"action":"sync"}')
+            -d '{"action":"draft","itemId":"293bf05e-5e5a-4397-b7fe-5a05c3ee8f03"}')
           echo "HTTP $code"
           cat /tmp/r.json
           echo
