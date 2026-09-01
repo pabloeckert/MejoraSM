@@ -1,0 +1,42 @@
+name: _tmp zernio probe inbox
+on: { workflow_dispatch: {} }
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - name: recent posts (IG)
+        run: |
+          echo "=== POSTS IG (limit 3) ==="
+          curl -s "https://zernio.com/api/v1/posts?accountId=${{ secrets.ZERNIO_INSTAGRAM_ACCOUNT_ID }}&page=1&limit=3" \
+            -H "Authorization: Bearer ${{ secrets.ZERNIO_API_KEY }}" | head -c 4000
+          echo
+      - name: recent posts (FB)
+        run: |
+          echo "=== POSTS FB (limit 3) ==="
+          curl -s "https://zernio.com/api/v1/posts?accountId=${{ secrets.ZERNIO_FACEBOOK_ACCOUNT_ID }}&page=1&limit=3" \
+            -H "Authorization: Bearer ${{ secrets.ZERNIO_API_KEY }}" | head -c 4000
+          echo
+      - name: inbox conversations (IG)
+        run: |
+          echo "=== CONVERSATIONS IG ==="
+          curl -s "https://zernio.com/api/v1/inbox/conversations?accountId=${{ secrets.ZERNIO_INSTAGRAM_ACCOUNT_ID }}&limit=5" \
+            -H "Authorization: Bearer ${{ secrets.ZERNIO_API_KEY }}" | head -c 4000
+          echo
+      - name: inbox conversations (FB)
+        run: |
+          echo "=== CONVERSATIONS FB ==="
+          curl -s "https://zernio.com/api/v1/inbox/conversations?accountId=${{ secrets.ZERNIO_FACEBOOK_ACCOUNT_ID }}&limit=5" \
+            -H "Authorization: Bearer ${{ secrets.ZERNIO_API_KEY }}" | head -c 4000
+          echo
+      - name: probe comments on first IG + FB post
+        run: |
+          IGPID=$(curl -s "https://zernio.com/api/v1/posts?accountId=${{ secrets.ZERNIO_INSTAGRAM_ACCOUNT_ID }}&page=1&limit=1" -H "Authorization: Bearer ${{ secrets.ZERNIO_API_KEY }}" | python3 -c "import sys,json;d=json.load(sys.stdin);p=(d.get('posts') or [{}])[0];print(p.get('_id') or p.get('id') or '')")
+          echo "IG post id candidate: $IGPID"
+          echo "=== COMMENTS on that IG post ==="
+          curl -s "https://zernio.com/api/v1/inbox/comments/$IGPID?accountId=${{ secrets.ZERNIO_INSTAGRAM_ACCOUNT_ID }}" -H "Authorization: Bearer ${{ secrets.ZERNIO_API_KEY }}" | head -c 4000
+          echo
+          FBPID=$(curl -s "https://zernio.com/api/v1/posts?accountId=${{ secrets.ZERNIO_FACEBOOK_ACCOUNT_ID }}&page=1&limit=1" -H "Authorization: Bearer ${{ secrets.ZERNIO_API_KEY }}" | python3 -c "import sys,json;d=json.load(sys.stdin);p=(d.get('posts') or [{}])[0];print(p.get('_id') or p.get('id') or '')")
+          echo "FB post id candidate: $FBPID"
+          echo "=== COMMENTS on that FB post ==="
+          curl -s "https://zernio.com/api/v1/inbox/comments/$FBPID?accountId=${{ secrets.ZERNIO_FACEBOOK_ACCOUNT_ID }}" -H "Authorization: Bearer ${{ secrets.ZERNIO_API_KEY }}" | head -c 4000
+          echo
