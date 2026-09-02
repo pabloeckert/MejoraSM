@@ -1,0 +1,14 @@
+name: _tmp test recycle
+on: { workflow_dispatch: {} }
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          code=$(curl -s -o /tmp/r.json -w "%{http_code}" -X POST \
+            "${{ secrets.VITE_SUPABASE_URL }}/functions/v1/recycle" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" -d '{"action":"candidates"}')
+          echo "HTTP $code"; cat /tmp/r.json; echo
+          [ "$code" -lt 300 ]
