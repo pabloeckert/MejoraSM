@@ -44,6 +44,41 @@ interface RuleCandidate {
   evidence: string;
 }
 
+// Fase 4 — Loop de aprendizaje activo. orchestrator registra un experimento
+// de timing por pieza autoagendada cuando todavía no hay regla aprendida.
+// Acá se les completa el engagement real cuando ya hay métrica, así el
+// resultado del experimento queda visible en /auditoria y sirve de base
+// para el análisis de timing (que ya corre sobre published_at, ahora con
+// datos balanceados entre bloques horarios en vez de todo a la misma hora).
+async function backfillExperiments(): Promise<void> {
+  try {
+    const { data: open } = await supabase
+      .from("content_experiments")
+      .select("id, proposal_id")
+      .is("measured_engagement", null)
+      .not("proposal_id", "is", null);
+    if (!open?.length) return;
+
+    for (const exp of open) {
+      const { data: mrows } = await supabase
+        .from("metrics")
+        .select("engagement_rate, measured_at")
+        .eq("proposal_id", exp.proposal_id)
+        .order("measured_at", { ascending: false })
+        .limit(1);
+      const rate = mrows?.[0]?.engagement_rate;
+      if (typeof rate === "number") {
+        await supabase
+          .from("content_experiments")
+          .update({ measured_engagement: rate, measured_at: new Date().toISOString() })
+          .eq("id", exp.id);
+      }
+    }
+  } catch (e) {
+    console.warn(`[rule-engine] backfillExperiments falló: ${(e as Error).message}`);
+  }
+}
+
 async function analyzeMetrics(): Promise<RuleCandidate[]> {
   // Get metrics with proposal details
   const { data: metrics } = await supabase
@@ -269,6 +304,7 @@ Deno.serve(async (req) => {
 
     switch (action) {
       case "analyze": {
+        await backfillExperiments();
         const rules = await analyzeMetrics();
         const saved = await saveRules(rules);
         result = {

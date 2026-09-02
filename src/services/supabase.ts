@@ -405,3 +405,15 @@ export const inboxApi = {
   markReplied: (id: string) =>
     supabase.from("inbox_items").update({ replied_at: new Date().toISOString() }).eq("id", id),
 };
+
+// ═══════════════════════════════════════
+// EXPERIMENTOS DE CONTENIDO (Fase 4 — loop de aprendizaje activo)
+// ═══════════════════════════════════════
+
+export const experimentsApi = {
+  all: () =>
+    supabase
+      .from("content_experiments")
+      .select("*")
+      .order("created_at", { ascending: false }),
+};

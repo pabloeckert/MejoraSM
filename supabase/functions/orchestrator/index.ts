@@ -433,7 +433,26 @@ async function pickNextOferta(): Promise<string> {
   return OFERTAS.reduce((best, o) => (counts[o] < counts[best] ? o : best), OFERTAS[0]);
 }
 
-async function pickNextSlot(): Promise<string> {
+// Fase 4 — Loop de aprendizaje activo. Sin una regla de timing aprendida,
+// en vez de mandar todo al primer bloque disponible (observación sesgada),
+// se rota entre los 3 bloques preferidos eligiendo el menos usado en los
+// experimentos de timing abiertos. Así rule-engine compara peras con peras.
+async function pickExplorationHour(): Promise<number> {
+  const since = new Date(Date.now() - 60 * 86_400_000).toISOString();
+  const { data } = await supabase
+    .from("content_experiments")
+    .select("variant")
+    .eq("dimension", "timing")
+    .gte("created_at", since);
+  const counts: Record<number, number> = Object.fromEntries(PREFERRED_UTC_HOURS.map((h) => [h, 0]));
+  for (const row of data || []) {
+    const h = Number(row.variant);
+    if (h in counts) counts[h]++;
+  }
+  return PREFERRED_UTC_HOURS.reduce((best, h) => (counts[h] < counts[best] ? h : best), PREFERRED_UTC_HOURS[0]);
+}
+
+async function pickNextSlot(): Promise<{ iso: string; experimentHour: number | null }> {
   const { data } = await supabase
     .from("proposals")
     .select("scheduled_at")
@@ -448,8 +467,15 @@ async function pickNextSlot(): Promise<string> {
   const earliest = new Date(Math.max(now, lastSlot + spacingMs));
 
   const learnedHour = await getLearnedTimingHour();
-  const hours = learnedHour !== null ? [learnedHour] : PREFERRED_UTC_HOURS;
-  return snapToPreferredHour(earliest, hours).toISOString();
+  if (learnedHour !== null) {
+    return { iso: snapToPreferredHour(earliest, [learnedHour]).toISOString(), experimentHour: null };
+  }
+  // Explorar: apuntar al bloque preferido menos usado. snapToPreferredHour
+  // lo empuja al día siguiente si esa hora ya pasó hoy — la hora del día
+  // no cambia, así que la variante del experimento es exactamente esa.
+  const explorationHour = await pickExplorationHour();
+  const slot = snapToPreferredHour(earliest, [explorationHour]);
+  return { iso: slot.toISOString(), experimentHour: explorationHour };
 }
 
 // ═══════════════════════════════════════
@@ -745,18 +771,32 @@ async function runDebate(session: { id: string }, topic: string) {
       cta: proposal.cta,
     };
 
+    let experimentHour: number | null = null;
     if (AUTO_PUBLISH_FORMATS.includes(format)) {
       insert.status = "scheduled";
       insert.oferta = await pickNextOferta();
-      insert.scheduled_at = await pickNextSlot();
+      const slot = await pickNextSlot();
+      insert.scheduled_at = slot.iso;
+      experimentHour = slot.experimentHour;
       oferta = insert.oferta as string;
-      scheduledAt = insert.scheduled_at as string;
+      scheduledAt = slot.iso;
     } else {
       insert.status = "pending";
     }
 
     const { data: insertedProposal } = await supabase.from("proposals").insert(insert).select("id").single();
     proposalId = insertedProposal?.id ?? null;
+
+    // Fase 4 — registrar el experimento de timing (solo cuando exploramos,
+    // no cuando ya hay una regla aprendida que dicta la hora).
+    if (proposalId && experimentHour !== null) {
+      await supabase.from("content_experiments").insert({
+        proposal_id: proposalId,
+        dimension: "timing",
+        variant: String(experimentHour),
+        hypothesis: `¿Publicar a las ${experimentHour}:00 UTC rinde mejor que los otros bloques?`,
+      });
+    }
   }
 
   // 6. Actualizar sesión (después de crear la propuesta, para poder

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Download, FileJson, FileSpreadsheet, Loader2, RefreshCw } from "lucide-react";
-import { proposalsApi, metricsApi, runLogApi } from "@/services/supabase";
+import { proposalsApi, metricsApi, runLogApi, experimentsApi } from "@/services/supabase";
 import { downloadCsv, downloadJson } from "@/lib/export";
 import { toast } from "@/hooks/use-toast";
 
@@ -67,6 +67,17 @@ const SOURCES: ExportSource[] = [
     dateField: "created_at",
     fetch: async () => {
       const { data, error } = await runLogApi.all();
+      if (error) throw error;
+      return (data || []) as Record<string, unknown>[];
+    },
+  },
+  {
+    key: "content_experiments",
+    label: "Experimentos de contenido",
+    description: "Variante de timing que le tocó a cada pieza autoagendada y su engagement real (Fase 4 — loop de aprendizaje activo).",
+    dateField: "created_at",
+    fetch: async () => {
+      const { data, error } = await experimentsApi.all();
       if (error) throw error;
       return (data || []) as Record<string, unknown>[];
     },
