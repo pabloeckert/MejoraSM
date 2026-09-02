@@ -25,8 +25,9 @@ Este archivo tiene dos mitades:
 | **Dominio propio** | `mejorasm.mejoraok.com` — CORS de las 8 funciones + canonical ya apuntan ahí. **Falta:** Pablo agrega el registro DNS (`CNAME mejorasm → pabloeckert.github.io`), después se agrega el archivo `CNAME` + se cambia `VITE_BASE_PATH` a `/app/` y se redespliega | preparado 2026-09-01 |
 | **Biblioteca** | **sacada** — no encajaba en el objetivo del proyecto (decisión de Pablo). `/biblioteca` redirige a `/propuestas`. La "línea de tiempo" del ciclo de vida pasó a una pestaña de Propuestas. Carpeta `biblioteca/` borrada (queda en git); fuentes movidas a `templates/fonts/` | 2026-09-01 |
 | **CI (`ci.yml`)** | **lint + tsc bloqueantes de nuevo** — la deuda bajó de 42 errores a 0; ESLint acotado a `src/**` (Deno fuera de scope). test + build siguen corriendo | 2026-08-31 (batch 8 de la auditoría) |
-| **Edge Functions** | 9: `orchestrator`, `vault-process`, `rule-engine`, `metrics-collector`, `copilot`, `classify-photo`, `insights`, `repo`, `inbox`. `publisher` y `ai-gateway` borradas | `inbox` agregada 2026-09-01 (Fase 1) |
+| **Edge Functions** | 11: `orchestrator`, `vault-process`, `rule-engine`, `metrics-collector`, `copilot`, `classify-photo`, `insights`, `repo`, `inbox`, `recycle`, `ads`. `publisher` y `ai-gateway` borradas | `recycle`/`ads` agregadas 2026-09-01 (plan de publicación) |
 | **Bandeja de conversaciones** | comentarios + DMs de IG/FB traídos de Zernio a `inbox_items`, clasificados por sentimiento (LLM), respondibles desde `/conversaciones` con OK humano. Cron `inbox-sync-cron.yml` cada 3h. Ver "Plan de publicación 2026 — Fase 1" en la bitácora | 2026-09-01 |
+| **Plan de publicación 2026** | 🟢 7 fases completas (1 bandeja de conversaciones · 2 higiene · 3 reciclado · 4 loop de aprendizaje activo / experimentos de timing · 5 LinkedIn gated · 6 Reels · 7 pauta FB solo-lectura). Pendiente de Pablo: DNS del dominio, limpiar IG/FB, conectar LinkedIn/FB-Ads en Zernio. Ver bitácora | cerrado 2026-09-01 |
 | **Auto-agenda (`pickNextSlot`)** | apunta a bloques horarios reales (12/16/23 UTC ≈ 09/13/20 ART), o a la hora de una `success_rule` de timing si hay una con confianza alta — ya no publica a la hora en que arrancó la primera cadena | 2026-08-31 (batch 2) |
 | **Fallback de IA** | Anthropic (`claude-sonnet-5`/`opus-5`) → Groq `openai/gpt-oss-120b`. `llama-3.3-70b-versatile` se retiró el 2026-08-16, ya migrado en los 3 puntos | 2026-08-18 |
 | **Límite de cuenta Anthropic** | resuelto — Pablo subió el límite de gasto, sin bloqueo | 2026-08-19 |
@@ -371,7 +372,7 @@ Páginas (`src/pages/`):
 | **Mesa de Diálogo** | `/mesa` | Le das un tema (elección manual, ver "decisiones explícitas de no automatizar" arriba) y dispara `orchestrator`: Estratega propone → Creativo redacta → Crítico evalúa contra los documentos de la Bóveda (RAG). Si aprueba y el formato tiene pipeline autónomo (`post`/`carrusel`), la propuesta se autoagenda sola — ver overhaul de autonomía arriba. |
 | **Laboratorio de Contenido** | `/laboratorio` | Versión directa: describís qué querés comunicar y te devuelve una propuesta ya armada (estrategia + copy + evaluación + hook/CTA/hashtags) lista para copiar o aprobar. |
 | **Calendario Editorial** | `/calendario` | De solo lectura desde el overhaul del 2026-08-02: refleja `proposals.scheduled_at`, no agenda nada (eso vive en Propuestas). |
-| **Propuestas** | `/propuestas` | Desde el overhaul del 2026-08-02, monitor de lo que se agenda/publica solo. Pestañas: Pendientes / Aprobadas / Programadas / Todas / **Línea de tiempo** (ciclo de vida completo agrupado por etapa — 2026-09-01, reemplaza la que vivía en Biblioteca) / Plantillas. |
+| **Propuestas** | `/propuestas` | Desde el overhaul del 2026-08-02, monitor de lo que se agenda/publica solo. Pestañas: Pendientes / Aprobadas / Programadas / Todas / **Línea de tiempo** (ciclo de vida completo agrupado por etapa — 2026-09-01, reemplaza la que vivía en Biblioteca) / **Reciclar** (Fase 3 plan de publicación — piezas viejas que rindieron, con hook/CTA refrescados) / Plantillas. |
 | **Subir material** | `/hub` | Rediseñado 2026-08-17. Sin flujo de "Conectar GitHub" desde 2026-09-01 (el token vive en la Edge Function `repo`) — si estás logueado, subir fotos ya funciona. **"Publicar ahora"** (`PublishNowCard`): subís una foto → "Preparar" (dispara `publish-now.yml` mode=prepare → genera copy + renderiza) → ves el preview real → "Publicar ahora" (mode=publish → IG+FB vía Zernio). |
 | **Monitor** | `/monitor` | Fase 5: port React de `dashboard/index.html` — historial real vía `historial_cache` en Supabase, badges por plataforma, acciones de reversión (reintentar/despublicar/marcar a mano se disparan directo, sin links a GitHub Actions desde 2026-09-01), link a la propuesta de cada pieza. |
 | **Conversaciones** | `/conversaciones` | Fase 1 del plan de publicación 2026: comentarios + DMs reales de IG/FB (vía Zernio → `inbox_items`), agrupados en hilos, filtros por plataforma / sentimiento / sin responder. Redacción sugerida en voz de marca (`inbox` acción `draft`) y envío a la red con confirmación (`reply`). |
@@ -380,7 +381,7 @@ Páginas (`src/pages/`):
 
 Hooks custom en `src/hooks/` (`useVault`, `useDialogue`, `useProposals`, `useMetrics`) llaman a `src/services/ai.ts` (invoca Edge Functions) y `src/services/supabase.ts` (CRUD directo). El cliente Supabase vive en `src/integrations/supabase/client.ts` y usa `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` (ver `.env.example`). `src/components/ui/` es el set estándar de shadcn sin modificar; la UI propia está en `src/components/layout/` (AppSidebar, AppLayout).
 
-### Backend — 9 Edge Functions
+### Backend — 11 Edge Functions
 
 Todas en `supabase/functions/` (Deno), cada una con su propia allowlist de CORS (`pabloeckert.github.io`, `mejorasm.mejoraok.com`, localhost) y con el guard de `_shared/auth.ts`:
 
@@ -395,6 +396,8 @@ Todas en `supabase/functions/` (Deno), cada una con su propia allowlist de CORS 
 | `insights` | Motor de insights del Dashboard (Fase A): contrasta las 6 semillas contra métricas reales + retro de Pablo. Cron lunes (`insights-cron.yml`). |
 | `repo` | **Proxy server-side a la API de GitHub** (2026-09-01) — lee `GITHUB_TOKEN` de los secrets. Acciones `listDir` / `readFile` / `writeFile` / `dispatchWorkflow`. Lo usa `src/services/github.ts` para subir fotos, leer manifiestos y disparar workflows sin que el navegador toque GitHub. Ver "Sacar GitHub de la vista" en la bitácora. |
 | `inbox` | **Bandeja de conversaciones** (Fase 1 plan de publicación 2026) — `sync` trae comentarios + DMs de IG/FB desde la API de inbox de Zernio a `inbox_items` y clasifica el sentimiento de los entrantes (LLM, JSON, batch 10); `draft` redacta una respuesta sugerida en voz de marca (RAG); `reply` la manda a Zernio + marca `replied_at`. Cron cada 3h (`inbox-sync-cron.yml`). |
+| `recycle` | **Reciclado de contenido** (Fase 3) — `candidates` (posts published >90d con engagement sobre la mediana, sin reciclar), `refresh` (LLM reescribe hook+CTA manteniendo el ángulo), `schedule` (inserta propuesta `pending` con `metadata.recycled_from`). Sin cron, se llama desde la pestaña "Reciclar" de Propuestas. |
+| `ads` | **Pauta de Facebook, solo lectura** (Fase 7) — `report`: campañas de FB Ads de Zernio + candidatos a boost del orgánico + consejo del LLM. **Nunca gasta plata.** Sin cron, se llama desde `AdsCard` en el Dashboard. |
 
 Deploy: `.github/workflows/deploy-functions.yml` (push a `supabase/functions/**`, o manual con función específica) — usa `SUPABASE_ACCESS_TOKEN` y `SUPABASE_PROJECT_REF` como secrets del repo.
 
@@ -448,11 +451,12 @@ Tablas en el schema `public`, todas con RLS habilitado (`calendar_events` se dro
 | `historial_cache` | Fix de raíz del "Failed to fetch" del Monitor (2026-08-17): fila única con el historial real sincronizado desde Zernio, para no depender de `raw.githubusercontent.com` — ver "Ronda de revisión post-Fase 6" más abajo |
 | `inbox_items` | Comentarios y DMs de IG/FB (`kind`), entrantes y salientes (`direction`), con etiqueta de sentimiento. Migración `024_inbox.sql`. Escrita por `inbox` |
 | `inbox_sync_state` | Fila única: `last_synced_at` / `last_error` de la bandeja. Migración `024` |
+| `content_experiments` | Fase 4 — variante de timing (12/16/23 UTC) que le tocó a cada pieza autoagendada + su engagement real. Migración `025`. Escrita por `orchestrator`, completada por `rule-engine` |
 | `app_admins` | Allowlist de emails con acceso (ver sección de auth) |
 
 Función RAG: `match_documents(query_embedding, match_count, similarity_threshold)` — búsqueda por similitud coseno sobre `doc_chunks` vía índice `ivfflat`, con cast `::REAL` (ver bug corregido arriba). Bucket de Storage: `vault` (privado).
 
-`supabase/migrations/`: schema SQL + pgvector, `001` a `024` en orden correlativo con el de ejecución real, todas ya aplicadas contra la base real vía `supabase db query --linked -f <archivo>` (no `db push`, ver "Bug conocido del CLI"). Las primeras siete (`001_initial_schema.sql` a `007_feed_posts_render.sql`) arman el schema base + auth/RLS real; de `008` en adelante cada una es un cambio puntual documentado en su propio comentario de cabecera y, cuando corresponde, en la sección de fase del plan que la motivó (`011`-`015` → Fases 0-4 del plan 2026-08-16; `016` → fix del Monitor; `020`-`022` → Fases A/C/E del plan de continuación; `023` → reinstauración del login; `024` → bandeja de conversaciones, Fase 1 del plan de publicación 2026).
+`supabase/migrations/`: schema SQL + pgvector, `001` a `025` en orden correlativo con el de ejecución real, todas ya aplicadas contra la base real vía `supabase db query --linked -f <archivo>` (no `db push`, ver "Bug conocido del CLI"). Las primeras siete (`001_initial_schema.sql` a `007_feed_posts_render.sql`) arman el schema base + auth/RLS real; de `008` en adelante cada una es un cambio puntual documentado en su propio comentario de cabecera y, cuando corresponde, en la sección de fase del plan que la motivó (`011`-`015` → Fases 0-4 del plan 2026-08-16; `016` → fix del Monitor; `020`-`022` → Fases A/C/E del plan de continuación; `023` → reinstauración del login; `024` → bandeja de conversaciones; `025` → experimentos de contenido, Fase 4 del plan de publicación 2026).
 
 ### System prompts reales de los 3 agentes (tabla `agent_config`, verificado en vivo)
 
@@ -538,6 +542,8 @@ content/inbox/<oferta>/*.jpg  → scripts/generate-brief.mjs (Claude, vía scrip
                                → scripts/publish-story.mjs (scripts/lib/zernio.mjs → Instagram + Facebook)
                                → foto usada se mueve a content/used/<oferta>/
 ```
+
+**Reel bajo demanda** (`.github/workflows/reel.yml`, `workflow_dispatch` con input `dimension`): `render-reel.mjs` toma la foto más nueva de esa carpeta, Claude arma hook+subtexto, Playwright hace un overlay de marca transparente y **ffmpeg** compone un MP4 vertical con Ken Burns (zoom lento) + audio silencioso; `publish-reel.mjs` lo sube a Zernio (`upload-direct`) y lo publica como Reel en IG+FB. El MP4 no va al repo. Input `publish=false` para solo armar y ver el resultado en el artifact. Ver "Fase 6" en la bitácora.
 
 `content/inbox/` y `content/used/` tienen 5 subcarpetas, una por dimensión del Manual de Marca: `personal`, `organizacional`, `comercial`, `empresarial`, `profesionalizacion`. `generate-brief.mjs` orienta el copy según la carpeta de origen de la foto — la identidad de marca se trae en vivo en cada corrida desde el repo externo [MejoraIdentidad](https://github.com/pabloeckert/MejoraIdentidad) (`SKILL.md`), sin copia local en este repo. Videos en `inbox/` se detectan pero no se procesan todavía (se avisan en el log, no se pierden). El workflow genera 1 story por foto (hasta 3), o 1 story de solo texto si `inbox/` está vacía.
 
@@ -1484,11 +1490,11 @@ Pablo: *"Aplica 'fuera de este plan' sin prototipado... deploy a producción dir
 |---|---|---|
 | **1 — Bandeja de conversaciones** | Comentarios + DMs de IG/FB traídos de Zernio, clasificados por sentimiento, respondibles desde el EDA con OK humano | 🟢 hecho y verificado en prod (2026-09-01) |
 | **2 — Higiene** | Bug `ENOENT briefs.json` de `daily-story.yml` en re-dispatch → 🟢 arreglado; `metrics-collector` ya no marca error por el `202` de Zernio (7 días → `stale`) → 🟢; autopilot `computeVetoSlot`/dedup → 🟢 revisado (determinístico, corrida end-to-end ya hecha). **Gated en Pablo:** dominio propio (falta el CNAME DNS), reactivar `sync-history` (falta que limpie IG/FB) | 🟢 lo autónomo; 2 ítems gated |
-| **3 — Reciclado de contenido** | Query "publicadas hace >90d con engagement > promedio" → LLM refresca hook/CTA → reinserta como propuesta `scheduled` + UI para elegir. Mecanismo ahora, dormido hasta que haya datos | ⏳ siguiente |
-| **5 — LinkedIn** | Variante de template + adaptación de copy + `linkedin` en el array de plataformas. **Gated:** Pablo conecta la cuenta de LinkedIn en Zernio. Código listo para cuando esté | ⏳ |
-| **4 — Loop de aprendizaje activo** | `success_rules` de alta confianza dirigen el prompt del Estratega de verdad; framework de A/B. Gated: volumen de datos | ⏳ |
-| **6 — Video/Reels** | ffmpeg en el runner, "Reel armado de fotos" (Ken Burns + texto animado → MP4) | ⏳ |
-| **7 — Ads de Facebook** | Leer performance de campañas, cruzar orgánico↔pago, sugerir boosts. Necesita definición con Pablo | ⏳ |
+| **3 — Reciclado de contenido** | Edge Function `recycle` + pestaña "Reciclar" en Propuestas. Mecanismo listo, dormido hasta que haya historial (metrics ≈ 0) | 🟢 hecho (2026-09-01) |
+| **5 — LinkedIn** | `publishPost()` suma `linkedin` cuando existe `ZERNIO_LINKEDIN_ACCOUNT_ID`. **Gated:** Pablo conecta LinkedIn en Zernio y carga el secret — hasta entonces todo sigue igual (IG+FB) | 🟢 código listo, gated |
+| **4 — Loop de aprendizaje activo** | Migración `025` (`content_experiments`) + exploración de horario en `pickNextSlot` + `backfillExperiments` en `rule-engine` + fuente en Auditoría | 🟢 hecho (2026-09-01) |
+| **6 — Video/Reels** | `render-reel.mjs` (Claude + Playwright + ffmpeg zoompan) + `publishReel` (Zernio `upload-direct` + mediaItem video) + `reel.yml`. Render verificado end-to-end (MP4 válido). Publicación real no probada (sería un Reel público) | 🟢 hecho (2026-09-01) |
+| **7 — Ads de Facebook** | Edge Function `ads` (`report`) — lee campañas + detecta orgánico para promocionar + consejo. **Nunca gasta plata.** 0 campañas hoy (sin cuenta de ads). `AdsCard` en el Dashboard | 🟢 hecho (2026-09-01) |
 
 ### Fase 1 — Bandeja de conversaciones (completa, 2026-09-01)
 
@@ -1515,6 +1521,49 @@ El sistema publicaba y medía números pero **nunca veía lo que la gente dice**
 - **Gated en Pablo, no resoluble solo** (son las dos únicas cosas de todo el plan que necesitan intervención humana):
   1. **Dominio propio `mejorasm.mejoraok.com`**: falta que Pablo agregue `CNAME mejorasm → pabloeckert.github.io` en el DNS de mejoraok.com. Después (automatizable): `hub/CNAME`, dominio en Pages, `VITE_BASE_PATH` a `/app/`, `autopilot.mjs::APP_URL`, Redirect URL de Supabase.
   2. **Reactivar `sync-history.yml`** (cron comentado): mientras Pablo no borre a mano los ~12 posts viejos de Instagram/Facebook, reactivarlo los vuelve a traer al Monitor. Cuando confirme que están limpios, descomentar el `schedule`.
+
+### Fase 3 — Reciclado de contenido (completa, 2026-09-01)
+
+Edge Function `recycle` (deployada):
+- `candidates`: propuestas `published` hace >90 días, `format in (post,carrusel)`, `is_test=false`, con engagement sobre la mediana de todas las métricas medidas, que no estén ya recicladas (`metadata.recycled_from`).
+- `refresh` (`{proposalId}`): el Creativo reescribe hook + CTA **manteniendo el ángulo** (RAG contra el Manual de Marca), devuelve preview, no inserta.
+- `schedule`: inserta una propuesta nueva `status='pending'`, `metadata.recycled_from`, copiando `format`/`oferta`/`dimension`/`buyer_persona`. El humano la agenda desde /propuestas.
+
+Frontend: pestaña "Reciclar" en Propuestas (`src/components/RecycleTab.tsx`). Probado real: `candidates` → `{"median":0,"count":0,"candidates":[]}` (0 posts publicados hoy tras el wipe — correcto). `refresh`/`schedule` no ejercitables sin un post real de >90 días; código revisado.
+
+### Fase 4 — Loop de aprendizaje activo (completa, 2026-09-01)
+
+Hasta ahora `rule-engine` analizaba el horario de forma observacional pero `pickNextSlot` tendía a mandar todo al mismo bloque, así que no había con qué comparar.
+- **Migración `025_content_experiments.sql`**: tabla `content_experiments` (`proposal_id`, `dimension` — 'timing' por ahora —, `variant`, `hypothesis`, `measured_engagement`, `measured_at`). Aplicada y verificada.
+- **`orchestrator`**: sin una `success_rule` de timing con confianza alta, `pickNextSlot` ahora **explora** — rota entre 12/16/23 UTC eligiendo el bloque menos usado en experimentos abiertos (`pickExplorationHour`), y registra un `content_experiments` por pieza autoagendada. Con una regla aprendida, la respeta y no experimenta.
+- **`rule-engine`**: `backfillExperiments()` (nueva, corre en cada `analyze`) completa `measured_engagement` de los experimentos abiertos desde `metrics`. El análisis de timing que ya existía sigue igual — pero ahora con datos balanceados entre bloques.
+- **Auditoría**: nueva fuente exportable "Experimentos de contenido".
+- Probado: `rule-engine analyze` → `HTTP 200`, `backfillExperiments` sin error (0 experimentos / 0 métricas hoy). El log de experimentos del `orchestrator` no se ejercitó (requiere una Mesa de Diálogo real que autoagenda) — código revisado, `pickExplorationHour` es determinístico.
+
+### Fase 5 — LinkedIn (código listo, gated en Pablo, 2026-09-01)
+
+`scripts/lib/zernio.mjs::publishPost()` agrega `{ platform: "linkedin", accountId }` cuando existe `ZERNIO_LINKEDIN_ACCOUNT_ID`. `publish-scheduled-posts.yml` / `manage-post.yml` / `sync-history.yml` pasan el env; `manage-post.mjs` acepta `linkedin` solo si su cuenta está configurada; `Monitor.tsx` muestra "LinkedIn" en los badges. Sin el secret, todo sigue exactamente como antes (IG + FB). **Se activa cuando Pablo conecte una cuenta de LinkedIn en Zernio y cargue `ZERNIO_LINKEDIN_ACCOUNT_ID`** como secret de GitHub Actions. `publishStory` no lo toca — LinkedIn no tiene stories.
+
+### Fase 6 — Video/Reels (completa, render verificado, 2026-09-01)
+
+Reels armados de una foto, bajo demanda:
+- **`scripts/render-reel.mjs`**: toma la foto más nueva de `content/inbox/<dimension>/`, Claude arma `{kicker, headline, subtext, caption}` (con visión, orientado a la dimensión), Playwright renderiza un overlay de marca **transparente** (reusa los `@font-face` de `story-template.html`, no duplica los 97KB de fuente), y **ffmpeg** compone un MP4 vertical 1080×1920: `zoompan` (Ken Burns, zoom lento 1.0→1.12) sobre la foto + overlay estático + pista de audio silenciosa (IG Reels lo exige). El MP4 vive solo en el runner — no va al repo (bloat de git); se sube directo a Zernio.
+- **`scripts/lib/zernio.mjs`**: `uploadMedia()` (`POST /v1/media/upload-direct`, multipart, hasta 25MB) + `publishReel()` — un `mediaItem` de tipo `video` sin `contentType: story` se publica como Reel en Instagram automáticamente (OpenAPI de Zernio: "Default posts become Reels or feed depending on media"). `createPostAndPollVideo` con polling extendido.
+- **`scripts/publish-reel.mjs`** + **`.github/workflows/reel.yml`** (`workflow_dispatch`, input `dimension` + `publish` boolean — destildá `publish` para solo armar el MP4 y verlo en el artifact). **ffmpeg NO viene preinstalado en ubuntu-24.04** — el workflow lo instala con `apt-get`.
+- **Verificado end-to-end**: `reel.yml` con `publish=false` → MP4 válido de 508KB (`ftyp isom/avc1`, `moov` con faststart, ~9s, H.264+AAC), `reel.json` con caption real. La publicación real vía Zernio **no se probó** (sería un Reel público real) — `createPostAndPollVideo` está revisado contra el OpenAPI de Zernio.
+
+### Fase 7 — Ads de Facebook (completa, solo lectura, 2026-09-01)
+
+Edge Function `ads` (`report`, deployada):
+- Lee `GET /v1/ads/campaigns?platform=facebook` de Zernio (hoy: **0 campañas** — no hay cuenta de anuncios conectada) + su analytics.
+- Detecta **candidatos a boost**: posts orgánicos publicados en los últimos 30 días, con engagement sobre la mediana, que no estén ya marcados `metadata.boosted`.
+- Consejo del LLM en voz de marca cruzando ambos, solo si hay datos reales.
+- **Nunca llama a `POST /v1/ads/boost` ni a nada que gaste plata** — es puro diagnóstico. Pautar de verdad lo hace Pablo desde el Business Manager.
+- Frontend: `AdsCard` colapsable en el Dashboard (debajo de Insights). Probado: `report` → `HTTP 200`, `{"hasAdsAccount":true,"campaigns":[],"boostCandidates":[],"advice":""}` — correcto sin campañas ni métricas.
+
+### Cierre del plan de publicación 2026 (2026-09-01)
+
+Las 7 fases ejecutadas de corrido, autónomas, en el orden pedido (1→2→3→5→4→6→7). Lo que quedó **pendiente de Pablo** (las únicas cosas que necesitan intervención humana, todas ya documentadas arriba): (a) DNS `CNAME mejorasm → pabloeckert.github.io` para el dominio propio; (b) borrar a mano los posts viejos de IG/FB y avisar para reactivar `sync-history`; (c) conectar LinkedIn en Zernio + cargar `ZERNIO_LINKEDIN_ACCOUNT_ID` (Fase 5 se activa sola ahí); (d) conectar una cuenta de Facebook Ads en Zernio (Fase 7 muestra datos ahí). Nada más quedó a medias por límite de sesión. Edge Functions: 11 (`ads` y `recycle` nuevas de este plan, además de `inbox`). Migraciones al día: `024` (inbox), `025` (experimentos).
 
 ## Notas históricas
 
