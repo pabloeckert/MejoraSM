@@ -352,3 +352,25 @@ export async function scheduleRecycledProposal(input: {
   );
   return handleResponse(res, "Error creando la propuesta reciclada");
 }
+
+// ═══════════════════════════════════════
+// ADS (Fase 7 — pauta de Facebook, solo lectura + consejo)
+// ═══════════════════════════════════════
+
+export interface AdsReport {
+  hasAdsAccount: boolean;
+  campaignsError: string | null;
+  campaigns: Array<{ name: string | null; status: string | null; spend: number | null; impressions: number | null; clicks: number | null }>;
+  boostCandidates: Array<{ hook: string | null; oferta: string | null; engagement: number | null; reach: number | null }>;
+  medianEngagement: number;
+  advice: string;
+}
+
+export async function getAdsReport(): Promise<AdsReport> {
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/ads`,
+    { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "report" }) },
+    VAULT_TIMEOUT_MS
+  );
+  return handleResponse(res, "Error consultando la pauta");
+}

@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles, Send, Loader2, MessageCircleQuestion } from "lucide-react";
 import { useCopilotAdvice, useCopilotChat } from "@/hooks/useCopilot";
+import { MiniMarkdown } from "@/components/MiniMarkdown";
 import { cn } from "@/lib/utils";
 
 // Copiloto Reflexivo — Fase 4 del plan estratégico 2026-08-16. Consejo del
@@ -12,32 +13,6 @@ import { cn } from "@/lib/utils";
 // stateless sobre los datos propios reales. Nunca muestra una cifra que no
 // haya llegado del backend — si la respuesta dice que faltan datos, se
 // muestra tal cual, no se disfraza.
-
-// UX18 (auditoría 2026-08-31): el LLM a veces devuelve markdown (**negrita**,
-// - viñetas) y antes se veía crudo. Render mínimo, sin dependencia nueva.
-function MiniMarkdown({ text }: { text: string }) {
-  const lines = text.split("\n");
-  return (
-    <>
-      {lines.map((line, i) => {
-        const bullet = /^\s*[-*]\s+/.test(line);
-        const clean = line.replace(/^\s*[-*]\s+/, "");
-        const parts = clean.split(/(\*\*[^*]+\*\*)/g).map((p, j) =>
-          p.startsWith("**") && p.endsWith("**") ? <strong key={j}>{p.slice(2, -2)}</strong> : <span key={j}>{p}</span>
-        );
-        if (!line.trim()) return <br key={i} />;
-        return bullet ? (
-          <div key={i} className="flex gap-1.5">
-            <span className="text-muted-foreground">•</span>
-            <span>{parts}</span>
-          </div>
-        ) : (
-          <p key={i}>{parts}</p>
-        );
-      })}
-    </>
-  );
-}
 
 export function CopilotCard() {
   const { data: advice, isLoading: isLoadingAdvice, isError: isAdviceError } = useCopilotAdvice();

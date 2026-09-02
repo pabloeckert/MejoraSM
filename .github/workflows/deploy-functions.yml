@@ -63,7 +63,7 @@ jobs:
           # Lista completa (2026-08-31): antes faltaban copilot y classify-photo,
           # que se venían deployando a mano. + insights (Fase A del plan de
           # continuación).
-          FUNCTIONS=("orchestrator" "vault-process" "metrics-collector" "rule-engine" "copilot" "classify-photo" "insights" "repo" "inbox" "recycle")
+          FUNCTIONS=("orchestrator" "vault-process" "metrics-collector" "rule-engine" "copilot" "classify-photo" "insights" "repo" "inbox" "recycle" "ads")
           
           FAILED=0
           for fn in "${FUNCTIONS[@]}"; do

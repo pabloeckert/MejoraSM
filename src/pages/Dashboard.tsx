@@ -37,6 +37,7 @@ import { useInbox, buildThreads, isUnanswered } from "@/hooks/useInbox";
 import { historialApi } from "@/services/supabase";
 import { CopilotCard } from "@/components/CopilotCard";
 import { InsightsSection } from "@/components/InsightsSection";
+import { AdsCard } from "@/components/AdsCard";
 import { ReportDialog, type ReportData } from "@/components/ReportDialog";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -1000,6 +1001,9 @@ function DashboardContent() {
 
       {/* Motor de insights con IA (Fase A del plan de continuación 2026-08-31) */}
       <InsightsSection onOpenReport={() => setReportOpen(true)} />
+
+      {/* Pauta de Facebook — solo lectura + consejo (Fase 7 plan de publicación 2026) */}
+      <AdsCard />
 
       {/* Pending approvals */}
       <Card>
