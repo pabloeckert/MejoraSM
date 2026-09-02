@@ -1,0 +1,91 @@
+# Reel armado de una foto — Fase 6 del plan de publicación 2026.
+# Bajo demanda: elegís la dimensión, el sistema toma la foto más nueva de
+# content/inbox/<dimension>/, arma un MP4 vertical con Ken Burns + overlay de
+# marca (ffmpeg) y lo publica como Reel en Instagram + Facebook vía Zernio.
+name: Reel
+
+on:
+  workflow_dispatch:
+    inputs:
+      dimension:
+        description: "Dimensión (carpeta de content/inbox/)"
+        required: true
+        type: choice
+        options:
+          - personal
+          - organizacional
+          - comercial
+          - empresarial
+          - profesionalizacion
+          - sociales
+      publish:
+        description: "Publicar en Instagram/Facebook (destildar para solo armar el MP4 y verlo en el artifact)"
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: reel
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  reel:
+    name: Armar y publicar reel
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar Playwright
+        run: npm install playwright
+
+      - name: Instalar Chromium para Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Verificar ffmpeg
+        run: ffmpeg -version | head -1
+
+      - name: Armar el reel (Claude + Playwright + ffmpeg)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          REEL_OFERTA: ${{ inputs.dimension }}
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/render-reel.mjs
+
+      - name: Commitear la foto usada (el MP4 NO va al repo — se sube directo a Zernio)
+        run: |
+          git config user.name "mejora-story-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add content/used content/inbox
+          git diff --cached --quiet || git commit -m "reel: $(date -u +%Y-%m-%d) (${{ inputs.dimension }})"
+          git push
+
+      - name: Publicar en Instagram y Facebook (vía Zernio)
+        if: ${{ inputs.publish }}
+        env:
+          ZERNIO_API_KEY: ${{ secrets.ZERNIO_API_KEY }}
+          ZERNIO_INSTAGRAM_ACCOUNT_ID: ${{ secrets.ZERNIO_INSTAGRAM_ACCOUNT_ID }}
+          ZERNIO_FACEBOOK_ACCOUNT_ID: ${{ secrets.ZERNIO_FACEBOOK_ACCOUNT_ID }}
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/publish-reel.mjs
+
+      - name: Subir el reel como artifact (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reel-${{ github.run_id }}
+          path: |
+            content/work/reel-*.mp4
+            content/work/reel.json
+          if-no-files-found: ignore

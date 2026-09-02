@@ -6,7 +6,11 @@
 // Env: ZERNIO_API_KEY, ZERNIO_INSTAGRAM_ACCOUNT_ID, ZERNIO_FACEBOOK_ACCOUNT_ID
 // (alcanza con tener configurada una de las dos cuentas; la otra es opcional)
 
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
 const ZERNIO_API_URL = "https://zernio.com/api/v1/posts";
+const ZERNIO_UPLOAD_URL = "https://zernio.com/api/v1/media/upload-direct";
 
 // Instagram procesa el media de forma asíncrona (container de Meta): un
 // status "processing"/"awaiting-finalize" recién creado es normal, no un
@@ -118,6 +122,116 @@ export async function createPostAndPoll({ apiKey, content, imageUrl, platforms }
       error: p.error ?? p.errorMessage ?? p.reason ?? p.message ?? null,
     }));
 
+    return {
+      success: failed.length === 0,
+      postId,
+      platforms: perPlatform,
+      error: failed.length > 0 ? JSON.stringify(failedSummary) : undefined,
+    };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// Fase 6 del plan de publicación 2026 — Reels armados de fotos.
+// Sube un archivo local (video mp4) a Zernio y devuelve su URL pública.
+// POST /v1/media/upload-direct acepta multipart hasta 25MB — un reel de
+// ~10s en 1080x1920 H.264 pesa 2-5MB, sobra.
+export async function uploadMedia(filePath, apiKey, contentType = "video/mp4") {
+  const buf = await readFile(filePath);
+  const form = new FormData();
+  form.append("file", new Blob([buf], { type: contentType }), path.basename(filePath));
+  form.append("contentType", contentType);
+  const res = await fetch(ZERNIO_UPLOAD_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.url) {
+    throw new Error(`Zernio upload-direct ${res.status}: ${JSON.stringify(data).slice(0, 400)}`);
+  }
+  return data.url;
+}
+
+// Publica un reel (video vertical) en Instagram y Facebook. En Instagram, un
+// mediaItem de tipo "video" sin contentType "story" se publica como Reel
+// automáticamente (openapi: "Default posts become Reels or feed depending on
+// media"). shareToFeed=true → aparece también en el perfil.
+export async function publishReel(videoPath, caption = "") {
+  const apiKey = process.env.ZERNIO_API_KEY;
+  const igAccountId = process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID;
+  const fbAccountId = process.env.ZERNIO_FACEBOOK_ACCOUNT_ID;
+
+  if (!apiKey) return { success: false, error: "Falta ZERNIO_API_KEY en el entorno." };
+
+  let videoUrl;
+  try {
+    videoUrl = await uploadMedia(videoPath, apiKey, "video/mp4");
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+
+  const platforms = [];
+  if (igAccountId) {
+    platforms.push({
+      platform: "instagram",
+      accountId: igAccountId,
+      platformSpecificData: { shareToFeed: true },
+    });
+  }
+  if (fbAccountId) {
+    platforms.push({ platform: "facebook", accountId: fbAccountId });
+  }
+  if (platforms.length === 0) {
+    return { success: false, error: "Falta configurar ZERNIO_INSTAGRAM_ACCOUNT_ID y/o ZERNIO_FACEBOOK_ACCOUNT_ID." };
+  }
+
+  return createPostAndPollVideo({ apiKey, content: caption, videoUrl, platforms });
+}
+
+// Igual que createPostAndPoll pero con un mediaItem de video. Se deja aparte
+// para no meterle un branch más a la función de imágenes, que ya es densa.
+async function createPostAndPollVideo({ apiKey, content, videoUrl, platforms }) {
+  try {
+    const res = await fetch(ZERNIO_API_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content,
+        mediaItems: [{ type: "video", url: videoUrl }],
+        platforms,
+        publishNow: true,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (data.existingPostId) {
+        const existing = await fetchPostPlatforms(data.existingPostId, apiKey);
+        if (existing && existing.every((p) => p.status === "published")) {
+          return { success: true, postId: data.existingPostId, platforms: existing, reconciled: true };
+        }
+      }
+      return { success: false, error: JSON.stringify(data).slice(0, 2000), existingPostId: data.existingPostId };
+    }
+
+    let perPlatform = data.post?.platforms || [];
+    const postId = data.post?._id;
+    // El procesamiento de video tarda más que el de imagen — se le da más margen.
+    for (let attempt = 0; attempt < POLL_ATTEMPTS * 2; attempt++) {
+      const pending = perPlatform.filter((p) => p.status !== "published" && p.status !== "failed");
+      if (pending.length === 0) break;
+      await sleep(POLL_DELAY_MS);
+      const refreshed = postId ? await fetchPostPlatforms(postId, apiKey) : null;
+      if (refreshed) perPlatform = refreshed;
+    }
+
+    const failed = perPlatform.filter((p) => p.status !== "published");
+    const failedSummary = failed.map((p) => ({
+      platform: p.platform,
+      status: p.status,
+      error: p.error ?? p.errorMessage ?? p.reason ?? p.message ?? null,
+    }));
     return {
       success: failed.length === 0,
       postId,
