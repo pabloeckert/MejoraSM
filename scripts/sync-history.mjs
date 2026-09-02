@@ -129,6 +129,7 @@ async function main() {
   const accountIds = [
     process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID,
     process.env.ZERNIO_FACEBOOK_ACCOUNT_ID,
+    process.env.ZERNIO_LINKEDIN_ACCOUNT_ID, // Fase 5 — vacío hasta conectar LinkedIn
   ].filter(Boolean);
 
   if (accountIds.length === 0) {

@@ -67,6 +67,8 @@ jobs:
           ZERNIO_API_KEY: ${{ secrets.ZERNIO_API_KEY }}
           ZERNIO_INSTAGRAM_ACCOUNT_ID: ${{ secrets.ZERNIO_INSTAGRAM_ACCOUNT_ID }}
           ZERNIO_FACEBOOK_ACCOUNT_ID: ${{ secrets.ZERNIO_FACEBOOK_ACCOUNT_ID }}
+          # Fase 5 — vacío hasta que Pablo conecte LinkedIn en Zernio y cargue el secret.
+          ZERNIO_LINKEDIN_ACCOUNT_ID: ${{ secrets.ZERNIO_LINKEDIN_ACCOUNT_ID }}
           RAW_BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/main
         run: node scripts/publish-scheduled-posts.mjs
 

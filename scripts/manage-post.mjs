@@ -22,7 +22,12 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ACCOUNT_ID_BY_PLATFORM = {
   instagram: process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID,
   facebook: process.env.ZERNIO_FACEBOOK_ACCOUNT_ID,
+  linkedin: process.env.ZERNIO_LINKEDIN_ACCOUNT_ID, // Fase 5 — vacío hasta conectar LinkedIn en Zernio
 };
+
+// Plataformas que este script acepta gestionar. LinkedIn solo si su cuenta
+// está configurada (si no, no tiene sentido ofrecerla).
+const PLATAFORMAS_OK = ["instagram", "facebook", ...(process.env.ZERNIO_LINKEDIN_ACCOUNT_ID ? ["linkedin"] : [])];
 
 function buildCaption(proposal) {
   return [proposal.hook, "", proposal.body, "", proposal.cta, "", ...(proposal.hashtags || [])]
@@ -142,8 +147,8 @@ async function main() {
     console.error("Uso: node scripts/manage-post.mjs <proposal_id> <platform> <reintentar|despublicar>");
     process.exit(1);
   }
-  if (!["instagram", "facebook"].includes(platform)) {
-    console.error(`Plataforma "${platform}" no soportada acá (instagram|facebook).`);
+  if (!PLATAFORMAS_OK.includes(platform)) {
+    console.error(`Plataforma "${platform}" no soportada acá (${PLATAFORMAS_OK.join("|")}).`);
     process.exit(1);
   }
 

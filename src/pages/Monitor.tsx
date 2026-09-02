@@ -30,7 +30,7 @@ import { toast } from "@/hooks/use-toast";
 // confiable, cacheado por sync-history.mjs/mark-manual.mjs — ver migración
 // 016_historial_cache.sql.
 
-const NOMBRES_PLATAFORMA: Record<string, string> = { instagram: "Instagram", facebook: "Facebook" };
+const NOMBRES_PLATAFORMA: Record<string, string> = { instagram: "Instagram", facebook: "Facebook", linkedin: "LinkedIn" };
 
 interface Platform {
   platform: string;

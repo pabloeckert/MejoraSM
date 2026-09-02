@@ -176,6 +176,11 @@ export async function publishPost(imageUrl, caption = "") {
   const apiKey = process.env.ZERNIO_API_KEY;
   const igAccountId = process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID;
   const fbAccountId = process.env.ZERNIO_FACEBOOK_ACCOUNT_ID;
+  // Fase 5 del plan de publicación 2026 — LinkedIn. Queda desactivado hasta
+  // que Pablo conecte la cuenta de LinkedIn en Zernio y cargue este secret;
+  // apenas exista, los posts de feed salen también a LinkedIn sin tocar nada
+  // más. LinkedIn no tiene "stories", así que publishStory() no lo incluye.
+  const liAccountId = process.env.ZERNIO_LINKEDIN_ACCOUNT_ID;
 
   if (!apiKey) {
     return { success: false, error: "Falta ZERNIO_API_KEY en el entorno." };
@@ -194,6 +199,12 @@ export async function publishPost(imageUrl, caption = "") {
       platform: "facebook",
       accountId: fbAccountId,
       platformSpecificData: { contentType: "post" },
+    });
+  }
+  if (liAccountId) {
+    platforms.push({
+      platform: "linkedin",
+      accountId: liAccountId,
     });
   }
 
