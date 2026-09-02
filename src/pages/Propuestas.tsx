@@ -25,7 +25,9 @@ import {
   GitBranch,
   Send,
   XCircle,
+  Recycle,
 } from "lucide-react";
+import { RecycleTab } from "@/components/RecycleTab";
 import { useProposals, usePendingProposals, useTemplates, useCreateTemplate, useUpdateTemplate, useDeleteTemplate } from "@/hooks/useProposals";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "@/components/ui/use-toast";
@@ -157,6 +159,10 @@ function PropuestasContent() {
             <GitBranch className="h-3.5 w-3.5" />
             Línea de tiempo
           </TabsTrigger>
+          <TabsTrigger value="recycle" className="gap-1.5">
+            <Recycle className="h-3.5 w-3.5" />
+            Reciclar
+          </TabsTrigger>
           <TabsTrigger value="templates" className="gap-1.5">
             <LayoutTemplate className="h-3.5 w-3.5" />
             Plantillas
@@ -266,6 +272,10 @@ function PropuestasContent() {
             onCopy={handleCopy}
             copiedId={copiedId}
           />
+        </TabsContent>
+
+        <TabsContent value="recycle" className="mt-6">
+          <RecycleTab />
         </TabsContent>
 
         <TabsContent value="templates" className="mt-6">

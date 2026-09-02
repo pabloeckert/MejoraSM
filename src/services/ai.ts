@@ -298,3 +298,57 @@ export async function sendInboxReply(itemId: string, message: string): Promise<{
   );
   return handleResponse(res, "Error enviando la respuesta");
 }
+
+// ═══════════════════════════════════════
+// RECYCLE (Reciclado de contenido — Fase 3 del plan de publicación 2026)
+// ═══════════════════════════════════════
+
+export interface RecycleCandidate {
+  id: string;
+  title: string | null;
+  hook: string | null;
+  format: string;
+  oferta: string | null;
+  published_at: string | null;
+  engagement: number | null;
+  reach: number | null;
+  aboveMedian: boolean;
+}
+
+export interface RecycleRefresh {
+  original: { hook: string | null; body: string | null; cta: string | null; hashtags: string[] | null };
+  refreshed: { hook: string; body: string; cta: string; hashtags: string[] | null };
+}
+
+export async function getRecycleCandidates(): Promise<{ median: number; count: number; candidates: RecycleCandidate[] }> {
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/recycle`,
+    { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "candidates" }) },
+    QUICK_TIMEOUT_MS
+  );
+  return handleResponse(res, "Error buscando contenido para reciclar");
+}
+
+export async function refreshRecycleProposal(proposalId: string): Promise<RecycleRefresh> {
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/recycle`,
+    { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "refresh", proposalId }) },
+    VAULT_TIMEOUT_MS
+  );
+  return handleResponse(res, "Error refrescando la pieza");
+}
+
+export async function scheduleRecycledProposal(input: {
+  proposalId: string;
+  hook: string;
+  body: string;
+  cta: string;
+  hashtags: string[];
+}): Promise<{ newProposalId: string }> {
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/recycle`,
+    { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "schedule", ...input }) },
+    QUICK_TIMEOUT_MS
+  );
+  return handleResponse(res, "Error creando la propuesta reciclada");
+}

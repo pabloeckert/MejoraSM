@@ -1483,8 +1483,8 @@ Pablo: *"Aplica 'fuera de este plan' sin prototipado... deploy a producción dir
 | Fase | Qué | Estado |
 |---|---|---|
 | **1 — Bandeja de conversaciones** | Comentarios + DMs de IG/FB traídos de Zernio, clasificados por sentimiento, respondibles desde el EDA con OK humano | 🟢 hecho y verificado en prod (2026-09-01) |
-| **2 — Higiene** | Bug de `daily-story.yml` (`ENOENT briefs.json` en re-dispatch); fallback de `metrics-collector` para posts trabados en "202 pending" de Zernio; verificar `pickNextSlot`/dedup del autopilot con corrida real; migración al dominio propio (gated: DNS de Pablo); reactivar `sync-history` (gated: Pablo limpia IG/FB) | ⏳ siguiente |
-| **3 — Reciclado de contenido** | Query "publicadas hace >90d con engagement > promedio" → LLM refresca hook/CTA → reinserta como propuesta `scheduled` + UI para elegir. Mecanismo ahora, dormido hasta que haya datos | ⏳ |
+| **2 — Higiene** | Bug `ENOENT briefs.json` de `daily-story.yml` en re-dispatch → 🟢 arreglado; `metrics-collector` ya no marca error por el `202` de Zernio (7 días → `stale`) → 🟢; autopilot `computeVetoSlot`/dedup → 🟢 revisado (determinístico, corrida end-to-end ya hecha). **Gated en Pablo:** dominio propio (falta el CNAME DNS), reactivar `sync-history` (falta que limpie IG/FB) | 🟢 lo autónomo; 2 ítems gated |
+| **3 — Reciclado de contenido** | Query "publicadas hace >90d con engagement > promedio" → LLM refresca hook/CTA → reinserta como propuesta `scheduled` + UI para elegir. Mecanismo ahora, dormido hasta que haya datos | ⏳ siguiente |
 | **5 — LinkedIn** | Variante de template + adaptación de copy + `linkedin` en el array de plataformas. **Gated:** Pablo conecta la cuenta de LinkedIn en Zernio. Código listo para cuando esté | ⏳ |
 | **4 — Loop de aprendizaje activo** | `success_rules` de alta confianza dirigen el prompt del Estratega de verdad; framework de A/B. Gated: volumen de datos | ⏳ |
 | **6 — Video/Reels** | ffmpeg en el runner, "Reel armado de fotos" (Ken Burns + texto animado → MP4) | ⏳ |
@@ -1506,6 +1506,15 @@ El sistema publicaba y medía números pero **nunca veía lo que la gente dice**
 - Verificado: `tsc` limpio, lint 0 errores, 62/62 tests, build limpio, CI + Deploy Functions + Deploy EDA verdes.
 
 **Pendiente real de Fase 1, no bloqueante:** ~15% de las tandas de clasificación fallan el parseo en una corrida dada (el LLM a veces no devuelve JSON limpio) — el reintento en cada `sync` las levanta en la corrida siguiente, así que converge a 0 sin fallar; si molesta, subir el determinismo del prompt o bajar el batch a 6.
+
+### Fase 2 — Higiene (lo autónomo hecho, 2026-09-01)
+
+- **Bug `ENOENT content/work/briefs.json` de `daily-story.yml`** (real desde 2026-08-31, nunca arreglado): en un `workflow_dispatch` manual el mismo día que ya se publicó, `generate-brief.mjs` salía con `exit 0` por `alreadyGeneratedToday` **sin** escribir `briefs.json`, y `render-story.mjs` explotaba al leerlo. Fix en tres puntos: `generate-brief.mjs` ahora escribe `briefs.json = []` antes de salir en ese caso; `render-story.mjs` y `publish-story.mjs` toleran archivo faltante o array vacío (loguean `skipped`, `return` sin `exit 1`). Probado local con los tres casos (archivo ausente, `[]`, normal) — exit 0 limpio en los dos primeros.
+- **`metrics-collector` y el `202` de Zernio**: un post cuyas analíticas Zernio nunca sincroniza (anomalía real documentada: 2 posts trabados >11 días el 2026-08-17) hacía que cada corrida del cron cada 6h registrara un `error` en `run_log` para siempre. Ahora `getPostAnalytics` devuelve `{pending:true}` en vez de tirar; `collectMetrics` lo marca `stale` si el post tiene ≥7 días publicado; `collect-all` informa `count` (medidos de verdad) / `pending` / `stale` / `errored` por separado y el `run_log` del cron solo queda en error si hubo un error real (402/424/500). Deployado; no se puede ejercitar hasta que `proposals` vuelva a tener posts publicados (está en 0 tras el wipe), pero la lógica es directa.
+- **Autopilot `computeVetoSlot` / dedup**: revisado, no re-corrido. `computeVetoSlot` es determinístico (23:00 UTC, +1 día si faltan <10h) y el dedup lo cubre `orchestrator.startSession` (fix B5) — con el autopilot corriendo solo 3×/semana el riesgo de duplicado en la ventana de 6 min es nulo. La corrida end-to-end real ya la hizo la sesión anterior (`proposalId ee1d32e5`, borrado en el wipe). El cron `0 6 * * 1,3,5` no disparó el lunes 2026-09-01 porque el archivo se pusheó después de las 06:00 UTC — próximo disparo miércoles.
+- **Gated en Pablo, no resoluble solo** (son las dos únicas cosas de todo el plan que necesitan intervención humana):
+  1. **Dominio propio `mejorasm.mejoraok.com`**: falta que Pablo agregue `CNAME mejorasm → pabloeckert.github.io` en el DNS de mejoraok.com. Después (automatizable): `hub/CNAME`, dominio en Pages, `VITE_BASE_PATH` a `/app/`, `autopilot.mjs::APP_URL`, Redirect URL de Supabase.
+  2. **Reactivar `sync-history.yml`** (cron comentado): mientras Pablo no borre a mano los ~12 posts viejos de Instagram/Facebook, reactivarlo los vuelve a traer al Monitor. Cuando confirme que están limpios, descomentar el `schedule`.
 
 ## Notas históricas
 
