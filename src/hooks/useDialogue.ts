@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { dialogueApi } from "@/services/supabase";
-import { startDialogue, continueDialogue } from "@/services/ai";
+import { startDialogue, continueDialogue, forceApproveDialogue } from "@/services/ai";
 
 export function useDialogueSessions() {
   return useQuery({
@@ -90,6 +90,21 @@ export function useContinueDialogue() {
     onSuccess: (_result, variables) => {
       qc.invalidateQueries({ queryKey: ["dialogue-sessions"] });
       qc.invalidateQueries({ queryKey: ["dialogue-messages", variables.sessionId] });
+      qc.invalidateQueries({ queryKey: ["proposals"] });
+    },
+  });
+}
+
+// Override humano (2026-09-02): Pablo tiene la última palabra sobre el
+// Crítico — ver forceApproveDialogue en services/ai.ts.
+export function useForceApprove() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => forceApproveDialogue(sessionId),
+    onSuccess: (_result, sessionId) => {
+      qc.invalidateQueries({ queryKey: ["dialogue-sessions"] });
+      qc.invalidateQueries({ queryKey: ["dialogue-messages", sessionId] });
+      qc.invalidateQueries({ queryKey: ["proposals"] });
     },
   });
 }

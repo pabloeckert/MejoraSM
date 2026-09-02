@@ -452,6 +452,63 @@ async function pickExplorationHour(): Promise<number> {
   return PREFERRED_UTC_HOURS.reduce((best, h) => (counts[h] < counts[best] ? h : best), PREFERRED_UTC_HOURS[0]);
 }
 
+// Factorizado 2026-09-02 — hallazgo real: runDebate() (acción "start") creaba
+// la propuesta + registraba el experimento de timing cuando el Crítico
+// aprobaba, pero continueSession() (acción "continue") nunca tenía el
+// equivalente — si el Crítico aprobaba recién en una segunda vuelta (después
+// de feedback), no pasaba nada: ni propuesta, ni agenda, ni cambio de estado
+// de la sesión. Pablo lo pisó en vivo dos veces (una sesión de prueba que
+// después se borró en el wipe de datos, y de nuevo acá). Este helper es el
+// mismo bloque de siempre, reusable desde los tres lugares que necesitan
+// crear una propuesta real a partir de contenido ya escrito por el Creativo
+// (runDebate, continueSession, y forceApprove — el override humano de abajo).
+async function createProposalFromContent(sessionId: string, contenido: string, estrategia: string, titleFallback: string) {
+  const proposal = extractProposal(contenido, estrategia);
+  const format = proposal.format || "post";
+  const insert: Record<string, unknown> = {
+    session_id: sessionId,
+    format,
+    title: proposal.hook || titleFallback,
+    body: proposal.body || contenido,
+    hashtags: proposal.hashtags || [],
+    hook: proposal.hook,
+    cta: proposal.cta,
+  };
+
+  let scheduledAt: string | null = null;
+  let oferta: string | null = null;
+  let experimentHour: number | null = null;
+  const autoPublished = AUTO_PUBLISH_FORMATS.includes(format);
+  if (autoPublished) {
+    insert.status = "scheduled";
+    insert.oferta = await pickNextOferta();
+    const slot = await pickNextSlot();
+    insert.scheduled_at = slot.iso;
+    experimentHour = slot.experimentHour;
+    oferta = insert.oferta as string;
+    scheduledAt = slot.iso;
+  } else {
+    insert.status = "pending";
+  }
+
+  const { data: insertedProposal } = await supabase.from("proposals").insert(insert).select("id").single();
+  const proposalId = insertedProposal?.id ?? null;
+
+  // Fase 4 — registrar el experimento de timing (solo cuando exploramos, no
+  // cuando ya hay una regla aprendida que dicta la hora) — mismo criterio
+  // que runDebate ya aplicaba, ahora compartido.
+  if (proposalId && experimentHour !== null) {
+    await supabase.from("content_experiments").insert({
+      proposal_id: proposalId,
+      dimension: "timing",
+      variant: String(experimentHour),
+      hypothesis: `¿Publicar a las ${experimentHour}:00 UTC rinde mejor que los otros bloques?`,
+    });
+  }
+
+  return { proposalId, autoPublished, scheduledAt, oferta, proposal };
+}
+
 async function pickNextSlot(): Promise<{ iso: string; experimentHour: number | null }> {
   const { data } = await supabase
     .from("proposals")
@@ -758,45 +815,13 @@ async function runDebate(session: { id: string }, topic: string) {
   // enterarse era adivinar que había que ir a /propuestas o /calendario.
   let scheduledAt: string | null = null;
   let oferta: string | null = null;
-  const autoPublished = evaluacion.aprobado && AUTO_PUBLISH_FORMATS.includes(proposal.format || "post");
+  let autoPublished = false;
   if (evaluacion.aprobado) {
-    const format = proposal.format || "post";
-    const insert: Record<string, unknown> = {
-      session_id: session.id,
-      format,
-      title: proposal.hook || topic,
-      body: proposal.body || contenido,
-      hashtags: proposal.hashtags || [],
-      hook: proposal.hook,
-      cta: proposal.cta,
-    };
-
-    let experimentHour: number | null = null;
-    if (AUTO_PUBLISH_FORMATS.includes(format)) {
-      insert.status = "scheduled";
-      insert.oferta = await pickNextOferta();
-      const slot = await pickNextSlot();
-      insert.scheduled_at = slot.iso;
-      experimentHour = slot.experimentHour;
-      oferta = insert.oferta as string;
-      scheduledAt = slot.iso;
-    } else {
-      insert.status = "pending";
-    }
-
-    const { data: insertedProposal } = await supabase.from("proposals").insert(insert).select("id").single();
-    proposalId = insertedProposal?.id ?? null;
-
-    // Fase 4 — registrar el experimento de timing (solo cuando exploramos,
-    // no cuando ya hay una regla aprendida que dicta la hora).
-    if (proposalId && experimentHour !== null) {
-      await supabase.from("content_experiments").insert({
-        proposal_id: proposalId,
-        dimension: "timing",
-        variant: String(experimentHour),
-        hypothesis: `¿Publicar a las ${experimentHour}:00 UTC rinde mejor que los otros bloques?`,
-      });
-    }
+    const created = await createProposalFromContent(session.id, contenido, estrategia, topic);
+    proposalId = created.proposalId;
+    autoPublished = created.autoPublished;
+    scheduledAt = created.scheduledAt;
+    oferta = created.oferta;
   }
 
   // 6. Actualizar sesión (después de crear la propuesta, para poder
@@ -900,10 +925,127 @@ async function continueSession(sessionId: string, feedback: string) {
   );
   await saveMessage(sessionId, "critico", evaluacion.feedback, nextTurn + 1);
 
+  // Hallazgo real 2026-09-02 (Pablo: mandó feedback tras un rechazo, el
+  // Crítico aprobó, y "no pasó nada" — nunca se agendó): a diferencia de
+  // runDebate() (acción "start"), esto nunca creaba la propuesta ni
+  // actualizaba dialogue_sessions cuando el Crítico aprobaba en una
+  // revisión — el estado de la sesión quedaba clavado en "needs_review"
+  // para siempre, sin importar cuántas rondas se aprobaran después.
+  const estrategia = messages?.find((m) => m.agent === "estratega")?.content || "";
+  let proposalId: string | null = null;
+  let autoPublished = false;
+  let scheduledAt: string | null = null;
+  let oferta: string | null = null;
+
+  if (evaluacion.aprobado) {
+    const created = await createProposalFromContent(sessionId, contenido, estrategia, session.topic || "");
+    proposalId = created.proposalId;
+    autoPublished = created.autoPublished;
+    scheduledAt = created.scheduledAt;
+    oferta = created.oferta;
+
+    await supabase
+      .from("dialogue_sessions")
+      .update({
+        status: "approved",
+        final_proposal: contenido,
+        metadata: {
+          ...(session.metadata || {}),
+          evaluacion,
+          proposal: created.proposal,
+          proposalId,
+          autoPublished,
+          scheduledAt,
+          oferta,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", sessionId);
+  }
+
   return {
     contenido,
     evaluacion,
     aprobado: evaluacion.aprobado,
+    proposalId,
+    autoPublished,
+    scheduledAt,
+    oferta,
+  };
+}
+
+// ═══════════════════════════════════════
+// FORZAR APROBACIÓN — override humano (2026-09-02)
+//
+// Pablo tiene la última palabra: el Crítico es un chequeo automático de
+// criterio de marca, no una autoridad final. Si rechaza algo que Pablo
+// quiere publicar igual, esto crea la propuesta a partir del ÚLTIMO texto
+// real que escribió el Creativo (la versión más reciente del contenido,
+// aprobada o no) y la agenda como si el Crítico la hubiera aprobado —
+// dejando registro explícito (mensaje de auditoría + metadata.forcedByHuman)
+// de que fue una decisión humana, no del sistema.
+// ═══════════════════════════════════════
+
+async function forceApprove(sessionId: string) {
+  const { data: session } = await supabase
+    .from("dialogue_sessions")
+    .select("*")
+    .eq("id", sessionId)
+    .single();
+
+  if (!session) {
+    throw new Error("Sesión no encontrada");
+  }
+
+  const { data: messages } = await supabase
+    .from("dialogue_messages")
+    .select("*")
+    .eq("session_id", sessionId)
+    .order("turn", { ascending: true });
+
+  const estrategia = messages?.find((m) => m.agent === "estratega")?.content || "";
+  const lastCreativo = [...(messages || [])].reverse().find((m) => m.agent === "creativo");
+
+  if (!lastCreativo) {
+    throw new Error("No hay contenido del Creativo en esta sesión para forzar la aprobación");
+  }
+
+  const created = await createProposalFromContent(sessionId, lastCreativo.content, estrategia, session.topic || "");
+
+  await saveMessage(
+    sessionId,
+    "sistema",
+    `Pablo forzó la aprobación de este contenido de forma manual, sin pasar por el chequeo del Crítico. Queda registrado como decisión humana, no del sistema.`,
+    (messages?.length || 0) + 1
+  );
+
+  await supabase
+    .from("dialogue_sessions")
+    .update({
+      status: "approved",
+      final_proposal: lastCreativo.content,
+      metadata: {
+        ...(session.metadata || {}),
+        proposal: created.proposal,
+        proposalId: created.proposalId,
+        autoPublished: created.autoPublished,
+        scheduledAt: created.scheduledAt,
+        oferta: created.oferta,
+        forcedByHuman: true,
+        forcedAt: new Date().toISOString(),
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sessionId);
+
+  return {
+    sessionId,
+    proposalId: created.proposalId,
+    autoPublished: created.autoPublished,
+    scheduledAt: created.scheduledAt,
+    oferta: created.oferta,
+    aprobado: true as const,
+    forcedByHuman: true as const,
   };
 }
 
@@ -1001,8 +1143,13 @@ Deno.serve(async (req) => {
         result = await continueSession(sessionId, feedback);
         break;
 
+      case "forceApprove":
+        validateBody(body, ["sessionId"]);
+        result = await forceApprove(sessionId);
+        break;
+
       default:
-        throw new Error("Acción no válida. Usa 'start' o 'continue'");
+        throw new Error("Acción no válida. Usa 'start', 'continue' o 'forceApprove'");
     }
 
     await logRun({

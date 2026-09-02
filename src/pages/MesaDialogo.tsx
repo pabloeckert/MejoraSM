@@ -23,12 +23,14 @@ import {
   XCircle,
   Send,
   Rocket,
+  Gavel,
 } from "lucide-react";
 import {
   useDialogueSessions,
   useDialogueMessages,
   useStartDialogue,
   useContinueDialogue,
+  useForceApprove,
 } from "@/hooks/useDialogue";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PiecePreview } from "@/components/PiecePreview";
@@ -94,6 +96,7 @@ function MesaDialogoContent() {
   const { data: sessions, isLoading } = useDialogueSessions();
   const startMutation = useStartDialogue();
   const continueMutation = useContinueDialogue();
+  const forceApproveMutation = useForceApprove();
 
   const [newTopic, setNewTopic] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -156,6 +159,34 @@ function MesaDialogoContent() {
         },
       }
     );
+  };
+
+  // Override humano (2026-09-02): Pablo tiene la última palabra — si el
+  // Crítico rechazó, esto fuerza la aprobación igual, con un confirm
+  // explícito porque salta el chequeo automático de criterio de marca.
+  const handleForceApprove = (sessionId: string) => {
+    const ok = window.confirm(
+      "¿Forzar la aprobación de este contenido? El Crítico lo rechazó — se va a publicar de todos modos, bajo tu propio criterio, sin el chequeo automático de marca."
+    );
+    if (!ok) return;
+    forceApproveMutation.mutate(sessionId, {
+      onSuccess: (result) => {
+        toast({
+          title: result.autoPublished ? "Forzado — ya se agendó para publicarse solo" : "Forzado — queda pendiente en Propuestas",
+          description:
+            result.autoPublished && result.scheduledAt
+              ? `Sale el ${formatScheduledAt(result.scheduledAt)}. Podés cancelarlo desde Propuestas si te arrepentís.`
+              : "Este formato (historia) no autoagenda — andá a Propuestas para publicarla a mano.",
+        });
+      },
+      onError: (e) => {
+        toast({
+          title: "No se pudo forzar la aprobación",
+          description: e instanceof Error ? e.message : "Error desconocido — probá de nuevo.",
+          variant: "destructive",
+        });
+      },
+    });
   };
 
   return (
@@ -275,6 +306,8 @@ function MesaDialogoContent() {
               }
               onContinue={handleContinue}
               isContinuing={continueMutation.isPending}
+              onForceApprove={handleForceApprove}
+              isForcingApprove={forceApproveMutation.isPending}
             />
           ))}
         </div>
@@ -289,12 +322,16 @@ function SessionCard({
   onSelect,
   onContinue,
   isContinuing,
+  onForceApprove,
+  isForcingApprove,
 }: {
   session: DialogueSession;
   isSelected: boolean;
   onSelect: () => void;
   onContinue: (sessionId: string, feedback: string, onClear: () => void) => void;
   isContinuing: boolean;
+  onForceApprove: (sessionId: string) => void;
+  isForcingApprove: boolean;
 }) {
   const [feedback, setFeedback] = useState("");
   const { data: messages } = useDialogueMessages(session.id, {
@@ -457,6 +494,28 @@ function SessionCard({
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* Forzar aprobación — override humano (2026-09-02): Pablo pidió
+              explícitamente tener la última palabra sobre el Crítico. Solo
+              tiene sentido con una evaluación real ya rechazada
+              ("needs_review") — una sesión recién iniciada o ya aprobada no
+              lo necesita. */}
+          {session.status === "needs_review" && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-destructive/40 text-destructive hover:bg-destructive/5"
+              disabled={isForcingApprove}
+              onClick={() => onForceApprove(session.id)}
+            >
+              {isForcingApprove ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Gavel className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Forzar aprobación — publicar de todos modos
+            </Button>
           )}
 
           {/* Aviso de autopublicación — hallazgo real de auditoría 2026-08-25:

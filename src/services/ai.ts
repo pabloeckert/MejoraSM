@@ -123,6 +123,23 @@ export interface ContinueResult {
   contenido: string;
   evaluacion: { aprobado: boolean; feedback: string };
   aprobado: boolean;
+  // Hallazgo real 2026-09-02: si el Crítico aprueba recién en una ronda de
+  // feedback (no en la primera pasada), la propuesta se crea/agenda acá
+  // también — mismo aviso que ya existía para la primera ronda.
+  proposalId: string | null;
+  autoPublished: boolean;
+  scheduledAt: string | null;
+  oferta: string | null;
+}
+
+export interface ForceApproveResult {
+  sessionId: string;
+  proposalId: string | null;
+  autoPublished: boolean;
+  scheduledAt: string | null;
+  oferta: string | null;
+  aprobado: true;
+  forcedByHuman: true;
 }
 
 export async function startDialogue(topic: string, mode: "dirigido" | "auto" = "dirigido"): Promise<DialogueResult> {
@@ -149,6 +166,23 @@ export async function continueDialogue(sessionId: string, feedback: string): Pro
     DIALOGUE_TIMEOUT_MS
   );
   return handleResponse(res, "Error continuando el diálogo");
+}
+
+// Override humano (2026-09-02): Pablo tiene la última palabra sobre el
+// Crítico — si rechazó algo que igual quiere publicar, esto fuerza la
+// aprobación a partir del último texto real del Creativo. Queda registrado
+// como decisión humana (metadata.forcedByHuman en la sesión).
+export async function forceApproveDialogue(sessionId: string): Promise<ForceApproveResult> {
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/orchestrator`,
+    {
+      method: "POST",
+      headers: await buildHeaders(),
+      body: JSON.stringify({ action: "forceApprove", sessionId }),
+    },
+    DIALOGUE_TIMEOUT_MS
+  );
+  return handleResponse(res, "Error forzando la aprobación");
 }
 
 // ═══════════════════════════════════════
