@@ -884,6 +884,16 @@ async function continueSession(sessionId: string, feedback: string) {
     .eq("id", sessionId)
     .single();
 
+  // Hallazgo real 2026-09-03: a diferencia de forceApprove() (que sí chequea
+  // `if (!session)` antes de usarla), acá se usaba session.topic más abajo
+  // sin ningún chequeo — un sessionId que ya no existe (ej. una pestaña
+  // vieja del navegador con una sesión de antes del wipe de la base del
+  // 2026-09-01, que vació dialogue_sessions) tira un TypeError crudo
+  // ("Cannot read properties of null") en vez de un mensaje claro.
+  if (!session) {
+    throw new Error("Sesión no encontrada — puede que ya no exista. Recargá Mesa de Diálogo.");
+  }
+
   // Obtener historial previo
   const { data: messages } = await supabase
     .from("dialogue_messages")
