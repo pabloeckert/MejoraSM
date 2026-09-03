@@ -1,0 +1,38 @@
+# TEMPORAL — probe de cuentas de Zernio + verificación de la función ads.
+# Se borra apenas confirma. NO es infraestructura.
+name: _tmp Zernio probe
+
+on:
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Listar cuentas conectadas en Zernio
+        run: |
+          echo "=== /v1/accounts ==="
+          curl -sS "https://zernio.com/api/v1/accounts" \
+            -H "Authorization: Bearer ${{ secrets.ZERNIO_API_KEY }}" | head -c 4000
+          echo ""
+          echo "=== /v1/social-accounts ==="
+          curl -sS "https://zernio.com/api/v1/social-accounts" \
+            -H "Authorization: Bearer ${{ secrets.ZERNIO_API_KEY }}" | head -c 4000
+          echo ""
+          echo "=== ads/campaigns?platform=facebook ==="
+          curl -sS "https://zernio.com/api/v1/ads/campaigns?platform=facebook&limit=20" \
+            -H "Authorization: Bearer ${{ secrets.ZERNIO_API_KEY }}" | head -c 4000
+          echo ""
+
+      - name: Verificar la Edge Function ads
+        run: |
+          echo "=== POST /functions/v1/ads {report} ==="
+          curl -sS -X POST "${{ secrets.VITE_SUPABASE_URL }}/functions/v1/ads" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"report"}' | head -c 4000
+          echo ""
