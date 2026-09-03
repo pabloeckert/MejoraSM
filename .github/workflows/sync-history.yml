@@ -3,12 +3,11 @@
 name: Sync Story History
 
 on:
-  # Pausado 2026-09-01: Pablo está limpiando el contenido viejo de Zernio /
-  # Instagram / Facebook a mano. Mientras tanto, sync-history no debe volver a
-  # traer ese historial viejo al Monitor. Descomentar cuando el contenido real
-  # esté limpio (o disparar a mano con workflow_dispatch).
-  # schedule:
-  #   - cron: "0 */6 * * *" # cada 6 horas
+  # Reactivado 2026-09-03: Pablo confirmó que limpió el contenido viejo de
+  # Instagram / Facebook. (Estuvo pausado desde 2026-09-01 para que no trajera
+  # ese historial viejo al Monitor mientras se limpiaba.)
+  schedule:
+    - cron: "0 */6 * * *" # cada 6 horas
   workflow_dispatch: {}
 
 permissions:
