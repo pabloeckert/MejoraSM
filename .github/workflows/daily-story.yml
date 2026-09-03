@@ -6,7 +6,13 @@ name: Daily Story
 on:
   schedule:
     - cron: "0 13 * * *" # 13:00 UTC = 10:00 ART
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publicar en Instagram/Facebook (destildar para solo generar + renderizar + commitear, sin publicar)"
+        required: false
+        type: boolean
+        default: true
 
 concurrency:
   group: daily-story
@@ -68,6 +74,9 @@ jobs:
           echo "no se pudo pushear"; exit 1
 
       - name: Publicar en Instagram y Facebook (vía Zernio)
+        # En el cron siempre publica; en un dispatch manual respeta el input
+        # (destildar "publish" = probar el pipeline sin publicar nada real).
+        if: ${{ github.event_name == 'schedule' || inputs.publish }}
         env:
           ZERNIO_API_KEY: ${{ secrets.ZERNIO_API_KEY }}
           ZERNIO_INSTAGRAM_ACCOUNT_ID: ${{ secrets.ZERNIO_INSTAGRAM_ACCOUNT_ID }}
