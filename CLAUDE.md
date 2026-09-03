@@ -422,7 +422,7 @@ Todas en `supabase/functions/` (Deno), cada una con su propia allowlist de CORS 
 
 Deploy: `.github/workflows/deploy-functions.yml` (push a `supabase/functions/**`, o manual con función específica) — usa `SUPABASE_ACCESS_TOKEN` y `SUPABASE_PROJECT_REF` como secrets del repo.
 
-**No hay Edge Function `publisher`** (se retiró el 2026-07-30 — publicaba directo a la Graph API de Meta, nunca configurada ni invocada por nada). La publicación de posts de feed corre en GitHub Actions, no en Supabase — ver "Arquitectura: publicación autónoma de posts de feed" más abajo. **Pendiente:** la función sigue `ACTIVE` en el proyecto real (`hsglmdarztrshihmzfph`) porque borrarla remoto quedó bloqueado por el clasificador de seguridad del entorno — falta correr `supabase functions delete publisher --project-ref hsglmdarztrshihmzfph` a mano.
+**No hay Edge Function `publisher`** (se retiró del código el 2026-07-30 — publicaba directo a la Graph API de Meta, nunca configurada ni invocada por nada; borrada del proyecto real en la Fase 0 del plan estratégico, 2026-08-16). La publicación de posts de feed corre en GitHub Actions, no en Supabase — ver "Arquitectura: publicación autónoma de posts de feed" más abajo. Confirmado el 2026-09-03: `supabase functions list` devuelve exactamente las 11 de la tabla de arriba, sin `publisher` ni `ai-gateway`.
 
 **Tampoco hay Edge Function `ai-gateway`** — eliminada tanto del código (2026-08-04, código muerto confirmado, sin ningún caller real en `src/`) como del proyecto real: `supabase functions delete ai-gateway --project-ref hsglmdarztrshihmzfph` corrió el 2026-08-04 y confirmó `{"function_slug":"ai-gateway","project_ref":"hsglmdarztrshihmzfph","message":"Deleted Edge Function."}`. A diferencia de `publisher`, este borrado remoto sí se completó — no quedó pendiente.
 
@@ -794,7 +794,7 @@ Resumen ejecutivo de los 5 puntos trabajados hoy para blindar el motor en códig
 
 | # | Punto | Estado | Evidencia |
 |---|---|---|---|
-| 1 | `deploy-migrations.yml` | 🟡 **Probablemente resuelto, sin confirmación 100%** | Dry-run limpio con CLI v2.111.0, sin el error del motor Effect. `db push` real y `workflow_dispatch` real quedaron bloqueados por el clasificador del entorno — falta que Pablo lo corra una vez para cerrar del todo |
+| 1 | `deploy-migrations.yml` | 🟢 **Resuelto 2026-09-03** | Historial de `schema_migrations` reparado (`migration repair`, `001`-`025`); `db push --dry-run` = `upToDate: true`. Ver "Historial de migraciones reparado" en la bitácora |
 | 2 | Rechazo real del Crítico | 🟢 **Confirmado, sin bugs** | Caso adversarial real (precio como gancho + culpar al individuo) — rechazado con motivo específico y correcto. `dialogue_sessions.id=36d571e3-...` |
 | 3 | `rule-engine` con datos reales | 🟡 **Lógica confirmada, pero con datos de prueba, no reales** | 10 filas de prueba (identificables, borrables) generaron 4 reglas coherentes con la señal diseñada. Los datos reales genuinos siguen siendo insuficientes (2 métricas reales hoy) — las reglas actuales en `success_rules` **no reflejan comportamiento real de audiencia todavía** |
 | 4 | Duplicado de autoagendado | 🟡 **Causa más probable + fix aplicado, no confirmación forense** | Gap de idempotencia real en `markPublished()` (no chequeaba éxito del PATCH) — corregido + capa extra de re-chequeo de status. Probada la lógica contra datos reales, no el flujo completo con Playwright/Zernio real. No hay logs del incidente puntual de la semana pasada para confirmar que fue exactamente esto |
@@ -807,6 +807,8 @@ Resumen ejecutivo de los 5 puntos trabajados hoy para blindar el motor en códig
 - **Revisar el post real publicado en esta prueba** (`zernio_post_id: 6a72afe966cd54ae189ec9db`) — decidir si queda como está o se despublica a mano.
 - **`publisher`** sigue `ACTIVE` en el proyecto real — pendiente de antes, sin resolver hoy (bloqueado por el clasificador, ver sección "Backend" más arriba).
 - Hallazgo menor sin arreglar: el regex de detección de emoji en `rule-engine` no cubre el bloque Unicode de Dingbats (✨✅❤️) — bajo impacto, no bloqueante.
+
+> **Actualización 2026-09-03 (auditoría "arreglar todo"):** de esta lista ya está resuelto — `deploy-migrations.yml` (historial reparado, ver bitácora del 2026-09-03), `publisher` (borrada en Fase 0, confirmado con `functions list`), el regex de emoji de `rule-engine` (ya cubre `\u{2600}-\u{27BF}`, ver `index.ts:144`). Los datos de prueba `TEST-QA-` / `7e57da7a-` y el post `6a72af…` desaparecieron con el wipe de la base del 2026-09-01. Nada de esta lista queda vivo.
 
 **Lo que sí quedó realmente blindado hoy:** el Crítico rechaza contenido real que viola el Criterio Medular (no solo aprueba, ya hay evidencia de ambos lados); el circuito completo de autonomía total (Mesa de Diálogo → autoagenda → publish real → métricas) corre de punta a punta sin gate humano, confirmado con una corrida real, no simulada; y el gap de idempotencia más probable detrás del duplicado de la semana pasada quedó cerrado con un fix concreto y probado.
 
