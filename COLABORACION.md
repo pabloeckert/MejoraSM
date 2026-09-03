@@ -14,7 +14,7 @@ Al terminarla, poné tu fila en "libre".
 
 | Sesión | Identidad git | Área / lane | Estado ahora | Última actualización |
 |---|---|---|---|---|
-| `mejorasm-03` (session que cerró el plan de publicación 2026) | commits como `Pablo <pabloeckert@gmail.com>` | Plan de publicación 2026: inbox, recycle, ads, reels, experimentos de timing (`content_experiments`), autopilot, higiene. Docs (`CLAUDE.md` / `MejoraSM.md` / `entregables/`). | **libre** — plan cerrado, sin trabajo en curso | 2026-09-02 |
+| `mejorasm-03` (session que cerró el plan de publicación 2026) | commits como `Pablo <pabloeckert@gmail.com>` | Plan de publicación 2026: inbox, recycle, ads, reels, experimentos de timing (`content_experiments`), autopilot, higiene. Docs (`CLAUDE.md` / `MejoraSM.md` / `entregables/`). | **sesión cerrada 2026-09-03** — todo committeado y pusheado, sin trabajo en curso. Un futuro retomo entra por acá igual | 2026-09-03 |
 | `session_01DDbWa2ZGKMaUhBWKTDJWi4` (alias de mensajería entre agentes: `mejorasm-01`) | commits como `Claude <noreply@anthropic.com>`, trailer `Claude-Session:` | Mesa de Diálogo / `orchestrator`: `forceApprove`, `createProposalFromContent`, flujo de propuestas, `continueSession`. | **libre** — `forceApprove` cerrado y verificado en prod; unidad de `entregables/` (ver mensaje abajo) también cerrada | 2026-09-03 (commit `417bbad`) |
 
 ---
