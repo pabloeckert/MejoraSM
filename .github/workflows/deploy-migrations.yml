@@ -20,6 +20,7 @@ jobs:
   migrate:
     name: Aplicar migraciones a Supabase
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code

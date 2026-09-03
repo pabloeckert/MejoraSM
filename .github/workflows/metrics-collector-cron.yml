@@ -16,6 +16,7 @@ jobs:
   collect:
     name: Recolectar métricas
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Invocar metrics-collector (collect-all)
         run: |

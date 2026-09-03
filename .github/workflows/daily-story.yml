@@ -25,6 +25,7 @@ jobs:
   story:
     name: Generar y publicar story
     runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     steps:
       - name: Checkout code

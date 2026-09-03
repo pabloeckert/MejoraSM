@@ -17,6 +17,7 @@ jobs:
   advice:
     name: Generar consejo del día
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Invocar copilot (advice)
         run: |

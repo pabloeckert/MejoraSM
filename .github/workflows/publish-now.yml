@@ -41,6 +41,7 @@ jobs:
     if: ${{ inputs.mode == 'prepare' }}
     name: Preparar (generar + renderizar, sin publicar)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -97,6 +98,7 @@ jobs:
     if: ${{ inputs.mode == 'publish' }}
     name: Publicar en Instagram y Facebook
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

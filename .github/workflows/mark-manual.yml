@@ -30,6 +30,7 @@ jobs:
   mark:
     name: "Marcar gestionado a mano — ${{ inputs.platform }} — ${{ inputs.post_id }}"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code

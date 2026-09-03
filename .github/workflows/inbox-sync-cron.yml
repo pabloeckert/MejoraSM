@@ -17,6 +17,7 @@ jobs:
   sync:
     name: Sincronizar bandeja de conversaciones
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Invocar inbox (sync)
         run: |

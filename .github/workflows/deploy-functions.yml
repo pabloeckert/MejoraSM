@@ -32,6 +32,7 @@ jobs:
   deploy:
     name: Deploy Edge Functions
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # Only deploy after CI passes (if triggered by push)
     # For manual dispatch, always run
     

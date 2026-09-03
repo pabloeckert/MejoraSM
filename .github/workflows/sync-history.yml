@@ -24,6 +24,7 @@ jobs:
   sync:
     name: Sincronizar historial de stories
     runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     steps:
       - name: Checkout code

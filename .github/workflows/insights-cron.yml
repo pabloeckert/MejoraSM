@@ -19,6 +19,7 @@ jobs:
   insights:
     name: Recalcular insights de la semana
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Invocar insights (get, force)
         run: |

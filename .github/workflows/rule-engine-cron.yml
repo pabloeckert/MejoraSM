@@ -17,6 +17,7 @@ jobs:
   analyze:
     name: Analizar métricas y generar reglas
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Invocar rule-engine (analyze)
         run: |
