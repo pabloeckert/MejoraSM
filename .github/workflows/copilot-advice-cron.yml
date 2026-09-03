@@ -10,6 +10,9 @@ on:
     - cron: "0 11 * * *" # 11:00 UTC = 08:00 ART, antes del horario habitual de trabajo
   workflow_dispatch: {}
 
+# Solo hace un curl a una Edge Function — no toca el repo.
+permissions: {}
+
 jobs:
   advice:
     name: Generar consejo del día

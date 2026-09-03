@@ -12,6 +12,9 @@ on:
     - cron: "30 11 * * 1" # lunes 11:30 UTC = 08:30 ART
   workflow_dispatch: {}
 
+# Solo hace un curl a una Edge Function — no toca el repo.
+permissions: {}
+
 jobs:
   insights:
     name: Recalcular insights de la semana

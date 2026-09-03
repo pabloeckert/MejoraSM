@@ -9,6 +9,9 @@ on:
     - cron: "0 3 * * *"
   workflow_dispatch: {}
 
+# Solo hace un curl a una Edge Function — no toca el repo.
+permissions: {}
+
 jobs:
   analyze:
     name: Analizar métricas y generar reglas

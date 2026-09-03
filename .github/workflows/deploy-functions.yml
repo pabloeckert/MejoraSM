@@ -14,10 +14,19 @@ on:
     paths:
       - 'supabase/functions/**'
 
-# Cancel in-progress runs for the same branch
+# Serializa los deploys en vez de cancelarlos: con dos sesiones de Claude
+# pusheando funciones casi a la vez, `cancel-in-progress: true` mataba un
+# deploy a mitad — y aunque el workflow deploya TODAS las funciones cada
+# vez (así que el siguiente cubre lo cancelado), un deploy cancelado puede
+# dejar funciones a medio subir si nada lo sigue. `false` los encola: cada
+# commit de funciones termina de deployarse. Cuesta unos minutos de cola,
+# nada más.
 concurrency:
   group: deploy-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
