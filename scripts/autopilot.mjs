@@ -67,6 +67,7 @@ async function supa(path, init = {}) {
       "Content-Type": "application/json",
       ...(init.headers || {}),
     },
+    signal: AbortSignal.timeout(20_000),
   });
   return res;
 }
@@ -106,6 +107,7 @@ async function sendAlertEmail({ proposalId, topic, oferta, proposal, slot }) {
       subject: `MejoraSM · se publica sola ${fmtART(slot)}: "${String(proposal?.hook || topic).slice(0, 70)}"`,
       html,
     }),
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) {
     throw new Error(`Resend ${res.status}: ${(await res.text()).slice(0, 300)}`);
@@ -124,6 +126,8 @@ async function main() {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ action: "start", mode: "auto" }),
+    // El debate de 3 agentes puede tardar; tope generoso pero acotado.
+    signal: AbortSignal.timeout(180_000),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -146,36 +150,58 @@ async function main() {
     return;
   }
 
-  // 3. Aprobada. Empujar a la ventana de veto.
-  const slot = computeVetoSlot();
-  const patch = await supa(`/rest/v1/proposals?id=eq.${proposalId}`, {
+  // 3. Aprobada. `orchestrator.startSession` ya la dejó `scheduled` a la hora
+  //    que eligió pickNextSlot — que puede ser pronto. Antes de nada, la
+  //    DESARMAMOS (pending, sin scheduled_at): así, si el proceso muere en
+  //    cualquier punto entre acá y el aviso, la pieza NO se publica sin que
+  //    Pablo haya visto el email. El invariante del módulo ("nunca se publica
+  //    algo sin haber avisado") tiene que sobrevivir a un runner que se cae.
+  const disarm = await supa(`/rest/v1/proposals?id=eq.${proposalId}`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ scheduled_at: slot.toISOString() }),
+    body: JSON.stringify({ status: "pending", scheduled_at: null }),
   });
-  if (!patch.ok) {
-    throw new Error(`No se pudo reprogramar la propuesta: ${patch.status} ${await patch.text()}`);
+  if (!disarm.ok) {
+    throw new Error(`No se pudo desarmar la propuesta antes de avisar: ${disarm.status} ${await disarm.text()}`);
   }
 
-  // 4. Avisar. Si el email falla, bajar a pending para no publicar sin aviso.
+  // 4. Avisar. Recién si el email sale, la RE-ARMAMOS para la ventana de veto.
+  const slot = computeVetoSlot();
   try {
     await sendAlertEmail({ proposalId, topic: autoTopic, oferta, proposal, slot });
   } catch (mailErr) {
-    await supa(`/rest/v1/proposals?id=eq.${proposalId}`, {
-      method: "PATCH",
-      headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ status: "pending", scheduled_at: null }),
-    });
     await logRun({
       source: "autopilot",
       step: "run",
       status: "error",
       proposalId,
       durationMs: elapsed(),
-      error: `Aviso falló, pieza dejada en pending: ${mailErr.message}`,
+      error: `Aviso falló, pieza queda en pending: ${mailErr.message}`,
       metadata: { autoTopic, oferta },
     });
-    console.error(`[autopilot] No se pudo avisar (${mailErr.message}). Pieza ${proposalId} bajada a pending.`);
+    console.error(`[autopilot] No se pudo avisar (${mailErr.message}). Pieza ${proposalId} queda en pending.`);
+    process.exit(1);
+  }
+
+  // 5. Email enviado. Armar para la ventana de veto.
+  const arm = await supa(`/rest/v1/proposals?id=eq.${proposalId}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ status: "scheduled", scheduled_at: slot.toISOString() }),
+  });
+  if (!arm.ok) {
+    // El aviso ya salió; la pieza quedó en pending. Pablo puede agendarla a
+    // mano desde el link del email — falla molesta, no peligrosa.
+    await logRun({
+      source: "autopilot",
+      step: "run",
+      status: "error",
+      proposalId,
+      durationMs: elapsed(),
+      error: `Aviso enviado pero no se pudo re-agendar: ${arm.status} ${await arm.text()}`,
+      metadata: { autoTopic, oferta },
+    });
+    console.error(`[autopilot] Aviso enviado, pero la pieza ${proposalId} no se pudo re-agendar — queda en pending.`);
     process.exit(1);
   }
 
