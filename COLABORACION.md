@@ -153,4 +153,12 @@ Deploy Functions y Deploy EDA confirmados verdes sobre `e90b251` (los 5 hallazgo
 
 Pablo repitió el mandato "arreglar todo" a las dos. Tu fila sigue en "sesión cerrada" — asumo que no estás corriendo en este momento. Como mi lane propia (backend de diálogo) quedó auditada y cerrada, sigo sola con **frontend común** (nadie la había tomado): `Dashboard.tsx`, `Propuestas.tsx`, `Calendario.tsx`, `Monitor.tsx`, `Hub.tsx`, `Conversaciones.tsx`, `Auditoria.tsx`, `src/services/supabase.ts`, `AppSidebar`/`AppLayout`. Voy dejando hallazgos acá con `[01]` como antes. Si te reactivás y ya estoy en algo, avisá antes de tocarlo — reviso este archivo antes de cada commit.
 
+- **`[01]` ✅ `src/services/supabase.ts` + `useProposals.ts` revisados a fondo** — sin hallazgos: paginación real, `run()` chequea error consistente en las 10 mutaciones, `reactivate` bloquea publicadas. Limpio.
+- **`[01]` ✅ `Monitor.tsx` — hallazgo real, más serio que los anteriores:** `handleDelete()` ("Borrar esta pieza") despublica de Facebook + marca Instagram a mano vía `useWorkflowAction().run()` — pero esa función **nunca tira** (atrapa el error adentro, tira su propio toast, devuelve `false`). `handleDelete` no chequeaba ese booleano: si el dispatch fallaba (token sin permiso de Actions, red, rate limit), el código seguía igual, sacaba la fila del Monitor y decía "Pieza borrada" — un **falso borrado** sobre una despublicación real que en realidad nunca pasó. Confirmé que los otros 4 handlers del mismo archivo (`AvisoInstagramFallido`, `AccionesFacebookFallido`, los dos de `GestionPublicacion`) sí chequeaban bien el booleano — era puntual a este. Corregido: aborta antes de tocar el Monitor si cualquiera de los dos dispatches falla. Commit `08da9c7`, Deploy EDA confirmando.
+- **`[01]` ✅ `Conversaciones.tsx` (envío de respuestas a gente real)** revisado con lupa — `handleSend()` no envuelve el `mutateAsync` en try/catch, pero `useSendReply()` ya tiene `onError` con toast propio a nivel de la mutación (corre igual aunque el caller no atrape el rechazo) — confirmado que no es un envío silencioso. Sin cambios.
+- **`[01]` ✅ `PublishNowCard.tsx`** — usa `github.triggerWorkflow` directo (no el wrapper `run()` que no tira), con try/catch propio. Sin el bug de Monitor.
+- **`[01]` ✅ `Hub.tsx`** (subida + clasificación de fotos) revisado — manejo de errores por foto individual, sin bloquear el resto del lote. Sin hallazgos.
+
+Sigo con `Propuestas.tsx`, `Calendario.tsx`, `Auditoria.tsx`, `Dashboard.tsx`, `AppSidebar`/`AppLayout`.
+
 — mejorasm-01
