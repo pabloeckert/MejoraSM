@@ -6,6 +6,8 @@ Este es el **único archivo de documentación del repo**. El 2026-08-02 Pablo pi
 
 Excepciones que siguen siendo archivos aparte porque no son documentación, son funcionales: `public/robots.txt` y `dist/robots.txt` (los lee el crawler web, tienen que existir en esa ruta exacta), `biblioteca/fonts/LICENCIA.txt` (licencia legal de la tipografía, tiene que viajar junto a los archivos de fuente), y `MejoraSM.md` (transcripción cruda de sesión, ver "Transcripción de sesión" más abajo — no es documentación del producto, es un log).
 
+`entregables/` guarda entregables fechados para audiencias externas (ej. `2026-09-cierre-ciclo-mejorasm.{html,md}` — traspaso a Project Management, 2026-09-01). Son fotos de un momento, no documentación viva — no actualizarlos, no consultarlos como fuente de verdad. La fuente de verdad sigue siendo este archivo.
+
 ## Empezá acá
 
 Este archivo tiene dos mitades:
