@@ -315,9 +315,24 @@ async function sync() {
     .neq("text", "")
     .order("item_time", { ascending: false })
     .limit(90);
-  const toClassify = (pending ?? []).filter((r: { text: string | null }) => (r.text ?? "").trim().length > 0);
+  let toClassify = (pending ?? []).filter((r: { text: string | null }) => (r.text ?? "").trim().length > 0);
 
   let classified = 0;
+
+  // Mensajes sin texto real (solo un adjunto/sticker/foto) no tienen nada que
+  // clasificar — se marcan `neutral` sin gastar una llamada al LLM. Si no,
+  // caen en un batch que el LLM no sabe resolver y quedan trabados para siempre.
+  const sinTexto = toClassify.filter((r: { text: string }) =>
+    /^(\[attachment\]|\[adjunto\]|[\s\p{P}]+)$/iu.test((r.text ?? "").trim())
+  );
+  for (const r of sinTexto) {
+    await supabase.from("inbox_items")
+      .update({ sentiment: "neutral", sentiment_note: "adjunto sin texto" })
+      .eq("id", (r as { id: string }).id);
+    classified++;
+  }
+  const sinTextoIds = new Set(sinTexto.map((r) => (r as { id: string }).id));
+  toClassify = toClassify.filter((r: { id: string }) => !sinTextoIds.has(r.id));
   for (let i = 0; i < toClassify.length; i += 10) {
     const batch = toClassify.slice(i, i + 10) as { id: string; text: string }[];
     try {
