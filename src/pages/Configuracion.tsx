@@ -322,6 +322,7 @@ interface DecisionRow {
     autoPublished?: boolean;
     oferta?: string | null;
     autoTopic?: string | null;
+    forcedByHuman?: boolean;
   } | null;
 }
 
@@ -364,8 +365,15 @@ function SystemDecisions() {
           <ul className="divide-y divide-border">
             {data.map((d) => {
               const aprobado = d.metadata?.evaluacion?.aprobado;
-              const veredicto =
-                d.status === "error"
+              // forceApprove no escribe metadata.evaluacion (no pasó por el
+              // Crítico) — sin esta rama, una sesión forzada caía al último
+              // else y mostraba el string crudo de la base ("approved") en
+              // vez de una etiqueta real, y no quedaba ningún indicio de que
+              // fue una decisión humana — justo lo que esta pantalla existe
+              // para mostrar.
+              const veredicto = d.metadata?.forcedByHuman
+                ? { label: "Forzada por Pablo", variant: "default" as const }
+                : d.status === "error"
                   ? { label: "Error", variant: "destructive" as const }
                   : aprobado === true
                     ? { label: "Aprobada", variant: "secondary" as const }

@@ -47,7 +47,18 @@ export function InsightsSection({ onOpenReport }: { onOpenReport: () => void }) 
       { insightId: id, weekStart, useful },
       {
         onSuccess: () => toast({ title: useful ? "Anotado como útil" : "Anotado — no aplica", description: "Se tiene en cuenta para el recálculo de la semana que viene." }),
-        onError: (e: Error) => toast({ title: "No se pudo guardar", description: e.message, variant: "destructive" }),
+        onError: (e: Error) => {
+          // Sin este revert, un guardado que falla igual mostraba el botón
+          // como "elegido" — el toast de error quedaba como único aviso, sin
+          // que la marca visual (que persiste) coincidiera con lo que
+          // realmente quedó guardado.
+          setRated((r) => {
+            const next = { ...r };
+            delete next[id];
+            return next;
+          });
+          toast({ title: "No se pudo guardar", description: e.message, variant: "destructive" });
+        },
       }
     );
   }

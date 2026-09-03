@@ -118,11 +118,16 @@ function BovedaContent() {
       await new Promise<void>((resolve) => uploadMutation.mutate(file, { onSettled: () => resolve() }));
     }
     if (ok.length > 1) toast({ title: `${ok.length} documentos subidos`, description: "El sistema los está clasificando y procesando." });
-    if (fileRef.current) fileRef.current.value = "";
   };
 
+  // Hay dos <input type="file"> reales (el del botón, con `fileRef`, y el
+  // del dropzone, sin ref propio) — resetear acá, con el input real del
+  // evento, cubre los dos. Sin esto, volver a elegir el mismo archivo desde
+  // el dropzone no disparaba `change` (el navegador no reemite el evento si
+  // el `value` del input no cambió) y el segundo intento no hacía nada.
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    e.target.value = "";
     if (files.length) void uploadFiles(files);
   };
 

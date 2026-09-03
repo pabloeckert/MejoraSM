@@ -196,7 +196,17 @@ async function classifyDocument(title: string, content: string): Promise<DocCate
   const user = `TÍTULO: ${title}\n\nTEXTO (recorte):\n${content.slice(0, 2500)}`;
 
   try {
-    const raw = (await callLLM(system, user)).toLowerCase().replace(/[^a-z_]/g, "");
+    // Normaliza espacios a "_" antes de sacar cualquier otro carácter — si
+    // el LLM responde "buyer persona" (espacio) en vez de "buyer_persona"
+    // (el formato exacto pedido), la versión anterior lo perdía en
+    // silencio: el espacio se descartaba junto con la puntuación y
+    // "buyerpersona" nunca matcheaba contra "buyer_persona", cayendo
+    // siempre a "otro" sin ningún aviso.
+    const raw = (await callLLM(system, user))
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-z_]/g, "");
     const match = DOC_CATEGORIES.find((c) => raw === c || raw.includes(c));
     return match ?? "otro";
   } catch (e: any) {

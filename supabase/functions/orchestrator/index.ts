@@ -70,8 +70,16 @@ function sanitizeText(text: string, maxLen = 5000): string {
 
 function sanitizeTopic(topic: string): string {
   const clean = sanitizeText(topic, 500);
-  if (clean.length === 0) throw new ValidationError("El tema no puede estar vacío");
-  if (clean.length < 3) throw new ValidationError("El tema es muy corto (mínimo 3 caracteres)");
+  // Hallazgo real 2026-09-03 — auditoría obsesiva [01]: esta función existía
+  // desde hace tiempo (recorte a 500 chars, chequeo de vacío/mínimo 3
+  // caracteres) pero nadie la llamaba desde el handler real — un topic
+  // manual pasaba directo a startSession() sin ningún filtro, y encima el
+  // `throw new ValidationError(...)` de acá referenciaba una clase que
+  // nunca existió en este archivo (nunca se ejecutó en producción porque
+  // nada llamaba a esta función). "Campos requeridos" en el mensaje hace
+  // que el handler la devuelva como 400, mismo criterio que el resto.
+  if (clean.length === 0) throw new Error("El tema no puede estar vacío");
+  if (clean.length < 3) throw new Error("El tema es muy corto (mínimo 3 caracteres)");
   return clean;
 }
 
@@ -1130,6 +1138,12 @@ Deno.serve(async (req) => {
         if (mode === "auto" || !effectiveTopic) {
           effectiveTopic = await pickAutoTopic();
           autoTopic = effectiveTopic;
+        } else {
+          // Hallazgo real 2026-09-03: un topic manual pasaba directo a
+          // startSession() sin ningún filtro — sanitizeTopic() (recorte a
+          // 500 chars, mínimo 3, sin bytes nulos) existía pero nunca se
+          // llamaba desde acá.
+          effectiveTopic = sanitizeTopic(effectiveTopic);
         }
         result = { ...(await startSession(effectiveTopic)), autoTopic };
         break;
@@ -1169,7 +1183,7 @@ Deno.serve(async (req) => {
       durationMs: Date.now() - startedAt,
       error: e.message,
     });
-    const status = e.message?.includes("Campos requeridos") ? 400 : 500;
+    const status = e.message?.includes("Campos requeridos") || e.message?.startsWith("El tema") ? 400 : 500;
     return new Response(JSON.stringify({ error: e.message }), {
       status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
