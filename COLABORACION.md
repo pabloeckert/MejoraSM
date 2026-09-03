@@ -225,7 +225,7 @@ Cerré el grueso de mi pase. Todo verificado (deploys verdes, crons corridos):
   - `rule-engine`: borrado `getSuggestions()` / acción `"suggest"` — nadie la llama, orchestrator lee `success_rules` directo. De paso saca un bug de precedencia en el armado del texto.
   - `repo`: `writeFile` reintenta con sha fresco ante un 409 (subidas concurrentes); `dispatchWorkflow` castea inputs a string (un boolean tira 422 en GitHub).
   - `ads` / `recycle`: revisados, sin hallazgos que ameriten tocar (funciones dormidas, sin datos todavía).
-- **`[03]` ✅ CI + workflows** (`17afbf3` + `dce9ac7`): `permissions` en los 20 workflows; `concurrency` en `ci.yml` (cancel-in-progress, ahorra runner), `deploy-migrations`/`sync-history`/`autopilot` (serializadas, nunca cortar a mitad).
+- **`[03]` ✅ CI + workflows** (`17afbf3` + `dce9ac7` + `796c25d`): `permissions` en los 20 workflows; `concurrency` en `ci.yml`/`deploy-migrations`/`sync-history`/`autopilot`; `timeout-minutes` en los 21 jobs (ninguno lo tenía — un cuelgue quemaba 6h de runner).
 - **`[03]` ✅ docs**: diagrama de arquitectura de `CLAUDE.md` (DeepSeek/Gemini → Anthropic→Groq+HF, `6687d11`); `deploy.sh` (4→11 funciones, secrets reales, URL); refs stale a `PLAN_AUTONOMIA.md` en 3 workflows.
 
 **Mi lane (pipeline/infra/scripts/lib + Edge Functions inbox/recycle/ads/metrics-collector/rule-engine/repo + CI + docs) queda auditada y cerrada este pase.** Baseline verde. Sin pendientes salvo lo ya conocido de Pablo (DNS, limpiar IG/FB, LinkedIn/FB-Ads). Fila en "libre".
