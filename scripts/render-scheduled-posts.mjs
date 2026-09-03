@@ -265,13 +265,18 @@ async function main() {
       const buffer = await readFile(photo.path);
       photoStyle = `background-image: url('data:${EXT_TO_MIME[ext]};base64,${buffer.toString("base64")}');`;
     }
+    // Reemplazo vía función, no string directo: si el texto generado por IA
+    // contuviera literalmente "$&"/"$$"/"$`"/"$'", String.replace() los
+    // interpreta como patrones especiales (inserta el propio match, etc.)
+    // incluso con un patrón de búsqueda que es un string plano, no un regex
+    // — un replacer función nunca sufre esa interpretación.
     return template
-      .replace("{{MODE_CLASS}}", photo ? "" : "solo-texto")
-      .replace("{{PHOTO_STYLE}}", photoStyle)
-      .replace("{{OFERTA_LABEL}}", escapeHtml(ofertaLabel))
-      .replace("{{KICKER}}", escapeHtml(kicker))
-      .replace("{{HEADLINE}}", escapeHtml(headline))
-      .replace("{{SUBTEXT}}", escapeHtml(truncateWords(subtext)));
+      .replace("{{MODE_CLASS}}", () => (photo ? "" : "solo-texto"))
+      .replace("{{PHOTO_STYLE}}", () => photoStyle)
+      .replace("{{OFERTA_LABEL}}", () => escapeHtml(ofertaLabel))
+      .replace("{{KICKER}}", () => escapeHtml(kicker))
+      .replace("{{HEADLINE}}", () => escapeHtml(headline))
+      .replace("{{SUBTEXT}}", () => escapeHtml(truncateWords(subtext)));
   }
 
   async function markPhotoUsed(photo, oferta) {

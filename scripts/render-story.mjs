@@ -78,12 +78,16 @@ async function main() {
       photoStyle = `background-image: url('data:${EXT_TO_MIME[ext]};base64,${buffer.toString("base64")}');`;
     }
 
+    // Reemplazo vía función, no string directo: un "$&"/"$$"/"$`"/"$'"
+    // literal en el texto generado por IA dispararía la interpretación
+    // especial de patrones de String.replace() (aplica igual con un patrón
+    // de búsqueda string plano, no solo regex) — una función replacer no.
     template = template
-      .replace("{{MODE_CLASS}}", brief.mode === "foto" ? "" : "solo-texto")
-      .replace("{{PHOTO_STYLE}}", photoStyle)
-      .replace("{{KICKER}}", escapeHtml(brief.kicker || "MEJORA CONTINUA"))
-      .replace("{{HEADLINE}}", escapeHtml(brief.headline || ""))
-      .replace("{{SUBTEXT}}", escapeHtml(brief.subtext || ""));
+      .replace("{{MODE_CLASS}}", () => (brief.mode === "foto" ? "" : "solo-texto"))
+      .replace("{{PHOTO_STYLE}}", () => photoStyle)
+      .replace("{{KICKER}}", () => escapeHtml(brief.kicker || "MEJORA CONTINUA"))
+      .replace("{{HEADLINE}}", () => escapeHtml(brief.headline || ""))
+      .replace("{{SUBTEXT}}", () => escapeHtml(brief.subtext || ""));
 
     await page.setContent(template, { waitUntil: "networkidle" });
     const outputPath = path.join(PUBLISHED_DIR, `${IMG_PREFIX}-${date}-${i + 1}.jpg`);

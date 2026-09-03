@@ -84,15 +84,19 @@ export function PiecePreview({
     return () => window.removeEventListener("resize", fit);
   }, [canvas.w]);
 
+  // Reemplazo vía función, no string directo: un "$&"/"$$"/"$`"/"$'" literal
+  // en el hook/body generado por IA dispararía la interpretación especial de
+  // patrones de String.replace() (aplica con un patrón de búsqueda string
+  // plano igual, no solo con regex) — una función replacer no la sufre.
   const html =
     template &&
     template
-      .replace("{{MODE_CLASS}}", "solo-texto")
-      .replace("{{PHOTO_STYLE}}", "")
-      .replace("{{OFERTA_LABEL}}", esc(dimensionLabel(oferta) || "Mejora Continua"))
-      .replace("{{KICKER}}", esc(dimensionLabel(oferta) || ""))
-      .replace("{{HEADLINE}}", esc((hook || "").replace(/\*\*/g, "")))
-      .replace("{{SUBTEXT}}", esc(firstWords(body || "", 22)));
+      .replace("{{MODE_CLASS}}", () => "solo-texto")
+      .replace("{{PHOTO_STYLE}}", () => "")
+      .replace("{{OFERTA_LABEL}}", () => esc(dimensionLabel(oferta) || "Mejora Continua"))
+      .replace("{{KICKER}}", () => esc(dimensionLabel(oferta) || ""))
+      .replace("{{HEADLINE}}", () => esc((hook || "").replace(/\*\*/g, "")))
+      .replace("{{SUBTEXT}}", () => esc(firstWords(body || "", 22)));
 
   return (
     <div className={className}>
