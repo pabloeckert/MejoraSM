@@ -98,9 +98,18 @@ function PropuestasContent() {
     const text = [proposal.hook, "", proposal.body, "", proposal.cta, "", ...(proposal.hashtags || [])]
       .filter((l) => l !== null && l !== undefined)
       .join("\n");
-    navigator.clipboard.writeText(text);
-    setCopiedId(proposal.id);
-    setTimeout(() => setCopiedId(null), 2000);
+    // Hallazgo real: writeText() devuelve una promesa que puede rechazar (el
+    // navegador bloquea el portapapeles fuera de un contexto seguro, o sin
+    // permiso) — sin chequearla, el tilde de "copiado" se mostraba igual
+    // aunque nada se hubiera copiado de verdad. Mismo criterio que ya usa
+    // ProposalDetailDialog.handleCopy.
+    navigator.clipboard.writeText(text).then(
+      () => {
+        setCopiedId(proposal.id);
+        setTimeout(() => setCopiedId(null), 2000);
+      },
+      () => toast({ title: "No se pudo copiar", description: "El navegador bloqueó el portapapeles.", variant: "destructive" })
+    );
   };
 
   const matchesFormat = (p: ProposalDetail) => formatFilter === "all" || p.format === formatFilter;
