@@ -611,7 +611,9 @@ Los tres conviven en el **mismo sitio** de GitHub Pages (un artifact por sitio):
 
 ## Variables de entorno
 
-Definidas en `.env.example` (copiar a `.env`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (frontend). Para Edge Functions (se configuran como **secrets en Supabase**, no en `.env` local): `GROQ_API_KEY` (gratis, [console.groq.com/keys](https://console.groq.com/keys)), `DEEPSEEK_API_KEY` (gratis con créditos iniciales, [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)), `GEMINI_API_KEY` (gratis, 15 RPM, [aistudio.google.com/apikey](https://aistudio.google.com/apikey)), `HF_API_KEY` (gratis, permiso "Read", [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)). El acceso admin ya no se gestiona por variable de entorno — es un INSERT en la tabla `app_admins`.
+El frontend (Vite/React) **solo** usa `VITE_SUPABASE_URL` + `VITE_SUPABASE_PUBLISHABLE_KEY` (ver `.env.example`). Todo lo demás son secrets del lado servidor.
+
+Secrets de Edge Functions que el código **usa hoy**: `ANTHROPIC_API_KEY` (IA principal), `GROQ_API_KEY` (fallback), `HF_API_KEY` (embeddings del RAG, permiso "Read"), `ZERNIO_API_KEY` (métricas/bandeja/ads), `GITHUB_TOKEN` (función `repo`). `DEEPSEEK_API_KEY` / `GEMINI_API_KEY` siguen en el catálogo y `callAI` tiene ramas para ellos, pero el ruteo real (`pickModel()`, 2026-08-05) nunca las selecciona — si están seteadas es residuo, no rompe nada. El acceso admin no es una env var — es un `INSERT` en `app_admins`.
 
 ## `backend/`
 
