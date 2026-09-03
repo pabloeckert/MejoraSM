@@ -6,6 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+# Solo lee el código y sube un artifact — sin acceso de escritura al repo.
+permissions:
+  contents: read
+
+# Un push nuevo sobre la misma rama/PR cancela el CI anterior en vuelo — no
+# tiene sentido gastar un runner validando un commit ya superado.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest

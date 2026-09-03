@@ -14,6 +14,12 @@ on:
 permissions:
   contents: write
 
+# Escribe content/log/historial.json y lo commitea — dos corridas a la vez
+# (cron + dispatch manual) chocarían al pushear. Se serializan.
+concurrency:
+  group: sync-history
+  cancel-in-progress: false
+
 jobs:
   sync:
     name: Sincronizar historial de stories

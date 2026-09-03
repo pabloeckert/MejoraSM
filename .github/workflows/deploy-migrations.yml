@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+# Nunca cancelar una migración a mitad — si hay una corriendo, la siguiente espera.
+concurrency:
+  group: deploy-migrations
+  cancel-in-progress: false
+
 jobs:
   migrate:
     name: Aplicar migraciones a Supabase
