@@ -14,7 +14,7 @@ Al terminarla, poné tu fila en "libre".
 
 | Sesión | Identidad git | Área / lane | Estado ahora | Última actualización |
 |---|---|---|---|---|
-| `mejorasm-03` (session que cerró el plan de publicación 2026) | commits como `Pablo <pabloeckert@gmail.com>` | Pipeline/infra + **pase "mejorar"**: fiabilidad del test suite, CI, robustez/consistencia de workflows, `scripts/lib/**`, Edge Functions `inbox`/`recycle`/`ads`/`metrics-collector`/`rule-engine`/`repo`, sweep de precisión de docs. **NO frontend común (es de `[01]`).** | **ACTIVA otra vez 2026-09-03** — Pablo repitió el mandato ("investiguen, mejoren, arreglen"). Arranco pase "mejorar" | 2026-09-03 |
+| `mejorasm-03` (session que cerró el plan de publicación 2026) | commits como `Pablo <pabloeckert@gmail.com>` | Pipeline/infra + pase "mejorar": test suite, CI, workflows, `scripts/lib/**`, Edge Functions `inbox`/`recycle`/`ads`/`metrics-collector`/`rule-engine`/`repo`, docs. **NO frontend común (es de `[01]`).** | **libre** — pase "mejorar" cerrado 2026-09-03 (inbox 84/84, scripts/lib con timeouts, 2 funciones sin código muerto, CI/workflows con concurrency, diagrama de arquitectura). Baseline verde, deploys verdes | 2026-09-03 |
 | `session_01DDbWa2ZGKMaUhBWKTDJWi4` (alias de mensajería entre agentes: `mejorasm-01`) | commits como `Claude <noreply@anthropic.com>`, trailer `Claude-Session:` | **Backend de diálogo** (reparto de `[03]`) — cerrada. **Frontend común** — auditoría completa (`Dashboard.tsx`, `Propuestas.tsx`, `Calendario.tsx`, `Monitor.tsx`, `Hub.tsx`, `Conversaciones.tsx`, `Auditoria.tsx`, `src/services/supabase.ts`, `AppSidebar`, `PublishNowCard.tsx`) — cerrada. | **libre** — 2 hallazgos reales (Monitor + Propuestas, ver abajo), commits `08da9c7`/`536844a`, bitácora en `CLAUDE.md`/`MejoraSM.md` Parte 18 (`547ac99`). Deploy EDA verde. Sin pendientes propios | 2026-09-03 |
 
 ---
@@ -212,6 +212,23 @@ Avances del pase, todo en mi lane:
   - **Resultado verificado en prod: 84/84 entrantes clasificados, `unc: 0`.** El pendiente "no bloqueante" de la Fase 1 (documentado en `CLAUDE.md`) queda cerrado.
 
 Sigo con: sweep de precisión de `CLAUDE.md` (diagrama de arquitectura con DeepSeek/Gemini) + revisión de `scripts/lib/**`.
+
+— mejorasm-03
+
+### 2026-09-03 (pase "mejorar", cont. 2) · de `mejorasm-03`
+
+Cerré el grueso de mi pase. Todo verificado (deploys verdes, crons corridos):
+
+- **`[03]` ✅ `scripts/lib/**` endurecido** (`4621410`) — `claude.mjs`/`run-log.mjs`/`zernio.mjs` no tenían tope de tiempo en NINGUNA llamada de red; una conexión colgada bloqueaba la corrida de GitHub Actions hasta el límite de 6h. Ahora: `AbortSignal.timeout` en Anthropic/Groq (90s), run_log (15s), Zernio (45s, upload de video 120s); `claude.mjs` reintenta también si el `fetch` tira (no solo ante 429/500); `zernio.mjs` con `safeJson` (no revienta si Zernio devuelve HTML de gateway).
+- **`[03]` ✅ Edge Functions de mi lane — código muerto + endurecido** (`9074e3f`, Deploy Functions verde, crons corridos OK):
+  - `metrics-collector`: borrado `generateInsights()` / acción `"insights"` — muerto desde que existe la Edge Function `insights` (Fase A), sin caller.
+  - `rule-engine`: borrado `getSuggestions()` / acción `"suggest"` — nadie la llama, orchestrator lee `success_rules` directo. De paso saca un bug de precedencia en el armado del texto.
+  - `repo`: `writeFile` reintenta con sha fresco ante un 409 (subidas concurrentes); `dispatchWorkflow` castea inputs a string (un boolean tira 422 en GitHub).
+  - `ads` / `recycle`: revisados, sin hallazgos que ameriten tocar (funciones dormidas, sin datos todavía).
+- **`[03]` ✅ CI + workflows** (`17afbf3` + `dce9ac7`): `permissions` en los 20 workflows; `concurrency` en `ci.yml` (cancel-in-progress, ahorra runner), `deploy-migrations`/`sync-history`/`autopilot` (serializadas, nunca cortar a mitad).
+- **`[03]` ✅ docs**: diagrama de arquitectura de `CLAUDE.md` (DeepSeek/Gemini → Anthropic→Groq+HF, `6687d11`); `deploy.sh` (4→11 funciones, secrets reales, URL); refs stale a `PLAN_AUTONOMIA.md` en 3 workflows.
+
+**Mi lane (pipeline/infra/scripts/lib + Edge Functions inbox/recycle/ads/metrics-collector/rule-engine/repo + CI + docs) queda auditada y cerrada este pase.** Baseline verde. Sin pendientes salvo lo ya conocido de Pablo (DNS, limpiar IG/FB, LinkedIn/FB-Ads). Fila en "libre".
 
 — mejorasm-03
 
