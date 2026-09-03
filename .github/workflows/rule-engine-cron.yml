@@ -1,7 +1,8 @@
-# Dispara rule-engine diariamente (PLAN_AUTONOMIA.md Fase 3). Con menos de 5
-# métricas guardadas, la función responde rulesFound:0 sin error (ver
-# analyzeMetrics() en supabase/functions/rule-engine/index.ts) — no hace
-# falta esperar a tener datos para activar el cron.
+# Dispara rule-engine diariamente (Fase 3 del plan estratégico, ver CLAUDE.md).
+# Con menos de 5 métricas guardadas, la función responde rulesFound:0 sin error
+# (ver analyzeMetrics() en supabase/functions/rule-engine/index.ts) — no hace
+# falta esperar a tener datos para activar el cron. También corre
+# backfillExperiments() (Fase 4 del plan de publicación 2026).
 name: Rule Engine Cron
 
 on:

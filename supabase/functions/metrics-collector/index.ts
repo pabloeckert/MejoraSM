@@ -227,61 +227,10 @@ async function collectAllPending() {
   return { count: collected, pending, stale, errored, results };
 }
 
-async function generateInsights() {
-  // Analyze metrics and generate insights
-  const { data: metrics } = await supabase
-    .from("metrics")
-    .select("*, proposals(title, format, hook, hashtags)")
-    .order("measured_at", { ascending: false })
-    .limit(50);
-
-  if (!metrics?.length) {
-    return { insights: [], message: "No hay suficientes métricas para generar insights" };
-  }
-
-  // Calculate averages
-  const avgEngagement =
-    metrics.reduce((sum, m) => sum + (m.engagement_rate || 0), 0) / metrics.length;
-
-  const topPost = metrics.reduce((best, m) =>
-    (m.engagement_rate || 0) > (best.engagement_rate || 0) ? m : best
-  );
-
-  // Group by format
-  const byFormat: Record<string, typeof metrics> = {};
-  for (const m of metrics) {
-    const format = m.proposals?.format || "post";
-    if (!byFormat[format]) byFormat[format] = [];
-    byFormat[format].push(m);
-  }
-
-  const formatStats = Object.entries(byFormat).map(([format, items]) => ({
-    format,
-    count: items.length,
-    avgEngagement:
-      items.reduce((sum, m) => sum + (m.engagement_rate || 0), 0) / items.length,
-  }));
-
-  return {
-    totalPosts: metrics.length,
-    avgEngagement: Math.round(avgEngagement * 100) / 100,
-    topPost: {
-      title: topPost.proposals?.title,
-      engagement: topPost.engagement_rate,
-      likes: topPost.likes,
-      reach: topPost.reach,
-    },
-    formatStats,
-    insights: [
-      avgEngagement > 3
-        ? "✅ Engagement rate por encima del promedio (3%). Seguir con la misma estrategia."
-        : "⚠️ Engagement rate bajo el promedio. Probar hooks más emocionales o cambiar horario.",
-      formatStats.length > 1
-        ? `📊 El formato "${formatStats.sort((a, b) => b.avgEngagement - a.avgEngagement)[0]?.format}" tiene mejor rendimiento.`
-        : "📊 Necesitás más variedad de formatos para comparar rendimiento.",
-    ],
-  };
-}
+// (Había acá un `generateInsights()` con consejos hardcodeados — código
+// muerto desde que existe la Edge Function `insights` real (Fase A del plan
+// de continuación): ningún caller, ni frontend ni cron. Borrado 2026-09-03,
+// dogma "lo que no se usa se borra".)
 
 // ═══════════════════════════════════════
 // HANDLER
@@ -304,7 +253,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     ({ action } = body);
 
-    let result: { count?: number; pending?: number; stale?: number; errored?: number } | undefined;
+    let result: Record<string, unknown> | undefined;
 
     switch (action) {
       case "collect":
@@ -316,12 +265,8 @@ Deno.serve(async (req) => {
         result = await collectAllPending();
         break;
 
-      case "insights":
-        result = await generateInsights();
-        break;
-
       default:
-        throw new Error("Acción no válida. Usa 'collect', 'collect-all' o 'insights'");
+        throw new Error("Acción no válida. Usa 'collect' o 'collect-all'");
     }
 
     await logRun({

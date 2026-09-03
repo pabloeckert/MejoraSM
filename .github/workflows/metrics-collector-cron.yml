@@ -1,8 +1,7 @@
-# Dispara metrics-collector cada 6h (PLAN_AUTONOMIA.md Fase 3). Hasta que se
-# configure el secret ZERNIO_API_KEY en Supabase (separado del mismo secret
-# ya cargado en GitHub Actions — son dos secret stores distintos), la función
-# responde un no-op limpio (ver supabase/functions/metrics-collector/index.ts)
-# — este workflow no necesita cambiar el día que ese secret se agregue.
+# Dispara metrics-collector cada 6h (Fase 3 del plan estratégico, ver CLAUDE.md).
+# La función trae métricas reales desde Zernio Analytics (ZERNIO_API_KEY ya
+# cargado como secret de Supabase desde 2026-08-05). Un post cuyas analíticas
+# Zernio nunca sincroniza (202) se informa aparte, no cuenta como error del cron.
 name: Metrics Collector Cron
 
 on:

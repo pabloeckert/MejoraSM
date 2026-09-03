@@ -1,7 +1,8 @@
 # Acciones manuales sobre un post de feed ya publicado en Zernio
 # (Instagram/Facebook), gemelo de manage-story.yml para propuestas del EDA.
-# Es el "monitor de reversión" (PLAN_AUTONOMIA.md Fase 2) para lo que ya
-# salió: "reintentar" reusa la misma imagen y caption ya renderizadas
+# Es el "monitor de reversión" del overhaul de autonomía (2026-08-02, ver
+# CLAUDE.md) para lo que ya salió: "reintentar" reusa la misma imagen y caption
+# ya renderizadas
 # (proposals.rendered_image_path), "despublicar" solo funciona en las
 # plataformas que Zernio soporta vía API (Instagram requiere borrado manual
 # desde la app). Requiere escribir "confirmacion: CONFIRMO" — cualquier otro

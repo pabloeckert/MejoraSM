@@ -1,7 +1,8 @@
 // supabase/functions/rule-engine/index.ts
 // Motor de reglas de éxito — analiza métricas y genera reglas automáticas
-// Uso: POST /rule-engine { action: "analyze" | "suggest", topic? }
-// Cron: ejecutar diariamente
+// Uso: POST /rule-engine { action: "analyze" }
+// Cron: rule-engine-cron.yml, diario. Quien consume las reglas es orchestrator
+// (lee success_rules directo con getLearnedRulesBlock()).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -248,35 +249,9 @@ async function saveRules(rules: RuleCandidate[]) {
   return saved;
 }
 
-// ═══════════════════════════════════════
-// SUGERENCIAS
-// ═══════════════════════════════════════
-
-async function getSuggestions(topic?: string) {
-  // Get active rules sorted by confidence
-  const { data: rules } = await supabase
-    .from("success_rules")
-    .select("*")
-    .gte("confidence", 0.5)
-    .order("confidence", { ascending: false })
-    .limit(10);
-
-  if (!rules?.length) {
-    return {
-      suggestions: [],
-      message: "No hay reglas aprendidas todavía. Necesitás al menos 5 posts con métricas.",
-    };
-  }
-
-  const suggestions = rules.map((r) => ({
-    type: r.rule_type,
-    suggestion: r.action?.reason || r.action?.prefer ? `Preferir: ${r.rule_type}` : `Evitar: ${r.rule_type}`,
-    confidence: Math.round(r.confidence * 100) + "%",
-    applied: r.times_applied || 0,
-  }));
-
-  return { suggestions, totalRules: rules.length };
-}
+// (Había acá un `getSuggestions()` / acción "suggest" — código muerto: quien
+// consume las reglas aprendidas es orchestrator, que lee `success_rules`
+// directo con `getLearnedRulesBlock()`, no esta función. Borrado 2026-09-03.)
 
 // ═══════════════════════════════════════
 // HANDLER
@@ -299,7 +274,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     ({ action } = body);
 
-    let result: { rulesFound?: number; rulesSaved?: number } | undefined;
+    let result: Record<string, unknown> | undefined;
 
     switch (action) {
       case "analyze": {
@@ -320,13 +295,8 @@ Deno.serve(async (req) => {
         break;
       }
 
-      case "suggest": {
-        result = await getSuggestions(body.topic);
-        break;
-      }
-
       default:
-        throw new Error("Acción no válida. Usa 'analyze' o 'suggest'");
+        throw new Error("Acción no válida. Usa 'analyze'");
     }
 
     await logRun({

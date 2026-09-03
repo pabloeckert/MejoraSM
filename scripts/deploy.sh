@@ -40,7 +40,9 @@ npx supabase link --project-ref "$PROJECT_REF" 2>/dev/null || echo "Ya linkeado"
 echo ""
 echo "3. Deployando Edge Functions..."
 
-FUNCTIONS=("orchestrator" "vault-process" "metrics-collector" "rule-engine")
+# Misma lista que .github/workflows/deploy-functions.yml (esa es la vía real
+# de deploy; este script es la alternativa manual local). Mantener las dos al día.
+FUNCTIONS=("orchestrator" "vault-process" "metrics-collector" "rule-engine" "copilot" "classify-photo" "insights" "repo" "inbox" "recycle" "ads")
 
 for fn in "${FUNCTIONS[@]}"; do
   echo "  → $fn..."
@@ -78,10 +80,12 @@ echo "5. Verificando secrets configurados..."
 echo "  (Los secrets no se pueden verificar desde CLI por seguridad)"
 echo "  Verificar manualmente en: https://supabase.com/dashboard/project/$PROJECT_REF/settings/edge-functions"
 echo ""
-echo "  Secrets necesarios:"
-echo "    - GROQ_API_KEY"
-echo "    - DEEPSEEK_API_KEY"
-echo "    - HF_API_KEY"
+echo "  Secrets que el código usa hoy:"
+echo "    - ANTHROPIC_API_KEY  (IA principal)"
+echo "    - GROQ_API_KEY       (fallback)"
+echo "    - HF_API_KEY         (embeddings del RAG)"
+echo "    - ZERNIO_API_KEY     (métricas / bandeja / ads)"
+echo "    - GITHUB_TOKEN       (función repo)"
 
 echo ""
 echo "======================================="
@@ -89,4 +93,4 @@ echo "✅ Deploy completo!"
 echo ""
 echo "Próximos pasos:"
 echo "  1. Verificar secrets en el dashboard"
-echo "  2. Probar el sistema en https://util.mejoraok.com/MejoraSM/"
+echo "  2. Probar el sistema en https://pabloeckert.github.io/MejoraSM/app/"

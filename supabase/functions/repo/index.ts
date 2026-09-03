@@ -97,24 +97,34 @@ async function readFile(token: string, path: string) {
 
 async function writeFile(token: string, path: string, contentBase64: string, message: string) {
   // Resolver el sha actual (si el archivo ya existe) — la API de contents lo
-  // exige para actualizar, no para crear.
-  const cur = await fetch(`${API}/contents/${encPath(path)}?ref=${BRANCH}`, { headers: ghHeaders(token) });
-  const sha = cur.ok ? (await cur.json()).sha : undefined;
+  // exige para actualizar, no para crear. Un PUT concurrente (dos subidas de
+  // foto casi a la vez) puede dejar el sha viejo y GitHub responde 409 — en
+  // ese caso se re-resuelve el sha una vez y se reintenta.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const cur = await fetch(`${API}/contents/${encPath(path)}?ref=${BRANCH}`, { headers: ghHeaders(token) });
+    const sha = cur.ok ? (await cur.json()).sha : undefined;
 
-  const res = await fetch(`${API}/contents/${encPath(path)}`, {
-    method: "PUT",
-    headers: { ...ghHeaders(token), "Content-Type": "application/json" },
-    body: JSON.stringify({ message, content: contentBase64, branch: BRANCH, ...(sha ? { sha } : {}) }),
-  });
-  if (!res.ok) throw new Error(`GitHub ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    const res = await fetch(`${API}/contents/${encPath(path)}`, {
+      method: "PUT",
+      headers: { ...ghHeaders(token), "Content-Type": "application/json" },
+      body: JSON.stringify({ message, content: contentBase64, branch: BRANCH, ...(sha ? { sha } : {}) }),
+    });
+    if (res.ok) return { ok: true };
+    if (res.status === 409 && attempt === 1) continue;
+    throw new Error(`GitHub ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
   return { ok: true };
 }
 
-async function dispatchWorkflow(token: string, workflowFile: string, inputs: Record<string, string>) {
+async function dispatchWorkflow(token: string, workflowFile: string, inputs: Record<string, unknown>) {
+  // GitHub exige que todo valor de input sea string (un boolean tira 422).
+  const stringInputs = Object.fromEntries(
+    Object.entries(inputs).map(([k, v]) => [k, String(v)]),
+  );
   const res = await fetch(`${API}/actions/workflows/${workflowFile}/dispatches`, {
     method: "POST",
     headers: { ...ghHeaders(token), "Content-Type": "application/json" },
-    body: JSON.stringify({ ref: BRANCH, inputs }),
+    body: JSON.stringify({ ref: BRANCH, inputs: stringInputs }),
   });
   if (res.status === 403 || res.status === 404) {
     throw new Error('El token del servidor no tiene permiso para ejecutar workflows (falta "Actions: Read and write").');
