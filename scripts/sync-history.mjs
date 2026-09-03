@@ -43,22 +43,34 @@ if (!RAW_BASE_URL) {
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+const MAX_PAGES = 50; // 5000 posts — tope de seguridad si Zernio devuelve una paginación rara
+
 async function fetchAllPostsForAccount(accountId, apiKey) {
   const posts = [];
   let page = 1;
-  while (true) {
+  while (page <= MAX_PAGES) {
     const url = `${ZERNIO_API_URL}?accountId=${accountId}&page=${page}&limit=${PAGE_LIMIT}`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+    let res;
+    try {
+      res = await fetch(url, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(45_000),
+      });
+    } catch (e) {
+      console.warn(`Aviso: Zernio no respondió (${e.name}) para accountId=${accountId} página ${page} — corto acá.`);
+      break;
+    }
     if (!res.ok) {
       console.warn(`Aviso: Zernio respondió ${res.status} para accountId=${accountId} página ${page} — corto acá.`);
       break;
     }
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     posts.push(...(data.posts || []));
     const pagination = data.pagination || {};
     if (!pagination.pages || page >= pagination.pages) break;
     page++;
   }
+  if (page > MAX_PAGES) console.warn(`Aviso: se alcanzó el tope de ${MAX_PAGES} páginas para accountId=${accountId}.`);
   return posts;
 }
 
@@ -99,8 +111,12 @@ async function loadFeedProposals() {
   if (!SUPABASE_URL || !SERVICE_KEY) return new Map();
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/proposals?zernio_post_id=not.is.null&select=id,zernio_post_id,hook,title,oferta,rendered_image_path`,
-    { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } }
-  );
+    { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` }, signal: AbortSignal.timeout(20_000) }
+  ).catch(() => null);
+  if (!res) {
+    console.warn("Aviso: no pude traer proposals de Supabase (red) — posts de feed quedan sin headline/oferta.");
+    return new Map();
+  }
   if (!res.ok) {
     console.warn(`Aviso: no pude traer proposals de Supabase (${res.status}) — posts de feed quedan sin headline/oferta.`);
     return new Map();
@@ -204,6 +220,7 @@ async function main() {
           Prefer: "resolution=merge-duplicates,return=minimal",
         },
         body: JSON.stringify({ id: 1, synced_at: syncedAt, posts: entries, updated_at: syncedAt }),
+        signal: AbortSignal.timeout(20_000),
       });
       if (!res.ok) {
         console.warn(`Aviso: no se pudo cachear el historial en Supabase (${res.status} ${await res.text()}).`);

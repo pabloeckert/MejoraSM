@@ -42,6 +42,7 @@ async function markPublished(proposalId, zernioPostId) {
     method: "PATCH",
     headers: restHeaders({ Prefer: "return=minimal" }),
     body: JSON.stringify({ status: "published", published_at: now, zernio_post_id: zernioPostId }),
+    signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) {
     throw new Error(
@@ -56,22 +57,40 @@ async function markPublished(proposalId, zernioPostId) {
 // futuro bug en el filtro de render-scheduled-posts.mjs) además del caso
 // principal ya cubierto por el chequeo en markPublished().
 async function isStillScheduled(proposalId) {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/proposals?id=eq.${proposalId}&select=status`,
-    { headers: restHeaders() }
-  );
+  let res;
+  try {
+    res = await fetch(
+      `${SUPABASE_URL}/rest/v1/proposals?id=eq.${proposalId}&select=status`,
+      { headers: restHeaders(), signal: AbortSignal.timeout(15_000) }
+    );
+  } catch {
+    return true; // si la consulta falla/cuelga, no bloquear la publicación por esto
+  }
   if (!res.ok) return true; // si falla la consulta, no bloquear la publicación por esto
   const rows = await res.json();
   return rows[0]?.status === "scheduled";
 }
 
 async function markError(proposalId, errorMessage) {
+  // PATCH sobre una columna jsonb REEMPLAZA el objeto entero — si escribimos
+  // solo { last_publish_error } perdemos metadata.recycled_from,
+  // metadata.experimentHour, metadata.forcedByHuman, etc. Traemos el metadata
+  // actual y lo mergeamos.
+  let current = {};
+  try {
+    const cur = await fetch(
+      `${SUPABASE_URL}/rest/v1/proposals?id=eq.${proposalId}&select=metadata`,
+      { headers: restHeaders(), signal: AbortSignal.timeout(15_000) },
+    );
+    if (cur.ok) current = (await cur.json())[0]?.metadata ?? {};
+  } catch { /* best-effort — si no se puede leer, al menos no rompemos */ }
   await fetch(`${SUPABASE_URL}/rest/v1/proposals?id=eq.${proposalId}`, {
     method: "PATCH",
     headers: restHeaders({ Prefer: "return=minimal" }),
     body: JSON.stringify({
-      metadata: { last_publish_error: errorMessage, last_publish_attempt: new Date().toISOString() },
+      metadata: { ...current, last_publish_error: errorMessage, last_publish_attempt: new Date().toISOString() },
     }),
+    signal: AbortSignal.timeout(15_000),
   });
 }
 
@@ -101,9 +120,8 @@ async function main() {
       continue;
     }
 
-    // outputPaths: 1 elemento para un post simple, varios para un carrusel
-    // (PLAN_AUTONOMIA.md Fase 7) — publishPost/createPostAndPoll ya aceptan
-    // un array de URLs.
+    // outputPaths: 1 elemento para un post simple, varios para un carrusel —
+    // publishPost/createPostAndPoll ya aceptan un array de URLs.
     const imageUrls = entry.outputPaths.map((p) => `${rawBaseUrl}/${p}`);
     const entryElapsed = startTimer();
     try {

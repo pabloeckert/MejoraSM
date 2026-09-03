@@ -91,6 +91,7 @@ async function fetchDueProposals() {
     `&select=*&order=scheduled_at.asc&limit=5`;
   const res = await fetch(url, {
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+    signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) {
     throw new Error(`Error consultando propuestas: ${res.status} ${await res.text()}`);
@@ -227,6 +228,7 @@ async function markRendered(proposalId, renderedImagePath) {
       Prefer: "return=minimal",
     },
     body: JSON.stringify({ rendered_image_path: renderedImagePath }),
+    signal: AbortSignal.timeout(15_000),
   });
 }
 
