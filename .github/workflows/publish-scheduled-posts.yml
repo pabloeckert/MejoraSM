@@ -56,9 +56,14 @@ jobs:
         run: |
           git config user.name "mejora-story-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add content/published content/used
-          git diff --cached --quiet || git commit -m "post: $(date -u +%Y-%m-%d)"
-          git push
+          for p in content/published content/used; do [ -e "$p" ] && git add "$p" || true; done
+          git diff --cached --quiet && { echo "nada que commitear"; exit 0; }
+          git commit -m "post: $(date -u +%Y-%m-%d)"
+          for i in 1 2 3 4 5; do
+            git pull --rebase --autostash origin main && git push && exit 0
+            echo "push rechazado, reintento $i…"; sleep 5
+          done
+          echo "no se pudo pushear"; exit 1
 
       - name: Publicar en Instagram y Facebook (vía Zernio)
         env:

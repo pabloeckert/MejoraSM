@@ -82,7 +82,9 @@ jobs:
         run: |
           git config user.name "mejora-story-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add content/published content/used content/inbox content/work/publish-now.json content/work/publish-now-briefs.json content/work/publish-now-renders.json content/log
+          for p in content/published content/used content/inbox content/work/publish-now.json content/work/publish-now-briefs.json content/work/publish-now-renders.json content/log; do
+            [ -e "$p" ] && git add "$p" || true
+          done
           git diff --cached --quiet && { echo "nada que commitear"; exit 0; }
           git commit -m "publicar ahora: preparar ($(date -u +%H:%M) UTC)"
           for i in 1 2 3 4 5; do
