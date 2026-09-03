@@ -32,9 +32,9 @@ Pablo cerró esta sesión por límite de la cuenta. **No hay ningún trabajo a m
 
 **Pendiente:**
 1. ~~DNS del dominio propio~~ ✅ **HECHO 2026-09-03**: `https://mejorasm.mejoraok.com` activo (hub en `/`, EDA en `/app/`), cert + HTTPS forzado, dominio viejo hace 301. Ver "Dominio propio activado" en `CLAUDE.md`.
-2. **De Pablo:** limpiar a mano los ~12 posts viejos de IG/FB. Después avisa y una sesión descomenta el `schedule` de `sync-history.yml` (1 línea, ~1 min).
-3. **De Pablo:** conectar LinkedIn en Zernio + cargar `ZERNIO_LINKEDIN_ACCOUNT_ID` como secret de GitHub Actions (Fase 5 se activa sola). Código listo.
-4. **De Pablo:** conectar una cuenta de Facebook Ads en Zernio (Fase 7 muestra datos ahí). Código listo.
+2. ~~Limpiar IG/FB + reactivar `sync-history`~~ ✅ **HECHO 2026-09-03**: Pablo limpió, se descomentó el cron, corrida real OK (10 posts — 9 stories recientes + 1 vieja).
+3. **LinkedIn conectado en Zernio** ✅ — falta que Pablo cargue el secret `ZERNIO_LINKEDIN_ACCOUNT_ID = 6a99f21e77555aae01d50cf5` (identificador, no credencial; el clasificador bloqueó que lo cargara la sesión). `gh secret set ZERNIO_LINKEDIN_ACCOUNT_ID --body "6a99f21e77555aae01d50cf5"`. Apenas exista, Fase 5 se activa sola.
+4. **FB Ads conectado en Zernio** ✅ — la función `ads` anda (`hasAdsAccount: true`), pero Zernio trae 2 campañas ajenas (un ad account "Read-Only" + el personal de Pablo con un anuncio de 2024). Decisión de Pablo: si MC tiene su propio ad account o si hay que filtrar. Ver "Cierre de pendientes del plan de publicación" en `CLAUDE.md`.
 5. ~~Redirect URL + Site URL de Supabase~~ ✅ **HECHO 2026-09-03** (Pablo agregó `https://mejorasm.mejoraok.com/app/reset.html` a Redirect URLs y cambió el Site URL a `https://mejorasm.mejoraok.com/app/`). El cambio de dominio queda 100% cerrado. Queda tener/setear la contraseña de `pabloeckert@gmail.com` (si no la recuerda: "Olvidé la contraseña" en el login).
 
 **Para retomar:** leé `CLAUDE.md` (referencia estable + últimas entradas de bitácora) y este archivo. Si Pablo da un mandato nuevo, actualizá tu fila arriba y avisá en "Mensajes" antes de tocar zona caliente.
