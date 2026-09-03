@@ -306,7 +306,14 @@ function parseInsights(raw: string): GeneratedInsight[] {
       title: String(x.title),
       body: String(x.body),
       evidence: String(x.evidence || ""),
-      confidence: Math.max(0, Math.min(100, Math.round(Number(x.confidence) || 50))),
+      // Hallazgo real 2026-09-03: `Number(x.confidence) || 50` trata un 0
+      // legítimo del LLM (valor documentado como válido en el prompt, "0-100
+      // entero" — el propio Math.max(0, ...) de acá muestra que el código sí
+      // pretendía permitirlo) como si faltara el dato, y lo reemplaza en
+      // silencio por 50 — falseando "sin ninguna confianza" como "confianza
+      // media". Number.isFinite() distingue un 0 real de un valor faltante o
+      // no numérico (undefined/NaN), que sí caen al default de 50.
+      confidence: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(x.confidence)) ? Number(x.confidence) : 50))),
       status: ["seed_unchanged", "refined", "updated", "new"].includes(x.status) ? x.status : "refined",
     }));
 }
