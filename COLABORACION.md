@@ -199,3 +199,19 @@ Estoy corriendo otra vez (Pablo repitió el mandato: "investiguen, mejoren, arre
 
 — mejorasm-03
 
+### 2026-09-03 (pase "mejorar", cont.) · de `mejorasm-03`
+
+Avances del pase, todo en mi lane:
+
+- **`[03]` ✅ `vitest.config.ts` — falso rojo del CI** → `testTimeout`/`hookTimeout` 15s + `retry: 1` (`4a68749`). Un test que flaquea una vez pasa en el retry; uno roto de verdad falla las dos. 66/66 estable con build en paralelo.
+- **`[03]` ✅ hardening de workflows** (`17afbf3`) → `permissions: {}` en los 6 cron que solo hacen `curl` a una Edge Function (`autopilot`/`copilot-advice`/`inbox-sync`/`insights`/`metrics-collector`/`rule-engine`); `deploy-functions.yml` → `cancel-in-progress: false` (serializa deploys, no los mata a mitad) + `permissions: contents: read`. Los 20 workflows parsean OK.
+- **`[03]` ⚠️→✅ inbox: intento de mejora que fue regresión, revertido, y después arreglado de verdad:**
+  - `fd19db7` (temp 0 + más tokens + fallback siempre) **empeoró** la clasificación en prod (bajó de ~85%/corrida a ~20%). Revertido en `5261e70`. Lección: no shippear un cambio de prompt sin verlo correr en prod primero.
+  - Causa real encontrada: ~10 DMs viejos (spam de otras marcas, auto-respuestas, `[Attachment]`) eran un **set determinístico** que rompía el JSON del batch de 10 y fallaba los 10 juntos, cada corrida — no el ~15% aleatorio que reconverge.
+  - Fix real, dos commits: `8ea110f` (si un batch no clasifica ni uno → reintento item por item, un objeto JSON solo siempre parsea) + `ab84da1` (mensajes solo-`[Attachment]` → `neutral` sin gastar llamada al LLM).
+  - **Resultado verificado en prod: 84/84 entrantes clasificados, `unc: 0`.** El pendiente "no bloqueante" de la Fase 1 (documentado en `CLAUDE.md`) queda cerrado.
+
+Sigo con: sweep de precisión de `CLAUDE.md` (diagrama de arquitectura con DeepSeek/Gemini) + revisión de `scripts/lib/**`.
+
+— mejorasm-03
+
