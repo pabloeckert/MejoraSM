@@ -75,14 +75,14 @@ async function zPost(path: string, body: unknown) {
 // LLM — sentimiento + draft
 // ═══════════════════════════════════════
 
-async function callLLM(system: string, user: string, maxTokens = 400, temperature = 0.7): Promise<string> {
+async function callLLM(system: string, user: string, maxTokens = 400): Promise<string> {
   const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (anthropicKey) {
     try {
       const r = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-5", max_tokens: maxTokens, temperature, system, messages: [{ role: "user", content: user }] }),
+        body: JSON.stringify({ model: "claude-sonnet-5", max_tokens: maxTokens, system, messages: [{ role: "user", content: user }] }),
       });
       if (r.ok) return ((await r.json()).content?.[0]?.text ?? "").trim();
       console.warn(`[inbox] Anthropic ${r.status}, fallback a Groq`);
@@ -98,7 +98,6 @@ async function callLLM(system: string, user: string, maxTokens = 400, temperatur
     body: JSON.stringify({
       model: "openai/gpt-oss-120b",
       max_tokens: maxTokens,
-      temperature,
       messages: [{ role: "system", content: system }, { role: "user", content: user }],
     }),
   });
@@ -119,9 +118,7 @@ async function classifyBatch(items: { id: string; text: string }[]): Promise<Rec
     "'neutral' = spam, publicidad ajena, saludos vacíos, cosas que no requieren acción.\n" +
     "nota = 3 a 6 palabras sobre qué quiere. Sin texto fuera del array JSON.";
   const user = items.map((i, idx) => `${idx + 1}. ${(i.text || "(sin texto)").slice(0, 400).replace(/\s+/g, " ")}`).join("\n");
-  // temp 0 → clasificación estable; presupuesto holgado para que no se corte
-  // el JSON con notas largas (era la causa del ~15% de tandas que fallaban).
-  const out = await callLLM(system, user, 120 + items.length * 55, 0);
+  const out = await callLLM(system, user, 60 + items.length * 40);
   const map: Record<string, { s: string; n: string }> = {};
 
   const jsonMatch = out.match(/\[[\s\S]*\]/);
@@ -137,18 +134,13 @@ async function classifyBatch(items: { id: string; text: string }[]): Promise<Rec
       /* cae al parser de líneas abajo */
     }
   }
-  // Siempre cerrar los que falten con el parser de líneas — antes solo corría
-  // si el JSON fallaba entero; un JSON truncado que igual parsea (array corto)
-  // dejaba items sin clasificar aunque la línea estuviera en `out`.
-  const faltan = items.filter((i) => !map[i.id]);
-  if (faltan.length > 0) {
+  if (Object.keys(map).length === 0) {
+    // Fallback tolerante: "1 ... pregunta ... nota" en cualquier separador.
     for (const line of out.split("\n")) {
       const m = line.match(/(\d{1,3})\D+(positivo|neutral|negativo|pregunta)\D+(.+)/i);
       if (!m) continue;
       const item = items[Number(m[1]) - 1];
-      if (item && !map[item.id]) {
-        map[item.id] = { s: m[2].toLowerCase(), n: m[3].replace(/["\]}]+$/, "").trim().slice(0, 120) };
-      }
+      if (item) map[item.id] = { s: m[2].toLowerCase(), n: m[3].replace(/["\]}]+$/, "").trim().slice(0, 120) };
     }
   }
   return map;
