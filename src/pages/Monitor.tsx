@@ -425,16 +425,25 @@ function PostCard({
     setDeleting(true);
     try {
       const { workflowFile, idValue, inputKey } = manageTarget(post);
+      // run() de useWorkflowAction() nunca tira — atrapa el error adentro,
+      // muestra su propio toast y devuelve `false`. Sin chequear ese booleano
+      // acá, un dispatch fallido (token sin permiso, red, rate limit de
+      // GitHub) seguía de largo igual: sacaba la fila del Monitor y decía
+      // "Pieza borrada" aunque Facebook nunca se hubiera despublicado de
+      // verdad — el mismo patrón de "falso guardado" ya documentado en este
+      // proyecto, acá en un "falso borrado".
       if (onFB) {
-        await runWorkflow(
+        const fbOk = await runWorkflow(
           "borrar-fb",
           workflowFile,
           { [inputKey]: idValue, platform: "facebook", action: "despublicar", confirmacion: "CONFIRMO" },
           "Despublicando de Facebook…"
         );
+        if (!fbOk) throw new Error("No se pudo despublicar de Facebook — el Monitor no se tocó, probá de nuevo.");
       }
       if (onIG) {
-        await runWorkflow("borrar-ig", "mark-manual.yml", { post_id: post.id, platform: "instagram" }, "Instagram marcado — borralo también desde la app.");
+        const igOk = await runWorkflow("borrar-ig", "mark-manual.yml", { post_id: post.id, platform: "instagram" }, "Instagram marcado — borralo también desde la app.");
+        if (!igOk) throw new Error("No se pudo registrar el marcado manual de Instagram — el Monitor no se tocó, probá de nuevo.");
       }
       const { error } = await historialApi.removePost(post.id);
       if (error) throw error;
