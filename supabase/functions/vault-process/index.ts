@@ -20,7 +20,6 @@ const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 const ALLOWED_ORIGINS = [
   "https://pabloeckert.github.io",
   "https://mejorasm.mejoraok.com",
-  "https://mejorasm-*.vercel.app",
   "http://localhost:8080",
   "http://localhost:5173",
   "http://localhost:3000",
@@ -28,9 +27,7 @@ const ALLOWED_ORIGINS = [
 
 function getCorsHeaders(req: Request) {
   const origin = req.headers.get("origin") || "";
-  const allowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".vercel.app")
-    ? origin
-    : ALLOWED_ORIGINS[0];
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers":
