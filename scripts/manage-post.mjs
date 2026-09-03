@@ -13,6 +13,9 @@
 //      ZERNIO_INSTAGRAM_ACCOUNT_ID, ZERNIO_FACEBOOK_ACCOUNT_ID
 
 import { createPostAndPoll, unpublishPost, UNPUBLISH_SOPORTADO } from "./lib/zernio.mjs";
+import { logRun, startTimer } from "./lib/run-log.mjs";
+
+const elapsed = startTimer();
 
 const [, , proposalId, platform, action] = process.argv;
 
@@ -47,7 +50,7 @@ function restHeaders(extra = {}) {
 async function fetchProposal() {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/proposals?id=eq.${proposalId}&select=*`,
-    { headers: restHeaders() }
+    { headers: restHeaders(), signal: AbortSignal.timeout(15_000) }
   );
   if (!res.ok) {
     throw new Error(`Error consultando la propuesta: ${res.status} ${await res.text()}`);
@@ -57,11 +60,20 @@ async function fetchProposal() {
 }
 
 async function markRejected(reason) {
-  await fetch(`${SUPABASE_URL}/rest/v1/proposals?id=eq.${proposalId}`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/proposals?id=eq.${proposalId}`, {
     method: "PATCH",
     headers: restHeaders({ Prefer: "return=minimal" }),
     body: JSON.stringify({ status: "rejected", rejection_reason: reason }),
+    signal: AbortSignal.timeout(15_000),
   });
+  if (!res.ok) {
+    // La despublicación en Zernio ya pasó — si esto falla, la propuesta queda
+    // `published` en la base mientras el post real está de baja. Hay que
+    // corregir el status a mano.
+    throw new Error(
+      `Se despublicó en ${platform} pero falló marcar la propuesta ${proposalId} como rejected: ${res.status} ${await res.text()}. Corregir el status a mano.`
+    );
+  }
 }
 
 async function reintentar(apiKey, proposal) {
@@ -158,14 +170,32 @@ async function main() {
     process.exit(1);
   }
 
-  if (action === "reintentar") return reintentar(apiKey, proposal);
-  if (action === "despublicar") return despublicar(apiKey, proposal);
+  if (action === "reintentar" || action === "despublicar") {
+    await (action === "reintentar" ? reintentar(apiKey, proposal) : despublicar(apiKey, proposal));
+    await logRun({
+      source: "manage-post",
+      step: action,
+      status: "success",
+      proposalId,
+      durationMs: elapsed(),
+      metadata: { platform },
+    });
+    return;
+  }
 
   console.error(`Acción "${action}" no reconocida (reintentar|despublicar).`);
   process.exit(1);
 }
 
-main().catch((e) => {
+main().catch(async (e) => {
   console.error(e);
+  await logRun({
+    source: "manage-post",
+    step: action || "unknown",
+    status: "error",
+    proposalId: proposalId || null,
+    durationMs: elapsed(),
+    error: String(e?.message || e),
+  });
   process.exit(1);
 });

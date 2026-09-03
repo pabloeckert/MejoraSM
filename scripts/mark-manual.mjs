@@ -36,6 +36,7 @@ async function syncToSupabase(acciones) {
         Prefer: "resolution=merge-duplicates,return=minimal",
       },
       body: JSON.stringify({ id: 1, acciones_manuales: acciones, updated_at: new Date().toISOString() }),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) {
       console.warn(`Aviso: no se pudo cachear la acción manual en Supabase (${res.status} ${await res.text()}).`);
