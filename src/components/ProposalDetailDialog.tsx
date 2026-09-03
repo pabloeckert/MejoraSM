@@ -146,10 +146,10 @@ export function ProposalDetailDialog({
     setScheduleDate(toDatetimeLocal(proposal.scheduled_at));
     setScheduleOferta(proposal.oferta || "");
     setConvertTo("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- depender de
-    // `proposal` entero pisaría una edición en curso en cada refetch de la
-    // query (polling/invalidación); solo debe resetear cuando cambia la
-    // pieza abierta o el diálogo se abre/cierra, no en cada dato nuevo.
+    // Resetea solo cuando cambia la pieza abierta o el diálogo se abre/cierra
+    // — depender de `proposal` entero pisaría una edición en curso en cada
+    // refetch de la query (polling/invalidación), no en cada dato nuevo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proposal?.id, open]);
 
   if (!proposal) return null;
