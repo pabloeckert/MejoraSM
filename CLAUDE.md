@@ -370,8 +370,9 @@ Resultado: `HTTP 200`, devolvió 3 filas reales de `proposals`. **Control en par
                │ fetch / Supabase JS client (JWT de sesión)
                ▼
 ┌─────────────────────────────┐      ┌──────────────────────┐
-│  Supabase Edge Functions     │─────▶│  Groq / DeepSeek /    │
-│  (Deno) supabase/functions/  │      │  Gemini / HuggingFace │
+│  Supabase Edge Functions     │─────▶│  Anthropic (Claude)  │
+│  (Deno) supabase/functions/  │      │  → Groq (fallback)   │
+│                              │      │  + HuggingFace (RAG) │
 └──────────────┬───────────────┘      └──────────────────────┘
                │ service_role (bypasea RLS)
                ▼
