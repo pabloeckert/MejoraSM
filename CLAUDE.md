@@ -66,7 +66,7 @@ El PM sumó una segunda sesión de Claude al proyecto. Las dos trabajan sobre `m
 
 Reglas duras:
 
-1. **`git pull --rebase origin main` antes de tocar el repo, siempre.** Nunca `git merge` (ensucia el historial con merge commits). Nunca `git stash pop` a ciegas — mirar `git stash list` primero (lección real: el 2026-09-02 un `stash pop` trajo un stash viejísimo de `biblioteca-de-contenido` y pisó `CLAUDE.md`; se detectó y restauró desde el último commit bueno, no se perdió nada).
+1. **`git pull --rebase origin main` antes de tocar el repo, siempre.** Nunca `git merge` (ensucia el historial con merge commits). Nunca `git stash pop` a ciegas — mirar `git stash list` primero (lección real: el 2026-09-02 un `stash pop` trajo un stash viejísimo de `biblioteca-de-contenido` y pisó `CLAUDE.md`; se detectó y restauró desde el último commit bueno, no se perdió nada). Ese stash (`e738b08`, del 2026-07-28, cambios sobre `biblioteca/` que ya no existe) se dropeó el 2026-09-03 con OK de Pablo — `git stash list` debe quedar vacío.
 2. **Commits chicos y frecuentes, push apenas una unidad esté verde.** No acumular 10 archivos sin pushear — cada minuto sin pushear es superficie de conflicto con la otra sesión.
 3. **Antes de editar un archivo "caliente"** (ver lista en `COLABORACION.md`: `orchestrator/index.ts`, `src/services/ai.ts`, `src/services/supabase.ts`, `Dashboard.tsx`, `CLAUDE.md`, `MejoraSM.md`, `deploy-functions.yml`): `git log --oneline -5 <archivo>` para ver si la otra sesión lo tocó recién, y anunciar la intención en `COLABORACION.md` (commit de una línea, rápido).
 4. **Migraciones de Supabase**: el próximo número lo reserva quien lo anuncie primero en `COLABORACION.md`. Aplicar contra la base es casi irreversible — coordinar sí o sí.
