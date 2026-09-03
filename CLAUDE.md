@@ -8,6 +8,8 @@ Excepciones que siguen siendo archivos aparte porque no son documentación, son 
 
 `entregables/` guarda entregables fechados para audiencias externas (ej. `2026-09-cierre-ciclo-mejorasm.{html,md}` — traspaso a Project Management, 2026-09-01). Son fotos de un momento, no documentación viva — no actualizarlos, no consultarlos como fuente de verdad. La fuente de verdad sigue siendo este archivo.
 
+`COLABORACION.md` (raíz) es el tablero vivo de coordinación entre sesiones de Claude Code trabajando en paralelo — funcional, no documentación de producto. Ver "Trabajo en paralelo" más abajo.
+
 ## Empezá acá
 
 Este archivo tiene dos mitades:
@@ -55,6 +57,21 @@ El 2026-08-16 Pablo compartió un plan estratégico generado por Lovable para Me
 **Modo de ejecución pedido, explícito:** autonomía real, no consultiva — no preguntar por decisiones de alcance/prioridad/diseño entre fases, solo consultar ante un bloqueo físico/técnico real (ej. algo que requiere el inbox de Pablo, o que el clasificador de seguridad del entorno bloquea de verdad). Cada unidad de trabajo terminada queda: deployada en producción, commiteada y pusheada a GitHub, reflejada en el repo local, y documentada acá abajo — las cuatro cosas, no algunas.
 
 **Protocolo de continuidad entre sesiones:** si el crédito de una sesión se agota a mitad de una fase, el último tramo disponible se usa para dejar esta sección (abajo) al día — qué está hecho, qué está en curso, qué sigue exactamente. Al escribir "continuemos" al inicio de una sesión nueva, se retoma desde acá, en las mismas condiciones, sin volver a explicar el contexto.
+
+### Trabajo en paralelo — dos (o más) sesiones de Claude Code (protocolo, 2026-09-02)
+
+El PM sumó una segunda sesión de Claude al proyecto. Las dos trabajan sobre `main` directo (sin PRs). El medio de coordinación es el repo. **Tablero vivo: `COLABORACION.md`** (raíz) — quién toca qué ahora + mensajes entre sesiones. Leerlo al arrancar y antes de cada tanda.
+
+Reglas duras:
+
+1. **`git pull --rebase origin main` antes de tocar el repo, siempre.** Nunca `git merge` (ensucia el historial con merge commits). Nunca `git stash pop` a ciegas — mirar `git stash list` primero (lección real: el 2026-09-02 un `stash pop` trajo un stash viejísimo de `biblioteca-de-contenido` y pisó `CLAUDE.md`; se detectó y restauró desde el último commit bueno, no se perdió nada).
+2. **Commits chicos y frecuentes, push apenas una unidad esté verde.** No acumular 10 archivos sin pushear — cada minuto sin pushear es superficie de conflicto con la otra sesión.
+3. **Antes de editar un archivo "caliente"** (ver lista en `COLABORACION.md`: `orchestrator/index.ts`, `src/services/ai.ts`, `src/services/supabase.ts`, `Dashboard.tsx`, `CLAUDE.md`, `MejoraSM.md`, `deploy-functions.yml`): `git log --oneline -5 <archivo>` para ver si la otra sesión lo tocó recién, y anunciar la intención en `COLABORACION.md` (commit de una línea, rápido).
+4. **Migraciones de Supabase**: el próximo número lo reserva quien lo anuncie primero en `COLABORACION.md`. Aplicar contra la base es casi irreversible — coordinar sí o sí.
+5. **Deploy de Edge Functions**: `deploy-functions.yml` deploya TODAS. Si las dos sesiones pushean funciones distintas casi a la vez, `concurrency: cancel-in-progress` puede cancelar un deploy — verificar que la última corrida de "Deploy Edge Functions" cubrió tu función.
+6. **Conflicto de rebase**: resolver a favor del contenido más nuevo de `main` + re-aplicar lo tuyo encima. Nunca `git push --force` sin que Pablo lo diga.
+7. **Distinguir de quién es cada commit** (mientras dure): esta configuración de git commitea como `Pablo <pabloeckert@gmail.com>`; la otra sesión, como `Claude <noreply@anthropic.com>` con trailer `Claude-Session:`. No es garantía a futuro — ante la duda, `git show <hash>`.
+8. **Respetar el lane del otro.** Si tu tarea te obliga a entrar en el lane de la otra sesión, anunciarlo en `COLABORACION.md` antes, no después.
 
 **Ampliación explícita del alcance (2026-08-17):** las Fases 4-6 se habían documentado como "roadmap, no en este ciclo" porque, a diferencia de 0-3, no tenían diseño concreto todavía. Al cerrar la Fase 3, se le presentó la disyuntiva a Pablo (arrancar Fase 4 ahora / cerrar el ciclo en Fase 3 / atender otra prioridad) y la respuesta fue explícita: **"continuar fase 4 hasta la ultima de manera autonoma me voy dormir vos quedas con la compu encendida trabajando"** — autoriza avanzar sin más check-ins por 4, 5 y 6, incluyendo diseñar el detalle concreto de cada una (no solo ejecutar un plan ya cerrado), bajo el mismo régimen de autonomía y el mismo estándar de verificación real que 0-3.
 
