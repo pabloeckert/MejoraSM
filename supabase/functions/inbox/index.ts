@@ -321,9 +321,20 @@ async function sync() {
   for (let i = 0; i < toClassify.length; i += 10) {
     const batch = toClassify.slice(i, i + 10) as { id: string; text: string }[];
     try {
-      const res = await classifyBatch(batch);
-      const hits = Object.keys(res).length;
-      if (hits === 0) console.warn(`[inbox] batch de ${batch.length} sin clasificar (parse falló)`);
+      let res = await classifyBatch(batch);
+      // Un batch que no arrancó nada (JSON roto por un item raro del lote —
+      // spam multilínea, adjuntos, auto-respuestas de otras marcas) falla los
+      // 10 juntos y, como el set es determinístico, falla en cada corrida.
+      // Reintento uno por uno: un solo objeto JSON es trivial de parsear.
+      const faltan = batch.filter((b) => !res[b.id]);
+      if (faltan.length === batch.length && batch.length > 1) {
+        console.warn(`[inbox] batch de ${batch.length} sin clasificar — reintento item por item`);
+        res = {};
+        for (const item of faltan) {
+          const solo = await classifyBatch([item]);
+          Object.assign(res, solo);
+        }
+      }
       for (const [id, v] of Object.entries(res)) {
         await supabase.from("inbox_items").update({ sentiment: v.s, sentiment_note: v.n }).eq("id", id);
         classified++;
