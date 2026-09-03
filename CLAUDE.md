@@ -21,7 +21,7 @@ Este archivo tiene dos mitades:
 
 | Pieza | Estado | Desde |
 |---|---|---|
-| **Stories diarias** | 100% automáticas, cron `daily-story.yml` 13:00 UTC. (Estuvo rota ~1 día: `git add content/inbox` con la carpeta inexistente tras el wipe — arreglado el 2026-09-03, ver bitácora "Mandato arreglar todo") | producción desde jul-2026 |
+| **Stories diarias** | 100% automáticas, cron `daily-story.yml` 13:00 UTC. Estuvo rota ~1 día (`git add content/inbox` con la carpeta inexistente tras el wipe) — arreglada y **confirmada end-to-end** el 2026-09-03 (ver bitácora "Mandato arreglar todo"). `workflow_dispatch` ahora tiene input `publish` (destildar = probar sin publicar) | producción desde jul-2026 |
 | **Posts/carruseles de feed** | 100% automáticos (Crítico aprueba → autoagenda → publica), cron `publish-scheduled-posts.yml` cada 15 min. **Elección de tema**: manual (Mesa de Diálogo) **o** autónoma vía `autopilot-cron.yml` (modo libre lun/mié/vie + email de aviso con ventana de veto — ver "Autopilot" en la bitácora; schedule **activo** desde 2026-09-01 (probado end-to-end), `RESEND_API_KEY`) | reactivado 2026-08-24; autopilot agregado 2026-09-01 |
 | **Login / auth del EDA** | **reinstaurado** — usuario/contraseña (Supabase Auth), UNA sola cuenta compartida (`pabloeckert@gmail.com`, la de `app_admins`). Sin alta de cuenta, sin OTP. Blanqueo por email → `/app/reset.html`. `AuthGate` envuelve la app | 2026-08-31 |
 | **RLS de Supabase** | **cerrado de nuevo** (`is_app_admin()`, migración `023` revierte `019`) en las 15 tablas + bucket `vault`. `_shared/auth.ts` volvió a exigir JWT real de `app_admins` o service-role (sin rama anon key) | 2026-08-31 |
@@ -1631,6 +1631,9 @@ Pablo le dio a las dos sesiones el mismo mensaje: obsesivo al detalle, arreglar 
 **Fix:**
 - `.gitkeep` en `content/inbox/` + las 6 dimensiones + `content/used/{personal,sociales}` — las carpetas ahora existen siempre en el repo.
 - Los 5 workflows que commitean contenido (`daily-story`, `publish-scheduled-posts`, `publish-now`, `reel`, `sync-history`): el `git add` filtra rutas inexistentes (`for p in …; do [ -e "$p" ] && git add "$p"; done`) y **todos** usan el mismo retry-loop con `git pull --rebase --autostash origin main` antes del push (antes solo `publish-now` lo tenía — los otros podían fallar por push concurrente con las otras sesiones / crons).
+- `daily-story.yml` sumó un input `publish` (default `true`) para el `workflow_dispatch` — mismo patrón que `reel.yml`: `publish=false` genera + renderiza + commitea sin publicar. El cron siempre publica.
+
+**Confirmado end-to-end** el 2026-09-03: `workflow_dispatch` con `publish=false` (run `33709692064`) — generar → renderizar → **commitear (el paso que fallaba)** → todo verde, commiteó `content/published/story-2026-09-03-1.jpg` sin publicar. Efecto colateral: como esa imagen ya existe, el cron de las 13:00 UTC de ese día saltea (`alreadyGeneratedToday`) — no se publicó story automática el 2026-09-03. Al día siguiente el cron corre normal.
 
 ### Otros fixes de la auditoría (2026-09-03, `mejorasm-03`)
 
