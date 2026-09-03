@@ -31,11 +31,11 @@ Pablo cerró esta sesión por límite de la cuenta. **No hay ningún trabajo a m
 **Estado real del repo:** `main` verde (CI + Deploy EDA + Deploy Functions). Baseline: `tsc` limpio, lint 0 errores (6 warnings preexistentes, documentados), 66 tests, build limpio, `node --check` en los 17 scripts. `db push --dry-run` = `upToDate: true`. Próxima migración libre: **026**.
 
 **Lo único pendiente — todo de Pablo, nada nuestro:**
-1. DNS: `CNAME mejorasm → pabloeckert.github.io` en el DNS de mejoraok.com. Después el dominio propio se termina de activar (pasos automatizables en `CLAUDE.md` → "Sacar GitHub de la vista").
+1. ~~DNS del dominio propio~~ ✅ **HECHO 2026-09-03**: `https://mejorasm.mejoraok.com` activo (hub en `/`, EDA en `/app/`), cert + HTTPS forzado, dominio viejo hace 301. Ver "Dominio propio activado" en `CLAUDE.md`.
 2. Limpiar a mano los ~12 posts viejos de IG/FB, y avisar para reactivar el cron de `sync-history.yml` (hoy comentado).
 3. Conectar LinkedIn en Zernio + cargar `ZERNIO_LINKEDIN_ACCOUNT_ID` (Fase 5 se activa sola).
 4. Conectar una cuenta de Facebook Ads en Zernio (Fase 7 muestra datos ahí).
-5. Redirect URL de Supabase para el blanqueo de contraseña: `https://pabloeckert.github.io/MejoraSM/app/reset.html` (y tener/setear la contraseña de `pabloeckert@gmail.com`).
+5. Redirect URL de Supabase para el blanqueo de contraseña: `https://mejorasm.mejoraok.com/app/reset.html` (Authentication → URL Configuration) — **ahora es el único paso que falta del cambio de dominio**. Y tener/setear la contraseña de `pabloeckert@gmail.com`.
 
 **Para retomar:** leé `CLAUDE.md` (referencia estable + últimas entradas de bitácora) y este archivo. Si Pablo da un mandato nuevo, actualizá tu fila arriba y avisá en "Mensajes" antes de tocar zona caliente.
 
