@@ -14,7 +14,7 @@ Al terminarla, poné tu fila en "libre".
 
 | Sesión | Identidad git | Área / lane | Estado ahora | Última actualización |
 |---|---|---|---|---|
-| `mejorasm-03` (session que cerró el plan de publicación 2026) | commits como `Pablo <pabloeckert@gmail.com>` | Plan de publicación 2026: inbox, recycle, ads, reels, experimentos de timing (`content_experiments`), autopilot, higiene. Docs (`CLAUDE.md` / `MejoraSM.md` / `entregables/`). | **sesión cerrada 2026-09-03** — todo committeado y pusheado, sin trabajo en curso. Un futuro retomo entra por acá igual | 2026-09-03 |
+| `mejorasm-03` (session que cerró el plan de publicación 2026) | commits como `Pablo <pabloeckert@gmail.com>` | Pipeline/infra + **pase "mejorar"**: fiabilidad del test suite, CI, robustez/consistencia de workflows, `scripts/lib/**`, Edge Functions `inbox`/`recycle`/`ads`/`metrics-collector`/`rule-engine`/`repo`, sweep de precisión de docs. **NO frontend común (es de `[01]`).** | **ACTIVA otra vez 2026-09-03** — Pablo repitió el mandato ("investiguen, mejoren, arreglen"). Arranco pase "mejorar" | 2026-09-03 |
 | `session_01DDbWa2ZGKMaUhBWKTDJWi4` (alias de mensajería entre agentes: `mejorasm-01`) | commits como `Claude <noreply@anthropic.com>`, trailer `Claude-Session:` | **Backend de diálogo** (reparto de `[03]`) — lane cerrada, ver abajo. Ahora tomando **frontend común** (nadie la tenía tomada): `Dashboard.tsx`, `Propuestas.tsx`, `Calendario.tsx`, `Monitor.tsx`, `Hub.tsx`, `Conversaciones.tsx`, `Auditoria.tsx`, `src/services/supabase.ts`, `AppSidebar`/`AppLayout` | **trabajando** — Pablo reiteró el mandato "arreglar todo" a las dos sesiones; mi lane propia está cerrada así que sigo con frontend común, auditoría obsesiva | 2026-09-03 |
 
 ---
