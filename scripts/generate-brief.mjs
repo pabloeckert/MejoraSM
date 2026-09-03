@@ -104,7 +104,9 @@ const OFERTAS = {
 // sin tocar MejoraSM para nada.
 async function loadIdentidadDeMarca() {
   try {
-    const res = await fetch(IDENTIDAD_URL);
+    // raw.githubusercontent.com tiene caídas documentadas — si cuelga, mejor
+    // seguir sin contexto fresco que comerse el presupuesto del job.
+    const res = await fetch(IDENTIDAD_URL, { signal: AbortSignal.timeout(20_000) });
     if (!res.ok) {
       console.warn(`Aviso: MejoraIdentidad respondió ${res.status} — sigo sin contexto de marca fresco.`);
       return "";

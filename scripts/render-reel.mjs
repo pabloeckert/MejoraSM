@@ -145,7 +145,9 @@ async function composeVideo(photoPath, overlayPath, outPath) {
     "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-shortest",
     outPath,
   ];
-  await execFileP("ffmpeg", args, { maxBuffer: 1024 * 1024 * 32 });
+  // timeout: un encode de 9s a 1080x1920 tarda segundos — si ffmpeg cuelga
+  // (filtro raro, input corrupto), 3 min es de sobra y evita comerse el job.
+  await execFileP("ffmpeg", args, { maxBuffer: 1024 * 1024 * 32, timeout: 180_000 });
 }
 
 async function main() {

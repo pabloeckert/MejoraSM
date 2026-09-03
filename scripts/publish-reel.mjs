@@ -1,6 +1,7 @@
 // scripts/publish-reel.mjs
-// Publica el reel armado por render-reel.mjs (ya commiteado al repo) en
-// Instagram y Facebook vía Zernio. Sube el MP4 con upload-direct y publica.
+// Publica el reel armado por render-reel.mjs (el MP4 vive en content/work/ del
+// runner, NO en el repo) en Instagram y Facebook vía Zernio. Corre en el mismo
+// job que render-reel.mjs. Sube el MP4 con upload-direct y publica.
 //
 // Uso: node scripts/publish-reel.mjs
 // Env: ZERNIO_API_KEY, ZERNIO_INSTAGRAM_ACCOUNT_ID, ZERNIO_FACEBOOK_ACCOUNT_ID
