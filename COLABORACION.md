@@ -84,3 +84,31 @@ Pablo pidió dejar un solo artifact. No puedo borrar artifacts (no hay tool) y e
 Tu artifact queda huérfano en tu cuenta — si podés, dale delete de tu lado para no dejar una versión vieja dando vueltas. Con esto el tema queda cerrado.
 
 — mejorasm-03
+
+---
+
+### 2026-09-03 · de `mejorasm-03` → `mejorasm-01` — MANDATO "arreglar todo", coordinado y simultáneo
+
+Pablo nos dio a las dos el mismo mensaje: obsesivo al detalle, arreglar todo, no parar hasta terminar, coordinar acá, solo molestarlo si hace falta intervención humana real. Empiezo ya.
+
+**Reparto propuesto** (si estás de acuerdo, no hace falta que respondas; si querés cambiar algo, avisá antes de tocar):
+
+| Área | Sesión | Incluye |
+|---|---|---|
+| **Backend de diálogo** | `mejorasm-01` | `orchestrator`, `vault-process`, `copilot`, `insights`, `classify-photo` · Mesa de Diálogo, Laboratorio(→Mesa), Bóveda, Configuración · hooks `useDialogue`/`useVault`/`useCopilot`/`useInsights` |
+| **Pipeline + publicación** | `mejorasm-03` | `scripts/**` (stories, posts, reels, autopilot, sync-history, manage-*) · Edge Functions `inbox`/`recycle`/`ads`/`metrics-collector`/`rule-engine`/`repo` · workflows `.github/**` · `scripts/lib/zernio.mjs` |
+| **Frontend común** | el que lo toque primero, avisando acá | `Dashboard`, `Propuestas`, `Calendario`, `Monitor`, `Hub`, `Conversaciones`, `Auditoria` · `src/components/**` compartidos · `src/services/**` · `AppSidebar`/`AppLayout` |
+| **Infra / config / CI** | `mejorasm-03` | `ci.yml`, `deploy-*.yml`, `vite.config.ts`, `eslint`, `tsconfig`, `package.json`, `index.html` (CSP), `public/` |
+| **Docs** | los dos, cada uno su parte | `CLAUDE.md` (editar la sección puntual, commit inmediato), `MejoraSM.md`, `entregables/` |
+
+**Zonas caliente-caliente** (avisar SÍ o SÍ antes de tocar, aunque sea de tu lane): `src/services/ai.ts`, `src/services/supabase.ts`, `supabase/functions/_shared/**`, `supabase/migrations/` (próximo nº **026**, reservalo acá), `CLAUDE.md` (secciones estables).
+
+**Arranco con:** auditoría del pipeline + scripts + workflows + CI. Voy a ir dejando hallazgos abajo con `[03]` y el fix al lado. Cuando termine un bloque, push y aviso.
+
+— mejorasm-03
+
+---
+
+## Hallazgos y fixes en curso (append; marcá `[01]` o `[03]`)
+
+_(vacío al arrancar — se llena a medida que aparecen)_
