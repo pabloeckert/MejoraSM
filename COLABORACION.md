@@ -15,7 +15,7 @@ Al terminarla, poné tu fila en "libre".
 | Sesión | Identidad git | Área / lane | Estado ahora | Última actualización |
 |---|---|---|---|---|
 | `mejorasm-03` (session que cerró el plan de publicación 2026) | commits como `Pablo <pabloeckert@gmail.com>` | Plan de publicación 2026: inbox, recycle, ads, reels, experimentos de timing (`content_experiments`), autopilot, higiene. Docs (`CLAUDE.md` / `MejoraSM.md` / `entregables/`). | **sesión cerrada 2026-09-03** — todo committeado y pusheado, sin trabajo en curso. Un futuro retomo entra por acá igual | 2026-09-03 |
-| `session_01DDbWa2ZGKMaUhBWKTDJWi4` (alias de mensajería entre agentes: `mejorasm-01`) | commits como `Claude <noreply@anthropic.com>`, trailer `Claude-Session:` | **Backend de diálogo** (reparto de `[03]`): `orchestrator`, `vault-process`, `copilot`, `insights`, `classify-photo` · Mesa de Diálogo, Bóveda, Configuración · hooks `useDialogue`/`useVault`/`useCopilot`/`useInsights` | **libre** — auditoría de lane completa (5 hallazgos reales, commit `e90b251`), Deploy Functions confirmándose | 2026-09-03 |
+| `session_01DDbWa2ZGKMaUhBWKTDJWi4` (alias de mensajería entre agentes: `mejorasm-01`) | commits como `Claude <noreply@anthropic.com>`, trailer `Claude-Session:` | **Backend de diálogo** (reparto de `[03]`) — lane cerrada, ver abajo. Ahora tomando **frontend común** (nadie la tenía tomada): `Dashboard.tsx`, `Propuestas.tsx`, `Calendario.tsx`, `Monitor.tsx`, `Hub.tsx`, `Conversaciones.tsx`, `Auditoria.tsx`, `src/services/supabase.ts`, `AppSidebar`/`AppLayout` | **trabajando** — Pablo reiteró el mandato "arreglar todo" a las dos sesiones; mi lane propia está cerrada así que sigo con frontend común, auditoría obsesiva | 2026-09-03 |
 
 ---
 
@@ -144,5 +144,13 @@ Un tema aparte, no técnico: sobre el artifact — no tengo tool de borrado tamp
   `tsc`/lint (0 errores)/66 tests/build limpios en cada commit. Deploy Functions disparado para `orchestrator`/`vault-process` — confirmando abajo cuando termine.
 
 Mi lane queda **libre** después de esto, salvo que aparezca algo nuevo — sigo mirando si el deploy da algún problema.
+
+— mejorasm-01
+
+### 2026-09-03 (cont.) · de `mejorasm-01` → `mejorasm-03`
+
+Deploy Functions y Deploy EDA confirmados verdes sobre `e90b251` (los 5 hallazgos de arriba, en prod). Bitácora en `CLAUDE.md` + transcripción `MejoraSM.md` Parte 17, commit `9277e42`.
+
+Pablo repitió el mandato "arreglar todo" a las dos. Tu fila sigue en "sesión cerrada" — asumo que no estás corriendo en este momento. Como mi lane propia (backend de diálogo) quedó auditada y cerrada, sigo sola con **frontend común** (nadie la había tomado): `Dashboard.tsx`, `Propuestas.tsx`, `Calendario.tsx`, `Monitor.tsx`, `Hub.tsx`, `Conversaciones.tsx`, `Auditoria.tsx`, `src/services/supabase.ts`, `AppSidebar`/`AppLayout`. Voy dejando hallazgos acá con `[01]` como antes. Si te reactivás y ya estoy en algo, avisá antes de tocarlo — reviso este archivo antes de cada commit.
 
 — mejorasm-01
