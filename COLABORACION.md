@@ -15,7 +15,7 @@ Al terminarla, poné tu fila en "libre".
 | Sesión | Identidad git | Área / lane | Estado ahora | Última actualización |
 |---|---|---|---|---|
 | `mejorasm-03` (session que cerró el plan de publicación 2026) | commits como `Pablo <pabloeckert@gmail.com>` | Pipeline/infra + pase "mejorar": scripts del pipeline, `scripts/lib/**`, Edge Functions `inbox`/`recycle`/`ads`/`metrics-collector`/`rule-engine`/`repo`, CI/workflows, docs. **NO frontend común / auth / componentes (es de `[01]`).** | **CERRADA 2026-09-03** — sesión de esta cuenta llegó al límite. Lane auditada de punta a punta, todo pusheado, CI verde. Sin trabajo a medias | 2026-09-03 |
-| `session_01DDbWa2ZGKMaUhBWKTDJWi4` (alias de mensajería entre agentes: `mejorasm-01`) | commits como `Claude <noreply@anthropic.com>`, trailer `Claude-Session:` | **Backend de diálogo** + **frontend común** + tercera pasada — cerradas (ver rondas previas). **Cuarta pasada**: pipeline de render (escapado HTML de copy generado por IA en los templates), `src/services/ai.ts` + `src/services/github.ts` (no auditados a fondo todavía), `supabase/functions/_shared/**`, migraciones SQL (RLS/constraints), `orchestrator/index.ts` completo | **trabajando** — Pablo dio mandato nuevo tras el cierre de `mejorasm-03`, arranco sweep fresco sin repetir lo ya cerrado | 2026-09-03 |
+| `session_01DDbWa2ZGKMaUhBWKTDJWi4` (alias de mensajería entre agentes: `mejorasm-01`) | commits como `Claude <noreply@anthropic.com>`, trailer `Claude-Session:` | Backend de diálogo + frontend común + tercera pasada + **cuarta pasada** (render pipeline, `ai.ts`/`github.ts`, `_shared/**`, migraciones, `orchestrator`/`copilot`/`vault-process`/`insights`/`classify-photo`/`repo` completos, hooks de React) — todas cerradas | **libre** — cuarta pasada terminada, 6 hallazgos reales, sin pendientes propios | 2026-09-03 |
 
 ---
 
@@ -323,5 +323,24 @@ Leí la nota de cierre de `mejorasm-03` ("Estado para la próxima sesión") — 
 - `orchestrator/index.ts` completo — es el archivo más grande y crítico; las rondas anteriores tocaron funciones puntuales (`sanitizeTopic`, `pickNextSlot`, `createProposalFromContent`, `forceApprove`) pero no hubo una lectura secuencial de punta a punta.
 
 Si `mejorasm-03` (o cualquier otra sesión) vuelve a estar activa, avisen acá antes de tocar algo de esta lista para no pisarnos. Reporto hallazgos reales o el cierre limpio, sin fabricar nada.
+
+— mejorasm-01
+
+### 2026-09-03 (cuarta pasada, cierre) · de `mejorasm-01`
+
+Terminé el sweep que había anunciado. **6 hallazgos reales**, todos commiteados y desplegados en verde:
+
+1. **Placeholders de render vía `String.replace()` — corrupción de HTML real** (`d47bf69`). `render-scheduled-posts.mjs`, `render-story.mjs` y `PiecePreview.tsx` (17 call sites en total) sustituían `{{HEADLINE}}`/`{{SUBTEXT}}`/etc. pasando el copy generado por IA como *string* de reemplazo — `String.replace()` interpreta `$&`/`$$`/`` $` ``/`$'` como patrones especiales ahí, sin importar que el patrón de búsqueda sea un string plano. Si un hook contenía literalmente `$&`, el placeholder mismo (`{{HEADLINE}}`) se reinsertaba visible en una pieza real publicada a Instagram/Facebook, sin revisión humana. Reproducido y confirmado con un one-liner de Node. Fix: reemplazo vía función en los 17 sitios.
+2. **`src/services/github.ts::call()` sin timeout** (`9f31f78`). Se reescribió el 2026-09-01, después del hallazgo B14 (2026-08-31) que arregló exactamente esta clase de bug en otros 3 archivos — y la reintrodujo acá. El caso más visible: el poll loop de `PublishNowCard` chequea su propio `POLL_TIMEOUT_MS` *después* del `await` a `getJsonFile()` — un fetch colgado nunca llega a ese chequeo, y "Publicar ahora" queda pegado en "preparando…"/"publicando…" para siempre. Mismo riesgo en `commitPhoto`/`triggerWorkflow`. Fix: mismo patrón `AbortController` que `ai.ts::fetchWithTimeout`.
+3. **`orchestrator::continueSession` sin chequear si la sesión existe** (`7e66a4a`). `forceApprove()` sí tiene `if (!session) throw ...` — `continueSession()` hace el mismo fetch pero usaba `session.topic` sin guard. Un `sessionId` de una pestaña vieja (ej. de antes del wipe de la base del 2026-09-01) tira un TypeError crudo en vez de un mensaje claro. El handler de afuera lo atrapa igual (nunca crashea la función), pero el error que ve Pablo es genérico. Fix: mismo guard que `forceApprove`.
+4. **`insights::parseInsights` — confianza 0 real del LLM se pisaba por 50** (`cfbd411`). `Number(x.confidence) || 50` trata un 0 legítimo (documentado como válido en el propio prompt, "0-100 entero") como si faltara el dato — justo lo opuesto de la regla innegociable de esta función ("nunca inventes una cifra"). Reproducido: `Number(0) || 50` → 50. Fix: `Number.isFinite()` en vez de `||`.
+5. **`vault-process` — "Reprocesar" un documento podía dejarlo sin ningún chunk** (`2a1252e`). Borraba los chunks viejos ANTES de insertar los nuevos — si el insert fallaba (red/DB), un documento buscable por RAG quedaba sin ningún chunk, peor que antes de apretar el botón. `doc_chunks.id` es su propia PK sin constraint único sobre `(document_id, chunk_index)`, así que insertar-antes-de-borrar es seguro. Fix: reordenado + borra por id capturado, nunca por `document_id`.
+6. Chequeado que el mismo patrón `Number(x) || N` en `vault-process::searchDocs` (línea del `safeLimit`) **NO** es un bug — ahí `0` no es un valor semánticamente válido (nadie pide "0 resultados de búsqueda a propósito"), a diferencia de `confidence: 0`. Lo dejo anotado para que quede claro que revisé el mismo patrón dos veces y solo una era real.
+
+**Revisado sin hallazgos** (además de lo ya cerrado en rondas previas): `auth.ts`, `runLog.ts`, migraciones SQL (RLS de `023`/`024`/`025` consistente, `app_admins` sin políticas a propósito), `orchestrator/index.ts` completo (1202 líneas) más allá del fix #3, `copilot/index.ts` completo (469 líneas), `classify-photo/index.ts` completo, `repo/index.ts` completo, y los hooks `useDialogue.ts`/`useVault.ts`/`useMetrics.ts`/`useInsights.ts`/`useCopilot.ts`/`useInbox.ts` completos.
+
+No toqué `metrics-collector`/`rule-engine`/`ads`/`recycle`/`inbox` (Edge Functions) — `mejorasm-03` ya los auditó a fondo en el pase "mejorar" con evidencia real, re-leerlos ahora sería duplicar trabajo ya hecho, no agregar valor.
+
+Todo verificado (`tsc`/lint 0 errores/66 tests/build en cada commit tocando frontend; los 5 commits de Edge Functions confirmados con `deploy-functions.yml` en verde uno por uno). **Mi lane queda libre.** Con esto se agotó la superficie que podía revisar sin repetir terreno ya cerrado por cualquiera de las dos sesiones — si Pablo trae algo nuevo, retomo desde ahí.
 
 — mejorasm-01
