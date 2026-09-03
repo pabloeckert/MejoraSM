@@ -383,8 +383,17 @@ async function processDocumentInner(documentId: string) {
     console.warn(`[vault-process] Embeddings fallaron: ${e.message}. Guardando chunks sin vectores.`);
   }
 
-  // 5. Eliminar chunks anteriores (si se reprocesa)
-  await supabase.from("doc_chunks").delete().eq("document_id", documentId);
+  // 5. Insertar los chunks nuevos ANTES de borrar los viejos (si se
+  // reprocesa) — hallazgo real 2026-09-03: el orden anterior (borrar
+  // primero, insertar después) dejaba el documento sin NINGÚN chunk si el
+  // insert fallaba (red, DB) — un "Reprocesar" que sale mal volvía
+  // BUSCABLE → NO BUSCABLE, peor que antes de tocar el botón. No hace
+  // falta un id compuesto para esto: `id` es su propia PK (gen_random_uuid),
+  // sin constraint único sobre (document_id, chunk_index), así que los
+  // chunks viejos y los nuevos pueden convivir un instante sin chocar.
+  const oldChunkIds = (
+    await supabase.from("doc_chunks").select("id").eq("document_id", documentId)
+  ).data?.map((c: { id: string }) => c.id) || [];
 
   // 6. Guardar chunks (con o sin embeddings)
   const chunkRecords = chunks.map((chunk, i) => ({
@@ -397,6 +406,13 @@ async function processDocumentInner(documentId: string) {
 
   const { error: insertError } = await supabase.from("doc_chunks").insert(chunkRecords);
   if (insertError) throw new Error(`Error guardando chunks: ${insertError.message}`);
+
+  // Recién ahora, con los chunks nuevos ya confirmados en la base, se
+  // borran los viejos por su id real (nunca por document_id) — así nunca
+  // se corre el riesgo de borrar de más los que se acaban de insertar.
+  if (oldChunkIds.length) {
+    await supabase.from("doc_chunks").delete().in("id", oldChunkIds);
+  }
 
   // Sin embeddings, el documento no es un error (tiene contenido real y
   // chunks reales) pero tampoco es buscable por RAG — estado propio para
