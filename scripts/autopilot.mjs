@@ -27,7 +27,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const ALERT_EMAIL = process.env.ALERT_EMAIL || "pabloeckert@gmail.com";
-const APP_URL = "https://pabloeckert.github.io/MejoraSM/app";
+const APP_URL = "https://mejorasm.mejoraok.com/app";
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
   console.error("[autopilot] Faltan SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY");

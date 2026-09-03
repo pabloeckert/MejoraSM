@@ -48,7 +48,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
-          VITE_BASE_PATH: /MejoraSM/app/
+          VITE_BASE_PATH: /app/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

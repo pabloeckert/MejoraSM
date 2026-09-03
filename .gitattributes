@@ -1,0 +1,2 @@
+# GitHub Pages es exigente con el formato del archivo CNAME — siempre LF, nunca CRLF.
+CNAME text eol=lf
