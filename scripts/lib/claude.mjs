@@ -42,17 +42,30 @@ async function askAnthropic({ system, userText, image, maxTokens }) {
   // Reintento a nivel red para errores transitorios (429 rate limit, 500,
   // 529 overloaded) — hallazgo real 2026-09-01: Anthropic devolvió respuestas
   // truncadas/erróneas varias veces seguidas en "publicar ahora".
+  // También reintenta si el propio `fetch` tira (blip de red, DNS) o si la
+  // conexión se cuelga más de 90s — sin esto, una corrida de GitHub Actions
+  // podía quedar bloqueada hasta el límite de 6h del job.
   let lastErr;
   for (let attempt = 1; attempt <= 3; attempt++) {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body,
-    });
+    let res;
+    try {
+      res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body,
+        signal: AbortSignal.timeout(90_000),
+      });
+    } catch (e) {
+      lastErr = new Error(`Anthropic: fallo de red (${e.name}: ${e.message})`);
+      if (attempt === 3) throw lastErr;
+      console.warn(`[claude.mjs] fetch falló (${e.name}), reintento ${attempt}/3 en ${attempt * 3}s`);
+      await new Promise((r) => setTimeout(r, attempt * 3000));
+      continue;
+    }
 
     if (res.ok) {
       const data = await res.json();
@@ -86,6 +99,7 @@ async function askGroqTextOnly({ system, userText, maxTokens }) {
       max_tokens: maxTokens,
       temperature: 0.7,
     }),
+    signal: AbortSignal.timeout(90_000),
   });
   if (!res.ok) {
     const err = await res.text();

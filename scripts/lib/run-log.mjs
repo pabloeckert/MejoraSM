@@ -42,6 +42,8 @@ export async function logRun({
         error,
         metadata,
       }),
+      // El logging es best-effort — no debe colgar el script si PostgREST no responde.
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) {
       console.warn(`[run-log] fallo al registrar "${source}/${step}": ${res.status} ${await res.text()}`);

@@ -30,12 +30,36 @@ const POLL_DELAY_MS = 10000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Todas las llamadas a Zernio con un tope de tiempo — sin esto, una conexión
+// colgada bloquea la corrida de GitHub Actions hasta el límite de 6h del job.
+// 45s alcanza de sobra: la parte lenta (Meta procesando el media) se maneja
+// aparte con el poll de fetchPostPlatforms, no dentro de una sola request.
+const ZERNIO_FETCH_TIMEOUT_MS = 45000;
+const zfetch = (url, init = {}) =>
+  fetch(url, { ...init, signal: AbortSignal.timeout(ZERNIO_FETCH_TIMEOUT_MS) });
+
+// Parsea el body como JSON sin tirar si Zernio devuelve HTML (502/504 de gateway,
+// página de error) — así el error real (status HTTP) sobrevive en vez de
+// convertirse en "Unexpected token '<'".
+async function safeJson(res) {
+  try {
+    return await res.json();
+  } catch {
+    return {};
+  }
+}
+
 async function fetchPostPlatforms(postId, apiKey) {
-  const res = await fetch(`${ZERNIO_API_URL}/${postId}`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
+  let res;
+  try {
+    res = await zfetch(`${ZERNIO_API_URL}/${postId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+  } catch {
+    return null; // blip de red durante el poll — se reintenta en la vuelta siguiente
+  }
   if (!res.ok) return null;
-  const data = await res.json();
+  const data = await safeJson(res);
   return data.post?.platforms || null;
 }
 
@@ -48,7 +72,7 @@ async function fetchPostPlatforms(postId, apiKey) {
 export async function createPostAndPoll({ apiKey, content, imageUrl, platforms }) {
   try {
     const urls = Array.isArray(imageUrl) ? imageUrl : [imageUrl];
-    const res = await fetch(ZERNIO_API_URL, {
+    const res = await zfetch(ZERNIO_API_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -62,7 +86,7 @@ export async function createPostAndPoll({ apiKey, content, imageUrl, platforms }
       }),
     });
 
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) {
       // 409 = Zernio detectó contenido duplicado dentro de las últimas 24hs
       // y no creó un post nuevo — viene con existingPostId.
@@ -146,8 +170,10 @@ export async function uploadMedia(filePath, apiKey, contentType = "video/mp4") {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}` },
     body: form,
+    // El upload de video puede tardar — tope más holgado que el resto.
+    signal: AbortSignal.timeout(120000),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await safeJson(res);
   if (!res.ok || !data.url) {
     throw new Error(`Zernio upload-direct ${res.status}: ${JSON.stringify(data).slice(0, 400)}`);
   }
@@ -194,7 +220,7 @@ export async function publishReel(videoPath, caption = "") {
 // para no meterle un branch más a la función de imágenes, que ya es densa.
 async function createPostAndPollVideo({ apiKey, content, videoUrl, platforms }) {
   try {
-    const res = await fetch(ZERNIO_API_URL, {
+    const res = await zfetch(ZERNIO_API_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -204,7 +230,7 @@ async function createPostAndPollVideo({ apiKey, content, videoUrl, platforms }) 
         publishNow: true,
       }),
     });
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) {
       if (data.existingPostId) {
         const existing = await fetchPostPlatforms(data.existingPostId, apiKey);
@@ -284,8 +310,8 @@ export async function publishStory(imageUrl, caption = "") {
 // mismo mecanismo (createPostAndPoll), único cambio real es contentType
 // "post" en vez de "story". A diferencia de las Stories, acá el caption SÍ
 // se ve en el feed — se manda el copy completo de la propuesta, no un texto
-// de referencia interno. imageUrl puede ser un array (carrusel, PLAN_AUTONOMIA.md
-// Fase 7) — createPostAndPoll ya soporta ambos casos.
+// de referencia interno. imageUrl puede ser un array (carrusel) — createPostAndPoll
+// ya soporta ambos casos.
 export async function publishPost(imageUrl, caption = "") {
   const apiKey = process.env.ZERNIO_API_KEY;
   const igAccountId = process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID;
@@ -349,7 +375,7 @@ export async function unpublishPost(postId, platform, apiKey) {
   }
 
   try {
-    const res = await fetch(`${ZERNIO_API_URL}/${postId}/unpublish`, {
+    const res = await zfetch(`${ZERNIO_API_URL}/${postId}/unpublish`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -358,7 +384,7 @@ export async function unpublishPost(postId, platform, apiKey) {
       body: JSON.stringify({ platform }),
     });
 
-    const data = await res.json();
+    const data = await safeJson(res);
     if (!res.ok) {
       return { success: false, error: JSON.stringify(data).slice(0, 2000) };
     }
