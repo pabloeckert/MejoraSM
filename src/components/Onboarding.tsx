@@ -18,7 +18,17 @@ export function Onboarding() {
   const { data: documents } = useDocuments();
 
   useEffect(() => {
-    const completed = localStorage.getItem(STORAGE_KEY);
+    // Este componente vive fuera del <ErrorBoundary> de App.tsx (tiene que
+    // montarse antes de la Suspense de rutas) — un storage bloqueado (modo
+    // privado, extensión de privacidad) que tire acá no tiene nada arriba
+    // que lo atrape y tumba toda la app en blanco. Mismo criterio defensivo
+    // que useProposalComments.ts (getCommentAuthor/setCommentAuthor).
+    let completed: string | null = null;
+    try {
+      completed = localStorage.getItem(STORAGE_KEY);
+    } catch {
+      /* storage bloqueado — se trata como "no completado", se ofrece igual */
+    }
     if (!completed) {
       // Small delay so the page loads first
       const timer = setTimeout(() => setOpen(true), 800);
@@ -26,15 +36,17 @@ export function Onboarding() {
     }
   }, []);
 
-  const handleComplete = () => {
-    localStorage.setItem(STORAGE_KEY, "true");
+  const markCompleted = () => {
+    try {
+      localStorage.setItem(STORAGE_KEY, "true");
+    } catch {
+      /* storage bloqueado — no persiste, vuelve a aparecer la próxima visita */
+    }
     setOpen(false);
   };
 
-  const handleSkip = () => {
-    localStorage.setItem(STORAGE_KEY, "true");
-    setOpen(false);
-  };
+  const handleComplete = markCompleted;
+  const handleSkip = markCompleted;
 
   const steps = [
     {
