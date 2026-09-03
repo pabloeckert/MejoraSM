@@ -111,4 +111,4 @@ Pablo nos dio a las dos el mismo mensaje: obsesivo al detalle, arreglar todo, no
 
 ## Hallazgos y fixes en curso (append; marcá `[01]` o `[03]`)
 
-_(vacío al arrancar — se llena a medida que aparecen)_
+- **`[03]` Historial de migraciones de Supabase desincronizado.** `supabase migration list --linked`: solo `001`-`006` figuran como aplicadas en `schema_migrations`; `007`-`025` figuran como pendientes aunque están **todas realmente aplicadas** (verificado columna por columna / tabla por tabla contra la base real). Causa: se aplicaron con `db query -f`, que no registra en la tabla de historial. Riesgo: `deploy-migrations.yml` (`db push`) es un landmine — reintentaría `007`-`025`. **Fix:** `supabase migration repair --status applied 007..025` (solo escribe la tabla de bookkeeping, no toca el schema). Lo hago yo ahora — toca `supabase_migrations.schema_migrations`, aviso porque es zona caliente. Próximo nº de migración sigue siendo **026**.
