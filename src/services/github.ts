@@ -36,16 +36,39 @@ async function buildHeaders() {
   };
 }
 
+// Hallazgo real (auditoría 2026-09-03): este archivo se reescribió el
+// 2026-09-01 (ver comentario de arriba) DESPUÉS del hallazgo B14 de la
+// auditoría del 2026-08-31 ("vault-process/classify-photo/copilot usaban
+// fetch pelado y podían colgarse para siempre"), y reintrodujo exactamente
+// la misma clase de bug acá — sin AbortController ni timeout, un fetch
+// colgado bloquea `listDir` (listado de fotos), `commitPhoto` (sube una
+// foto real, el botón queda cargando para siempre), `triggerWorkflow`
+// (Reintentar/Despublicar del Monitor, "Publicar ahora") y, el caso más
+// visible, `getJsonFile` dentro del poll loop de PublishNowCard: si un
+// solo tick se cuelga, el `await` nunca vuelve, así que el chequeo de
+// POLL_TIMEOUT_MS de ese componente (que vive después del await) nunca se
+// alcanza — la UI queda en "preparando…"/"publicando…" sin error y sin
+// más salida que recargar la página a mano.
+const CALL_TIMEOUT_MS = 60_000;
+
 async function call<T = unknown>(action: string, params: Record<string, unknown> = {}): Promise<T> {
   let res: Response;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CALL_TIMEOUT_MS);
   try {
     res = await fetch(`${SUPABASE_URL}/functions/v1/repo`, {
       method: "POST",
       headers: await buildHeaders(),
       body: JSON.stringify({ action, ...params }),
+      signal: controller.signal,
     });
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error("La operación tardó demasiado — revisá tu conexión y probá de nuevo.");
+    }
     throw new Error("No se pudo guardar — revisá tu conexión y probá de nuevo.");
+  } finally {
+    clearTimeout(timer);
   }
   const data = await res.json().catch(() => ({}) as Record<string, unknown>);
   if (!res.ok) {
