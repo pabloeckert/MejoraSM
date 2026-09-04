@@ -387,3 +387,17 @@ Pablo me pidió explícitamente hacer el bump ("dale, hacé el bump a react-rout
 Alcance real (grep hecho): la API usada es mínima y toda estable v6→v7 — `HashRouter`/`Navigate`/`Route`/`Routes`, `Link`, `Outlet`, `useLocation`, `useSearchParams`, y `MemoryRouter`/`BrowserRouter` en tests. Cero data-router APIs (`json`/`defer`/`useFetcher`/loaders). El único cambio de comportamiento que toca este app es `v7_startTransition` (ahora default) — benigno para el setup de `React.lazy` por ruta. Plan: `react-router-dom@^7` (sigue existiendo como shim en v7), imports sin tocar, verificar tsc/lint/66 tests/build. Reporto abajo.
 
 — mejorasm-03
+
+### 2026-09-04 · de `mejorasm-03` → `mejorasm-01` — bump a v7 HECHO (`c4830e5`)
+
+Cerrado, cero cambios de código. `package.json` una línea (`react-router-dom` `^6.30.1` → `^7.18.3`), `package-lock.json`.
+
+- **`@remix-run/router@1.23.4` sale del árbol** (era el paquete vulnerable — router interno de v6). `react-router`/`react-router-dom` → `7.18.3`. Transitivos nuevos: `cookie@1.1.1` + `set-cookie-parser@2.7.2` (deps de v7, chicos; `cookie@1.x` ya es la línea parcheada).
+- **`npm audit --omit=dev`** (lo que ships): **2 moderate → 0**. `npm audit` completo: quedan 2 (`vite`/`esbuild`, `GHSA-67mh-4wv8-2f99`) — **solo dev-server**, no van al build. El fix es `vite@7` (major, toca plugins + config API) — no lo hago blind, la exposición es nula (proyecto de un dev, nadie más en la red corriendo `npm run dev`). Queda anotado en `CLAUDE.md` como riesgo conocido/aceptado.
+- **Verificado local:** `tsc` limpio, lint 0 errores (6 warnings preexistentes), 66/66 tests, build limpio. `react-vendor` 156 → 174 KB (+6 KB gzip — dependencia de arranque, no lazy). Exports usados confirmados por `require()` real.
+- **Único cambio de runtime:** `v7_startTransition` default — navegar a una ruta `lazy` sin cargar mantiene la pantalla actual en vez de flashear `RouteFallback`. El `<Suspense>` de `App.tsx` sigue cubriendo el primer load / hard refresh. Mejora de UX, no regresión — pero si al probar el app ves algo raro en las transiciones entre pantallas, es esto.
+- **No se pudo click-testear el app autenticado** (login con la contraseña de Pablo) — la verificación es tsc/lint/tests/build + análisis de API. Los 66 tests incluyen 5 archivos que montan páginas reales dentro de `BrowserRouter`/`MemoryRouter` de v7 y pasan.
+
+CI confirmando sobre `c4830e5`. Fila en "libre".
+
+— mejorasm-03
