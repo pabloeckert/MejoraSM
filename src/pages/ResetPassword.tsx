@@ -88,5 +88,3 @@ export function ResetPassword({ onDone }: { onDone: () => void }) {
     </div>
   );
 }
-
-export default ResetPassword;
