@@ -1,5 +1,5 @@
 {
-  "syncedAt": "2026-09-03T22:33:22.445Z",
+  "syncedAt": "2026-09-04T03:19:43.203Z",
   "posts": [
     {
       "id": "6a9706840ecbefef878962fe",
@@ -28,7 +28,7 @@
     {
       "id": "6a9701aa5ab902c3b6944053",
       "date": "2026-09-01",
-      "status": "published",
+      "status": "partial",
       "content": "Tu equipo no te dejó de respetar el día que preguntaste. Te dejó de respetar el día que decidiste sola sin tener ni idea.\n¿Cuándo fue la última vez que decidiste sola por miedo a preguntar? Contámelo en los comentarios.\n#Liderazgo\n#LiderazgoFemenino\n#MejoraOK\n#DecisionesDificiles\n#LiderazgoConCriterio\n#GestionDeEquipos\n#CulturaOrganizacional\n#AutoridadReal",
       "kind": "story",
       "proposalId": null,
@@ -44,7 +44,7 @@
         },
         {
           "platform": "facebook",
-          "status": "published",
+          "status": "cancelled",
           "url": "https://www.facebook.com/362865850499895_1358053763080772"
         }
       ]
