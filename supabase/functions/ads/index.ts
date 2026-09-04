@@ -83,13 +83,37 @@ async function callLLM(system: string, user: string, maxTokens = 600): Promise<s
   return ((await r.json()).choices?.[0]?.message?.content ?? "").trim();
 }
 
+// Zernio trae TODAS las cuentas de anuncios a las que el usuario de Facebook
+// tiene acceso, no solo la de la marca. Al conectar (2026-09-03) aparecieron
+// una campaña de un ad account "(Read-Only)" que ya no existe y un anuncio de
+// Marketplace de un auto de 2024 del ad account personal de Pablo — basura.
+// Filtramos: cuentas de solo lectura (no se puede pautar ahí) y campañas sin
+// actividad en el último año (viejas/muertas). Cuando MC corra una campaña real
+// desde una cuenta propia, pasa el filtro sin tocar nada.
+const STALE_CAMPAIGN_DAYS = 365;
+
+function isRelevantCampaign(c: Record<string, unknown>): boolean {
+  const acct = String(c.platformAdAccountName ?? "");
+  if (/read[\s-]*only/i.test(acct)) return false;
+  const lastActivity = (c.latestAd ?? c.earliestAd) as string | undefined;
+  if (lastActivity) {
+    const age = (Date.now() - new Date(lastActivity).getTime()) / 86_400_000;
+    if (Number.isFinite(age) && age > STALE_CAMPAIGN_DAYS) return false;
+  }
+  return true;
+}
+
 async function report() {
-  // 1. Campañas de Facebook Ads (si hay).
+  // 1. Campañas de Facebook Ads reales de Mejora Continua (si hay).
   let campaigns: Array<Record<string, unknown>> = [];
   let campaignsError: string | null = null;
   try {
-    const r = await zGet(`/ads/campaigns?platform=facebook&limit=20`);
-    campaigns = (r.campaigns ?? []) as Array<Record<string, unknown>>;
+    const r = await zGet(`/ads/campaigns?platform=facebook&limit=50`);
+    const raw = (r.campaigns ?? []) as Array<Record<string, unknown>>;
+    campaigns = raw.filter(isRelevantCampaign);
+    if (raw.length !== campaigns.length) {
+      console.log(`[ads] ${raw.length - campaigns.length} campaña(s) filtradas (read-only o sin actividad >${STALE_CAMPAIGN_DAYS}d)`);
+    }
   } catch (e) {
     campaignsError = errMsg(e);
   }
@@ -145,13 +169,19 @@ async function report() {
   return {
     hasAdsAccount: campaigns.length > 0 || (campaignsError === null),
     campaignsError,
-    campaigns: campaigns.map((c) => ({
-      name: c.name ?? c.campaignName ?? null,
-      status: c.status ?? null,
-      spend: c.spend ?? c.totalSpend ?? null,
-      impressions: c.impressions ?? null,
-      clicks: c.clicks ?? null,
-    })),
+    // Zernio devuelve las métricas anidadas en `c.metrics`, no al tope del
+    // objeto — el mapeo viejo (`c.spend`/`c.impressions`/`c.clicks`) daba
+    // siempre null aunque hubiera datos. Nombre de campaña: `c.campaignName`.
+    campaigns: campaigns.map((c) => {
+      const m = (c.metrics ?? {}) as Record<string, unknown>;
+      return {
+        name: c.campaignName ?? c.name ?? null,
+        status: c.status ?? null,
+        spend: m.spend ?? c.spend ?? null,
+        impressions: m.impressions ?? c.impressions ?? null,
+        clicks: m.clicks ?? c.clicks ?? null,
+      };
+    }),
     boostCandidates: candidates,
     medianEngagement: median,
     advice,
