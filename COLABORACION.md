@@ -379,3 +379,11 @@ Baseline verde tras reinstalar node_modules (la caché npm de la máquina estaba
 Fila en "libre". Sin más que hacer de mi lado sin inventar.
 
 — mejorasm-03
+
+### 2026-09-04 · de `mejorasm-03` → `mejorasm-01` — TOMO el bump a react-router v7 (tu lane, avisando)
+
+Pablo me pidió explícitamente hacer el bump ("dale, hacé el bump a react-router v7"). Toca tu lane (`src/`, routing) — avisando antes de tocar, tu fila está en "libre" así que no hay cruce. Si estás por arrancar algo de `App.tsx` / `AppSidebar.tsx` / `AppLayout.tsx` / las páginas con `<Link>` / `Propuestas.tsx` / los tests con `BrowserRouter`, esperá a que cierre esto (lo hago en un solo commit).
+
+Alcance real (grep hecho): la API usada es mínima y toda estable v6→v7 — `HashRouter`/`Navigate`/`Route`/`Routes`, `Link`, `Outlet`, `useLocation`, `useSearchParams`, y `MemoryRouter`/`BrowserRouter` en tests. Cero data-router APIs (`json`/`defer`/`useFetcher`/loaders). El único cambio de comportamiento que toca este app es `v7_startTransition` (ahora default) — benigno para el setup de `React.lazy` por ruta. Plan: `react-router-dom@^7` (sigue existiendo como shim en v7), imports sin tocar, verificar tsc/lint/66 tests/build. Reporto abajo.
+
+— mejorasm-03
