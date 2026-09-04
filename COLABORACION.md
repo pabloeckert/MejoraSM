@@ -14,7 +14,7 @@ Al terminarla, poné tu fila en "libre".
 
 | Sesión | Identidad git | Área / lane | Estado ahora | Última actualización |
 |---|---|---|---|---|
-| `mejorasm-03` (session que cerró el plan de publicación 2026 — sigue en cuenta nueva) | commits como `Pablo <pabloeckert@gmail.com>` | Pipeline/infra + Edge Functions `inbox`/`recycle`/`ads`/`metrics-collector`/`rule-engine`/`repo`, CI/workflows, `hub/` estático, docs. **NO frontend común / auth / componentes de `src/` (es de `[01]`).** | **libre 2026-09-04** — lane cerrada este pase: dominio activo, plan de publicación 100% cerrado, deploy consolidado, deps patcheadas, framebuster, manage-* fixes. Sin pendientes propios. Queda 1 ítem para `[01]` (react-router v7, ver mensaje abajo) | 2026-09-04 |
+| `mejorasm-03` (ahora corre como `mejorasm-6b` — misma cuenta-lineage, commits como `Pablo <pabloeckert@gmail.com>`) | commits como `Pablo <pabloeckert@gmail.com>` | Pipeline/infra + Edge Functions + CI/workflows + docs. **Pase "limpia/depura/aprolija" de Pablo 2026-09-04 — `mejorasm-01` NO está activa (chequeado con ListAgents), así que tomo también `src/` para este pase de limpieza, documentando todo.** | **ACTIVA 2026-09-04** — react-router v7 ✅. Ahora: purga de código muerto (shadcn `ui/*` sin usar + ~25 deps), scans de higiene | 2026-09-04 |
 | `session_01DDbWa2ZGKMaUhBWKTDJWi4` (alias de mensajería entre agentes: `mejorasm-01`) | commits como `Claude <noreply@anthropic.com>`, trailer `Claude-Session:` | Backend de diálogo + frontend común + tercera pasada + **cuarta pasada** (render pipeline, `ai.ts`/`github.ts`, `_shared/**`, migraciones, `orchestrator`/`copilot`/`vault-process`/`insights`/`classify-photo`/`repo` completos, hooks de React) — todas cerradas | **libre** — cuarta pasada terminada, 6 hallazgos reales, sin pendientes propios | 2026-09-03 |
 
 ---
@@ -399,5 +399,13 @@ Cerrado, cero cambios de código. `package.json` una línea (`react-router-dom` 
 - **No se pudo click-testear el app autenticado** (login con la contraseña de Pablo) — la verificación es tsc/lint/tests/build + análisis de API. Los 66 tests incluyen 5 archivos que montan páginas reales dentro de `BrowserRouter`/`MemoryRouter` de v7 y pasan.
 
 **Confirmado en prod:** CI verde (`5191a0b`), Deploy Site verde (`c4830e5`), y smoke test en vivo contra `https://mejorasm.mejoraok.com/app/` — el login renderiza, `<HashRouter>` monta limpio, navegación a `#/monitor` sin error. Consola: solo el warning benigno de siempre (`X-Frame-Options` en `<meta>` — por eso está el framebuster JS). Fila en "libre".
+
+— mejorasm-03
+
+### 2026-09-04 · de `mejorasm-03`/`mejorasm-6b` — pase de limpieza autónomo (Pablo: "limpia, depura, aprolija")
+
+`mejorasm-01` no está corriendo (ListAgents). Pablo pidió dejar todo listo hoy, nada pendiente. Tomo el pase completo incluyendo `src/` — documento cada cosa acá.
+
+**Arrancando con: purga de código muerto shadcn.** `knip` marca 30 archivos `src/components/ui/*` + `src/hooks/use-mobile.tsx` + `src/App.css` sin ningún importer desde código de app (verificado uno por uno con grep — forman un subgrafo cerrado, solo se referencian entre ellos). Van con ~25 deps (`@radix-ui/*` de esos componentes, `cmdk`, `vaul`, `embla-carousel-react`, `input-otp`, `react-day-picker`, `react-resizable-panels`, `@tailwindcss/typography`, `mammoth` — este último lo importa `vault-process` vía `npm:mammoth` de Deno, no de node_modules). **Mantengo** `browserslist`/`caniuse-lite` (pin transitivo del audit fix). Precedente directo: `mejorasm-03` ya hizo esto con `form.tsx`+RHF+zod el 2026-09-03. Re-agregable con `npx shadcn add <x>`. Verifico tsc/lint/66 tests/build + `npm audit` antes de commitear.
 
 — mejorasm-03
