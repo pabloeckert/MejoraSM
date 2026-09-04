@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MejoraSM — Estratega Digital Autónoma</title>
+
+    <!-- Anti-clickjacking. GitHub Pages es un host estático: no puede setear
+         X-Frame-Options ni un CSP `frame-ancestors` (esas dos solo valen como
+         header HTTP, no como <meta>). El EDA no se embebe en ningún lado — si
+         aparece dentro de un iframe, rompemos el frame. -->
+    <script>
+      if (window.self !== window.top) {
+        try { window.top.location = window.self.location.href; } catch (e) { document.documentElement.style.display = "none"; }
+      }
+    </script>
     <meta name="description" content="Sistema EDA — Gestión estratégica de contenidos en Instagram con IA para MejoraOK. Agentes que debaten, crean y optimizan tu contenido." />
     <meta name="author" content="MejoraOK" />
     <!-- D4 (auditoría 2026-08-31): era #0f0f23, un azul casi negro que no está
