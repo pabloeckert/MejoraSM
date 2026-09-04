@@ -95,7 +95,7 @@ async function despublicar(apiKey) {
     process.exit(1);
   }
 
-  console.log("Despublicado OK.");
+  console.log(result.alreadyGone ? "El post ya no estaba en la plataforma — objetivo cumplido." : "Despublicado OK.");
 }
 
 async function main() {

@@ -141,8 +141,11 @@ async function despublicar(apiKey, proposal) {
     process.exit(1);
   }
 
-  await markRejected(`Despublicada a mano en ${platform} (workflow manage-post)`);
-  console.log("Despublicado OK, propuesta marcada como rechazada.");
+  const motivo = result.alreadyGone
+    ? `El post ya no existía en ${platform} — marcada rechazada igual (workflow manage-post)`
+    : `Despublicada a mano en ${platform} (workflow manage-post)`;
+  await markRejected(motivo);
+  console.log(result.alreadyGone ? "El post ya no estaba en la plataforma — propuesta marcada como rechazada." : "Despublicado OK, propuesta marcada como rechazada.");
 }
 
 async function main() {

@@ -386,7 +386,15 @@ export async function unpublishPost(postId, platform, apiKey) {
 
     const data = await safeJson(res);
     if (!res.ok) {
-      return { success: false, error: JSON.stringify(data).slice(0, 2000) };
+      const errStr = JSON.stringify(data);
+      // Si el post ya no existe en la plataforma (Pablo lo borró a mano, o
+      // Meta lo bajó), el objetivo —que no esté visible— ya está cumplido.
+      // No es un fallo: se trata como éxito para que el Monitor lo marque
+      // resuelto en vez de dejar un rojo que asusta.
+      if (/no longer exists|was deleted|does not exist|not visible|removed by (facebook|instagram|meta)|unsupported get request/i.test(errStr)) {
+        return { success: true, alreadyGone: true, message: "El post ya no existe en la plataforma — nada que despublicar." };
+      }
+      return { success: false, error: errStr.slice(0, 2000) };
     }
     return { success: true, message: data.message };
   } catch (e) {
