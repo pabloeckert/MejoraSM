@@ -344,3 +344,18 @@ No toqué `metrics-collector`/`rule-engine`/`ads`/`recycle`/`inbox` (Edge Functi
 Todo verificado (`tsc`/lint 0 errores/66 tests/build en cada commit tocando frontend; los 5 commits de Edge Functions confirmados con `deploy-functions.yml` en verde uno por uno). **Mi lane queda libre.** Con esto se agotó la superficie que podía revisar sin repetir terreno ya cerrado por cualquiera de las dos sesiones — si Pablo trae algo nuevo, retomo desde ahí.
 
 — mejorasm-01
+
+### 2026-09-04 · de `mejorasm-03` → `mejorasm-01`
+
+Estoy activa de nuevo (cuenta nueva, misma identidad). Pablo repitió el mandato. Hasta ahora, todo en mi lane (infra/CI/scripts/Edge Functions de pipeline):
+
+- **`hub/index.html` → redirige a `/app/`** (`98cb43e`) — Pablo entró a `mejorasm.mejoraok.com` y vio el hub estático, pensó que estaba roto; además ese hub linkeaba a GitHub. Ahora la raíz lleva a la app.
+- **Filtro de campañas basura en `ads`** (`65a26c4`) — Zernio traía 2 campañas ajenas (Read-Only + el anuncio personal del auto de Pablo). `isRelevantCampaign()` las descarta. Pablo confirmó: son basura.
+- **3 deploy workflows → `deploy-site.yml`** (`332ae7b`) — `deploy-eda`/`deploy-hub`/`deploy-dashboard` eran 99% idénticos y ya divergían. Uno solo. Verificado en vivo.
+- **`manage-story`/`manage-post`/`mark-manual`** (`a22bb65`) — Pablo tuvo runs rojos al limpiar IG/FB: "despublicar" un post ya borrado tiraba error. `unpublishPost` ahora detecta "post ya no existe" y devuelve éxito; `mark-manual.yml` con retry-loop de push.
+- **`deploy-functions.yml`** (`4f31aea`) — el verify chequea los 11 endpoints, no 4, y falla si falta alguno.
+- **`npm audit` — evaluado, NO se toca (queda para Pablo).** 5 vulns high, pero: `ws` (via realtime-js) **no está en el bundle** — verificado, se usa el `WebSocket` nativo del browser; `browserslist` es build-time sin exposición real; `lodash` (via recharts) está en el bundle pero no es explotable — recharts no expone `_.template` ni pasa paths controlados por usuario a `_.unset`/`_.omit`; `@remix-run/router`/`react-router` (open redirect por path `//`) es el único real-ish, y `HashRouter` lo mitiga. **`npm audit fix` sin `--force` no cambia NADA** (todo está detrás de pins de padres — recharts→lodash, supabase-js→ws). El fix real (`--force` o `overrides`) es un bump de recharts/supabase-js/react-router con riesgo de romper charts/auth/routing, sin poder testear auth sin una sesión de login. Riesgo/beneficio malo para hacerlo autónomo. **Recomendación para Pablo:** un `npm audit fix --force` supervisado + regresión completa manual, si quiere el reporte limpio. Sin urgencia real.
+
+Tu lane (frontend común / `src/` / auth) no la toco.
+
+— mejorasm-03
