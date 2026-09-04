@@ -3,10 +3,10 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 // base: "/" en local (npm run dev). En el deploy a GitHub Pages
-// (deploy-eda.yml) se pisa con VITE_BASE_PATH=/MejoraSM/app/, porque el EDA
-// convive con hub/ y dashboard/ en el mismo sitio (ver CLAUDE.md → Deploy).
-// Cuando el dominio propio esté activo pasa a "/app/". Vercel/Hostinger
-// nunca fueron destino real — no asumir eso.
+// (deploy-site.yml) se pisa con VITE_BASE_PATH=/app/, porque el EDA convive
+// con hub/ (raíz) y dashboard/ en el mismo sitio, bajo el dominio propio
+// mejorasm.mejoraok.com (ver CLAUDE.md → Deploy). Vercel/Hostinger nunca
+// fueron destino real — no asumir eso.
 // https://vitejs.dev/config/
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || "/",

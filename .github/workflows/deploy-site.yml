@@ -1,25 +1,22 @@
-# Publica el EDA (src/, build de Vite) a GitHub Pages, en el subpath /app/.
+# Publica el sitio combinado a GitHub Pages en UN solo artifact:
+#   /            → hub/ (redirige a /app/)
+#   /app/        → build de Vite del EDA (src/)
+#   /dashboard/  → dashboard/ (monitor estático de solo lectura)
 #
-# Hasta ahora el EDA no tenía ningún destino de deploy confirmado: Hostinger
-# (util.mejoraok.com) no resuelve DNS y Vercel (mejorasm.vercel.app) devuelve
-# 404 — ningún proyecto conectado (ver README.md). GitHub Pages es el único
-# destino que se puede desplegar y verificar de punta a punta sin credenciales
-# nuevas (ya hay un sitio de Pages activo para hub/dashboard). Si
-# más adelante se decide Vercel u otro hosting, este workflow se puede
-# desactivar sin tocar el resto.
-#
-# GitHub Pages en modo "workflow" sirve UN solo artifact por sitio — por eso
-# este workflow arma un _site/ que combina hub/ (raíz) + dashboard/ (subpath)
-# + dist/ del EDA (subpath /app/), igual que
-# deploy-hub.yml y deploy-dashboard.yml. Si cualquiera
-# de los cuatro solo subiera su propia parte, se pisarían entre sí.
+# GitHub Pages en modo "workflow" sirve un solo artifact por sitio, así que
+# TODO el sitio se reconstruye en cada deploy — no se puede publicar solo una
+# parte sin borrar el resto. Antes había 3 workflows casi idénticos
+# (deploy-eda / deploy-hub / deploy-dashboard) que ya habían empezado a
+# divergir (los guards `if [ -d ]`, el nombre de un step); se unificaron acá
+# el 2026-09-03. `hub/CNAME` declara el dominio propio (mejorasm.mejoraok.com).
 
-name: Deploy EDA
+name: Deploy Site
 
 on:
   push:
     branches: [main]
     paths:
+      # EDA (src/ + config del build)
       - "src/**"
       - "index.html"
       - "vite.config.ts"
@@ -29,6 +26,11 @@ on:
       - "tailwind.config.ts"
       - "tsconfig*.json"
       - "components.json"
+      # Páginas estáticas del sitio combinado
+      - "hub/**"
+      - "dashboard/**"
+      # Este workflow (así un cambio acá se autodespliega)
+      - ".github/workflows/deploy-site.yml"
   workflow_dispatch: {}
 
 permissions:
@@ -70,10 +72,10 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Armar sitio combinado (hub/ + dashboard/ + app/)
+      - name: Armar sitio combinado
         run: |
           mkdir -p _site
-          cp -r hub/. _site/
+          cp -r hub/. _site/               # raíz + hub/CNAME (dominio propio)
           if [ -d dashboard ]; then
             mkdir -p _site/dashboard
             cp -r dashboard/. _site/dashboard/
