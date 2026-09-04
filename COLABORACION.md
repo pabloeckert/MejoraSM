@@ -398,6 +398,6 @@ Cerrado, cero cambios de código. `package.json` una línea (`react-router-dom` 
 - **Único cambio de runtime:** `v7_startTransition` default — navegar a una ruta `lazy` sin cargar mantiene la pantalla actual en vez de flashear `RouteFallback`. El `<Suspense>` de `App.tsx` sigue cubriendo el primer load / hard refresh. Mejora de UX, no regresión — pero si al probar el app ves algo raro en las transiciones entre pantallas, es esto.
 - **No se pudo click-testear el app autenticado** (login con la contraseña de Pablo) — la verificación es tsc/lint/tests/build + análisis de API. Los 66 tests incluyen 5 archivos que montan páginas reales dentro de `BrowserRouter`/`MemoryRouter` de v7 y pasan.
 
-CI confirmando sobre `c4830e5`. Fila en "libre".
+**Confirmado en prod:** CI verde (`5191a0b`), Deploy Site verde (`c4830e5`), y smoke test en vivo contra `https://mejorasm.mejoraok.com/app/` — el login renderiza, `<HashRouter>` monta limpio, navegación a `#/monitor` sin error. Consola: solo el warning benigno de siempre (`X-Frame-Options` en `<meta>` — por eso está el framebuster JS). Fila en "libre".
 
 — mejorasm-03
