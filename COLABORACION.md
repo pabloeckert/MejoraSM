@@ -14,7 +14,7 @@ Al terminarla, poné tu fila en "libre".
 
 | Sesión | Identidad git | Área / lane | Estado ahora | Última actualización |
 |---|---|---|---|---|
-| `mejorasm-03` (ahora corre como `mejorasm-6b` — misma cuenta-lineage, commits como `Pablo <pabloeckert@gmail.com>`) | commits como `Pablo <pabloeckert@gmail.com>` | Pipeline/infra + Edge Functions + CI/workflows + docs. **Pase "limpia/depura/aprolija" de Pablo 2026-09-04 — `mejorasm-01` NO está activa (chequeado con ListAgents), así que tomo también `src/` para este pase de limpieza, documentando todo.** | **ACTIVA 2026-09-04** — react-router v7 ✅. Ahora: purga de código muerto (shadcn `ui/*` sin usar + ~25 deps), scans de higiene | 2026-09-04 |
+| `mejorasm-03` (ahora corre como `mejorasm-6b` — misma cuenta-lineage, commits como `Pablo <pabloeckert@gmail.com>`) | commits como `Pablo <pabloeckert@gmail.com>` | Pipeline/infra + Edge Functions + CI/workflows + docs + (este pase) `src/`. | **libre 2026-09-04** — pase "limpia/depura/aprolija" cerrado, ver mensaje de cierre abajo. Sin pendientes propios | 2026-09-04 |
 | `session_01DDbWa2ZGKMaUhBWKTDJWi4` (alias de mensajería entre agentes: `mejorasm-01`) | commits como `Claude <noreply@anthropic.com>`, trailer `Claude-Session:` | Backend de diálogo + frontend común + tercera pasada + **cuarta pasada** (render pipeline, `ai.ts`/`github.ts`, `_shared/**`, migraciones, `orchestrator`/`copilot`/`vault-process`/`insights`/`classify-photo`/`repo` completos, hooks de React) — todas cerradas | **libre** — cuarta pasada terminada, 6 hallazgos reales, sin pendientes propios | 2026-09-03 |
 
 ---
@@ -407,5 +407,23 @@ Cerrado, cero cambios de código. `package.json` una línea (`react-router-dom` 
 `mejorasm-01` no está corriendo (ListAgents). Pablo pidió dejar todo listo hoy, nada pendiente. Tomo el pase completo incluyendo `src/` — documento cada cosa acá.
 
 **Arrancando con: purga de código muerto shadcn.** `knip` marca 30 archivos `src/components/ui/*` + `src/hooks/use-mobile.tsx` + `src/App.css` sin ningún importer desde código de app (verificado uno por uno con grep — forman un subgrafo cerrado, solo se referencian entre ellos). Van con ~25 deps (`@radix-ui/*` de esos componentes, `cmdk`, `vaul`, `embla-carousel-react`, `input-otp`, `react-day-picker`, `react-resizable-panels`, `@tailwindcss/typography`, `mammoth` — este último lo importa `vault-process` vía `npm:mammoth` de Deno, no de node_modules). **Mantengo** `browserslist`/`caniuse-lite` (pin transitivo del audit fix). Precedente directo: `mejorasm-03` ya hizo esto con `form.tsx`+RHF+zod el 2026-09-03. Re-agregable con `npx shadcn add <x>`. Verifico tsc/lint/66 tests/build + `npm audit` antes de commitear.
+
+— mejorasm-03
+
+### 2026-09-04 (cierre del pase de limpieza) · de `mejorasm-03`/`mejorasm-6b`
+
+Pase "limpia, depura, aprolija, mejora, arregla todo — nada pendiente" cerrado. Resumen (detalle completo en `CLAUDE.md` → "Pase de limpieza obsesiva" y `MejoraSM.md` Parte 23):
+
+- **`c4a099b`**: purgados 30 componentes shadcn sin uso + `use-mobile.tsx` + `App.css` + 24 deps huérfanas. `vite.config.ts` corregido de paso (manualChunks referenciaba una dep borrada). `-3876` líneas.
+- Lint: `no-unused-vars` estaba en `"off"` → prendido, 7 violaciones reales arregladas. **6 → 0 warnings.**
+- **`6f55455`**: autocorrección — `mammoth` restaurado, lo usa `load-vault-documents.mjs` (knip no ve ese entry point). Documentado sin maquillar.
+- **`f0221d8`**: `npm update` dentro de rangos ya declarados (radix, supabase-js, react-query, lucide-react, playwright, eslint, etc.). `package.json` sin cambios.
+- **`df4730c`**: 2 `export default` muertos en Login/ResetPassword (duplicados del named export real).
+- **`a89d379`**: `public/.htaccess` (Apache, subpath viejo, nunca se procesó en GH Pages) + `placeholder.svg` (leftover del molde) borrados.
+- **Investigado y descartado a propósito, sin tocar:** los 62 hallazgos de `deno lint` en las Edge Functions son 100% `no-explicit-any` — cero bugs reales, no vale el riesgo de tocar 11 funciones en prod por cosmética. `unsafe-eval` en el CSP de `index.html`: confirmado que el build de prod nunca llama `eval()` (grep en `dist/`), pero `unsafe-inline` sigue ahí de todas formas (mismo `script-src`) así que sacar solo `unsafe-eval` no sube mucho el piso de seguridad real, y no se puede probar el app logueado para confirmar que nada lo necesita — queda anotado como oportunidad de hardening futura, no ejecutado a ciegas. `AUTO_AGENDA_DIMENSIONES` sin consumers hoy pero es documentación-como-código real, se deja. `cargar-clave-zernio.ps1` → gitignoreado (Pablo ya había dicho "dejarla" sin trackear, ahora sin el ruido `??`).
+
+Verificado en cada uno de los 6 commits: tsc limpio, lint 0/0, 66/66 tests, build limpio, `npm audit --omit=dev` = 0, CI + Deploy Site verdes. Smoke test final en vivo (screenshot real) contra `https://mejorasm.mejoraok.com/app/` — cero regresión visual.
+
+`main` @ `89dabb5`. Sin trabajo a medias, sin pendientes propios. Si `mejorasm-01` vuelve a estar activa: nada que coordinar, lane libre.
 
 — mejorasm-03
