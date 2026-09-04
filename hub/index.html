@@ -3,199 +3,38 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Mejora Continua — Subir material</title>
+<title>MejoraSM</title>
+<meta name="robots" content="noindex" />
+<!-- La raíz del sitio redirige a la app. El "Subí material" vive dentro de
+     MejoraSM (/app/#/hub) — sin GitHub a la vista, con la subida por el
+     servidor. Este archivo estático quedó solo como puerta de entrada. -->
+<meta http-equiv="refresh" content="0; url=/app/" />
+<link rel="canonical" href="https://mejorasm.mejoraok.com/app/" />
 <style>
-  @import url("https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&display=swap");
-
-  :root {
-    --azul: #1A3D84;
-    --rojo: #E1061E;
-    --amarillo: #F7CC13;
-    --tinta: #2B2B2B;
-    --gris: #6B7280;
-    --blanco: #FFFFFF;
-  }
-
+  :root { --azul: #1A3D84; --rojo: #E1061E; --amarillo: #F7CC13; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   body {
-    font-family: "League Spartan", sans-serif;
-    background: var(--blanco);
-    color: var(--tinta);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 56px 24px 40px;
+    font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    background: #fff; color: #2B2B2B; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 20px; padding: 24px; text-align: center;
   }
-
-  header {
-    text-align: center;
-    max-width: 640px;
-    margin-bottom: 48px;
-  }
-
-  .dots { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+  .dots { display: flex; gap: 10px; }
   .dot { width: 12px; height: 12px; border-radius: 50%; }
-  .dot.rojo { background: var(--rojo); }
-  .dot.amarillo { background: var(--amarillo); }
-  .dot.azul { background: var(--azul); }
-
-  h1 {
-    font-weight: 700;
-    font-size: 34px;
-    color: var(--azul);
-    margin-bottom: 12px;
-    letter-spacing: -0.01em;
-  }
-
-  p.lead {
-    font-size: 18px;
-    color: var(--gris);
-    line-height: 1.5;
-  }
-
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 20px;
-    max-width: 920px;
-    width: 100%;
-  }
-
-  a.card {
-    display: block;
-    text-decoration: none;
-    color: inherit;
-    border: 1px solid #E5E7EB;
-    border-radius: 16px;
-    padding: 28px 26px;
-    transition: border-color 0.15s, transform 0.15s;
-  }
-  a.card:hover {
-    border-color: var(--azul);
-    transform: translateY(-2px);
-  }
-
-  .card-kicker {
-    font-weight: 600;
-    font-size: 13px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--rojo);
-    margin-bottom: 10px;
-  }
-
-  .card-title {
-    font-weight: 700;
-    font-size: 22px;
-    color: var(--azul);
-    margin-bottom: 10px;
-  }
-
-  .card-desc {
-    font-size: 15px;
-    color: var(--gris);
-    line-height: 1.45;
-  }
-
-  .card-cta {
-    margin-top: 16px;
-    font-weight: 600;
-    font-size: 14px;
-    color: var(--tinta);
-  }
-  .card-cta::after { content: " →"; }
-
-  footer {
-    margin-top: 56px;
-    max-width: 640px;
-    text-align: center;
-    font-size: 14px;
-    color: var(--gris);
-    line-height: 1.6;
-  }
-
-  footer .aviso {
-    background: #FFFBEA;
-    border: 1px solid var(--amarillo);
-    border-radius: 10px;
-    padding: 14px 18px;
-    margin-bottom: 20px;
-    color: var(--tinta);
-    text-align: left;
-  }
-
-  .brand {
-    margin-top: 32px;
-    font-weight: 700;
-    color: var(--azul);
-    font-size: 14px;
-    letter-spacing: 0.04em;
+  .dot.r { background: var(--rojo); } .dot.a { background: var(--amarillo); } .dot.z { background: var(--azul); }
+  h1 { font-size: 22px; font-weight: 700; color: var(--azul); letter-spacing: -0.01em; }
+  p { color: #6B7280; font-size: 15px; }
+  a.btn {
+    display: inline-block; margin-top: 4px; background: var(--azul); color: #fff;
+    text-decoration: none; padding: 12px 22px; border-radius: 10px; font-weight: 600; font-size: 15px;
   }
 </style>
 </head>
 <body>
-  <header>
-    <div class="dots"><span class="dot rojo"></span><span class="dot amarillo"></span><span class="dot azul"></span></div>
-    <h1>Subí material</h1>
-    <p class="lead">Elegí la oferta a la que corresponde la foto. El sistema arma la story con la identidad de marca y la publica sola.</p>
-  </header>
-
-  <div class="grid">
-    <a class="card" href="https://github.com/pabloeckert/MejoraSM/upload/main/content/inbox/personal" target="_blank" rel="noopener">
-      <div class="card-kicker">Personal</div>
-      <div class="card-title">Liderazgo y foco</div>
-      <div class="card-desc">Todo cambio empieza en quien lidera. Gestión emocional, creencias, objetivos.</div>
-      <div class="card-cta">Subir foto acá</div>
-    </a>
-
-    <a class="card" href="https://github.com/pabloeckert/MejoraSM/upload/main/content/inbox/organizacional" target="_blank" rel="noopener">
-      <div class="card-kicker">Organizacional</div>
-      <div class="card-title">Equipo y cultura</div>
-      <div class="card-desc">Cuando el líder está firme, el equipo lo siente. Roles, procesos, comunicación.</div>
-      <div class="card-cta">Subir foto acá</div>
-    </a>
-
-    <a class="card" href="https://github.com/pabloeckert/MejoraSM/upload/main/content/inbox/comercial" target="_blank" rel="noopener">
-      <div class="card-kicker">Comercial</div>
-      <div class="card-title">Ventas y negociación</div>
-      <div class="card-desc">Un líder con confianza vende distinto. Pricing, fidelización, marketing.</div>
-      <div class="card-cta">Subir foto acá</div>
-    </a>
-
-    <a class="card" href="https://github.com/pabloeckert/MejoraSM/upload/main/content/inbox/empresarial" target="_blank" rel="noopener">
-      <div class="card-kicker">Empresarial</div>
-      <div class="card-title">Modelo de negocio</div>
-      <div class="card-desc">La base sobre la que todo se sostiene. Finanzas, escalabilidad, calidad.</div>
-      <div class="card-cta">Subir foto acá</div>
-    </a>
-
-    <a class="card" href="https://github.com/pabloeckert/MejoraSM/upload/main/content/inbox/profesionalizacion" target="_blank" rel="noopener">
-      <div class="card-kicker">Profesionalización</div>
-      <div class="card-title">Nivel integrador</div>
-      <div class="card-desc">Líderes formados, métricas claras, procesos replicables — las 4 dimensiones juntas.</div>
-      <div class="card-cta">Subir foto acá</div>
-    </a>
-
-    <a class="card" href="https://github.com/pabloeckert/MejoraSM/upload/main/content/inbox/sociales" target="_blank" rel="noopener">
-      <div class="card-kicker">Sociales</div>
-      <div class="card-title">Equipo, alianzas y celebraciones</div>
-      <div class="card-desc">La cara humana de la marca. After Office, encuentros, nuevos proyectos — no es una dimensión de servicio.</div>
-      <div class="card-cta">Subir foto acá</div>
-    </a>
-  </div>
-
-  <footer>
-    <div class="aviso">
-      Por ahora solo se procesan <strong>fotos</strong> (jpg, png, webp). Los
-      videos se pueden subir igual — quedan guardados — pero todavía no se
-      arma una pieza con ellos. Eso es lo próximo.
-    </div>
-    Subís la foto, confirmás el commit en la pantalla que se abre, y listo —
-    al otro día (o corriendo el workflow a mano) sale publicada sola en
-    Instagram y Facebook, con el diseño de marca.
-    <div class="brand">MEJORA CONTINUA · mejoraok.com</div>
-  </footer>
+  <div class="dots"><span class="dot r"></span><span class="dot a"></span><span class="dot z"></span></div>
+  <h1>MejoraSM</h1>
+  <p>Te estamos llevando a la app…</p>
+  <a class="btn" href="/app/">Entrar a MejoraSM</a>
+  <script>location.replace("/app/");</script>
 </body>
 </html>
