@@ -105,14 +105,15 @@ jobs:
           
           echo ""
           echo "🏥 Verifying endpoints..."
-          
-          for fn in orchestrator vault-process metrics-collector rule-engine; do
+          MISSING=0
+          for fn in orchestrator vault-process metrics-collector rule-engine copilot classify-photo insights repo inbox recycle ads; do
             code=$(curl -s -o /dev/null -w "%{http_code}" \
               "$SUPABASE_URL/functions/v1/$fn" \
               -H "apikey: $ANON_KEY" 2>/dev/null)
             case "$code" in
-              401|405|400) echo "  ✅ $fn — active (HTTP $code)" ;;
-              404)         echo "  ❌ $fn — NOT FOUND (HTTP 404)" ;;
-              *)           echo "  ⚠️  $fn — HTTP $code" ;;
+              401|403|405|400) echo "  ✅ $fn — active (HTTP $code)" ;;
+              404)             echo "  ❌ $fn — NOT FOUND (HTTP 404)"; MISSING=$((MISSING+1)) ;;
+              *)               echo "  ⚠️  $fn — HTTP $code" ;;
             esac
           done
+          [ "$MISSING" -gt 0 ] && { echo "::error::$MISSING función(es) no encontradas tras el deploy"; exit 1; } || true
