@@ -23,7 +23,23 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
-      "@typescript-eslint/no-unused-vars": "off",
+      // Prendido 2026-09-04 (pase de limpieza): estaba en "off", así que un
+      // import muerto no lo cachaba nadie. Con "^_" ignorado para el caso
+      // deliberado (args de callbacks que no se usan).
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+      ],
+    },
+  },
+  {
+    // src/components/ui/** son primitivos shadcn sin modificar — el patrón de
+    // exportar el componente + su objeto de variantes (cva) desde el mismo
+    // archivo es la convención oficial de shadcn, no un descuido. El warning
+    // de react-refresh ahí es ruido; el resto de las reglas sí aplican.
+    files: ["src/components/ui/**/*.{ts,tsx}"],
+    rules: {
+      "react-refresh/only-export-components": "off",
     },
   },
 );

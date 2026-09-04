@@ -6,7 +6,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Upload, MessageSquare, Zap, ArrowRight, Check, Rocket } from "lucide-react";
 import { useDocuments } from "@/hooks/useVault";
 

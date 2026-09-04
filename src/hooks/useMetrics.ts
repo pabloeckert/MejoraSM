@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { metricsApi } from "@/services/supabase";
 
 // calendar_events (y sus hooks useCalendarEvents/useCreateCalendarEvent/

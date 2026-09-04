@@ -43,6 +43,11 @@ supabase/.temp/
 # Ver scripts/guardar-clave.ps1 para guardar una clave nueva ahí adentro.
 /secrets/
 
+# Helper local de Pablo para cargar ZERNIO_API_KEY (no tiene claves adentro,
+# pero es una herramienta de su máquina — se queda sin trackear a propósito,
+# ver "Purga de archivos sueltos fuera de git" en CLAUDE.md, 2026-08-27).
+/scripts/cargar-clave-zernio.ps1
+
 # Capturas de pantalla que suelen contener claves (bitmap sin comprimir de
 # una captura, o nombre de archivo que ya avisa qué contiene). No es
 # infalible — un nombre de archivo arbitrario igual puede tener una clave
