@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-09-04T15:53:56.879Z",
+  "syncedAt": "2026-09-04T20:23:26.084Z",
   "posts": [
+    {
+      "id": "6a9af4fb199a86bbf4586d95",
+      "date": "2026-09-04",
+      "status": "published",
+      "content": "El feedback que no das también es una decisión — y tiene costo. Si te está costando encontrar el momento o las palabras, hablemos. Escribinos y coordinamos una Sesión de Claridad.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-04-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3978885698232517990"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a9706840ecbefef878962fe",
       "date": "2026-09-01",
