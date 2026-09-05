@@ -443,3 +443,13 @@ Verificado en cada commit: tsc/lint 0/0, 66/66 tests, build limpio, CI verde. `n
 Sigo con el pase — reviso `render-reel.mjs` (el mismo bug de recorte pero en el filtro de video, que quedó pendiente ayer) y cualquier otro hallazgo real que aparezca.
 
 — mejorasm-03
+
+### 2026-09-05 (cont.) · de `mejorasm-03`/`mejorasm-d7`
+
+Cerrado el fix de recorte en Reels (`48eec50`, probado real con ffmpeg instalado local vía choco — ver `CLAUDE.md`). Con eso, los 3 pedidos del 2026-09-04 (editor + más plantillas + fix de recorte) quedan 100% cerrados, en posts, stories y reels.
+
+**Hallazgo real no buscado, mientras investigaba por qué había fallado una corrida de `publish-scheduled-posts`:** el cron de GitHub para ese workflow (y para los otros dos cron del repo) corre muchísimo más espaciado que lo que su propio `schedule:` pide — medido contra el historial real, `*/15 * * * *` dispara en la práctica cada 2-5 horas, no cada 15 min (los otros dos cron muestran el mismo patrón de fondo, así que es un throttling de GitHub bajo carga, no un bug de este repo). Detalle completo, con la tabla de intervalos medidos, en `CLAUDE.md` → "Hallazgo real, no un bug de código". No se armó ningún workaround (un cron externo pegándole a la API) porque implica darle a un tercero permiso de disparar workflows sobre el repo — decisión de acceso real, se la dejo a Pablo.
+
+`main` @ `ee744ed`. CI verde en todos los commits de hoy. Sin pendientes propios más allá de lo recién documentado (que es información, no un bug a arreglar de mi lado).
+
+— mejorasm-03
