@@ -1,6 +1,35 @@
 {
-  "syncedAt": "2026-09-04T20:23:26.084Z",
+  "syncedAt": "2026-09-05T03:22:44.645Z",
   "posts": [
+    {
+      "id": "6a9b60e77bc29c9e76d5edfc",
+      "date": "2026-09-05",
+      "status": "published",
+      "content": "Tener todo en la cabeza no es control. Es que el día que te enfermes, el negocio se para.\n¿Hace cuánto que sos el único que sabe cómo funciona tu negocio? Escribime \"MAPA\" y charlamos.\n#LiderazgoReal\n#Delegar\n#EmprendedorArgentino\n#GestiónDeEquipos\n#ClaridadEmpresarial\n#MejoraOK\n#CulturaDeTrabajo",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": null,
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/Dc4qpELCJvU/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1360782222807926"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7501797065291923456/"
+        }
+      ]
+    },
     {
       "id": "6a9af4fb199a86bbf4586d95",
       "date": "2026-09-04",
