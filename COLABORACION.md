@@ -14,7 +14,7 @@ Al terminarla, poné tu fila en "libre".
 
 | Sesión | Identidad git | Área / lane | Estado ahora | Última actualización |
 |---|---|---|---|---|
-| `mejorasm-03` (ahora corre como `mejorasm-6b` — misma cuenta-lineage, commits como `Pablo <pabloeckert@gmail.com>`) | commits como `Pablo <pabloeckert@gmail.com>` | Pipeline/infra + Edge Functions + CI/workflows + docs + (este pase) `src/`. | **libre 2026-09-04** — pase "limpia/depura/aprolija" cerrado, ver mensaje de cierre abajo. Sin pendientes propios | 2026-09-04 |
+| `mejorasm-03` (ahora corre como `mejorasm-d7` — misma cuenta-lineage, commits como `Pablo <pabloeckert@gmail.com>`) | commits como `Pablo <pabloeckert@gmail.com>` | Pipeline/infra + Edge Functions + CI/workflows + docs + templates de render + `src/` cuando hace falta. | **ACTIVA 2026-09-05** — editor de collage en "Publicar ahora" hecho (ver mensaje abajo). Sigo con el pase obsesivo de Pablo | 2026-09-05 |
 | `session_01DDbWa2ZGKMaUhBWKTDJWi4` (alias de mensajería entre agentes: `mejorasm-01`) | commits como `Claude <noreply@anthropic.com>`, trailer `Claude-Session:` | Backend de diálogo + frontend común + tercera pasada + **cuarta pasada** (render pipeline, `ai.ts`/`github.ts`, `_shared/**`, migraciones, `orchestrator`/`copilot`/`vault-process`/`insights`/`classify-photo`/`repo` completos, hooks de React) — todas cerradas | **libre** — cuarta pasada terminada, 6 hallazgos reales, sin pendientes propios | 2026-09-03 |
 
 ---
@@ -425,5 +425,21 @@ Pase "limpia, depura, aprolija, mejora, arregla todo — nada pendiente" cerrado
 Verificado en cada uno de los 6 commits: tsc limpio, lint 0/0, 66/66 tests, build limpio, `npm audit --omit=dev` = 0, CI + Deploy Site verdes. Smoke test final en vivo (screenshot real) contra `https://mejorasm.mejoraok.com/app/` — cero regresión visual.
 
 `main` @ `89dabb5`. Sin trabajo a medias, sin pendientes propios. Si `mejorasm-01` vuelve a estar activa: nada que coordinar, lane libre.
+
+— mejorasm-03
+
+### 2026-09-05 · de `mejorasm-03`/`mejorasm-d7`
+
+`mejorasm-01` no está corriendo (chequeado con ListAgents — solo aparecen sesiones de otros proyectos). Sigo sola, pase obsesivo de Pablo ("busca errores, busca aciertos, actualiza, limpia, optimiza, aprolija, depura, mejora... agregando sin quitar nada de lo que funciona").
+
+**Cerrado desde el pedido de ayer (editor + más plantillas + fix de recorte):**
+- `cf395a3` / `41fb20f`: fix de recorte universal (contain + backdrop difuminado) en post-template.html y story-template.html + template de collage automático para posts (2+ fotos → collage solo, sin gate humano nuevo).
+- `fdd6058`: editor de collage en "Publicar ahora" — checkbox nuevo (solo visible con 2+ fotos), 100% aditivo, wireado de punta a punta (`claude.mjs` con `images` plural, `generate-brief.mjs` con `PUBLISH_NOW_COLLAGE`, `render-story.mjs`, `publish-now.yml`, `PublishNowCard.tsx`). El flujo de siempre (1 foto → 1 story) no cambió en nada.
+
+Verificado en cada commit: tsc/lint 0/0, 66/66 tests, build limpio, CI verde. `npm audit --omit=dev` = 0, `knip` sin hallazgos nuevos.
+
+**Nota técnica:** un commit de ayer (`fdd6058`) salió con el mensaje parcialmente roto — usé backticks dentro de un `-m "..."` en bash y la shell interpretó `` `images` ``/`` `image` ``/`` `collage` `` como sustitución de comando (vacío, "command not found"). El código está perfecto, solo el texto del mensaje quedó con esas palabras faltantes. No se hizo `--amend` + force-push para arreglarlo (regla dura del repo: nunca forzar push a main sin que Pablo lo pida). Desde ahora uso `git commit -F <archivo>` para mensajes con backticks, evita el problema de raíz.
+
+Sigo con el pase — reviso `render-reel.mjs` (el mismo bug de recorte pero en el filtro de video, que quedó pendiente ayer) y cualquier otro hallazgo real que aparezca.
 
 — mejorasm-03
