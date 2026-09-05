@@ -125,14 +125,26 @@ async function renderOverlay(brief) {
 }
 
 async function composeVideo(photoPath, overlayPath, outPath) {
-  // 1) foto: escalar para llenar 1080x1920 y recortar; zoompan (Ken Burns:
+  // 1) foto real: nunca se recorta (mismo hallazgo y mismo criterio que el
+  //    fix de post-template.html/story-template.html del 2026-09-04 — una
+  //    captura de pantalla con una relación de aspecto muy distinta a
+  //    1350:2400, forzada con crop puro, perdía contenido real en los
+  //    bordes). Rama "bgstill": escala+recorta+difumina (relleno de fondo,
+  //    ahí sí no importa perder bordes porque es solo textura). Rama
+  //    "fgstill": escala SIN recortar (force_original_aspect_ratio=decrease)
+  //    y se superpone centrada sobre el fondo difuminado — mismo recurso
+  //    "contain + backdrop" que las plantillas HTML, llevado a un filtro de
+  //    ffmpeg. Recién sobre ese compuesto se aplica el Ken Burns (zoompan,
   //    zoom lento del 1.0 al 1.12) a lo largo de toda la duración.
   // 2) overlay PNG transparente encima, estático.
   // 3) pista de audio silenciosa (Instagram Reels exige audio).
   const frames = DURATION_S * FPS;
   const filter =
     `[0:v]scale=1350:2400:force_original_aspect_ratio=increase,crop=1350:2400,` +
-    `zoompan=z='min(zoom+0.0006,1.12)':d=${frames}:s=1080x1920:fps=${FPS},setsar=1[bg];` +
+    `gblur=sigma=30,eq=brightness=-0.15:saturation=1.1[bgstill];` +
+    `[0:v]scale=1350:2400:force_original_aspect_ratio=decrease[fgstill];` +
+    `[bgstill][fgstill]overlay=(W-w)/2:(H-h)/2[composited];` +
+    `[composited]zoompan=z='min(zoom+0.0006,1.12)':d=${frames}:s=1080x1920:fps=${FPS},setsar=1[bg];` +
     `[bg][1:v]overlay=0:0:format=auto[v]`;
   const args = [
     "-y",
