@@ -28,6 +28,10 @@ const USED_DIR = path.join(ROOT, "content/used");
 const PUBLISHED_DIR = path.join(ROOT, "content/published");
 const WORK_DIR = path.join(ROOT, "content/work");
 const TEMPLATE_PATH = path.join(ROOT, "templates/post-template.html");
+// Collage de 2 fotos (2026-09-04) — variante automática para cuando hay
+// más de una foto real disponible para la misma oferta, en vez de forzar
+// siempre una sola imagen de fondo. Ver templates/collage-template.html.
+const COLLAGE_TEMPLATE_PATH = path.join(ROOT, "templates/collage-template.html");
 const MANIFEST_PATH = path.join(WORK_DIR, "scheduled-posts.json");
 
 const EXT_TO_MIME = {
@@ -249,6 +253,7 @@ async function main() {
   }
 
   const templateBase = await readFile(TEMPLATE_PATH, "utf8");
+  const collageTemplateBase = await readFile(COLLAGE_TEMPLATE_PATH, "utf8");
   const browser = await chromium.launch();
   // Feed 4:5 (1080×1350), no 1:1 — ver skill mejora-continua-brand, sección
   // "Redes sociales — formato y zona segura" (agregada 2026-08-24).
@@ -259,12 +264,7 @@ async function main() {
   const manifest = [];
 
   async function renderSlide(template, { photo, ofertaLabel, kicker, headline, subtext }) {
-    let photoStyle = "";
-    if (photo) {
-      const ext = path.extname(photo.name).toLowerCase();
-      const buffer = await readFile(photo.path);
-      photoStyle = `background-image: url('data:${EXT_TO_MIME[ext]};base64,${buffer.toString("base64")}');`;
-    }
+    const photoStyle = photo ? await photoStyleFor(photo) : "";
     // Reemplazo vía función, no string directo: si el texto generado por IA
     // contuviera literalmente "$&"/"$$"/"$`"/"$'", String.replace() los
     // interpreta como patrones especiales (inserta el propio match, etc.)
@@ -273,6 +273,28 @@ async function main() {
     return template
       .replace("{{MODE_CLASS}}", () => (photo ? "" : "solo-texto"))
       .replace("{{PHOTO_STYLE}}", () => photoStyle)
+      .replace("{{OFERTA_LABEL}}", () => escapeHtml(ofertaLabel))
+      .replace("{{KICKER}}", () => escapeHtml(kicker))
+      .replace("{{HEADLINE}}", () => escapeHtml(headline))
+      .replace("{{SUBTEXT}}", () => escapeHtml(truncateWords(subtext)));
+  }
+
+  async function photoStyleFor(photo) {
+    const ext = path.extname(photo.name).toLowerCase();
+    const buffer = await readFile(photo.path);
+    return `background-image: url('data:${EXT_TO_MIME[ext]};base64,${buffer.toString("base64")}');`;
+  }
+
+  // Variante de 2 fotos (2026-09-04) — mismo criterio de reemplazo vía
+  // función que renderSlide, por el mismo riesgo real de $&/$$/$`/$'.
+  async function renderCollageSlide(template, { photo1, photo2, ofertaLabel, kicker, headline, subtext }) {
+    const style1 = photo1 ? await photoStyleFor(photo1) : "";
+    const style2 = photo2 ? await photoStyleFor(photo2) : "";
+    return template
+      .replace("{{MODE_CLASS}}", () => "")
+      .replace("{{PHOTO_STYLE_1}}", () => style1)
+      .replace("{{PHOTO_STYLE_2}}", () => style2)
+      .replace("{{PANE2_VACIO}}", () => (photo2 ? "" : "vacio"))
       .replace("{{OFERTA_LABEL}}", () => escapeHtml(ofertaLabel))
       .replace("{{KICKER}}", () => escapeHtml(kicker))
       .replace("{{HEADLINE}}", () => escapeHtml(headline))
@@ -330,19 +352,42 @@ async function main() {
       continue;
     }
 
-    const photo = await findPhoto(proposal.oferta);
-    const html = await renderSlide(templateBase, {
-      photo,
-      ofertaLabel,
-      kicker: ofertaLabel,
-      headline: proposal.hook || proposal.title || "",
-      subtext: proposal.body || "",
-    });
+    // Collage automático (2026-09-04): con 2+ fotos reales disponibles para
+    // la misma oferta, en vez de forzar siempre una sola imagen de fondo se
+    // usa el template de 2 fotos — más variedad real, sin intervención
+    // humana. Con 1 sola foto (el caso más común) sigue el post clásico.
+    const twoPhotos = await findPhotos(proposal.oferta, 2);
+    let photo = null;
+    let html;
+    if (twoPhotos.length >= 2) {
+      html = await renderCollageSlide(collageTemplateBase, {
+        photo1: twoPhotos[0],
+        photo2: twoPhotos[1],
+        ofertaLabel,
+        kicker: ofertaLabel,
+        headline: proposal.hook || proposal.title || "",
+        subtext: proposal.body || "",
+      });
+    } else {
+      photo = await findPhoto(proposal.oferta);
+      html = await renderSlide(templateBase, {
+        photo,
+        ofertaLabel,
+        kicker: ofertaLabel,
+        headline: proposal.hook || proposal.title || "",
+        subtext: proposal.body || "",
+      });
+    }
     await page.setContent(html, { waitUntil: "networkidle" });
     const outputPath = path.join(PUBLISHED_DIR, `post-${date}-${proposal.id.slice(0, 8)}.jpg`);
     await page.screenshot({ path: outputPath, type: "jpeg", quality: 92 });
 
-    if (photo) await markPhotoUsed(photo, proposal.oferta);
+    if (twoPhotos.length >= 2) {
+      await markPhotoUsed(twoPhotos[0], proposal.oferta);
+      await markPhotoUsed(twoPhotos[1], proposal.oferta);
+    } else if (photo) {
+      await markPhotoUsed(photo, proposal.oferta);
+    }
 
     const relativeOutputPath = path.relative(ROOT, outputPath);
     await markRendered(proposal.id, relativeOutputPath);
