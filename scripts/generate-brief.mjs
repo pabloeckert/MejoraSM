@@ -35,7 +35,11 @@ const IDENTIDAD_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraIdent
 // los dos corren cerca. PUBLISH_NOW_OFERTA fija de qué carpeta sale.
 const PUBLISH_NOW = process.env.PUBLISH_NOW === "1";
 const PN_OFERTA = (process.env.PUBLISH_NOW_OFERTA || "").trim();
-const MAX_STORIES = PUBLISH_NOW ? 1 : 2;
+// Collage de 2 fotos (2026-09-04, pedido de Pablo) — opción manual desde
+// "Publicar ahora", aditiva: sin este flag, el comportamiento de siempre
+// (1 foto, la más reciente) no cambia en nada.
+const PN_COLLAGE = process.env.PUBLISH_NOW_COLLAGE === "true";
+const MAX_STORIES = PUBLISH_NOW ? (PN_COLLAGE ? 2 : 1) : 2;
 const BRIEFS_FILE = PUBLISH_NOW ? "publish-now-briefs.json" : "briefs.json";
 const RUN_SOURCE = PUBLISH_NOW ? "publish-now" : "daily-story";
 
@@ -266,6 +270,43 @@ async function briefFor(item, avoidHeadlines, systemPrompt) {
   throw new Error(`No se pudo generar un brief válido tras ${BRIEF_ATTEMPTS} intentos: ${lastError.message}`);
 }
 
+// Collage de 2 fotos (2026-09-04) — un solo brief para dos fotos reales,
+// pensado como "dos momentos/ángulos de la misma sesión" en vez de dos
+// stories separadas. Solo se llama desde "Publicar ahora" con la opción
+// de collage activada; el flujo normal (1 foto → briefFor) no la toca.
+async function briefForCollage(items, systemPrompt) {
+  const oferta = OFERTAS[items[0].oferta];
+  const images = [];
+  for (const item of items) {
+    const ext = path.extname(item.path).toLowerCase();
+    const buffer = await readFile(item.path);
+    images.push({ base64: buffer.toString("base64"), media_type: EXT_TO_MIME[ext] });
+  }
+  const userText =
+    `Generá la story a partir de estas DOS fotos reales, que se van a mostrar ` +
+    `una al lado de la otra en un collage — pensalas como dos momentos o dos ` +
+    `ángulos de lo mismo (ej: antes/durante, dos instantes reales de una misma ` +
+    `sesión). Un solo copy que hable de las dos fotos juntas, no de una sola. ` +
+    `Es contenido de la oferta "${oferta.nombre}": ${oferta.contexto} Que el ` +
+    `copy hable de esa dimensión específica, no genérico de la marca.`;
+
+  let lastError;
+  for (let attempt = 1; attempt <= BRIEF_ATTEMPTS; attempt++) {
+    let text = "";
+    try {
+      text = await askClaude({ system: systemPrompt, userText, images, maxTokens: 1600 });
+      return extractJson(text);
+    } catch (e) {
+      lastError = e;
+      console.error(
+        `Intento ${attempt}/${BRIEF_ATTEMPTS} (collage): ${e.message}. Respuesta cruda:\n---\n${text}\n---`
+      );
+      if (attempt < BRIEF_ATTEMPTS) await sleep(2000 * attempt);
+    }
+  }
+  throw new Error(`No se pudo generar un brief de collage válido tras ${BRIEF_ATTEMPTS} intentos: ${lastError.message}`);
+}
+
 // Freno de una-corrida-por-día: si ya hay una story publicada hoy, una
 // segunda corrida (típicamente un reintento manual tras un fallo parcial de
 // Zernio) no debe generar contenido nuevo — eso es lo que produjo la
@@ -320,6 +361,19 @@ async function main(elapsed) {
     brief.mode = "solo-texto";
     brief.oferta = null;
     brief.photoUsedPath = null;
+    briefs.push(brief);
+  } else if (PUBLISH_NOW && PN_COLLAGE && photos.length >= 2) {
+    // Collage: un solo brief para las 2 fotos más recientes, no una por foto.
+    // Si se pidió collage pero solo había 1 foto real, este branch ni se
+    // alcanza (la condición de arriba lo evita) y sigue el camino normal.
+    const [item1, item2] = photos.slice(-2);
+    const brief = await briefForCollage([item1, item2], systemPrompt);
+    brief.mode = "collage";
+    brief.oferta = item1.oferta;
+    const usedDir = path.join(USED_DIR, item1.oferta);
+    await mkdir(usedDir, { recursive: true });
+    brief.photoUsedPath = path.join(usedDir, item1.name);
+    brief.photoUsedPath2 = path.join(usedDir, item2.name);
     briefs.push(brief);
   } else {
     for (const item of photos) {

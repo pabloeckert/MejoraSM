@@ -17,6 +17,8 @@ const PUBLISHED_DIR = path.join(ROOT, "content/published");
 const LOG_DIR = path.join(ROOT, "content/log");
 const LOCAL_BRIEFS_PATH = path.join(LOG_DIR, "local-briefs.json");
 const TEMPLATE_PATH = path.join(ROOT, "templates/story-template.html");
+// Collage de 2 fotos (2026-09-04) — ver templates/story-collage-template.html.
+const COLLAGE_TEMPLATE_PATH = path.join(ROOT, "templates/story-collage-template.html");
 
 // "Publicar ahora" (2026-09-01) — archivos e imagen propios para no pisarse
 // con el cron diario si corren cerca. Ver generate-brief.mjs.
@@ -56,6 +58,7 @@ async function main() {
     return;
   }
   const templateBase = await readFile(TEMPLATE_PATH, "utf8");
+  const collageTemplateBase = await readFile(COLLAGE_TEMPLATE_PATH, "utf8");
 
   const browser = await chromium.launch();
   const page = await browser.newPage({
@@ -69,25 +72,42 @@ async function main() {
 
   for (let i = 0; i < briefs.length; i++) {
     const brief = briefs[i];
-    let template = templateBase;
+    let template;
 
-    let photoStyle = "";
-    if (brief.mode === "foto" && brief.photoUsedPath) {
-      const ext = path.extname(brief.photoUsedPath).toLowerCase();
-      const buffer = await readFile(brief.photoUsedPath);
-      photoStyle = `background-image: url('data:${EXT_TO_MIME[ext]};base64,${buffer.toString("base64")}');`;
+    // Collage (2026-09-04): 2 fotos reales en un solo template, en vez de
+    // una imagen de fondo. Mismo criterio de reemplazo vía función que el
+    // resto (riesgo real de "$&"/"$$"/"$`"/"$'" en texto generado por IA).
+    if (brief.mode === "collage" && brief.photoUsedPath && brief.photoUsedPath2) {
+      const ext1 = path.extname(brief.photoUsedPath).toLowerCase();
+      const buf1 = await readFile(brief.photoUsedPath);
+      const style1 = `background-image: url('data:${EXT_TO_MIME[ext1]};base64,${buf1.toString("base64")}');`;
+      const ext2 = path.extname(brief.photoUsedPath2).toLowerCase();
+      const buf2 = await readFile(brief.photoUsedPath2);
+      const style2 = `background-image: url('data:${EXT_TO_MIME[ext2]};base64,${buf2.toString("base64")}');`;
+
+      template = collageTemplateBase
+        .replace("{{MODE_CLASS}}", () => "")
+        .replace("{{PHOTO_STYLE_1}}", () => style1)
+        .replace("{{PHOTO_STYLE_2}}", () => style2)
+        .replace("{{PANE2_VACIO}}", () => "")
+        .replace("{{KICKER}}", () => escapeHtml(brief.kicker || "MEJORA CONTINUA"))
+        .replace("{{HEADLINE}}", () => escapeHtml(brief.headline || ""))
+        .replace("{{SUBTEXT}}", () => escapeHtml(brief.subtext || ""));
+    } else {
+      let photoStyle = "";
+      if (brief.mode === "foto" && brief.photoUsedPath) {
+        const ext = path.extname(brief.photoUsedPath).toLowerCase();
+        const buffer = await readFile(brief.photoUsedPath);
+        photoStyle = `background-image: url('data:${EXT_TO_MIME[ext]};base64,${buffer.toString("base64")}');`;
+      }
+
+      template = templateBase
+        .replace("{{MODE_CLASS}}", () => (brief.mode === "foto" ? "" : "solo-texto"))
+        .replace("{{PHOTO_STYLE}}", () => photoStyle)
+        .replace("{{KICKER}}", () => escapeHtml(brief.kicker || "MEJORA CONTINUA"))
+        .replace("{{HEADLINE}}", () => escapeHtml(brief.headline || ""))
+        .replace("{{SUBTEXT}}", () => escapeHtml(brief.subtext || ""));
     }
-
-    // Reemplazo vía función, no string directo: un "$&"/"$$"/"$`"/"$'"
-    // literal en el texto generado por IA dispararía la interpretación
-    // especial de patrones de String.replace() (aplica igual con un patrón
-    // de búsqueda string plano, no solo regex) — una función replacer no.
-    template = template
-      .replace("{{MODE_CLASS}}", () => (brief.mode === "foto" ? "" : "solo-texto"))
-      .replace("{{PHOTO_STYLE}}", () => photoStyle)
-      .replace("{{KICKER}}", () => escapeHtml(brief.kicker || "MEJORA CONTINUA"))
-      .replace("{{HEADLINE}}", () => escapeHtml(brief.headline || ""))
-      .replace("{{SUBTEXT}}", () => escapeHtml(brief.subtext || ""));
 
     await page.setContent(template, { waitUntil: "networkidle" });
     const outputPath = path.join(PUBLISHED_DIR, `${IMG_PREFIX}-${date}-${i + 1}.jpg`);

@@ -58,6 +58,8 @@ async function main() {
     manifest.kicker = b?.kicker || null;
     manifest.captionFeed = b?.caption_feed || "";
     manifest.imagePath = r?.outputPath || null;
+    // Collage de 2 fotos (2026-09-04) — informativo para el preview del EDA.
+    manifest.mode = b?.mode || "foto";
   }
 
   await writeFile(MANIFEST, JSON.stringify(manifest, null, 2));

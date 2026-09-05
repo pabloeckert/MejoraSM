@@ -29,6 +29,8 @@ interface Manifest {
   imagePath?: string | null;
   error?: string | null;
   updatedAt?: string;
+  // Collage de 2 fotos (2026-09-04) — informativo, lo escribe publish-now-manifest.mjs.
+  mode?: "foto" | "collage" | "solo-texto";
 }
 
 type UiState = "idle" | "preparing" | "prepared" | "publishing" | "published" | "error";
@@ -46,6 +48,10 @@ export function PublishNowCard({ dimension }: { dimension: string }) {
   const [state, setState] = useState<UiState>("idle");
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Collage de 2 fotos (2026-09-04, pedido de Pablo: "más plantillas... si no
+  // podés automático, dejame editar") — opción manual, solo visible cuando
+  // hay 2+ fotos reales; sin tocarla, el comportamiento de siempre no cambia.
+  const [useCollage, setUseCollage] = useState(false);
   const nonceRef = useRef<string>("");
   const startedRef = useRef<number>(0); // cuándo se disparó la fase actual
   const pollStopRef = useRef<() => void>(() => {});
@@ -55,7 +61,9 @@ export function PublishNowCard({ dimension }: { dimension: string }) {
 
   const inboxPath = `content/inbox/${dimension}`;
   const { data: inboxFiles } = useDirListing(inboxPath);
-  const hasPhoto = (inboxFiles ?? []).some((f) => f.type === "file" && IMG_RE.test(f.name));
+  const photoCount = (inboxFiles ?? []).filter((f) => f.type === "file" && IMG_RE.test(f.name)).length;
+  const hasPhoto = photoCount > 0;
+  const hasTwoPhotos = photoCount >= 2;
 
   useEffect(() => () => pollStopRef.current(), []);
 
@@ -144,7 +152,12 @@ export function PublishNowCard({ dimension }: { dimension: string }) {
     nonceRef.current = nonce;
     setState("preparing");
     try {
-      await github.triggerWorkflow("publish-now.yml", { mode: "prepare", oferta: dimension, nonce });
+      await github.triggerWorkflow("publish-now.yml", {
+        mode: "prepare",
+        oferta: dimension,
+        nonce,
+        collage: String(hasTwoPhotos && useCollage),
+      });
       poll("prepared");
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : "No se pudo iniciar.");
@@ -181,6 +194,7 @@ export function PublishNowCard({ dimension }: { dimension: string }) {
     setState("idle");
     setManifest(null);
     setErrorMsg(null);
+    setUseCollage(false);
   }
 
   const imgUrl = manifest?.imagePath ? github.rawUrl(manifest.imagePath) : null;
@@ -198,8 +212,19 @@ export function PublishNowCard({ dimension }: { dimension: string }) {
 
         {state === "idle" && (
           <div className="space-y-2">
+            {hasTwoPhotos && (
+              <label className="flex items-center gap-2 rounded-md border border-border p-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={useCollage}
+                  onChange={(e) => setUseCollage(e.target.checked)}
+                  className="h-4 w-4 accent-primary"
+                />
+                Armar un collage con las 2 fotos más recientes, en vez de una sola story
+              </label>
+            )}
             <Button onClick={handlePrepare} disabled={!hasPhoto} className="w-full sm:w-auto">
-              Preparar story de {dimensionLabel(dimension)}
+              Preparar {useCollage && hasTwoPhotos ? "collage" : "story"} de {dimensionLabel(dimension)}
             </Button>
             {!hasPhoto && (
               <p className="text-xs text-muted-foreground">
@@ -232,6 +257,11 @@ export function PublishNowCard({ dimension }: { dimension: string }) {
                 />
               )}
               <div className="space-y-1.5 text-sm">
+                {manifest.mode === "collage" && (
+                  <span className="inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                    Collage (2 fotos)
+                  </span>
+                )}
                 {manifest.headline && (
                   <p>
                     <span className="text-[11px] font-semibold text-muted-foreground">TÍTULO</span>

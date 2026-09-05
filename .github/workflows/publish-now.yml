@@ -22,6 +22,11 @@ on:
         description: "Dimensión (personal, organizacional, comercial, empresarial, profesionalizacion, sociales)"
         required: false
         default: ""
+      collage:
+        description: "Usar el template de collage (2 fotos) en vez de la story clásica de 1 foto"
+        required: false
+        type: boolean
+        default: false
       nonce:
         description: "Identificador de la corrida (lo pone el EDA)"
         required: false
@@ -62,6 +67,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PUBLISH_NOW: "1"
           PUBLISH_NOW_OFERTA: ${{ inputs.oferta }}
+          PUBLISH_NOW_COLLAGE: ${{ inputs.collage }}
         run: node scripts/generate-brief.mjs
 
       - name: Renderizar imagen

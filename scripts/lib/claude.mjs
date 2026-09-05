@@ -22,12 +22,16 @@ const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-5";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_MODEL = "openai/gpt-oss-120b";
 
-async function askAnthropic({ system, userText, image, maxTokens }) {
+async function askAnthropic({ system, userText, image, images, maxTokens }) {
   const content = [];
-  if (image) {
+  // `images` (2026-09-04, collage de 2 fotos) es aditivo — `image` singular
+  // sigue funcionando igual para todos los callers existentes. Si vienen
+  // los dos, `images` gana (no debería pasar en la práctica).
+  const imageList = images && images.length ? images : image ? [image] : [];
+  for (const img of imageList) {
     content.push({
       type: "image",
-      source: { type: "base64", media_type: image.media_type, data: image.base64 },
+      source: { type: "base64", media_type: img.media_type, data: img.base64 },
     });
   }
   content.push({ type: "text", text: userText });
@@ -109,13 +113,13 @@ async function askGroqTextOnly({ system, userText, maxTokens }) {
   return data.choices?.[0]?.message?.content ?? "";
 }
 
-export async function askClaude({ system, userText, image, maxTokens = 1024 }) {
+export async function askClaude({ system, userText, image, images, maxTokens = 1024 }) {
   if (!ANTHROPIC_API_KEY) throw new Error("Falta ANTHROPIC_API_KEY en el entorno.");
 
   try {
-    return await askAnthropic({ system, userText, image, maxTokens });
+    return await askAnthropic({ system, userText, image, images, maxTokens });
   } catch (e) {
-    if (image) throw e; // sin fallback de visión verificado — no arriesgar un resultado silenciosamente mal
+    if (image || images?.length) throw e; // sin fallback de visión verificado — no arriesgar un resultado silenciosamente mal
     console.warn(`[claude.mjs] Anthropic falló (${e.message}), fallback a Groq (solo texto)`);
     return await askGroqTextOnly({ system, userText, maxTokens });
   }
