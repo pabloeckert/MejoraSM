@@ -47,11 +47,38 @@
     flex-direction: column;
   }
 
+  /* 2026-09-04: antes .photo era un solo fondo con cover — recortaba a la
+     fuerza cualquier foto que no fuera casi 1080x1060 (el caso real que
+     rompía: capturas de sesiones con clientes, que vienen con una relación
+     de aspecto de pantalla, no de foto). Ahora la foto real nunca se
+     recorta (contain), y el hueco que deja lo llena una copia de la misma
+     foto, agrandada y difuminada, de fondo — mismo recurso que usan
+     Instagram/Facebook para fotos que no llenan el marco. */
   .photo {
     width: 100%;
     height: 1060px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .photo-backdrop {
+    position: absolute;
+    inset: 0;
     background-size: cover;
     background-position: center;
+    filter: blur(48px) brightness(0.55) saturate(1.15);
+    transform: scale(1.18);
+  }
+
+  .photo-fg {
+    position: absolute;
+    inset: 0;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  .photo-backdrop, .photo-fg {
     {{PHOTO_STYLE}}
   }
 
@@ -143,7 +170,7 @@
 </head>
 <body>
   <div class="story {{MODE_CLASS}}">
-    <div class="photo"></div>
+    <div class="photo"><div class="photo-backdrop"></div><div class="photo-fg"></div></div>
     <div class="panel">
       <div class="kicker">{{KICKER}}</div>
       <div class="headline">{{HEADLINE}}</div>
