@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-09-05T14:44:20.005Z",
+  "syncedAt": "2026-09-05T20:01:31.073Z",
   "posts": [
+    {
+      "id": "6a9c392ae9415fef3664736f",
+      "date": "2026-09-05",
+      "status": "published",
+      "content": "¿Cuántas reuniones de tu semana terminan sin una decisión concreta? Empezá por ahí la próxima vez que convoques a tu equipo.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-05-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3979581892751142071"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a9b60e77bc29c9e76d5edfc",
       "date": "2026-09-05",
@@ -11,7 +35,7 @@
       "headline": null,
       "kicker": null,
       "oferta": null,
-      "imageUrl": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-05-1.jpg",
       "platforms": [
         {
           "platform": "instagram",
