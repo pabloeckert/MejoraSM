@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-09-06T15:03:22.903Z",
+  "syncedAt": "2026-09-06T20:05:59.818Z",
   "posts": [
+    {
+      "id": "6a9d8d8199321de61cde5d7d",
+      "date": "2026-09-06",
+      "status": "published",
+      "content": "La agenda llena no siempre significa avance real. Contanos: ¿qué tarea de hoy mueve realmente la aguja? 👇",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-06-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3980312754937922951"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a9cb231d35f04342f99155f",
       "date": "2026-09-06",
