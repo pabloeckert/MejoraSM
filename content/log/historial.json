@@ -1,6 +1,35 @@
 {
-  "syncedAt": "2026-09-05T20:01:31.073Z",
+  "syncedAt": "2026-09-06T03:22:31.473Z",
   "posts": [
+    {
+      "id": "6a9cb231d35f04342f99155f",
+      "date": "2026-09-06",
+      "status": "published",
+      "content": "Tener todo en la cabeza no es control. Es que el día que te enfermes, el negocio se para.\n¿Hace cuánto que sos el único que sabe cómo funciona tu negocio? Escribime \"MAPA\" y charlamos.\n#LiderazgoReal\n#Delegar\n#EmprendedorArgentino\n#GestiónDeEquipos\n#ClaridadEmpresarial\n#MejoraOK\n#CulturaDeTrabajo",
+      "kind": "post",
+      "proposalId": "1651d621-b4ec-434b-b700-ef6b36cef684",
+      "headline": "Tener todo en la cabeza no es control. Es que el día que te enfermes, el negocio se para.",
+      "kicker": null,
+      "oferta": "personal",
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-09-06-1651d621-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/Dc7PS--jNPJ/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1361605736058908"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7502159234256699392/"
+        }
+      ]
+    },
     {
       "id": "6a9c392ae9415fef3664736f",
       "date": "2026-09-05",
