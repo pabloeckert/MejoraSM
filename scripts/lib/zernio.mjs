@@ -12,6 +12,13 @@ import path from "node:path";
 const ZERNIO_API_URL = "https://zernio.com/api/v1/posts";
 const ZERNIO_UPLOAD_URL = "https://zernio.com/api/v1/media/upload-direct";
 
+// Cuenta de IG/FB desconectada en Zernio (token de Meta vencido — pasa cada
+// ~60 días). No es transitorio: reintentar no arregla nada, Pablo tiene que
+// reconectar la cuenta en zernio.com y refrescar los account IDs. Se detecta
+// para dar un mensaje claro en run_log en vez de un "exit 1" genérico
+// (hallazgo real 2026-09-07: la story diaria falló así sin aviso legible).
+const ACCOUNT_DISCONNECTED_RE = /ACCOUNT_DISCONNECTED|is disconnected|access token is no longer valid|reconnect your account/i;
+
 // Instagram procesa el media de forma asíncrona (container de Meta): un
 // status "processing"/"awaiting-finalize" recién creado es normal, no un
 // fallo — se resuelve solo unos segundos después. Reconsultamos el post
@@ -116,6 +123,13 @@ export async function createPostAndPoll({ apiKey, content, imageUrl, platforms }
       // que publish-scheduled-posts.mjs lo trate como "ya está en Zernio, no
       // es un fallo" en vez de reventar el workflow y reintentar para siempre.
       const errStr = JSON.stringify(data);
+      if (ACCOUNT_DISCONNECTED_RE.test(errStr)) {
+        return {
+          success: false,
+          accountDisconnected: true,
+          error: "Cuenta de Instagram/Facebook desconectada en Zernio — el token de Meta venció. Hay que reconectarla en zernio.com y refrescar los account IDs. Reintentar no sirve.",
+        };
+      }
       if (/already (scheduled|publishing|posted)|this exact content/i.test(errStr)) {
         return {
           success: false,
@@ -164,11 +178,17 @@ export async function createPostAndPoll({ apiKey, content, imageUrl, platforms }
       error: p.error ?? p.errorMessage ?? p.reason ?? p.message ?? null,
     }));
 
+    const disconnected = failed.length > 0 && ACCOUNT_DISCONNECTED_RE.test(JSON.stringify(failedSummary));
     return {
       success: failed.length === 0,
       postId,
       platforms: perPlatform,
-      error: failed.length > 0 ? JSON.stringify(failedSummary) : undefined,
+      accountDisconnected: disconnected || undefined,
+      error: failed.length > 0
+        ? (disconnected
+          ? "Cuenta de Instagram/Facebook desconectada en Zernio — el token de Meta venció. Hay que reconectarla en zernio.com. Reintentar no sirve."
+          : JSON.stringify(failedSummary))
+        : undefined,
     };
   } catch (e) {
     return { success: false, error: e.message };
@@ -259,6 +279,13 @@ async function createPostAndPollVideo({ apiKey, content, videoUrl, platforms }) 
       // Ver createPostAndPoll — mismo caso: 409 de contenido duplicado sin
       // existingPostId. No es un fallo, Zernio ya tiene la pieza.
       const errStr = JSON.stringify(data);
+      if (ACCOUNT_DISCONNECTED_RE.test(errStr)) {
+        return {
+          success: false,
+          accountDisconnected: true,
+          error: "Cuenta de Instagram/Facebook desconectada en Zernio — el token de Meta venció. Hay que reconectarla en zernio.com y refrescar los account IDs. Reintentar no sirve.",
+        };
+      }
       if (/already (scheduled|publishing|posted)|this exact content/i.test(errStr)) {
         return { success: false, alreadyHandled: true, error: errStr.slice(0, 2000), existingPostId: data.existingPostId };
       }
