@@ -1903,7 +1903,8 @@ La corrida de `daily-story.yml` del **2026-09-07 18:02 UTC falló** (`exit 1`). 
 - `scripts/lib/zernio.mjs` detecta `ACCOUNT_DISCONNECTED` (en el 409 y en el fallo per-plataforma) → `{ accountDisconnected: true }` + mensaje accionable.
 - `publish-scheduled-posts.mjs`: ese caso se loguea como `skipped` con `metadata.reason: "account-disconnected"` (no `error` — el pipeline hizo bien en no publicar a una cuenta caída, no es un malfuncionamiento). La propuesta queda `scheduled` → se publica sola al reconectar.
 - `publish-story.mjs`: branch propio — log `skipped` + mensaje 🔴, `exit 1` igual (badge del workflow rojo = señal visible).
-- `copilot/index.ts`: query nueva sobre `run_log` (`metadata->>reason = 'account-disconnected'`, últimas 48h) → si hay, mete una línea `🔴 URGENTE` al principio del contexto del consejo del día. Así el Dashboard lo grita.
+- `copilot/index.ts`: query nueva sobre `run_log` (`metadata->>reason = 'account-disconnected'`, últimas 48h) → si hay, mete una línea `🔴 URGENTE` al principio del contexto del consejo del día.
+- `Dashboard.tsx` (`0e7537a`): banner rojo propio arriba de la franja de atención ("🔴 Instagram/Facebook desconectado de Zernio" + link a zernio.com) — query liviana a `run_log` (últimos 3 días). No depende del consejo del día (que está cacheado por fecha). `runLogApi.accountDisconnectedRecently()` nuevo.
 
 ### Hardening de Edge Functions — pin de versión (`b061b3d`)
 
@@ -1915,7 +1916,9 @@ Las 11 Edge Functions importaban `https://esm.sh/@supabase/supabase-js@2` — un
 
 ### Estado del EDA tras esta pasada
 
-Recorrido logueado de Dashboard, Subir material (las 6 dimensiones), Manual de Marca, Mesa de Diálogo, Propuestas (todas las pestañas + abrir el detalle de una pieza), Calendario, Monitor, Conversaciones, Auditoría, Configuración — **cero errores de consola en ninguna, todo renderiza con datos reales**. `run_log`: último `error` fue el 2026-09-05 22:53 (el 409 duplicado, ya cubierto por `9ade568`); nada roto en curso salvo la cuenta de IG desconectada de arriba. `tsc -b` / lint 0/0 / 66 tests / build / `npm audit --omit=dev` = 0, todo verde. CI + Deploy Site verdes en cada commit.
+Recorrido logueado de Dashboard, Subir material (las 6 dimensiones), Manual de Marca, Mesa de Diálogo, Propuestas (todas las pestañas + abrir el detalle de una pieza), Calendario, Monitor, Conversaciones, Auditoría, Configuración — **cero errores de consola en ninguna, todo renderiza con datos reales**. `run_log`: último `error` real fue el 2026-09-05 22:53 (el 409 duplicado, ya cubierto por `9ade568`); nada roto en curso salvo la cuenta de IG desconectada de arriba (bloqueo externo, necesita a Pablo). `tsc -b` / lint 0/0 / 66 tests / build / `npm audit --omit=dev` = 0, todo verde. CI + Deploy verdes en cada commit. Codebase sin deuda visible: 0 TODO/FIXME/`@ts-ignore` en `src/`, 1 solo `eslint-disable` (documentado).
+
+**Lo único genuinamente pendiente al cierre de esta sesión: Pablo reconecta la cuenta de Instagram en zernio.com.** Todo lo demás — CI, tipos, UX, pipeline, docs — quedó listo y verificado.
 
 ## Notas históricas
 

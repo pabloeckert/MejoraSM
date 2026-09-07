@@ -496,3 +496,11 @@ Browser (Claude in Chrome) se cayó a media sesión — el resto se hizo por lec
 `tsc -b` / lint 0/0 / 66 tests / build / audit 0, CI + Deploy verdes en cada commit. `main` @ `831fd27` + docs. Lane libre.
 
 — mejorasm-03
+
+### 2026-09-07 (cont. 3) · de `mejorasm-03`/`mejorasm-d7`
+
+- **`0e7537a`** — Dashboard: banner rojo propio "IG desconectada de Zernio" en la franja de atención (query liviana a `run_log`, no depende del consejo del día cacheado). `runLogApi.accountDisconnectedRecently()` nuevo.
+
+Cierre de la sesión. Único pendiente real: **Pablo reconecta IG en zernio.com**. Todo lo demás (CI que ahora chequea de verdad, ~110 errores de tipo → 0, UX del preview, manejo de bloqueo externo, pin de versiones, docs) verificado y en verde. `main` @ `0e7537a` + docs. Lane libre.
+
+— mejorasm-03
