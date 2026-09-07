@@ -1,32 +1,13 @@
 // src/services/supabase.ts
-// Cliente de Supabase para queries directas (CRUD)
+// Helpers de queries directas (CRUD) sobre Supabase. El cliente es UNO SOLO
+// para todo el frontend — vive en src/integrations/supabase/client.ts. Antes
+// este archivo creaba su propio createClient(), lo que producía el warning
+// real "Multiple GoTrueClient instances detected" con riesgo de carreras al
+// refrescar el token de auth (hallazgo auditoría en vivo 2026-09-07).
 
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error(
-    "[supabase] Variables de entorno no configuradas.\n" +
-    "Creá un archivo .env con:\n" +
-    "  VITE_SUPABASE_URL=https://tu-proyecto.supabase.co\n" +
-    "  VITE_SUPABASE_PUBLISHABLE_KEY=tu-anon-key\n" +
-    "En Vercel: Settings → Environment Variables"
-  );
-}
-
-// createClient() valida el formato de la URL de forma síncrona al importar
-// el módulo — con "" (caso sin .env) tira "supabaseUrl is required." y
-// rompe cualquier test/build que importe este archivo, no solo las
-// pantallas que de verdad necesitan la conexión real. El placeholder
-// mantiene el formato válido para no crashear en frío; el error real de
-// red al llamar la API sigue avisando fuerte igual, y el console.error de
-// arriba ya deja explícito qué falta configurar.
-export const supabase = createClient(
-  supabaseUrl || "https://placeholder.supabase.co",
-  supabaseKey || "placeholder-anon-key"
-);
+export { supabase };
 
 // PostgREST devuelve como máximo 1000 filas por default (db-max-rows), sin
 // error ni aviso — simplemente falta el resto. Hallazgo real de auditoría
