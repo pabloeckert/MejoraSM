@@ -13,7 +13,7 @@
 // acceso con usuario/contraseña — ver 023_reclose_access_password.sql y
 // CLAUDE.md, sección "Reinstauración del login — usuario/contraseña,
 // 2026-08-31".
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
 
 export interface AuthResult {
   ok: boolean;

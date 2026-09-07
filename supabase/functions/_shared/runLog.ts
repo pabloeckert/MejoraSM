@@ -4,7 +4,7 @@
 // error. El logging nunca debe romper el flujo real de la función que lo
 // usa — cualquier fallo al escribir se trata como warning, no como error.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,

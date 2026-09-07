@@ -4,7 +4,7 @@
 // Cron: ejecutar cada 6 horas
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
 import { requireAuth, unauthorizedResponse } from "../_shared/auth.ts";
 import { logRun } from "../_shared/runLog.ts";
 

@@ -3,7 +3,7 @@
 // Uso: POST /vault-process { documentId } | { action: "search", query, limit }
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
 import mammoth from "npm:mammoth@1.8.0";
 import { getDocumentProxy, extractText } from "npm:unpdf@1.4.0";
 import { Buffer } from "node:buffer";

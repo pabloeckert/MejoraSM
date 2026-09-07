@@ -5,7 +5,7 @@
 // (lee success_rules directo con getLearnedRulesBlock()).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
 import { requireAuth, unauthorizedResponse } from "../_shared/auth.ts";
 import { logRun } from "../_shared/runLog.ts";
 
@@ -119,7 +119,6 @@ async function analyzeMetrics(): Promise<RuleCandidate[]> {
 
   // 2. Analyze hook patterns
   const highPerformers = metrics.filter((m) => (m.engagement_rate || 0) > avgEngagement * 1.2);
-  const lowPerformers = metrics.filter((m) => (m.engagement_rate || 0) < avgEngagement * 0.8);
 
   if (highPerformers.length >= 2) {
     // Check for question hooks
