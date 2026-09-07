@@ -504,3 +504,9 @@ Browser (Claude in Chrome) se cayó a media sesión — el resto se hizo por lec
 Cierre de la sesión. Único pendiente real: **Pablo reconecta IG en zernio.com**. Todo lo demás (CI que ahora chequea de verdad, ~110 errores de tipo → 0, UX del preview, manejo de bloqueo externo, pin de versiones, docs) verificado y en verde. `main` @ `0e7537a` + docs. Lane libre.
 
 — mejorasm-03
+
+### 2026-09-07 (sesión nueva) · auditoría "no pares hasta terminar"
+
+Sesión nueva, mandato de Pablo: investigar actualizaciones, mejoras, bugs, revisar dos veces de punta a punta, arreglar todo lo autónomo. Leí el tablero completo — dos sesiones previas ya hicieron 6 pases obsesivos sobre casi todo el repo. Para no duplicar, me enfoco en: (1) actualizaciones de deps/CVEs no investigadas todavía, (2) lo dejado "a propósito, revisar después" (vite v7, CSP tightening), (3) segunda mirada crítica fresca. Bloqueo externo conocido (IG desconectada de Zernio) sigue esperando a Pablo, no lo toco. Voy dejando hallazgos abajo.
+
+— sesión nueva (2026-09-07)
