@@ -43,6 +43,21 @@ function escapeHtml(str = "") {
     .replace(/"/g, "&quot;");
 }
 
+// Guardrail defensivo, no existía acá (hallazgo real 2026-09-07, mismo
+// patrón ya arreglado en render-scheduled-posts.mjs para posts/carruseles).
+// generate-brief.mjs le pide al LLM "máx 11 palabras" para headline y "máx
+// 26" para subtext, pero nada en el código lo verificaba — dependía 100% de
+// que el modelo respetara el prompt. story-template.html/
+// story-collage-template.html no truncan ni recortan overflow (screenshot
+// sin fullPage), así que un headline/subtext verbose se corta en seco o se
+// superpone en una story que se publica sola, sin ningún gate humano.
+// Margen chico sobre lo que ya pide el prompt, no un límite nuevo distinto.
+function truncateWords(text = "", maxWords = 30) {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= maxWords) return text.trim();
+  return words.slice(0, maxWords).join(" ") + "…";
+}
+
 async function main() {
   const briefsPath = path.join(WORK_DIR, BRIEFS_FILE);
   if (!existsSync(briefsPath)) {
@@ -91,8 +106,8 @@ async function main() {
         .replace("{{PHOTO_STYLE_2}}", () => style2)
         .replace("{{PANE2_VACIO}}", () => "")
         .replace("{{KICKER}}", () => escapeHtml(brief.kicker || "MEJORA CONTINUA"))
-        .replace("{{HEADLINE}}", () => escapeHtml(brief.headline || ""))
-        .replace("{{SUBTEXT}}", () => escapeHtml(brief.subtext || ""));
+        .replace("{{HEADLINE}}", () => escapeHtml(truncateWords(brief.headline || "", 14)))
+        .replace("{{SUBTEXT}}", () => escapeHtml(truncateWords(brief.subtext || "")));
     } else {
       let photoStyle = "";
       if (brief.mode === "foto" && brief.photoUsedPath) {
@@ -105,8 +120,8 @@ async function main() {
         .replace("{{MODE_CLASS}}", () => (brief.mode === "foto" ? "" : "solo-texto"))
         .replace("{{PHOTO_STYLE}}", () => photoStyle)
         .replace("{{KICKER}}", () => escapeHtml(brief.kicker || "MEJORA CONTINUA"))
-        .replace("{{HEADLINE}}", () => escapeHtml(brief.headline || ""))
-        .replace("{{SUBTEXT}}", () => escapeHtml(brief.subtext || ""));
+        .replace("{{HEADLINE}}", () => escapeHtml(truncateWords(brief.headline || "", 14)))
+        .replace("{{SUBTEXT}}", () => escapeHtml(truncateWords(brief.subtext || "")));
     }
 
     await page.setContent(template, { waitUntil: "networkidle" });

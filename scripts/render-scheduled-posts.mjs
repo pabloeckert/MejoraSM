@@ -87,6 +87,20 @@ function truncateAtClause(text = "", maxWords = 20) {
   return slice + "…";
 }
 
+// HEADLINE (el hook, {{HEADLINE}} en post-template.html/collage-template.html)
+// nunca tenía ningún tope de longitud — a diferencia de SUBTEXT, que sí pasa
+// por truncateWords(). El prompt del Creativo tampoco le pone límite de
+// palabras al HOOK (sí al cuerpo del carrusel, ~15 palabras). Hallazgo real
+// 2026-09-07: un hook verbose (nada se lo impide al LLM) puede superponerse
+// con la pastilla de oferta (.tag, position:absolute) o exceder el lienzo —
+// como el screenshot no es fullPage, el exceso queda cortado en seco en una
+// pieza que se autoagenda y publica sin ningún gate humano. Límite más chico
+// que el body (font-size 62-72px vs 32px) — corta en coma si hay una útil
+// cerca, igual que el resto del cuerpo del carrusel.
+function truncateHeadline(text = "") {
+  return truncateAtClause(text, 12);
+}
+
 async function fetchDueProposals() {
   const now = new Date().toISOString();
   const url =
@@ -275,7 +289,7 @@ async function main() {
       .replace("{{PHOTO_STYLE}}", () => photoStyle)
       .replace("{{OFERTA_LABEL}}", () => escapeHtml(ofertaLabel))
       .replace("{{KICKER}}", () => escapeHtml(kicker))
-      .replace("{{HEADLINE}}", () => escapeHtml(headline))
+      .replace("{{HEADLINE}}", () => escapeHtml(truncateHeadline(headline)))
       .replace("{{SUBTEXT}}", () => escapeHtml(truncateWords(subtext)));
   }
 
@@ -297,7 +311,7 @@ async function main() {
       .replace("{{PANE2_VACIO}}", () => (photo2 ? "" : "vacio"))
       .replace("{{OFERTA_LABEL}}", () => escapeHtml(ofertaLabel))
       .replace("{{KICKER}}", () => escapeHtml(kicker))
-      .replace("{{HEADLINE}}", () => escapeHtml(headline))
+      .replace("{{HEADLINE}}", () => escapeHtml(truncateHeadline(headline)))
       .replace("{{SUBTEXT}}", () => escapeHtml(truncateWords(subtext)));
   }
 
