@@ -316,7 +316,7 @@ export function ProposalDetailDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle className="line-clamp-2 text-base leading-snug">
               {proposal.hook || proposal.title || "Sin título"}

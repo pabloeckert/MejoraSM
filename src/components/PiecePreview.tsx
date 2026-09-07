@@ -71,12 +71,15 @@ export function PiecePreview({
 }) {
   const canvas = CANVAS[format || "post"] || CANVAS.post;
   const { data: template, isLoading, isError } = useTemplate(canvas.file);
+  const rootRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.25);
 
   useEffect(() => {
     function fit() {
-      const w = wrapRef.current?.clientWidth ?? 320;
+      // Medimos el contenedor padre, no el wrap: el wrap ahora tiene un ancho
+      // explícito (canvas.w * scale), así que medirlo a él sería un loop.
+      const w = rootRef.current?.clientWidth ?? 320;
       setScale(Math.min(1, w / canvas.w));
     }
     fit();
@@ -99,11 +102,15 @@ export function PiecePreview({
       .replace("{{SUBTEXT}}", () => esc(firstWords(body || "", 22)));
 
   return (
-    <div className={className}>
+    <div ref={rootRef} className={className} style={{ width: "100%", maxWidth: "100%" }}>
       <div
         ref={wrapRef}
         className="overflow-hidden rounded-md border border-border bg-muted"
-        style={{ height: canvas.h * scale }}
+        // El iframe mide canvas.w (1080px) en el layout aunque `transform:
+        // scale()` lo achique visualmente — sin un ancho explícito acá, ese
+        // 1080 estiraba el DialogContent y metía scroll horizontal (bug real
+        // auditoría en vivo 2026-09-07). Fijamos el ancho al tamaño escalado.
+        style={{ height: canvas.h * scale, width: canvas.w * scale, maxWidth: "100%" }}
       >
         {isLoading && (
           <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Cargando preview…</div>
