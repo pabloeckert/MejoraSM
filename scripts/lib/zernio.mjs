@@ -106,13 +106,31 @@ export async function createPostAndPoll({ apiKey, content, imageUrl, platforms }
           return { success: true, postId: data.existingPostId, platforms: existing, reconciled: true };
         }
       }
+      // Hallazgo real 2026-09-07 (auditoría en vivo del EDA): Zernio devuelve
+      // un 409 "This exact content is already scheduled, publishing, or was
+      // posted..." SIN `existingPostId` — así que la reconciliación de arriba
+      // no dispara, y esto quedaba como `error` en run_log en CADA corrida
+      // del cron (la propuesta seguía `scheduled` → reintento → mismo 409),
+      // ensuciando el "consejo del día" del copiloto con "5 fallos" que en
+      // realidad son una pieza que Zernio YA tiene. `alreadyHandled` deja
+      // que publish-scheduled-posts.mjs lo trate como "ya está en Zernio, no
+      // es un fallo" en vez de reventar el workflow y reintentar para siempre.
+      const errStr = JSON.stringify(data);
+      if (/already (scheduled|publishing|posted)|this exact content/i.test(errStr)) {
+        return {
+          success: false,
+          alreadyHandled: true,
+          error: errStr.slice(0, 2000),
+          existingPostId: data.existingPostId,
+        };
+      }
       return {
         success: false,
         // Mismo hallazgo que el corte de abajo: 300 caracteres es
         // demasiado poco para un error real de la API — se sube a 2000
         // (igual se corta algo si Zernio devuelve un payload gigante, pero
         // ya no pierde el mensaje real por un límite arbitrario chico).
-        error: JSON.stringify(data).slice(0, 2000),
+        error: errStr.slice(0, 2000),
         existingPostId: data.existingPostId,
       };
     }
@@ -238,7 +256,13 @@ async function createPostAndPollVideo({ apiKey, content, videoUrl, platforms }) 
           return { success: true, postId: data.existingPostId, platforms: existing, reconciled: true };
         }
       }
-      return { success: false, error: JSON.stringify(data).slice(0, 2000), existingPostId: data.existingPostId };
+      // Ver createPostAndPoll — mismo caso: 409 de contenido duplicado sin
+      // existingPostId. No es un fallo, Zernio ya tiene la pieza.
+      const errStr = JSON.stringify(data);
+      if (/already (scheduled|publishing|posted)|this exact content/i.test(errStr)) {
+        return { success: false, alreadyHandled: true, error: errStr.slice(0, 2000), existingPostId: data.existingPostId };
+      }
+      return { success: false, error: errStr.slice(0, 2000), existingPostId: data.existingPostId };
     }
 
     let perPlatform = data.post?.platforms || [];

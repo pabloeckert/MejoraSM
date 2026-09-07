@@ -71,6 +71,34 @@ async function isStillScheduled(proposalId) {
   return rows[0]?.status === "scheduled";
 }
 
+// Zernio devolvió "this exact content is already scheduled/publishing/posted"
+// sin un post id que reconciliar (ver zernio.mjs, hallazgo 2026-09-07). No es
+// un fallo — la pieza está en manos de Zernio. Se marca `published` para que
+// el cron deje de reintentarla en cada corrida (y de ensuciar run_log), con
+// una marca en metadata de que se cerró por el mensaje de Zernio, no con un
+// post id real.
+async function markReconciled(proposalId, note) {
+  let current = {};
+  try {
+    const cur = await fetch(
+      `${SUPABASE_URL}/rest/v1/proposals?id=eq.${proposalId}&select=metadata`,
+      { headers: restHeaders(), signal: AbortSignal.timeout(15_000) },
+    );
+    if (cur.ok) current = (await cur.json())[0]?.metadata ?? {};
+  } catch { /* best-effort */ }
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/proposals?id=eq.${proposalId}`, {
+    method: "PATCH",
+    headers: restHeaders({ Prefer: "return=minimal" }),
+    body: JSON.stringify({
+      status: "published",
+      published_at: new Date().toISOString(),
+      metadata: { ...current, reconciled_by_zernio_message: true, reconciled_at: new Date().toISOString(), reconciled_note: note },
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`markReconciled falló para ${proposalId}: ${res.status} ${await res.text()}`);
+}
+
 async function markError(proposalId, errorMessage) {
   // PATCH sobre una columna jsonb REEMPLAZA el objeto entero — si escribimos
   // solo { last_publish_error } perdemos metadata.recycled_from,
@@ -126,6 +154,14 @@ async function main() {
     const entryElapsed = startTimer();
     try {
       const result = await publishPost(imageUrls.length === 1 ? imageUrls[0] : imageUrls, entry.caption);
+      if (result.alreadyHandled) {
+        // Zernio ya tiene esta pieza (contenido duplicado exacto). No es un
+        // fallo — se cierra la propuesta y se sigue, sin exit(1).
+        await markReconciled(entry.proposalId, result.error?.slice(0, 300) || "Zernio: contenido ya en cola/publicado");
+        console.log(`Propuesta ${entry.proposalId}: Zernio ya tenía esta pieza (contenido duplicado) — marcada published, no es un fallo.`);
+        await logRun({ source: "publish-scheduled-posts", step: "publish-scheduled-posts", status: "skipped", proposalId: entry.proposalId, durationMs: entryElapsed(), metadata: { reason: "zernio-duplicate-reconciled" } });
+        continue;
+      }
       if (!result.success) {
         failures++;
         await markError(entry.proposalId, result.error || "Fallo desconocido publicando en Zernio");

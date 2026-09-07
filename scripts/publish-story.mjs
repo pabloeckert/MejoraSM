@@ -51,7 +51,10 @@ async function main() {
     const result = await publishStory(imageUrl, r.caption_feed);
     console.log("  Resultado:", JSON.stringify(result));
 
-    if (!result.success) failures++;
+    // alreadyHandled: Zernio ya tiene esta pieza (contenido duplicado exacto)
+    // — no es un fallo (ver zernio.mjs, hallazgo 2026-09-07).
+    if (!result.success && !result.alreadyHandled) failures++;
+    else if (result.alreadyHandled) console.log("  (Zernio ya tenía esta pieza — no cuenta como fallo)");
 
     if (i < renders.length - 1) await sleep(DELAY_MS);
   }
