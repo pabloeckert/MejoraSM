@@ -166,6 +166,74 @@ async function collectMetrics(proposalId: string, postId: string, publishedAt?: 
   return { postId, metrics, updated: !!existing };
 }
 
+// ═══════════════════════════════════════
+// CHEQUEO PROACTIVO DE SALUD DE CUENTAS (2026-09-07)
+// ═══════════════════════════════════════
+// Hasta ahora, "la cuenta de IG se desconectó" solo se descubría cuando una
+// publicación real fallaba (ver ACCOUNT_DISCONNECTED_RE en scripts/lib/zernio.mjs)
+// — con la story diaria corriendo una vez al día y los posts de feed
+// dependiendo de que el Crítico apruebe algo, el aviso podía tardar horas o
+// no llegar hasta el próximo intento real. Este chequeo corre en cada corrida
+// del cron de métricas (cada 6h) contra GET /v1/accounts de Zernio — no
+// publica nada, solo mira el estado de conexión.
+//
+// Shape verificado en un probe real (Fase 5/LinkedIn, 2026-09-03): cada
+// cuenta trae `enabled`/`active` booleanos. No hay documentación pública de
+// Zernio para confirmar que ESTOS son los únicos campos que indican
+// desconexión — por eso esto es "mejor esfuerzo": si el shape cambia o no
+// matchea, simplemente no detecta nada (mismo comportamiento de hoy), nunca
+// genera un falso positivo agresivo ni hace fallar el cron.
+const ZERNIO_ACCOUNTS_URL = "https://zernio.com/api/v1/accounts";
+
+// Mismos IDs de cuenta reales que ya usa `inbox/index.ts` — son identificadores
+// públicos de cuenta, no secretos, por eso van como constante y no como env var
+// (los `ZERNIO_*_ACCOUNT_ID` solo existen como secrets de GitHub Actions, no
+// de Supabase — esta función corre como Edge Function, no los vería nunca).
+const ZERNIO_ACCOUNTS = [
+  { platform: "instagram", id: "6a56405a3ecd8aa344faecae" },
+  { platform: "facebook", id: "6a5640333ecd8aa344fadb4b" },
+  { platform: "linkedin", id: "6a99f21e77555aae01d50cf5" },
+];
+
+interface ZernioAccount {
+  id?: string;
+  accountId?: string;
+  _id?: string;
+  enabled?: boolean;
+  active?: boolean;
+  status?: string;
+}
+
+async function checkAccountsHealth(apiKey: string): Promise<{ disconnected: string[] } | null> {
+  try {
+    const res = await fetch(ZERNIO_ACCOUNTS_URL, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return null; // no penalizar el cron por un 500/timeout de Zernio acá
+    const data = await res.json();
+    const accounts: ZernioAccount[] = Array.isArray(data?.accounts)
+      ? data.accounts
+      : Array.isArray(data)
+        ? data
+        : [];
+    if (accounts.length === 0) return null;
+
+    const disconnected: string[] = [];
+    for (const { platform, id } of ZERNIO_ACCOUNTS) {
+      const acc = accounts.find((a) => a?.id === id || a?.accountId === id || a?._id === id);
+      if (!acc) continue; // no encontrarla no es evidencia suficiente de desconexión
+      const enabled = acc.enabled ?? acc.active ?? acc.status;
+      if (enabled === false || (typeof acc.status === "string" && /disconnect|expired|invalid/i.test(acc.status))) {
+        disconnected.push(platform);
+      }
+    }
+    return { disconnected };
+  } catch {
+    return null; // best-effort — nunca afecta el resultado del cron
+  }
+}
+
 async function collectAllPending() {
   const apiKey = Deno.env.get("ZERNIO_API_KEY");
   if (!apiKey) {
@@ -221,10 +289,24 @@ async function collectAllPending() {
     }
   }
 
+  // Chequeo de salud de cuentas, aparte del resultado de métricas — un log
+  // propio con el mismo contrato que ya usan Dashboard/copilot
+  // (metadata->>reason = "account-disconnected"), para no esperar a que
+  // falle una publicación real.
+  const health = await checkAccountsHealth(apiKey);
+  if (health && health.disconnected.length > 0) {
+    await logRun({
+      source: "metrics-collector",
+      step: "health-check",
+      status: "skipped",
+      metadata: { reason: "account-disconnected", platforms: health.disconnected, via: "accounts-health-check" },
+    });
+  }
+
   // count = piezas realmente medidas. Un post en "202 pendiente" o "stale" no
   // es un error del pipeline — se informa aparte para que el run_log del cron
   // no quede en rojo permanente por una limitación de Zernio.
-  return { count: collected, pending, stale, errored, results };
+  return { count: collected, pending, stale, errored, results, accountsHealth: health };
 }
 
 // (Había acá un `generateInsights()` con consejos hardcodeados — código
