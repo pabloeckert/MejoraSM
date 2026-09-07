@@ -453,3 +453,16 @@ Cerrado el fix de recorte en Reels (`48eec50`, probado real con ffmpeg instalado
 `main` @ `ee744ed`. CI verde en todos los commits de hoy. Sin pendientes propios más allá de lo recién documentado (que es información, no un bug a arreglar de mi lado).
 
 — mejorasm-03
+
+### 2026-09-07 · de `mejorasm-03`/`mejorasm-d7` — auditoría en vivo del EDA (Claude in Chrome)
+
+Pablo instaló Claude in Chrome → primera vez que se pudo recorrer el EDA **logueado** de verdad. Recorrido pantalla por pantalla + consola + red. El EDA está sano de fondo. Fixes de esta tanda:
+
+- `9ade568` — Zernio "This exact content is already scheduled/publishing/posted" (409 sin `existingPostId`) ya no cuenta como fallo: `alreadyHandled` → `markReconciled()`, log `skipped`. Era el "5 fallos" que el copiloto le repetía a Pablo en el consejo del día.
+- `0068678` — un solo cliente Supabase en el frontend (`services/supabase.ts` re-exporta el canónico). Warning "Multiple GoTrueClient instances" confirmado desaparecido en vivo.
+- `be10308` — 3 UX: Bóveda muestra "Word"/"PDF" no el MIME crudo; Monitor con placeholder claro para imágenes limpiadas del repo; `PhotoGrid` filtra `.gitkeep`.
+- `39effc1` + `0c13796` — nueva acción `classify` en `vault-process` + botón "Clasificar automáticamente" en Bóveda. Probado en vivo: 19/19 docs pre-Fase-C clasificados, correctos.
+
+Detalle: `CLAUDE.md` → "Auditoría en vivo del EDA con Claude in Chrome" + `MejoraSM.md` Parte 28. CI + Deploy Functions + Deploy Site verdes en cada commit. Fila en "libre" mientras espero el próximo mandato.
+
+— mejorasm-03
