@@ -1899,7 +1899,19 @@ La corrida de `daily-story.yml` del **2026-09-07 18:02 UTC falló** (`exit 1`). 
 2. Después de reconectar, verificar el account ID con `GET /v1/accounts` — si cambió, actualizar el secret `ZERNIO_INSTAGRAM_ACCOUNT_ID` en GitHub Actions (hoy `6a56405a3ecd8aa344faecae`).
 3. Los carruseles que hayan quedado en `error` se republican solos en la próxima corrida del cron una vez reconectada la cuenta (siguen `scheduled`).
 
-**Fix de código aplicado (`f3fde4a`):** `scripts/lib/zernio.mjs` ahora detecta `ACCOUNT_DISCONNECTED` (en el 409 y en el fallo per-plataforma) y devuelve `{ accountDisconnected: true }` + un mensaje que dice exactamente qué hacer — eso llega a `run_log` y al "consejo del día" del copiloto en vez de un `exit 1` opaco. No cambia que haya que reconectar a mano.
+**Fix de código aplicado (`f3fde4a` + `831fd27`):**
+- `scripts/lib/zernio.mjs` detecta `ACCOUNT_DISCONNECTED` (en el 409 y en el fallo per-plataforma) → `{ accountDisconnected: true }` + mensaje accionable.
+- `publish-scheduled-posts.mjs`: ese caso se loguea como `skipped` con `metadata.reason: "account-disconnected"` (no `error` — el pipeline hizo bien en no publicar a una cuenta caída, no es un malfuncionamiento). La propuesta queda `scheduled` → se publica sola al reconectar.
+- `publish-story.mjs`: branch propio — log `skipped` + mensaje 🔴, `exit 1` igual (badge del workflow rojo = señal visible).
+- `copilot/index.ts`: query nueva sobre `run_log` (`metadata->>reason = 'account-disconnected'`, últimas 48h) → si hay, mete una línea `🔴 URGENTE` al principio del contexto del consejo del día. Así el Dashboard lo grita.
+
+### Hardening de Edge Functions — pin de versión (`b061b3d`)
+
+Las 11 Edge Functions importaban `https://esm.sh/@supabase/supabase-js@2` — un **major flotante**: cada deploy podía traer un minor distinto en silencio. Pin a `@2.116.0` (lo que esm.sh resuelve hoy — cero cambio de comportamiento, solo explícito). Probado end-to-end: `rule-engine` y `inbox` corridos post-deploy, HTTP 200, 58 upserts reales OK. `deno lint`: -11 `no-unversioned-import`. De paso, `lowPerformers` (var muerta en `rule-engine`) sacada. Lo que **no** se tocó: `no-import-prefix` (24, fuerza usar un `deno.json` import map — pelea con el patrón de Supabase Edge Functions, riesgo > beneficio) y `no-explicit-any` (26, `catch (e: any)`, cosmético). `deno lint` no corre en CI, es informativo.
+
+### CSP — revisado, no tocado (a propósito)
+
+`script-src` tiene `'unsafe-inline'` (por el framebuster inline de `index.html`) y `'unsafe-eval'` (`dist/` tiene UN `new Function("" + C)` en el polyfill de `setImmediate` que arrastra JSZip en el chunk de `/boveda` — rama muerta en la práctica, JSZip siempre le pasa funciones, pero el analizador estático lo flaggea). `img-src` es `https:` (amplio). Tightening cualquiera de los tres es defensa en profundidad real pero **no verificable sin la app logueada en un navegador** (extensión caída esta sesión) — y romper el upload de `.zip` de la Bóveda o una imagen es peor que el beneficio marginal en una app de un solo dueño detrás de login. Queda documentado con el detalle exacto para cuando se pueda probar en vivo. `X-Frame-Options: DENY` como `<meta>` es un no-op (solo vale como header HTTP) — el framebuster JS es la protección real, ya documentado en el propio comentario del `index.html`.
 
 ### Estado del EDA tras esta pasada
 

@@ -481,3 +481,18 @@ Detalle: `CLAUDE.md` → "Auditoría en vivo del EDA con Claude in Chrome" + `Me
 Recorrido logueado completo del EDA: cero errores de consola en ninguna pantalla, todo con datos reales. `tsc -b` / lint 0/0 / 66 tests / build / audit = 0, CI + Deploy verdes en cada commit. `main` @ `f3fde4a` + docs. Lane libre.
 
 — mejorasm-03
+
+### 2026-09-07 (cont. 2) · de `mejorasm-03`/`mejorasm-d7` — hardening + manejo de bloqueo externo
+
+Browser (Claude in Chrome) se cayó a media sesión — el resto se hizo por lectura de código + disparo de crons read-only + `run_log`.
+
+- **`b061b3d`** — pin de `@supabase/supabase-js@2` → `@2.116.0` en las 11 Edge Functions (major flotante = drift silencioso entre deploys). Probado: `rule-engine` + `inbox` post-deploy, HTTP 200, 58 upserts reales OK. + sacada var muerta `lowPerformers` en rule-engine.
+- **`831fd27`** — `ACCOUNT_DISCONNECTED` se trata como bloqueo externo (no bug): `publish-scheduled-posts` loguea `skipped` + reason, `publish-story` branch propio, `copilot` mete línea 🔴 URGENTE en el consejo del día cuando lo detecta en `run_log`.
+- CSP revisado, no tocado: `unsafe-eval` lo usa un `new Function` de JSZip (rama muerta), `unsafe-inline` el framebuster — tightening no verificable sin browser, documentado.
+- Codebase limpio: 0 TODO/FIXME/ts-ignore en `src/`, 1 solo `eslint-disable` (documentado).
+
+**🔴 Sigue necesitando a Pablo: reconectar Instagram en zernio.com.** `daily-story` falló hoy 18:02 UTC (token de Meta vencido).
+
+`tsc -b` / lint 0/0 / 66 tests / build / audit 0, CI + Deploy verdes en cada commit. `main` @ `831fd27` + docs. Lane libre.
+
+— mejorasm-03
