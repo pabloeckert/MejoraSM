@@ -252,6 +252,27 @@ async function setStatus(documentId: string, processing_status: string, processi
   await supabase.from("documents").update({ processing_status, processing_error }).eq("id", documentId);
 }
 
+// Clasificar SOLO el tipo de un documento ya procesado, sin re-extraer texto
+// ni regenerar embeddings (nada de llamadas a HF). Para los 19 documentos
+// pre-existentes que quedaron "Sin clasificar" porque la clasificación solo
+// corría al subir (Fase C 2026-08-31). Hallazgo auditoría en vivo 2026-09-07.
+async function classifyExisting(documentId: string) {
+  validateUUID(documentId, "documentId");
+  const { data: doc, error } = await supabase
+    .from("documents")
+    .select("id, title, file_path, content, category")
+    .eq("id", documentId)
+    .single();
+  if (error || !doc) throw new Error(`Documento no encontrado: ${error?.message ?? documentId}`);
+  if (!doc.content || !doc.content.trim()) {
+    throw new Error("El documento no tiene texto extraído — reprocesalo primero.");
+  }
+  const category = await classifyDocument(doc.title || doc.file_path, doc.content);
+  const { error: upErr } = await supabase.from("documents").update({ category }).eq("id", documentId);
+  if (upErr) throw new Error(`No se pudo guardar la categoría: ${upErr.message}`);
+  return { category };
+}
+
 async function processDocument(documentId: string) {
   validateUUID(documentId, "documentId");
 
@@ -500,6 +521,11 @@ Deno.serve(async (req) => {
         result = await processDocument(documentId);
         break;
 
+      case "classify":
+        validateBody({ documentId }, ["documentId"]);
+        result = await classifyExisting(documentId);
+        break;
+
       case "search": {
         validateBody({ query }, ["query"]);
         const results = await searchDocs(query, limit || 5);
@@ -508,7 +534,7 @@ Deno.serve(async (req) => {
       }
 
       default:
-        throw new ValidationError("Acción no válida. Usa 'process' o 'search'");
+        throw new ValidationError("Acción no válida. Usa 'process', 'classify' o 'search'");
     }
 
     await logRun({

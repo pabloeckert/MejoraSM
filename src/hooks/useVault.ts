@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { documentsApi } from "@/services/supabase";
-import { processDocument } from "@/services/ai";
+import { processDocument, classifyDocument } from "@/services/ai";
 import { toast } from "@/hooks/use-toast";
 
 const PROCESSING_STATUSES = ["pending", "extracting", "chunking", "embedding"];
@@ -104,6 +104,38 @@ export function useProcessDocument() {
         title: "No se pudo reprocesar el documento",
         description: err.message || "Error desconocido",
       });
+    },
+  });
+}
+
+// Clasifica de a uno una lista de documentos ya procesados que quedaron sin
+// categoría — sin re-extraer texto ni re-embeddear (2026-09-07).
+export function useClassifyUnclassified() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (documentIds: string[]) => {
+      let ok = 0;
+      const errors: string[] = [];
+      for (const id of documentIds) {
+        try {
+          await classifyDocument(id);
+          ok += 1;
+        } catch (e) {
+          errors.push(e instanceof Error ? e.message : String(e));
+        }
+      }
+      return { ok, total: documentIds.length, errors };
+    },
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["documents"] });
+      toast({
+        title: r.errors.length ? "Clasificación parcial" : "Listo",
+        description: `${r.ok}/${r.total} documentos clasificados${r.errors.length ? ` · ${r.errors.length} fallaron` : ""}.`,
+        variant: r.errors.length ? "destructive" : "default",
+      });
+    },
+    onError: (err: Error) => {
+      toast({ variant: "destructive", title: "No se pudo clasificar", description: err.message || "Error desconocido" });
     },
   });
 }

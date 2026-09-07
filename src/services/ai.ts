@@ -205,6 +205,17 @@ export async function processDocument(documentId: string): Promise<ProcessResult
   return handleResponse(res, "Error procesando el documento");
 }
 
+// Clasifica SOLO el tipo de un documento ya procesado (sin re-extraer ni
+// re-embeddear) — para los que quedaron "Sin clasificar" (2026-09-07).
+export async function classifyDocument(documentId: string): Promise<{ category: string }> {
+  const res = await fetchWithTimeout(
+    `${SUPABASE_URL}/functions/v1/vault-process`,
+    { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "classify", documentId }) },
+    VAULT_TIMEOUT_MS
+  );
+  return handleResponse(res, "Error clasificando el documento");
+}
+
 // ═══════════════════════════════════════
 // COPILOT (Copiloto Reflexivo — Fase 4 del plan estratégico 2026-08-16)
 // ═══════════════════════════════════════

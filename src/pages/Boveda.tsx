@@ -4,8 +4,8 @@ import type { DocRow } from "@/shared/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, Trash2, Loader2, Search, RotateCw, AlertTriangle, FileArchive } from "lucide-react";
-import { useDocuments, useUploadDocument, useDeleteDocument, useProcessDocument, useSetDocumentCategory } from "@/hooks/useVault";
+import { Upload, FileText, Trash2, Loader2, Search, RotateCw, AlertTriangle, FileArchive, Sparkles } from "lucide-react";
+import { useDocuments, useUploadDocument, useDeleteDocument, useProcessDocument, useSetDocumentCategory, useClassifyUnclassified } from "@/hooks/useVault";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -76,6 +76,7 @@ function BovedaContent() {
   const deleteMutation = useDeleteDocument();
   const processMutation = useProcessDocument();
   const categoryMutation = useSetDocumentCategory();
+  const classifyMutation = useClassifyUnclassified();
   const fileRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -277,9 +278,27 @@ function BovedaContent() {
         <div className="space-y-6">
           {groups.map((group) => (
             <div key={group.key} className="space-y-2">
-              <div className="flex items-baseline gap-2">
+              <div className="flex flex-wrap items-baseline gap-2">
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{group.label}</h2>
                 <span className="text-xs text-muted-foreground/60">{group.docs.length}</span>
+                {group.key === "__none__" && group.docs.some((d) => d.content) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="ml-auto h-7 text-xs"
+                    disabled={classifyMutation.isPending}
+                    onClick={() =>
+                      classifyMutation.mutate(group.docs.filter((d) => d.content).map((d) => d.id))
+                    }
+                  >
+                    {classifyMutation.isPending ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-1 h-3 w-3" />
+                    )}
+                    Clasificar automáticamente
+                  </Button>
+                )}
               </div>
               <div className="grid gap-3">
                 {group.docs.map((doc: DocRow) => {
