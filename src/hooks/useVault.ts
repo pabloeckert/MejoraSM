@@ -126,8 +126,8 @@ export function useClassifyUnclassified() {
       }
       return { ok, total: documentIds.length, errors };
     },
-    onSuccess: (r) => {
-      qc.invalidateQueries({ queryKey: ["documents"] });
+    onSuccess: async (r) => {
+      await qc.refetchQueries({ queryKey: ["documents"] });
       toast({
         title: r.errors.length ? "Clasificación parcial" : "Listo",
         description: `${r.ok}/${r.total} documentos clasificados${r.errors.length ? ` · ${r.errors.length} fallaron` : ""}.`,
