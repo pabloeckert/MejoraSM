@@ -49,6 +49,19 @@ function isSupported(name: string) {
   return SUPPORTED_EXT.some((ext) => lower.endsWith(ext));
 }
 
+// doc.file_type es el MIME crudo — "application/vnd.openxmlformats-office
+// document.wordprocessingml.document" no le dice nada a nadie. Hallazgo
+// auditoría en vivo 2026-09-07.
+function prettyFileType(mime?: string | null): string {
+  if (!mime) return "documento";
+  if (mime.includes("pdf")) return "PDF";
+  if (mime.includes("wordprocessingml") || mime.includes("msword")) return "Word";
+  if (mime.includes("markdown")) return "Markdown";
+  if (mime.startsWith("text/")) return "Texto";
+  if (mime.includes("zip")) return "ZIP";
+  return mime.split("/").pop() || "documento";
+}
+
 export default function Boveda() {
   return (
     <ErrorBoundary>
@@ -283,7 +296,7 @@ function BovedaContent() {
                           <div>
                             <p className="text-sm font-medium">{doc.title}</p>
                             <p className="text-xs text-muted-foreground">
-                              {doc.file_type || "documento"} ·{" "}
+                              {prettyFileType(doc.file_type)} ·{" "}
                               {new Date(doc.created_at).toLocaleDateString("es-AR")}
                               {doc.word_count ? ` · ${doc.word_count} palabras` : ""}
                             </p>

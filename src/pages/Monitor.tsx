@@ -393,6 +393,7 @@ function PostCard({
 }) {
   const fallidas = post.platforms.filter((p) => p.status === "failed");
   const [deleting, setDeleting] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
   const [confirm, ConfirmUI] = useConfirm();
   const { run: runWorkflow } = useWorkflowAction();
 
@@ -462,13 +463,28 @@ function PostCard({
   return (
     <Card className="flex flex-col overflow-hidden">
       {ConfirmUI}
-      {post.imageUrl && (
+      {post.imageUrl && !imgFailed && (
         <img
           src={post.imageUrl}
           alt={post.kind === "story" ? `Story del ${post.date}` : `Post del ${post.date}`}
           loading="lazy"
+          onError={() => setImgFailed(true)}
           className={cn("w-full bg-muted object-cover", post.kind === "story" ? "aspect-[9/16]" : "aspect-[4/5]")}
         />
+      )}
+      {post.imageUrl && imgFailed && (
+        // La imagen renderizada de una pieza vieja pudo haberse borrado del
+        // repo (ej. el wipe de content/published/). Antes quedaba un recuadro
+        // gris ambiguo que parecía "cargando para siempre" (hallazgo auditoría
+        // en vivo 2026-09-07).
+        <div
+          className={cn(
+            "flex w-full items-center justify-center bg-muted px-4 text-center text-xs text-muted-foreground",
+            post.kind === "story" ? "aspect-[9/16]" : "aspect-[4/5]",
+          )}
+        >
+          Imagen no disponible — la pieza ya se publicó, el archivo se limpió del repo.
+        </div>
       )}
       <CardContent className="flex flex-1 flex-col gap-2.5 p-4">
         <div className="flex items-center justify-between gap-2">

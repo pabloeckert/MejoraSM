@@ -49,7 +49,11 @@ const HEIC_RE = /\.(heic|heif)$/i;
 function PhotoGrid({ dimension, folder, emptyLabel }: { dimension: string; folder: "inbox" | "used"; emptyLabel: string }) {
   const path = `content/${folder}/${dimension}`;
   const { data: entries, isLoading, isError } = useDirListing(path);
-  const photos = (entries || []).filter((e) => e.type === "file");
+  // Solo imágenes reales — content/inbox/<dim>/ tiene un .gitkeep (agregado
+  // 2026-09-03 para que la carpeta exista siempre) que se colaba en la grilla
+  // como una "foto" rota → "no disponible" al lado de las reales (hallazgo
+  // auditoría en vivo 2026-09-07).
+  const photos = (entries || []).filter((e) => e.type === "file" && IMG_RE.test(e.name));
 
   if (isLoading) {
     return (
