@@ -190,8 +190,13 @@ export default function Hub() {
     }));
     setPending(items);
 
-    // B9: clasificar cada foto, en paralelo. Si falla una, queda con la
-    // dimensión de la pestaña seleccionada — el humano confirma o corrige.
+    // B9: clasificar cada foto, en paralelo. La sugerencia del sistema NO
+    // pisa la dimensión elegida arriba (`selectedDim`) — hallazgo real
+    // 2026-09-07: Pablo eligió "Sociales", subió una captura, el clasificador
+    // la mandó a "Empresarial" sin avisar de forma clara, y la foto nunca
+    // apareció en la vista de "Sociales" ni habilitó "Preparar story". Ahora
+    // la elección explícita manda; si el sistema cree que va en otra, lo dice
+    // con un botón para aplicarlo (ver el render de `pending`).
     await Promise.allSettled(
       items.map(async (it) => {
         try {
@@ -199,7 +204,7 @@ export default function Hub() {
           const res = await suggestPhotoDimension(base64, mimeType);
           setPending((prev) =>
             prev
-              ? prev.map((p) => (p.id === it.id ? { ...p, dimension: res.dimension, suggested: res.dimension, suggesting: false } : p))
+              ? prev.map((p) => (p.id === it.id ? { ...p, suggested: res.dimension, suggesting: false } : p))
               : prev
           );
         } catch {
@@ -276,8 +281,8 @@ export default function Hub() {
                   <span className="text-muted-foreground">Mirando cada foto para sugerir su dimensión…</span>
                 ) : (
                   <span>
-                    Revisá la dimensión de cada foto antes de confirmar. Lo que sugirió el sistema está pre-elegido —
-                    cambialo si no corresponde.
+                    Cada foto se guarda en <b>{OFERTAS.find((o) => o.key === selectedDim)?.kicker}</b> (la dimensión elegida
+                    arriba). Si el sistema cree que alguna va en otra, te lo avisa — vos decidís.
                   </span>
                 )}
               </div>
@@ -297,19 +302,29 @@ export default function Hub() {
                           <Loader2 className="h-3 w-3 animate-spin" /> analizando…
                         </p>
                       ) : (
-                        <select
-                          value={p.dimension}
-                          onChange={(e) => setPendingDimension(p.id, e.target.value)}
-                          aria-label={`Dimensión de ${p.file.name}`}
-                          className="mt-0.5 w-full rounded border border-input bg-background px-1.5 py-1 text-xs"
-                        >
-                          {OFERTAS.map((o) => (
-                            <option key={o.key} value={o.key}>
-                              {o.kicker}
-                              {p.suggested === o.key ? " (sugerida)" : ""}
-                            </option>
-                          ))}
-                        </select>
+                        <>
+                          <select
+                            value={p.dimension}
+                            onChange={(e) => setPendingDimension(p.id, e.target.value)}
+                            aria-label={`Dimensión de ${p.file.name}`}
+                            className="mt-0.5 w-full rounded border border-input bg-background px-1.5 py-1 text-xs"
+                          >
+                            {OFERTAS.map((o) => (
+                              <option key={o.key} value={o.key}>
+                                {o.kicker}
+                              </option>
+                            ))}
+                          </select>
+                          {p.suggested && p.suggested !== p.dimension && (
+                            <button
+                              type="button"
+                              onClick={() => setPendingDimension(p.id, p.suggested!)}
+                              className="mt-1 text-[11px] text-primary underline underline-offset-2"
+                            >
+                              El sistema cree que es de {dimensionLabel(p.suggested)} — usar esa
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
