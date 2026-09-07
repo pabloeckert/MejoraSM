@@ -64,3 +64,8 @@ supabase/.temp/
 *[Cc]lave*.jpeg
 Captura*de*pantalla*.png
 Screenshot*.png
+
+# tsc -b incremental build info
+tsconfig.app.tsbuildinfo
+tsconfig.node.tsbuildinfo
+*.tsbuildinfo

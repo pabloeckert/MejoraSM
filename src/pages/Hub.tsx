@@ -45,6 +45,9 @@ const KICKER = dimensionLabel;
 // renderiza ni el navegador ni el pipeline (Chromium).
 const MAX_FILE_MB = 25;
 const HEIC_RE = /\.(heic|heif)$/i;
+// Mismas extensiones que acepta el pipeline (EXT_TO_MIME en render-*.mjs) y
+// que ya usa PublishNowCard. Sirve para filtrar el .gitkeep de la grilla.
+const IMG_RE = /\.(jpe?g|png|webp)$/i;
 
 function PhotoGrid({ dimension, folder, emptyLabel }: { dimension: string; folder: "inbox" | "used"; emptyLabel: string }) {
   const path = `content/${folder}/${dimension}`;
