@@ -313,6 +313,18 @@ export const runLogApi = {
       .select("*")
       .order("created_at", { ascending: false })
       .limit(limit),
+
+  // ¿La cuenta de IG/FB está desconectada en Zernio? El pipeline loguea
+  // `skipped` con este reason cuando Zernio responde ACCOUNT_DISCONNECTED
+  // (token de Meta vencido). Lo mira el Dashboard para gritar "reconectá IG".
+  accountDisconnectedRecently: (sinceIso: string) =>
+    supabase
+      .from("run_log")
+      .select("created_at")
+      .eq("metadata->>reason", "account-disconnected")
+      .gte("created_at", sinceIso)
+      .order("created_at", { ascending: false })
+      .limit(1),
 };
 
 // ═══════════════════════════════════════

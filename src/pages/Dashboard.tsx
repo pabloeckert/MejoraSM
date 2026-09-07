@@ -34,7 +34,7 @@ import { usePendingProposals, useProposals } from "@/hooks/useProposals";
 import { useAllMetrics } from "@/hooks/useMetrics";
 import { useInsights } from "@/hooks/useInsights";
 import { useInbox, buildThreads, isUnanswered } from "@/hooks/useInbox";
-import { historialApi } from "@/services/supabase";
+import { historialApi, runLogApi } from "@/services/supabase";
 import { CopilotCard } from "@/components/CopilotCard";
 import { InsightsSection } from "@/components/InsightsSection";
 import { AdsCard } from "@/components/AdsCard";
@@ -201,11 +201,13 @@ function AttentionStrip({
   soon,
   failedDocs,
   unanswered,
+  accountDisconnected,
 }: {
   pendingHistorias: number;
   soon: number;
   failedDocs: number;
   unanswered: number;
+  accountDisconnected: boolean;
 }) {
   const items: { text: string; href: string }[] = [];
   if (pendingHistorias > 0)
@@ -223,19 +225,34 @@ function AttentionStrip({
   if (failedDocs > 0)
     items.push({ text: `${failedDocs} ${failedDocs === 1 ? "documento" : "documentos"} sin procesar en el Manual de Marca`, href: "/boveda" });
 
-  if (items.length === 0) return null;
+  if (items.length === 0 && !accountDisconnected) return null;
 
   return (
-    <Card className="border-amber-500/40 bg-amber-500/5">
-      <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-1.5 p-4">
-        <span className="text-sm font-semibold text-amber-700">Necesita tu atención:</span>
-        {items.map((it, i) => (
-          <Link key={i} to={it.href} className="text-sm text-foreground underline decoration-amber-500/40 hover:decoration-amber-500">
-            {it.text}
-          </Link>
-        ))}
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-2">
+      {accountDisconnected && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="flex flex-wrap items-center gap-x-3 gap-y-1 p-4">
+            <span className="text-sm font-semibold text-destructive">🔴 Instagram/Facebook desconectado de Zernio</span>
+            <span className="text-sm text-foreground">
+              El token de Meta venció — nada se está publicando. Reconectá la cuenta en{" "}
+              <a href="https://zernio.com" target="_blank" rel="noreferrer" className="underline">zernio.com</a>. Las piezas agendadas salen solas al reconectar.
+            </span>
+          </CardContent>
+        </Card>
+      )}
+      {items.length > 0 && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-1.5 p-4">
+            <span className="text-sm font-semibold text-amber-700">Necesita tu atención:</span>
+            {items.map((it, i) => (
+              <Link key={i} to={it.href} className="text-sm text-foreground underline decoration-amber-500/40 hover:decoration-amber-500">
+                {it.text}
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
 
@@ -301,6 +318,21 @@ function DashboardContent() {
   const [detail, setDetail] = useState<DetailContent | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const { data: insightsData } = useInsights();
+
+  // ¿La cuenta de IG/FB se desconectó de Zernio? (token de Meta vencido). Es
+  // lo más urgente que puede pasar — nada publica hasta reconectar. El
+  // pipeline loguea `skipped` con reason "account-disconnected" en run_log.
+  const { data: accountDisconnected } = useQuery({
+    queryKey: ["account-disconnected"],
+    queryFn: async () => {
+      const sinceIso = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await runLogApi.accountDisconnectedRecently(sinceIso);
+      if (error) throw error;
+      return (data?.length ?? 0) > 0;
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
 
   // Desglose por red: solo dato real disponible es status/URL por
   // plataforma. Hasta el 2026-08-17 se traía directo de
@@ -691,6 +723,7 @@ function DashboardContent() {
         soon={scheduledUpcoming.filter((p) => new Date(p.scheduled_at as string).getTime() - Date.now() < 2 * 60 * 60 * 1000).length}
         failedDocs={(documents || []).filter((d: { processing_status?: string }) => d.processing_status === "error").length}
         unanswered={unansweredConversations}
+        accountDisconnected={!!accountDisconnected}
       />
 
       {/* Quick start banner for new users */}
