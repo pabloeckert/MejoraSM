@@ -326,7 +326,7 @@ function DashboardContent() {
   });
 
   const metricsFlagged: FlaggedMetricRow[] = useMemo(
-    () => (allMetrics ?? []).map((m: MetricRow) => ({ ...m, isTest: isTestRow(m) })),
+    () => ((allMetrics ?? []) as unknown as MetricRow[]).map((m) => ({ ...m, isTest: isTestRow(m) })),
     [allMetrics]
   );
   const testCount = metricsFlagged.filter((m) => m.isTest).length;
@@ -404,7 +404,7 @@ function DashboardContent() {
   }
 
   function openPieceDetail(m: FlaggedMetricRow) {
-    const platforms = platformsByProposal?.get(m.proposals?.id) ?? [];
+    const platforms = platformsByProposal?.get(m.proposals?.id ?? "") ?? [];
     setDetail({
       title: m.proposals?.hook || m.proposals?.title || "Pieza",
       description: m.proposals?.format ? `Formato: ${m.proposals.format}` : undefined,
@@ -487,7 +487,7 @@ function DashboardContent() {
         openKpiDetail(
           "Engagement sobre alcance",
           "Por pieza: (likes+comentarios+shares+guardados) / reach, de mayor a menor.",
-          (m) => (m.reach ? ((m.likes + m.comments + m.shares + m.saves) / m.reach) * 100 : 0),
+          (m) => (m.reach ? (((m.likes ?? 0) + (m.comments ?? 0) + (m.shares ?? 0) + (m.saves ?? 0)) / m.reach) * 100 : 0),
           "%"
         ),
     },
@@ -529,7 +529,7 @@ function DashboardContent() {
         openKpiDetail(
           "Clics al enlace",
           "Clics reales por pieza (solo las que ya tienen dato recolectado), de mayor a menor.",
-          (m) => m.clicks,
+          (m) => m.clicks ?? 0,
           ""
         ),
     },
@@ -579,14 +579,13 @@ function DashboardContent() {
   const nowTs = Date.now();
   const in7Days = nowTs + 7 * 24 * 60 * 60 * 1000;
   const scheduledUpcoming: ScheduledProposal[] = (proposals || [])
-    .filter((p: ScheduledProposal) => p.status === "scheduled" && p.scheduled_at)
-    .filter((p: ScheduledProposal) => {
+    .filter((p) => p.status === "scheduled" && p.scheduled_at)
+    .filter((p) => {
       const t = new Date(p.scheduled_at as string).getTime();
       return t >= nowTs && t <= in7Days;
     })
     .sort(
-      (a: ScheduledProposal, b: ScheduledProposal) =>
-        new Date(a.scheduled_at as string).getTime() - new Date(b.scheduled_at as string).getTime()
+      (a, b) => new Date(a.scheduled_at as string).getTime() - new Date(b.scheduled_at as string).getTime()
     );
 
   // D5 (auditoría 2026-08-31): mientras la query carga, mostrar "—" en vez de
@@ -616,8 +615,7 @@ function DashboardContent() {
         ? "—"
         : String(
             (proposals || []).filter(
-              (p: { created_at?: string }) =>
-                p.created_at && Date.now() - new Date(p.created_at).getTime() <= 30 * 24 * 60 * 60 * 1000
+              (p) => p.created_at && Date.now() - new Date(p.created_at).getTime() <= 30 * 24 * 60 * 60 * 1000
             ).length
           ),
       sub: "Últimos 30 días",
@@ -642,13 +640,13 @@ function DashboardContent() {
   });
   const formatData = Object.entries(formatCounts).map(([name, value]) => ({ name, value }));
 
-  const recentActivity = (proposals as ProposalRow[] | undefined ?? [])
+  const recentActivity = (proposals ?? [])
     .filter((p) => p.status === "published" || p.status === "scheduled" || p.status === "pending")
     .map((p) => ({
       ...p,
       displayDate: p.published_at || p.scheduled_at || p.created_at,
     }))
-    .sort((a: ProposalRow & { displayDate?: string }, b: ProposalRow & { displayDate?: string }) => new Date(b.displayDate || 0).getTime() - new Date(a.displayDate || 0).getTime())
+    .sort((a, b) => new Date(b.displayDate || 0).getTime() - new Date(a.displayDate || 0).getTime())
     .slice(0, 5);
 
   const lastSync = visibleMetrics.reduce<string | null>((latest, m) => {
@@ -804,7 +802,7 @@ function DashboardContent() {
           ) : (
             <div className="flex flex-col">
               {publishedWithPlatforms.slice(0, 6).map((m) => {
-                const platforms = platformsByProposal?.get(m.proposals?.id) ?? [];
+                const platforms = platformsByProposal?.get(m.proposals?.id ?? "") ?? [];
                 return (
                   <button
                     type="button"
@@ -1074,8 +1072,8 @@ function DashboardContent() {
             </div>
           ) : (
             <div className="flex flex-col">
-              {(recentActivity as (ProposalRow & { displayDate?: string })[]).map((p) => {
-                const statusMeta = STATUS_META[p.status] ?? STATUS_META.pending;
+              {recentActivity.map((p) => {
+                const statusMeta = STATUS_META[p.status ?? "pending"] ?? STATUS_META.pending;
                 return (
                   <div
                     key={p.id}
@@ -1087,7 +1085,7 @@ function DashboardContent() {
                       </p>
                       <p className="text-[11.5px] text-muted-foreground">
                         {statusMeta.dateLabel}:{" "}
-                        {new Date(p.displayDate).toLocaleDateString("es-AR", {
+                        {new Date(p.displayDate ?? Date.now()).toLocaleDateString("es-AR", {
                           day: "numeric",
                           month: "short",
                           hour: "2-digit",
@@ -1141,7 +1139,7 @@ function DashboardContent() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13.5px] font-semibold">{e.hook || e.title || "Sin título"}</p>
                     <p className="text-[11.5px] text-muted-foreground">
-                      {new Date(e.scheduled_at).toLocaleDateString("es-AR")}
+                      {new Date(e.scheduled_at as string).toLocaleDateString("es-AR")}
                     </p>
                   </div>
                   <Badge variant="outline" className="flex-shrink-0">{e.format || "post"}</Badge>

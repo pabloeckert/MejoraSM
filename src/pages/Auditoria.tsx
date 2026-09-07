@@ -35,7 +35,8 @@ const SOURCES: ExportSource[] = [
     fetch: async () => {
       const { data, error } = await proposalsApi.list();
       if (error) throw error;
-      return (data || []) as Record<string, unknown>[];
+      // El export trata cada fuente como filas planas (bolsa de columnas).
+      return (data || []) as unknown as Record<string, unknown>[];
     },
   },
   {

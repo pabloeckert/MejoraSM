@@ -98,7 +98,7 @@ function toDatetimeLocal(iso: string | null) {
 }
 
 export function ProposalDetailDialog({
-  proposal,
+  proposal: proposalProp,
   open,
   onOpenChange,
 }: {
@@ -132,27 +132,30 @@ export function ProposalDetailDialog({
   // dejaba el modo edición y los cambios stale. Ahora también resetea al
   // cerrar el diálogo.
   useEffect(() => {
-    if (!proposal) return;
+    if (!proposalProp) return;
     setIsEditing(false);
     setShowReject(false);
     setRejectReason("");
     setEditFields({
-      title: proposal.title || "",
-      hook: proposal.hook || "",
-      body: proposal.body || "",
-      cta: proposal.cta || "",
-      hashtags: (proposal.hashtags || []).join(" "),
+      title: proposalProp.title || "",
+      hook: proposalProp.hook || "",
+      body: proposalProp.body || "",
+      cta: proposalProp.cta || "",
+      hashtags: (proposalProp.hashtags || []).join(" "),
     });
-    setScheduleDate(toDatetimeLocal(proposal.scheduled_at));
-    setScheduleOferta(proposal.oferta || "");
+    setScheduleDate(toDatetimeLocal(proposalProp.scheduled_at));
+    setScheduleOferta(proposalProp.oferta || "");
     setConvertTo("");
     // Resetea solo cuando cambia la pieza abierta o el diálogo se abre/cierra
     // — depender de `proposal` entero pisaría una edición en curso en cada
     // refetch de la query (polling/invalidación), no en cada dato nuevo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proposal?.id, open]);
+  }, [proposalProp?.id, open]);
 
-  if (!proposal) return null;
+  if (!proposalProp) return null;
+  // Narrowing estable para los handlers anidados (function declarations no
+  // heredan el narrowing del early-return de arriba).
+  const proposal: ProposalDetail = proposalProp;
 
   const isPublished = proposal.status === "published";
   const isScheduled = proposal.status === "scheduled";

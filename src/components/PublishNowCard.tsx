@@ -85,7 +85,9 @@ export function PublishNowCard({ dimension }: { dimension: string }) {
             setErrorMsg(m.error || "La preparación anterior falló. Probá de nuevo.");
             setState("error");
           } else {
-            setState(m.phase);
+            // resumable ya garantizó "prepared" | "published" | "error", y el
+            // "error" se maneja arriba — el ?? es solo para el tipo.
+            setState(m.phase ?? "idle");
           }
         }
       } catch {

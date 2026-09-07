@@ -6,6 +6,7 @@
 // refrescar el token de auth (hallazgo auditoría en vivo 2026-09-07).
 
 import { supabase } from "@/integrations/supabase/client";
+import type { ProposalDetail } from "@/components/ProposalDetailDialog";
 
 export { supabase };
 
@@ -17,10 +18,17 @@ export { supabase };
 // entero, no una muestra silenciosa. Este helper pagina con `.range()`
 // hasta agotar resultados reales.
 const PAGE_SIZE = 1000;
+// El callback devuelve un builder de PostgREST cuyo `data` es la fila real
+// generada (o una fila con join). El caller declara `T` con la forma liviana
+// que la UI necesita — que siempre es un subconjunto de esa fila real — así
+// que acá aceptamos `unknown[]` en el builder y devolvemos `T[]` al caller.
 async function fetchAllPages<T>(
-  buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
+  buildQuery: (
+    from: number,
+    to: number
+  ) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>
 ): Promise<{ data: T[] | null; error: { message: string } | null }> {
-  const all: T[] = [];
+  const all: unknown[] = [];
   let from = 0;
   for (;;) {
     const { data, error } = await buildQuery(from, from + PAGE_SIZE - 1);
@@ -30,7 +38,7 @@ async function fetchAllPages<T>(
     if (data.length < PAGE_SIZE) break;
     from += PAGE_SIZE;
   }
-  return { data: all, error: null };
+  return { data: all as T[], error: null };
 }
 
 // ═══════════════════════════════════════
@@ -142,7 +150,7 @@ export const proposalsApi = {
   // Pagina de a 1000 filas reales — sin esto, pasado ese volumen faltaban
   // propuestas en silencio tanto acá como en el export de Auditoría.
   list: () =>
-    fetchAllPages<Record<string, unknown>>((from, to) =>
+    fetchAllPages<ProposalDetail>((from, to) =>
       supabase
         .from("proposals")
         .select("*, dialogue_sessions(topic)")

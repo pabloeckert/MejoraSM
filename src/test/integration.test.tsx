@@ -135,6 +135,11 @@ vi.mock("@supabase/supabase-js", () => ({
   }),
 }));
 
+// El mock de `from()` devuelve un objeto chainable de spies — TS ahora conoce
+// el tipo real del builder de PostgREST (que no expone .eq/.update/.single en
+// todas las ramas), así que casteamos a esta forma laxa para las aserciones.
+type MockChain = Record<string, ReturnType<typeof vi.fn>>;
+
 describe("Supabase Service — CRUD operations", () => {
   beforeEach(() => {
     vi.stubEnv("VITE_SUPABASE_URL", "https://test.supabase.co");
@@ -145,7 +150,7 @@ describe("Supabase Service — CRUD operations", () => {
 
   it("documentsApi.get calls eq('id', id)", async () => {
     const { documentsApi } = await import("@/services/supabase");
-    const chain = documentsApi.get("test-id");
+    const chain = documentsApi.get("test-id") as unknown as MockChain;
     expect(mockFrom2).toHaveBeenCalledWith("documents");
     expect(chain.eq).toHaveBeenCalledWith("id", "test-id");
     expect(chain.single).toHaveBeenCalled();
@@ -153,14 +158,14 @@ describe("Supabase Service — CRUD operations", () => {
 
   it("dialogueApi.getMessages calls eq + order", async () => {
     const { dialogueApi } = await import("@/services/supabase");
-    const chain = dialogueApi.getMessages("session-123");
+    const chain = dialogueApi.getMessages("session-123") as unknown as MockChain;
     expect(mockFrom2).toHaveBeenCalledWith("dialogue_messages");
     expect(chain.eq).toHaveBeenCalledWith("session_id", "session-123");
   });
 
   it("proposalsApi.approve calls update with status", async () => {
     const { proposalsApi } = await import("@/services/supabase");
-    const chain = proposalsApi.approve("prop-123");
+    const chain = proposalsApi.approve("prop-123") as unknown as MockChain;
     expect(mockFrom2).toHaveBeenCalledWith("proposals");
     expect(chain.update).toHaveBeenCalledWith({ status: "approved" });
     expect(chain.eq).toHaveBeenCalledWith("id", "prop-123");
@@ -168,16 +173,16 @@ describe("Supabase Service — CRUD operations", () => {
 
   it("proposalsApi.reject includes rejection reason", async () => {
     const { proposalsApi } = await import("@/services/supabase");
-    const chain = proposalsApi.reject("prop-123", "Off brand");
+    const chain = proposalsApi.reject("prop-123", "Off brand") as unknown as MockChain;
     expect(mockFrom2).toHaveBeenCalledWith("proposals");
     expect(chain.update).toHaveBeenCalledWith({ status: "rejected", rejection_reason: "Off brand" });
   });
 
   it("proposalsApi.schedule sets status and date", async () => {
     const { proposalsApi } = await import("@/services/supabase");
-    const chain = proposalsApi.schedule("prop-123", "2026-05-01T10:00:00Z");
+    const chain = proposalsApi.schedule("prop-123", "2026-05-01T10:00:00Z", "comercial") as unknown as MockChain;
     expect(mockFrom2).toHaveBeenCalledWith("proposals");
-    expect(chain.update).toHaveBeenCalledWith({ status: "scheduled", scheduled_at: "2026-05-01T10:00:00Z" });
+    expect(chain.update).toHaveBeenCalledWith({ status: "scheduled", scheduled_at: "2026-05-01T10:00:00Z", oferta: "comercial" });
   });
 });
 

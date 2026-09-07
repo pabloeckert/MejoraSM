@@ -37,8 +37,13 @@ jobs:
       # PM5 (auditoría 2026-08-31): la deuda de lint bajó de 42 errores a 0
       # (no-explicit-any tipados, eslint acotado a src/, Deno fuera de scope).
       # Se saca continue-on-error — lint vuelve a ser bloqueante.
+      #
+      # 2026-09-07: `tsc --noEmit` acá era un NO-OP — tsconfig.json raíz es
+      # solution-style (`"files": []` + `references`), y sin `-b` no chequea
+      # nada. Un `IMG_RE is not defined` real pasó CI sin ruido. Ahora `tsc -b`
+      # (build de las referencias app + node) — chequea de verdad.
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npx tsc -b
 
       - name: Lint
         run: npm run lint
