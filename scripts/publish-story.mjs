@@ -42,6 +42,7 @@ async function main() {
     return;
   }
   let failures = 0;
+  let accountDisconnected = false;
 
   for (let i = 0; i < renders.length; i++) {
     const r = renders[i];
@@ -53,10 +54,22 @@ async function main() {
 
     // alreadyHandled: Zernio ya tiene esta pieza (contenido duplicado exacto)
     // — no es un fallo (ver zernio.mjs, hallazgo 2026-09-07).
-    if (!result.success && !result.alreadyHandled) failures++;
+    if (result.accountDisconnected) {
+      accountDisconnected = true;
+      console.error(`\n  ⚠️  ${result.error}`);
+    } else if (!result.success && !result.alreadyHandled) failures++;
     else if (result.alreadyHandled) console.log("  (Zernio ya tenía esta pieza — no cuenta como fallo)");
 
     if (i < renders.length - 1) await sleep(DELAY_MS);
+  }
+
+  if (accountDisconnected) {
+    // No es un bug del pipeline — el token de Meta venció en Zernio. Se loguea
+    // `skipped` con reason claro (para el Dashboard / copiloto) pero se sale
+    // con 1 igual, para que el badge del workflow quede rojo y visible.
+    await logRun({ source: RUN_SOURCE, step: "publish-story", status: "skipped", durationMs: elapsed(), metadata: { reason: "account-disconnected", note: "Reconectá la cuenta de IG/FB en zernio.com — el token de Meta venció." } });
+    console.error("\n🔴 Reconectá la cuenta de Instagram/Facebook en zernio.com. La story se generó y renderizó bien, solo falta publicarla.");
+    process.exit(1);
   }
 
   if (failures > 0) {

@@ -162,6 +162,17 @@ async function main() {
         await logRun({ source: "publish-scheduled-posts", step: "publish-scheduled-posts", status: "skipped", proposalId: entry.proposalId, durationMs: entryElapsed(), metadata: { reason: "zernio-duplicate-reconciled" } });
         continue;
       }
+      if (result.accountDisconnected) {
+        // No es un fallo del pipeline: la cuenta de IG/FB está desconectada en
+        // Zernio (token de Meta vencido) y Pablo tiene que reconectarla. La
+        // propuesta queda `scheduled` — se publica sola cuando la cuenta vuelva.
+        // Se loguea `skipped` (no `error`) con reason claro para que el
+        // Dashboard / copiloto lo muestren como "reconectá IG", no como un bug.
+        await markError(entry.proposalId, result.error);
+        console.error(`Propuesta ${entry.proposalId}: cuenta desconectada en Zernio — ${result.error}`);
+        await logRun({ source: "publish-scheduled-posts", step: "publish-scheduled-posts", status: "skipped", proposalId: entry.proposalId, durationMs: entryElapsed(), metadata: { reason: "account-disconnected", note: result.error } });
+        continue;
+      }
       if (!result.success) {
         failures++;
         await markError(entry.proposalId, result.error || "Fallo desconocido publicando en Zernio");

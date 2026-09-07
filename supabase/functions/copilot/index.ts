@@ -239,7 +239,7 @@ async function gatherDataSummary(): Promise<DataSummary> {
   const sevenDaysFromNowIso = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
   const fortyEightHoursAgoIso = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
 
-  const [metricsRes, rulesRes, runLogErrorsRes, scheduledRes, publishedRes] = await Promise.all([
+  const [metricsRes, rulesRes, runLogErrorsRes, scheduledRes, publishedRes, disconnectRes] = await Promise.all([
     supabase
       .from("metrics")
       .select("engagement_rate, likes, reach, impressions, proposals(format, is_test)")
@@ -269,6 +269,15 @@ async function gatherDataSummary(): Promise<DataSummary> {
       .select("id")
       .eq("status", "published")
       .gte("published_at", sevenDaysAgoIso),
+    // Cuenta de IG/FB desconectada en Zernio — se loguea como `skipped` (no
+    // `error`) con este reason. Es lo más urgente que puede pasar: nada
+    // publica hasta que Pablo reconecte.
+    supabase
+      .from("run_log")
+      .select("created_at")
+      .eq("metadata->>reason", "account-disconnected")
+      .gte("created_at", fortyEightHoursAgoIso)
+      .limit(1),
   ]);
 
   const realMetrics = ((metricsRes.data as MetricRow[] | null) || []).filter((m) => !m.proposals?.is_test);
@@ -281,6 +290,7 @@ async function gatherDataSummary(): Promise<DataSummary> {
   const runLogErrors = (runLogErrorsRes.data as RunLogErrorRow[] | null) || [];
   const scheduledCount = scheduledRes.data?.length || 0;
   const publishedCount = publishedRes.data?.length || 0;
+  const accountDisconnected = (disconnectRes.data?.length || 0) > 0;
 
   const evidence = {
     realMetricsCount: realMetrics.length,
@@ -289,9 +299,13 @@ async function gatherDataSummary(): Promise<DataSummary> {
     runLogErrorsLast48h: runLogErrors.length,
     scheduledNext7Days: scheduledCount,
     publishedLast7Days: publishedCount,
+    accountDisconnected,
   };
 
   const lines = [
+    accountDisconnected
+      ? "🔴 URGENTE: la cuenta de Instagram/Facebook está DESCONECTADA en Zernio (el token de Meta venció). NADA se está publicando — ni stories, ni carruseles, ni autopilot. Pablo tiene que entrar a zernio.com y reconectar la cuenta. Esto es lo primero que hay que mencionar."
+      : null,
     `Métricas reales disponibles: ${realMetrics.length} (filas de prueba excluidas).`,
     avgEngagement !== null
       ? `Engagement promedio real: ${Math.round(avgEngagement * 100) / 100}%.`
@@ -310,7 +324,7 @@ async function gatherDataSummary(): Promise<DataSummary> {
     `${scheduledCount} pieza(s) agendada(s) para los próximos 7 días. ${publishedCount} publicada(s) en los últimos 7 días.`,
   ];
 
-  return { summaryText: lines.join("\n"), evidence };
+  return { summaryText: lines.filter(Boolean).join("\n"), evidence };
 }
 
 // ═══════════════════════════════════════
