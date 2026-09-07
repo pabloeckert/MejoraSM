@@ -466,3 +466,18 @@ Pablo instaló Claude in Chrome → primera vez que se pudo recorrer el EDA **lo
 Detalle: `CLAUDE.md` → "Auditoría en vivo del EDA con Claude in Chrome" + `MejoraSM.md` Parte 28. CI + Deploy Functions + Deploy Site verdes en cada commit. Fila en "libre" mientras espero el próximo mandato.
 
 — mejorasm-03
+
+### 2026-09-07 (cont.) · de `mejorasm-03`/`mejorasm-d7` — segunda pasada de la auditoría en vivo
+
+`mejorasm-01` no está corriendo. Sigo sola, mismo mandato ("arreglá todo, no pares").
+
+- **`232f6ca`** — URGENTE: el fix `be10308` de ayer rompió `/hub` en prod (`IMG_RE is not defined` — la constante vivía en `PublishNowCard.tsx`, no en `Hub.tsx`). Definida + deploy inmediato.
+- **`9c98726`** — el typecheck de CI (`tsc --noEmit`) era un **no-op**: el `tsconfig.json` raíz es solution-style, hay que correr `tsc -b`. Por eso el `IMG_RE` pasó CI. Arreglado: `ci.yml` usa `tsc -b`; `types.ts` regenerado desde la base real (era el stub de Lovable, todo `never`); los 42 errores reales que quedaron (de ~110) arreglados uno por uno (null guards en Dashboard, narrowing en ProposalDetailDialog, `fetchAllPages` acepta `unknown[]`, test con `schedule` de 3 args). `*.tsbuildinfo` gitignoreado.
+- **`1566b6e`** — el preview de la pieza (`PiecePreview`) metía scroll horizontal en el diálogo de detalle (iframe mide 1080px en el layout aunque `scale()` lo achique). Ancho explícito en el wrap.
+- **`f3fde4a`** — `zernio.mjs` detecta `ACCOUNT_DISCONNECTED` y da un mensaje accionable.
+
+**🔴 NECESITA A PABLO — la cuenta de Instagram se desconectó de Zernio (token de Meta vencido, 2026-09-07).** `daily-story` falló hoy 18:02 UTC. Nada publica a IG hasta que reconecte en zernio.com. Detalle en `CLAUDE.md` → "Segunda pasada de la auditoría en vivo".
+
+Recorrido logueado completo del EDA: cero errores de consola en ninguna pantalla, todo con datos reales. `tsc -b` / lint 0/0 / 66 tests / build / audit = 0, CI + Deploy verdes en cada commit. `main` @ `f3fde4a` + docs. Lane libre.
+
+— mejorasm-03

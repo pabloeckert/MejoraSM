@@ -28,7 +28,8 @@ Este archivo tiene dos mitades:
 | **GitHub (subir fotos / disparar workflows)** | **del lado del servidor** — Edge Function `repo` con el secret `GITHUB_TOKEN`. El frontend (`src/services/github.ts`) es un cliente liviano de esa función; ya no hay "Conectar GitHub", ni PAT en `localStorage`, ni la palabra "GitHub" en ninguna pantalla. Ver "Sacar GitHub de la vista" en la bitácora | 2026-09-01 |
 | **Dominio propio** | 🟢 **activo y 100% cerrado**: `https://mejorasm.mejoraok.com` → la raíz **redirige a `/app/`** (la app), EDA en `/app/`, monitor estático en `/dashboard/`. Cloudflare CNAME DNS-only → `pabloeckert.github.io`; `hub/CNAME` en el repo (`.gitattributes` fuerza LF); `VITE_BASE_PATH` = `/app/` en los 3 `deploy-*.yml`; cert Let's Encrypt, HTTPS forzado; dominio viejo hace 301. Supabase: Redirect URL + Site URL ya apuntan al dominio nuevo (Pablo, 2026-09-03) | activado 2026-09-03 |
 | **Biblioteca** | **sacada** — no encajaba en el objetivo del proyecto (decisión de Pablo). `/biblioteca` redirige a `/propuestas`. La "línea de tiempo" del ciclo de vida pasó a una pestaña de Propuestas. Carpeta `biblioteca/` borrada (queda en git); fuentes movidas a `templates/fonts/` | 2026-09-01 |
-| **CI (`ci.yml`)** | **lint + tsc bloqueantes** — 0 errores, **0 warnings** (bajó de 6 el 2026-09-04: `@typescript-eslint/no-unused-vars` estaba en `"off"`, se prendió como error + se sacaron los imports muertos reales que aparecieron), ESLint acotado a `src/**` (Deno fuera de scope). test + build corriendo. `permissions: contents:read` + `concurrency` (cancela el CI de un commit ya superado). `vitest.config` con `testTimeout` 15s + `retry: 1` (mata el falso rojo por sobrecarga). Los 20 workflows con `permissions` + `timeout-minutes` (2026-09-03) | 2026-09-04 |
+| **CI (`ci.yml`)** | **lint + tsc bloqueantes de verdad** — el typecheck corría `tsc --noEmit` contra un `tsconfig.json` solution-style (`"files": []`), que **no chequea nada**; se pasó a `tsc -b` el 2026-09-07 (ver bitácora "Segunda pasada de la auditoría en vivo"). `types.ts` regenerado desde la base real → `tsc -b` en **0 errores**. lint 0/0. test + build corriendo. `permissions: contents:read` + `concurrency`. `vitest.config` con `testTimeout` 15s + `retry: 1`. Los 20 workflows con `permissions` + `timeout-minutes` (2026-09-03) | 2026-09-07 |
+| **Publicación a Instagram** | 🔴 **caída desde el 2026-09-07** — el token de Meta de la cuenta de IG venció en Zernio (`ACCOUNT_DISCONNECTED`). **Pablo tiene que reconectar la cuenta en zernio.com** (ver bitácora). Afecta story diaria, carruseles autoagendados, autopilot, "Publicar ahora". Se republica solo al reconectar (las piezas siguen `scheduled`). `zernio.mjs` ahora da un mensaje claro en vez de `exit 1` opaco | reconectar |
 | **Edge Functions** | 11: `orchestrator`, `vault-process`, `rule-engine`, `metrics-collector`, `copilot`, `classify-photo`, `insights`, `repo`, `inbox`, `recycle`, `ads`. `publisher` y `ai-gateway` borradas | `recycle`/`ads` agregadas 2026-09-01 (plan de publicación) |
 | **Bandeja de conversaciones** | comentarios + DMs de IG/FB traídos de Zernio a `inbox_items`, clasificados por sentimiento (LLM), respondibles desde `/conversaciones` con OK humano. Cron `inbox-sync-cron.yml` cada 3h. Ver "Plan de publicación 2026 — Fase 1" en la bitácora | 2026-09-01 |
 | **Plan de publicación 2026** | 🟢 7 fases completas y **todos los pendientes de Pablo cerrados el 2026-09-03**: dominio propio activo (raíz redirige a `/app/`), IG/FB limpio + `sync-history` reactivado (cron 6h), **LinkedIn activo** (`ZERNIO_LINKEDIN_ACCOUNT_ID` cargado — el próximo post de feed sale también a LinkedIn), **FB-Ads activo con filtro** (`ads` descarta campañas basura de otros ad accounts — ver bitácora). Ver "Cierre de pendientes del plan de publicación" en la bitácora | cerrado 2026-09-01, pendientes cerrados 2026-09-03 |
@@ -281,7 +282,7 @@ npm run preview                   # sirve el build de dist/ localmente
 npm run lint                      # ESLint (*.ts/*.tsx)
 npm test                          # Vitest (src/**/*.{test,spec}.{ts,tsx}, jsdom)
 npm run test:watch                # Vitest en modo watch
-npx tsc --noEmit                  # typecheck sin emitir (parte del gate de verificación)
+npx tsc -b                        # typecheck real (parte del gate). OJO: `tsc --noEmit` a secas es un NO-OP — el tsconfig raíz es solution-style ("files": []). Usar SIEMPRE `-b`. Deja *.tsbuildinfo (gitignoreado)
 ```
 
 **Correr un solo test:**
@@ -477,6 +478,8 @@ Tablas en el schema `public`, todas con RLS habilitado (`calendar_events` se dro
 | `app_admins` | Allowlist de emails con acceso (ver sección de auth) |
 
 Función RAG: `match_documents(query_embedding, match_count, similarity_threshold)` — búsqueda por similitud coseno sobre `doc_chunks` vía índice `ivfflat`, con cast `::REAL` (ver bug corregido arriba). Bucket de Storage: `vault` (privado).
+
+Tipos TypeScript de la base: `src/integrations/supabase/types.ts` — **regenerar con `npx supabase gen types typescript --linked > src/integrations/supabase/types.ts`** cada vez que cambie el schema (una tabla/columna nueva sin regenerar → el cliente tipado la ve como `never` y `tsc -b` rompe). El cliente canónico (`src/integrations/supabase/client.ts`) es `createClient<Database>` y lo re-exporta `src/services/supabase.ts` — **uno solo para todo el frontend** (dos `createClient` sobre la misma storage key = warning "Multiple GoTrueClient instances").
 
 `supabase/migrations/`: schema SQL + pgvector, `001` a `025`, todas aplicadas contra la base real **y registradas en el historial de Supabase** (`schema_migrations`) — el gap de bookkeeping se cerró el 2026-09-03 con `supabase migration repair` (ver bitácora). `db push --dry-run` = `upToDate: true`. Las primeras siete (`001_initial_schema.sql` a `007_feed_posts_render.sql`) arman el schema base + auth/RLS real; de `008` en adelante cada una es un cambio puntual documentado en su propio comentario de cabecera y, cuando corresponde, en la sección de fase del plan que la motivó (`011`-`015` → Fases 0-4 del plan 2026-08-16; `016` → fix del Monitor; `020`-`022` → Fases A/C/E del plan de continuación; `023` → reinstauración del login; `024` → bandeja de conversaciones; `025` → experimentos de contenido, Fase 4 del plan de publicación 2026).
 
@@ -1862,6 +1865,45 @@ Pablo instaló "Claude in Chrome" → por primera vez se pudo recorrer el EDA **
 - **Bóveda: los 19 docs pre-Fase-C nunca se clasificaron** (`39effc1`) → nueva acción `classify` en `vault-process` (clasifica solo el tipo, sin re-extraer ni re-embeddear) + botón "Clasificar automáticamente" en el grupo "Sin clasificar". **Probado en vivo: 19/19 clasificados, correctos** (9 manual/criterio, 8 buyer personas, 1 tono, 1 otros). El grupo "Sin clasificar" desapareció.
 
 Nota sobre acciones destructivas/irreversibles: en la sesión de browser NO se tocó ningún botón de publicar, despublicar, borrar ni forzar aprobación — solo navegación, inspección y la clasificación de docs (reversible, cambia un campo `category` que Pablo puede corregir con el dropdown).
+
+## Segunda pasada de la auditoría en vivo — CI, tipos y un hallazgo que necesita a Pablo — 2026-09-07
+
+Continuación del mandato "arreglá todo, no pares". Segunda tanda de la misma sesión, con la app logueada abierta en Claude in Chrome.
+
+### El typecheck de CI era un no-op — y tapaba ~110 errores de tipo reales
+
+`ci.yml` corría `npx tsc --noEmit`. El `tsconfig.json` raíz es **solution-style** (`"files": []` + `references` a `tsconfig.app.json` / `tsconfig.node.json`), y `tsc --noEmit` contra ese archivo **no chequea nada** — hay que correr `tsc -b`. Por eso el `IMG_RE is not defined` del fix `be10308` (un `TS2304` de manual) pasó CI sin un solo warning y crasheó `/hub` en producción a `ErrorBoundary`. Se arregló primero eso (`232f6ca`, deploy inmediato — `/hub` volvió a andar), después el fondo:
+
+- **`ci.yml`**: `tsc --noEmit` → `tsc -b`. Ahora chequea de verdad.
+- **`src/integrations/supabase/types.ts`**: era el stub de Lovable (`Tables: { [_ in never]: never }`) — el cliente tipado `createClient<Database>` resolvía **cada `.from()` a `never`**. Regenerado con `supabase gen types typescript --linked` → las 20 tablas reales + el RPC `match_documents`. Solo eso bajó los errores de `tsc -b` de ~110 a 42.
+- **Los 42 restantes, todos reales** (ya no ruido de `never`), arreglados en `9c98726`:
+  - `ProposalDetailDialog`: el narrowing de `if (!proposal) return null` **no llega a los handlers anidados** (`function` declarations) — TS los ve como llamables después. Se captura `const proposal = proposalProp` post-guarda.
+  - `fetchAllPages` (`services/supabase.ts`): acepta `unknown[]` del builder de PostgREST y devuelve `T[]` al caller — la fila real siempre es superset de la forma liviana que usa la UI, así que el cast es sano y va en un solo lugar.
+  - `Dashboard`: **guardas de null en aritmética de métricas** (`m.likes + m.comments + …` podía dar `NaN` si algún campo venía null), `.get(id ?? "")`, índices `?? "pending"`, y se sacaron anotaciones de parámetro redundantes (`(p: ScheduledProposal) =>`) que peleaban con la inferencia.
+  - `PublishNowCard`: `setState(m.phase ?? "idle")` — `phase` podía ser `undefined`.
+  - `integration.test.tsx`: `proposalsApi.schedule` toma **3 args** (`id, date, oferta`) — el test pasaba 2 (bug stale real) — + cast de los chains mockeados a un tipo laxo.
+- **`.gitignore`**: `*.tsbuildinfo` (los deja `tsc -b`).
+
+### Un preview que metía scroll horizontal en el diálogo de detalle (`1566b6e`)
+
+Visto en vivo: el modal de una propuesta tenía scrollbar horizontal y texto cortado a la derecha. Causa: el `<iframe>` de `PiecePreview` mide `canvas.w` (1080px) en el layout aunque `transform: scale()` lo achique visualmente — sin ancho explícito en el wrap, ese 1080 estiraba el `DialogContent` (`max-w-lg` = 512px) y **todos sus hijos** a 1082px. Fix: el wrap del iframe ahora tiene ancho explícito (`canvas.w * scale`); `fit()` mide un `rootRef` nuevo (el contenedor padre), no el wrap, para no entrar en loop de medición; `overflow-x-hidden` en el `DialogContent` como refuerzo.
+
+### 🔴 Hallazgo que necesita intervención de Pablo — la cuenta de Instagram se desconectó de Zernio
+
+La corrida de `daily-story.yml` del **2026-09-07 18:02 UTC falló** (`exit 1`). Causa real, del log: Zernio devolvió `ACCOUNT_DISCONNECTED` — *"Account … (instagram 'mejoraok') is disconnected and cannot be posted to. Your instagram access token is no longer valid. Please reconnect your account."* El token de Meta de la cuenta de Instagram en Zernio **venció** (pasa cada ~60 días con los long-lived tokens). Sept 6 la story publicó bien; entre Sept 6 15:57 y Sept 7 18:02 se cayó.
+
+**Impacto:** nada publica a Instagram hasta que Pablo reconecte. Afecta la story diaria, los 2 carruseles autoagendados (Sept 7 23:00 y Sept 8 23:00 UTC — van a fallar), el autopilot, y "Publicar ahora". Facebook puede seguir andando (cuenta aparte) pero la corrida muere en `exit 1` antes de confirmarlo.
+
+**Qué tiene que hacer Pablo (no automatizable):**
+1. Entrar a **zernio.com** → reconectar la cuenta de Instagram de Mejora Continua (re-autorizar con Meta).
+2. Después de reconectar, verificar el account ID con `GET /v1/accounts` — si cambió, actualizar el secret `ZERNIO_INSTAGRAM_ACCOUNT_ID` en GitHub Actions (hoy `6a56405a3ecd8aa344faecae`).
+3. Los carruseles que hayan quedado en `error` se republican solos en la próxima corrida del cron una vez reconectada la cuenta (siguen `scheduled`).
+
+**Fix de código aplicado (`f3fde4a`):** `scripts/lib/zernio.mjs` ahora detecta `ACCOUNT_DISCONNECTED` (en el 409 y en el fallo per-plataforma) y devuelve `{ accountDisconnected: true }` + un mensaje que dice exactamente qué hacer — eso llega a `run_log` y al "consejo del día" del copiloto en vez de un `exit 1` opaco. No cambia que haya que reconectar a mano.
+
+### Estado del EDA tras esta pasada
+
+Recorrido logueado de Dashboard, Subir material (las 6 dimensiones), Manual de Marca, Mesa de Diálogo, Propuestas (todas las pestañas + abrir el detalle de una pieza), Calendario, Monitor, Conversaciones, Auditoría, Configuración — **cero errores de consola en ninguna, todo renderiza con datos reales**. `run_log`: último `error` fue el 2026-09-05 22:53 (el 409 duplicado, ya cubierto por `9ade568`); nada roto en curso salvo la cuenta de IG desconectada de arriba. `tsc -b` / lint 0/0 / 66 tests / build / `npm audit --omit=dev` = 0, todo verde. CI + Deploy Site verdes en cada commit.
 
 ## Notas históricas
 
