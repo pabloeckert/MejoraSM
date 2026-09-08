@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-09-08T16:10:28.473Z",
+  "syncedAt": "2026-09-08T20:49:21.948Z",
   "posts": [
+    {
+      "id": "6aa03f84b56891b2985cdff9",
+      "date": "2026-09-08",
+      "status": "published",
+      "content": "¿Cuántas de tus reuniones terminan sin ninguna decisión concreta? Probá aplicar este filtro antes de agendar la próxima y contanos qué cambia.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-08-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3981794534802595943"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6a9d8d8199321de61cde5d7d",
       "date": "2026-09-06",
