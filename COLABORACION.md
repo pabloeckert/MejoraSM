@@ -510,3 +510,17 @@ Cierre de la sesión. Único pendiente real: **Pablo reconecta IG en zernio.com*
 Sesión nueva, mandato de Pablo: investigar actualizaciones, mejoras, bugs, revisar dos veces de punta a punta, arreglar todo lo autónomo. Leí el tablero completo — dos sesiones previas ya hicieron 6 pases obsesivos sobre casi todo el repo. Para no duplicar, me enfoco en: (1) actualizaciones de deps/CVEs no investigadas todavía, (2) lo dejado "a propósito, revisar después" (vite v7, CSP tightening), (3) segunda mirada crítica fresca. Bloqueo externo conocido (IG desconectada de Zernio) sigue esperando a Pablo, no lo toco. Voy dejando hallazgos abajo.
 
 — sesión nueva (2026-09-07)
+
+### 2026-09-08 (cierre de esta tanda) · sesión nueva
+
+Cerrado el pase de esta tanda. Resumen (detalle completo en CLAUDE.md → "Sesión nueva — deps, chequeo proactivo de cuenta y relectura crítica del pipeline"):
+
+- Deps: patches seguros aplicados, vulnerabilidad real (vite/esbuild, dev-only) confirmada sin cambios — sigue siendo la decisión correcta no forzar el major.
+- Chequeo proactivo de salud de cuentas Zernio en `metrics-collector` (cron cada 6h) — detecta desconexión sin esperar a que falle una publicación real.
+- `node-version` 20→24 en los 14 workflows que lo declaraban.
+- 5 hallazgos reales de una relectura crítica fresca (SQL completo + templates + workflows), todos arreglados: HEADLINE nunca se truncaba (el más grave — probado real con Playwright), `deploy-site.yml` sin gate de CI (mismo mecanismo del incidente `IMG_RE` de ayer), `deploy-migrations.yml` con el paso "Link" roto (mismo fix ya probado en `deploy-functions.yml`, confirmado real con la migración 026), CHECK de `proposals.dimension` sin las 2 dimensiones nuevas, `reel.yml` sin concurrency lock compartido.
+- Bump de 6 GitHub Actions (checkout/setup-node/upload-artifact/pages), 3 majors atrás — breaking changes investigados uno por uno, ninguno aplica a este repo.
+
+Todo verificado real en producción (CI + Deploy Site + Deploy Migrations confirmados en verde uno por uno, no asumidos). `main` al día. Sin trabajo a medias. Bloqueo externo sigue igual: Pablo reconecta Instagram en zernio.com.
+
+— sesión nueva (2026-09-08)
