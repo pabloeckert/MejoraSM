@@ -78,16 +78,14 @@ async function markRejected(reason) {
 
 async function reintentar(apiKey, proposal) {
   if (!proposal.rendered_image_path) {
-    console.error(
+    throw new Error(
       `La propuesta "${proposalId}" no tiene rendered_image_path — no puedo reintentar sin la imagen ya renderizada.`
     );
-    process.exit(1);
   }
 
   const accountId = ACCOUNT_ID_BY_PLATFORM[platform];
   if (!accountId) {
-    console.error(`Falta configurar la cuenta de Zernio para "${platform}".`);
-    process.exit(1);
+    throw new Error(`Falta configurar la cuenta de Zernio para "${platform}".`);
   }
 
   const imageUrl = `https://raw.githubusercontent.com/${process.env.GITHUB_REPOSITORY}/main/${proposal.rendered_image_path}`;
@@ -103,14 +101,12 @@ async function reintentar(apiKey, proposal) {
   console.log("Resultado:", JSON.stringify(result));
 
   if (result.existingPostId) {
-    console.error(
+    throw new Error(
       `Zernio marcó esto como contenido duplicado de las últimas 24hs (post existente: ${result.existingPostId}) — no se creó un post nuevo.`
     );
-    process.exit(1);
   }
   if (!result.success) {
-    console.error("El reintento falló — revisar el resultado de arriba.");
-    process.exit(1);
+    throw new Error("El reintento falló — revisar el resultado de arriba.");
   }
 
   console.log(
@@ -122,14 +118,12 @@ async function reintentar(apiKey, proposal) {
 
 async function despublicar(apiKey, proposal) {
   if (!UNPUBLISH_SOPORTADO.includes(platform)) {
-    console.error(
+    throw new Error(
       `Zernio no soporta despublicar "${platform}" vía API (solo: ${UNPUBLISH_SOPORTADO.join(", ")}). Instagram requiere borrado manual desde la app.`
     );
-    process.exit(1);
   }
   if (!proposal.zernio_post_id) {
-    console.error(`La propuesta "${proposalId}" no tiene zernio_post_id — no está publicada o falta sincronizar.`);
-    process.exit(1);
+    throw new Error(`La propuesta "${proposalId}" no tiene zernio_post_id — no está publicada o falta sincronizar.`);
   }
 
   console.log(`Despublicando "${platform}" del post "${proposal.zernio_post_id}"...`);
@@ -137,8 +131,7 @@ async function despublicar(apiKey, proposal) {
   console.log("Resultado:", JSON.stringify(result));
 
   if (!result.success) {
-    console.error("La despublicación falló — revisar el resultado de arriba.");
-    process.exit(1);
+    throw new Error("La despublicación falló — revisar el resultado de arriba.");
   }
 
   const motivo = result.alreadyGone
@@ -151,26 +144,21 @@ async function despublicar(apiKey, proposal) {
 async function main() {
   const apiKey = process.env.ZERNIO_API_KEY;
   if (!apiKey) {
-    console.error("Falta ZERNIO_API_KEY en el entorno.");
-    process.exit(1);
+    throw new Error("Falta ZERNIO_API_KEY en el entorno.");
   }
   if (!SUPABASE_URL || !SERVICE_KEY) {
-    console.error("Faltan SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY en el entorno.");
-    process.exit(1);
+    throw new Error("Faltan SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY en el entorno.");
   }
   if (!proposalId || !platform || !action) {
-    console.error("Uso: node scripts/manage-post.mjs <proposal_id> <platform> <reintentar|despublicar>");
-    process.exit(1);
+    throw new Error("Uso: node scripts/manage-post.mjs <proposal_id> <platform> <reintentar|despublicar>");
   }
   if (!PLATAFORMAS_OK.includes(platform)) {
-    console.error(`Plataforma "${platform}" no soportada acá (${PLATAFORMAS_OK.join("|")}).`);
-    process.exit(1);
+    throw new Error(`Plataforma "${platform}" no soportada acá (${PLATAFORMAS_OK.join("|")}).`);
   }
 
   const proposal = await fetchProposal();
   if (!proposal) {
-    console.error(`No encontré la propuesta "${proposalId}" en Supabase.`);
-    process.exit(1);
+    throw new Error(`No encontré la propuesta "${proposalId}" en Supabase.`);
   }
 
   if (action === "reintentar" || action === "despublicar") {
@@ -186,12 +174,18 @@ async function main() {
     return;
   }
 
-  console.error(`Acción "${action}" no reconocida (reintentar|despublicar).`);
-  process.exit(1);
+  throw new Error(`Acción "${action}" no reconocida (reintentar|despublicar).`);
 }
 
 main().catch(async (e) => {
-  console.error(e);
+  // Mensaje limpio en consola (no el stack trace completo) — todos los
+  // puntos de validación/fallo de arriba ahora tiran Error en vez de
+  // console.error + process.exit(1) directo (hallazgo real 2026-09-08: un
+  // process.exit(1) llamado dentro de reintentar()/despublicar() terminaba
+  // el proceso sin pasar por este catch, así que esos fallos nunca quedaban
+  // en run_log — Auditoría no mostraba ningún rastro de un reintento o
+  // despublicación que hubiera fallado por validación).
+  console.error(e?.message || e);
   await logRun({
     source: "manage-post",
     step: action || "unknown",
