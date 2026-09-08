@@ -201,14 +201,36 @@ export function PublishNowCard({ dimension }: { dimension: string }) {
 
   const imgUrl = manifest?.imagePath ? github.rawUrl(manifest.imagePath) : null;
 
+  // Hallazgo real (auditoría 2026-09-08): Hub.tsx no remonta esta card al
+  // cambiar de pestaña de dimensión (misma instancia, solo cambia el prop
+  // `dimension`) — si Pablo prepara una pieza de "Personal" y cambia a la
+  // pestaña "Comercial" mientras espera, el polling en background sigue
+  // atado a la pieza real (por nonce/manifest, nunca a `dimension`), así
+  // que la publicación en sí siempre usa la dimensión correcta. Pero el
+  // texto de acá abajo antes usaba siempre `dimension` (la pestaña ACTUAL),
+  // no la de la pieza realmente en curso — mostraba "Comercial" mientras
+  // preparaba/mostraba/publicaba una pieza que en realidad era de
+  // "Personal". Con un manifest activo, se muestra su dimensión real
+  // (`manifest.oferta`); en idle (sin nada en curso todavía) sigue
+  // mostrando la pestaña actual, que ahí sí es la que corresponde.
+  const activeDimLabel = dimensionLabel(state === "idle" ? dimension : manifest?.oferta || dimension);
+
   return (
     <Card>
       <CardContent className="space-y-4 p-5">
         <div>
           <h3 className="text-sm font-semibold">Publicar una story ahora</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Subí la foto arriba (dimensión <b>{dimensionLabel(dimension)}</b>), después tocá "Preparar": el sistema arma
-            el copy y la imagen, la ves, y recién ahí publicás en Instagram y Facebook.
+            {state === "idle" ? (
+              <>
+                Subí la foto arriba (dimensión <b>{activeDimLabel}</b>), después tocá "Preparar": el sistema arma el
+                copy y la imagen, la ves, y recién ahí publicás en Instagram y Facebook.
+              </>
+            ) : (
+              <>
+                Pieza de <b>{activeDimLabel}</b> {state === "preparing" ? "en preparación" : state === "publishing" ? "publicándose" : state === "published" ? "publicada" : "lista"}.
+              </>
+            )}
           </p>
         </div>
 
@@ -335,7 +357,7 @@ export function PublishNowCard({ dimension }: { dimension: string }) {
                 </Button>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  Subí de nuevo una foto de <b>{dimensionLabel(dimension)}</b> arriba para reintentar.
+                  Subí de nuevo una foto de <b>{activeDimLabel}</b> arriba para reintentar.
                 </p>
               )}
               <Button variant="outline" size="sm" onClick={reset}>

@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Brain, Paintbrush, Shield, Save, Loader2, Info, History } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/services/supabase";
@@ -77,8 +77,18 @@ function ConfiguracionContent() {
 
   const [config, setConfig] = useState<AgentConfigState>({});
 
-  // Initialize from DB or defaults
+  // Solo inicializa una vez — hallazgo real (auditoría 2026-09-08): antes
+  // este efecto corría en cada cambio de referencia de `dbConfig` (una
+  // query de React Query siempre devuelve un array nuevo en cada refetch),
+  // y `saveMutation.onSuccess` invalida esa misma query — así que guardar
+  // el prompt del Estratega mientras Pablo seguía tipeando en el del
+  // Creativo pisaba esa edición en curso apenas terminaba el guardado, sin
+  // ningún aviso. Mismo criterio ya usado en ProposalDetailDialog.tsx para
+  // el mismo problema (resetear por id/evento puntual, no por cada dato
+  // nuevo de la query).
+  const initializedRef = useRef(false);
   useEffect(() => {
+    if (initializedRef.current) return;
     if (dbConfig && dbConfig.length > 0) {
       const mapped = Object.fromEntries(
         dbConfig.map((c) => [
@@ -87,6 +97,7 @@ function ConfiguracionContent() {
         ])
       );
       setConfig(mapped);
+      initializedRef.current = true;
     } else if (!isLoading) {
       // Defaults — provider/model son ignorados por pickModel() desde el
       // 2026-08-05, se guardan solo para no dejar la columna NULL.
@@ -103,6 +114,7 @@ function ConfiguracionContent() {
           ])
         )
       );
+      initializedRef.current = true;
     }
   }, [dbConfig, isLoading]);
 
