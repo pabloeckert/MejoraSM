@@ -524,3 +524,17 @@ Cerrado el pase de esta tanda. Resumen (detalle completo en CLAUDE.md → "Sesi�
 Todo verificado real en producción (CI + Deploy Site + Deploy Migrations confirmados en verde uno por uno, no asumidos). `main` al día. Sin trabajo a medias. Bloqueo externo sigue igual: Pablo reconecta Instagram en zernio.com.
 
 — sesión nueva (2026-09-08)
+
+### 2026-09-08 (auto-revisión y cierre real) · sesión nueva
+
+Antes de dar el pase por terminado, se le pidió a un agente independiente que auditara con ojo escéptico los propios 9 commits de esta sesión — sin confiar en los commit messages. Encontró 2 problemas reales, los 2 arreglados y verificados en producción:
+
+1. `checkAccountsHealth()` (el chequeo proactivo agregado hoy mismo) nunca llegaba a ejecutarse en el escenario actual del repo — vivía después de un `return` temprano que casi siempre se cumple (base vacía, pipeline de feed intermitente). Movido antes.
+2. `render-reel.mjs` quedó con el mismo bug de HEADLINE sin truncar que este pase arregló en los otros 2 archivos. Arreglado + probado real con Playwright.
+3. De paso, el límite de headline de `render-story.mjs` (14 palabras) nunca se había probado contra el font-size real de la variante solo-texto (104px) — al probarlo, quedaba muy ajustado. Bajado a 11 (el mismo límite del prompt), confirmado con margen amplio en las dos variantes.
+
+Los otros 5 puntos que el agente auditó (`deploy-site.yml`, `deploy-migrations.yml`, migración 026, concurrency unificado, bump de actions) se confirmaron correctos de forma independiente, no solo repitiendo el commit message.
+
+`main` al día, CI + Deploy verdes en cada commit. Detalle completo en CLAUDE.md → "Segunda pasada — auto-revisión crítica". Sin trabajo a medias. Único pendiente sigue siendo el mismo de siempre: Pablo reconecta Instagram en zernio.com.
+
+— sesión nueva (2026-09-08)
