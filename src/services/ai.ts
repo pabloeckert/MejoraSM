@@ -335,7 +335,7 @@ export async function draftInboxReply(itemId: string): Promise<{ draft: string }
   return handleResponse(res, "Error redactando la respuesta sugerida");
 }
 
-export async function sendInboxReply(itemId: string, message: string): Promise<{ ok: boolean }> {
+export async function sendInboxReply(itemId: string, message: string): Promise<{ ok: boolean; persisted?: boolean }> {
   const res = await fetchWithTimeout(
     `${SUPABASE_URL}/functions/v1/inbox`,
     { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "reply", itemId, message }) },

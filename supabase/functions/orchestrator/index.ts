@@ -467,6 +467,21 @@ async function pickExplorationHour(): Promise<number> {
 // mismo bloque de siempre, reusable desde los tres lugares que necesitan
 // crear una propuesta real a partir de contenido ya escrito por el Creativo
 // (runDebate, continueSession, y forceApprove — el override humano de abajo).
+// Hallazgo real (auditoría 2026-09-08): el insert de acá abajo nunca
+// chequeaba `error` — si el índice único idx_proposals_no_duplicate_schedule
+// (012_idempotencia_scheduling.sql, sobre oferta+día+formato) lo rechazaba
+// por una colisión real (dos llamadas a orchestrator que aprueban casi al
+// mismo tiempo — ej. autopilot.mjs corriendo mientras Pablo aprueba a mano
+// una Mesa de Diálogo, o dos rondas de continue/forceApprove calculando el
+// mismo slot antes de que cualquiera de las dos inserte), `proposalId`
+// quedaba `null` en silencio y la función igual devolvía `autoPublished:
+// true` — dialogue_sessions.metadata y el toast que ve Pablo dicen "esto ya
+// se agendó solo", pero no existe ninguna fila en `proposals`. El contenido
+// aprobado por el Crítico se pierde sin ningún rastro visible.
+async function insertProposalOnce(insert: Record<string, unknown>) {
+  return await supabase.from("proposals").insert(insert).select("id").single();
+}
+
 async function createProposalFromContent(sessionId: string, contenido: string, estrategia: string, titleFallback: string) {
   const proposal = extractProposal(contenido, estrategia);
   const format = proposal.format || "post";
@@ -496,7 +511,27 @@ async function createProposalFromContent(sessionId: string, contenido: string, e
     insert.status = "pending";
   }
 
-  const { data: insertedProposal } = await supabase.from("proposals").insert(insert).select("id").single();
+  let { data: insertedProposal, error: insertError } = await insertProposalOnce(insert);
+
+  // Colisión real contra el índice único de agenda — recalcular oferta/slot
+  // (ahora que la propuesta que ganó la carrera ya está insertada, deberían
+  // salir distintos) y reintentar una sola vez. Mismo patrón que ya usa
+  // copilot/index.ts para el 23505 de copilot_advice y repo/index.ts para
+  // el 409 de GitHub.
+  if (insertError?.code === "23505" && autoPublished) {
+    insert.oferta = await pickNextOferta();
+    const retrySlot = await pickNextSlot();
+    insert.scheduled_at = retrySlot.iso;
+    experimentHour = retrySlot.experimentHour;
+    oferta = insert.oferta as string;
+    scheduledAt = retrySlot.iso;
+    ({ data: insertedProposal, error: insertError } = await insertProposalOnce(insert));
+  }
+
+  if (insertError) {
+    throw new Error(`No se pudo crear la propuesta: ${insertError.message}`);
+  }
+
   const proposalId = insertedProposal?.id ?? null;
 
   // Fase 4 — registrar el experimento de timing (solo cuando exploramos, no
@@ -831,7 +866,7 @@ async function runDebate(session: { id: string }, topic: string) {
 
   // 6. Actualizar sesión (después de crear la propuesta, para poder
   // guardar el proposalId/autoPublished en el metadata también)
-  await supabase
+  const { error: updateError } = await supabase
     .from("dialogue_sessions")
     .update({
       status: evaluacion.aprobado ? "approved" : "needs_review",
@@ -848,6 +883,24 @@ async function runDebate(session: { id: string }, topic: string) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", session.id);
+
+  // Hallazgo real (auditoría 2026-09-08): este update nunca chequeaba
+  // error — si fallaba (RLS, blip de red, timeout) DESPUÉS de que la
+  // propuesta ya se hubiera creado/agendado, la sesión quedaba en "active"
+  // para siempre, exactamente el síntoma que el catch de startSession
+  // (más abajo) fue agregado a propósito para eliminar — solo que por una
+  // vía que ese catch no cubre (una excepción, no un {error} devuelto). No
+  // se relanza (la propuesta y el contenido ya están guardados de verdad,
+  // no hay nada que revertir) — solo se deja visible en /auditoria.
+  if (updateError) {
+    await logRun({
+      source: "orchestrator",
+      step: "runDebate-update-session",
+      status: "error",
+      proposalId,
+      error: `dialogue_sessions.update falló tras crear la propuesta: ${updateError.message}`,
+    });
+  }
 
   return {
     sessionId: session.id,
@@ -959,7 +1012,7 @@ async function continueSession(sessionId: string, feedback: string) {
     scheduledAt = created.scheduledAt;
     oferta = created.oferta;
 
-    await supabase
+    const { error: updateError } = await supabase
       .from("dialogue_sessions")
       .update({
         status: "approved",
@@ -976,6 +1029,17 @@ async function continueSession(sessionId: string, feedback: string) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", sessionId);
+
+    // Mismo hallazgo que en runDebate — ver el comentario de arriba.
+    if (updateError) {
+      await logRun({
+        source: "orchestrator",
+        step: "continueSession-update-session",
+        status: "error",
+        proposalId,
+        error: `dialogue_sessions.update falló tras crear la propuesta: ${updateError.message}`,
+      });
+    }
   }
 
   return {
@@ -1034,7 +1098,7 @@ async function forceApprove(sessionId: string) {
     (messages?.length || 0) + 1
   );
 
-  await supabase
+  const { error: updateError } = await supabase
     .from("dialogue_sessions")
     .update({
       status: "approved",
@@ -1052,6 +1116,17 @@ async function forceApprove(sessionId: string) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", sessionId);
+
+  // Mismo hallazgo que en runDebate/continueSession — ver el comentario ahí.
+  if (updateError) {
+    await logRun({
+      source: "orchestrator",
+      step: "forceApprove-update-session",
+      status: "error",
+      proposalId: created.proposalId,
+      error: `dialogue_sessions.update falló tras crear la propuesta: ${updateError.message}`,
+    });
+  }
 
   return {
     sessionId,

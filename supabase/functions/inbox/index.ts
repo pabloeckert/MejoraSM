@@ -392,10 +392,19 @@ async function reply(itemId: string, message: string) {
     await zPost(`/inbox/conversations/${item.thread_id}/messages`, { accountId: item.account_id, message });
   }
 
+  // El envío de arriba ya es real e irreversible — el mensaje le llegó a un
+  // cliente real. Lo de acá abajo es solo registro propio; si falla, NO hay
+  // que reportar la operación como fallida (eso llevaría a un reintento real
+  // de envío). Hallazgo real (auditoría 2026-09-08): antes estas dos
+  // escrituras no chequeaban error — si `replied_at` no llegaba a setearse,
+  // Conversaciones.tsx sigue filtrando el hilo como "sin responder" para
+  // siempre, aunque ya se le mandó una respuesta real. Riesgo concreto:
+  // alguien ve el hilo "sin responder" y le manda una segunda respuesta real
+  // al mismo cliente pensando que la primera nunca salió.
   const now = new Date().toISOString();
-  await supabase.from("inbox_items").update({ replied_at: now }).eq("id", itemId);
+  const { error: updateError } = await supabase.from("inbox_items").update({ replied_at: now }).eq("id", itemId);
   // Guardar nuestra respuesta como fila outgoing para que se vea el hilo.
-  await supabase.from("inbox_items").insert({
+  const { error: insertError } = await supabase.from("inbox_items").insert({
     kind: item.kind,
     platform: item.platform,
     account_id: item.account_id,
@@ -406,7 +415,18 @@ async function reply(itemId: string, message: string) {
     direction: "outgoing",
     item_time: now,
   });
-  return { ok: true };
+
+  if (updateError || insertError) {
+    await logRun({
+      source: "inbox",
+      step: "reply-persist",
+      status: "error",
+      error: `Mensaje real enviado a Zernio OK, pero el registro en inbox_items falló (update: ${updateError?.message || "ok"}, insert: ${insertError?.message || "ok"}) — el hilo puede seguir figurando "sin responder" pese a que ya se contestó.`,
+      metadata: { itemId, threadId: item.thread_id },
+    });
+    return { ok: true, persisted: false };
+  }
+  return { ok: true, persisted: true };
 }
 
 // ═══════════════════════════════════════

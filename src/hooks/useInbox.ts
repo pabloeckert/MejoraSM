@@ -69,9 +69,21 @@ export function useSendReply() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ itemId, message }: { itemId: string; message: string }) => sendInboxReply(itemId, message),
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ["inbox"] });
-      toast({ title: "Respuesta enviada" });
+      // El mensaje real ya se mandó siempre (result.ok) — persisted:false
+      // significa que el registro propio falló (hallazgo real 2026-09-08):
+      // el hilo puede seguir figurando "sin responder" pese a que ya se
+      // contestó. Avisar para que no se mande una segunda respuesta real
+      // pensando que la primera no salió.
+      if (result.persisted === false) {
+        toast({
+          title: "Respuesta enviada",
+          description: "Se mandó bien, pero no se pudo actualizar el registro acá — puede seguir apareciendo como sin responder.",
+        });
+      } else {
+        toast({ title: "Respuesta enviada" });
+      }
     },
     onError: (err: Error) =>
       toast({ variant: "destructive", title: "No se pudo enviar", description: err.message }),
