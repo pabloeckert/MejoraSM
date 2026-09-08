@@ -251,6 +251,27 @@ async function collectAllPending() {
     };
   }
 
+  // Chequeo de salud de cuentas — corre siempre que haya apiKey, ANTES de
+  // mirar si hay proposals. Bug real encontrado en una auto-revisión
+  // (2026-09-08): esto vivía después del `return` temprano de "no hay
+  // proposals publicadas" (unas líneas más abajo) — con la base vacía desde
+  // el wipe del 2026-09-01 y el pipeline de feed dependiendo de que el
+  // Crítico apruebe algo (autopilot corre 3x/semana con ~50% de rechazo),
+  // ese `return` se ejecutaba casi siempre y el chequeo de salud nunca
+  // llegaba a correr — justo el escenario real de hoy. El propósito
+  // declarado ("detectar la desconexión sin esperar a que falle una
+  // publicación real") requiere que corra siempre, no solo cuando además
+  // hay contenido de feed ya publicado.
+  const health = await checkAccountsHealth(apiKey);
+  if (health && health.disconnected.length > 0) {
+    await logRun({
+      source: "metrics-collector",
+      step: "health-check",
+      status: "skipped",
+      metadata: { reason: "account-disconnected", platforms: health.disconnected, via: "accounts-health-check" },
+    });
+  }
+
   // zernio_post_id es lo que efectivamente llena el pipeline actual
   // (scripts/publish-scheduled-posts.mjs, vía Zernio) — instagram_post_id es
   // legacy del publisher viejo (Graph API directa) y ya no lo escribe nadie.
@@ -261,7 +282,7 @@ async function collectAllPending() {
     .not("zernio_post_id", "is", null);
 
   if (!proposals?.length) {
-    return { message: "No hay posts publicados para recolectar métricas", count: 0 };
+    return { message: "No hay posts publicados para recolectar métricas", count: 0, accountsHealth: health };
   }
 
   const results = [];
@@ -287,20 +308,6 @@ async function collectAllPending() {
         error: e.message,
       });
     }
-  }
-
-  // Chequeo de salud de cuentas, aparte del resultado de métricas — un log
-  // propio con el mismo contrato que ya usan Dashboard/copilot
-  // (metadata->>reason = "account-disconnected"), para no esperar a que
-  // falle una publicación real.
-  const health = await checkAccountsHealth(apiKey);
-  if (health && health.disconnected.length > 0) {
-    await logRun({
-      source: "metrics-collector",
-      step: "health-check",
-      status: "skipped",
-      metadata: { reason: "account-disconnected", platforms: health.disconnected, via: "accounts-health-check" },
-    });
   }
 
   // count = piezas realmente medidas. Un post en "202 pendiente" o "stale" no

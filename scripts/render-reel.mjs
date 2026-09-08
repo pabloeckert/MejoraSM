@@ -45,6 +45,20 @@ function escapeHtml(s = "") {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+// Guardrail defensivo — no existía acá. Mismo hallazgo real ya arreglado en
+// render-scheduled-posts.mjs y render-story.mjs (2026-09-08): el prompt le
+// pide a Claude "max 12 palabras" para headline y "max 18" para subtext,
+// pero nada en el código lo verificaba. El overlay del Reel no tiene
+// max-height/line-clamp en .headline (font-size 76px) ni tope superior en
+// .panel — un hook verbose puede superponerse con .rule/.subtext/.brand en
+// una pieza que se publica de forma autónoma. Margen chico sobre lo que ya
+// pide el prompt, no un límite nuevo distinto.
+function truncateWords(text = "", maxWords = 14) {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= maxWords) return text.trim();
+  return words.slice(0, maxWords).join(" ") + "…";
+}
+
 async function pickPhoto() {
   const dir = path.join(INBOX_DIR, OFERTA);
   if (!existsSync(dir)) return null;
@@ -102,9 +116,9 @@ html, body { width: 1080px; height: 1920px; background: transparent; }
   <div class="scrim"></div>
   <div class="panel">
     <div class="kicker">${escapeHtml(brief.kicker || "MEJORA CONTINUA")}</div>
-    <div class="headline">${escapeHtml(brief.headline || "")}</div>
+    <div class="headline">${escapeHtml(truncateWords(brief.headline || "", 13))}</div>
     <div class="rule"></div>
-    <div class="subtext">${escapeHtml(brief.subtext || "")}</div>
+    <div class="subtext">${escapeHtml(truncateWords(brief.subtext || "", 20))}</div>
   </div>
   <div class="brand">Mejora Continua</div>
   <div class="site">mejoraok.com</div>

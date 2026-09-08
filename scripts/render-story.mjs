@@ -51,7 +51,12 @@ function escapeHtml(str = "") {
 // story-collage-template.html no truncan ni recortan overflow (screenshot
 // sin fullPage), así que un headline/subtext verbose se corta en seco o se
 // superpone en una story que se publica sola, sin ningún gate humano.
-// Margen chico sobre lo que ya pide el prompt, no un límite nuevo distinto.
+// El headline usa el mismo límite que ya pide el prompt (11), sin margen —
+// probado real con Playwright contra story-template.html en la variante
+// solo-texto (font-size 104px, el peor caso): un límite de 14 (margen +3)
+// llenaba casi 6 líneas y quedaba muy cerca del footer; 11 deja aire de
+// sobra. El subtext sí mantiene margen (+4 sobre el límite del prompt) —
+// su font-size es bastante menor (42-46px) y tolera más texto sin riesgo.
 function truncateWords(text = "", maxWords = 30) {
   const words = text.trim().split(/\s+/);
   if (words.length <= maxWords) return text.trim();
@@ -106,7 +111,7 @@ async function main() {
         .replace("{{PHOTO_STYLE_2}}", () => style2)
         .replace("{{PANE2_VACIO}}", () => "")
         .replace("{{KICKER}}", () => escapeHtml(brief.kicker || "MEJORA CONTINUA"))
-        .replace("{{HEADLINE}}", () => escapeHtml(truncateWords(brief.headline || "", 14)))
+        .replace("{{HEADLINE}}", () => escapeHtml(truncateWords(brief.headline || "", 11)))
         .replace("{{SUBTEXT}}", () => escapeHtml(truncateWords(brief.subtext || "")));
     } else {
       let photoStyle = "";
@@ -120,7 +125,7 @@ async function main() {
         .replace("{{MODE_CLASS}}", () => (brief.mode === "foto" ? "" : "solo-texto"))
         .replace("{{PHOTO_STYLE}}", () => photoStyle)
         .replace("{{KICKER}}", () => escapeHtml(brief.kicker || "MEJORA CONTINUA"))
-        .replace("{{HEADLINE}}", () => escapeHtml(truncateWords(brief.headline || "", 14)))
+        .replace("{{HEADLINE}}", () => escapeHtml(truncateWords(brief.headline || "", 11)))
         .replace("{{SUBTEXT}}", () => escapeHtml(truncateWords(brief.subtext || "")));
     }
 
