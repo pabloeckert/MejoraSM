@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -576,6 +576,20 @@ export default function Monitor() {
   const accionesManuales = data?.accionesManuales || new Map<string, AccionManual>();
   const [syncing, setSyncing] = useState(false);
 
+  // Guard de desmontaje — hallazgo real (auditoría 2026-09-08): los dos
+  // setTimeout de refreshAfterAction (~95s en total) no tenían cleanup ni
+  // chequeo de si el componente seguía montado. Si Pablo navega afuera de
+  // /monitor en esa ventana después de Reintentar/Despublicar/"Ya lo hice a
+  // mano", el setSyncing final corría sobre un componente ya desmontado
+  // (warning de React, no un crash — pero evitable).
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   // manage-post.yml/manage-story.yml solo tocan Zernio/proposals — a
   // diferencia de mark-manual.yml, no escriben historial_cache. Sin este
   // paso, un reintento/despublicación quedaba invisible acá hasta el cron
@@ -587,12 +601,14 @@ export default function Monitor() {
   function refreshAfterAction() {
     setSyncing(true);
     setTimeout(() => {
+      if (!mountedRef.current) return;
       github.triggerWorkflow("sync-history.yml", {}).catch(() => {
         // best-effort — el botón "Actualizar" de arriba sigue disponible como respaldo
       });
       setTimeout(async () => {
+        if (!mountedRef.current) return;
         await refetch();
-        setSyncing(false);
+        if (mountedRef.current) setSyncing(false);
       }, 20_000);
     }, 75_000);
   }
