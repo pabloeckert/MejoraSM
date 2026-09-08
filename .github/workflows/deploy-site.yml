@@ -45,7 +45,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -61,6 +61,30 @@ jobs:
 
       - name: Instalar dependencias
         run: npm ci --legacy-peer-deps
+
+      # Gate real antes de publicar — hallazgo 2026-09-07: este workflow y
+      # ci.yml disparan de forma independiente sobre el mismo push, sin
+      # ningún `needs`/`workflow_run` entre ellos. `npm run build` es
+      # `vite build` a secas (no tipa) — si ci.yml falla en rojo por un
+      # error de tsc/lint/test, este workflow igual construye y publica el
+      # código roto a producción (el mecanismo exacto detrás del incidente
+      # real de "IMG_RE is not defined" del 2026-09-07: pasó CI cuando el
+      # typecheck todavía era un no-op, y sin este gate hubiera pasado
+      # igual incluso con tsc -b ya arreglado). Mismos tres chequeos que
+      # ci.yml, corridos acá también — sí, es redundante con CI, pero es la
+      # única forma de que un error real bloquee la publicación en vez de
+      # solo ponerse en rojo en un workflow que nadie está mirando.
+      - name: Typecheck (gate)
+        run: npx tsc -b
+
+      - name: Lint (gate)
+        run: npm run lint
+
+      - name: Tests (gate)
+        run: npm test
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
       - name: Build EDA (Vite)
         run: npm run build
