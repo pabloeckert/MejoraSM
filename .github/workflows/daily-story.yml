@@ -14,8 +14,11 @@ on:
         type: boolean
         default: true
 
+# Grupo compartido con publish-now/publish-scheduled-posts/reel (2026-09-08)
+# — los 4 tocan content/inbox/, content/used/ y content/work/. Ver el
+# comentario completo en publish-now.yml.
 concurrency:
-  group: daily-story
+  group: content-pipeline
   cancel-in-progress: false
 
 permissions:

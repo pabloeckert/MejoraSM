@@ -32,10 +32,15 @@ on:
         required: false
         default: "manual"
 
-# Comparte grupo con daily-story para que nunca corran a la vez (los dos
-# tocan content/work/ y content/published/).
+# Grupo compartido con daily-story/publish-scheduled-posts/reel (2026-09-08)
+# — los 4 workflows leen/escriben content/inbox/, content/used/ y
+# content/work/. Antes cada uno tenía su propio grupo y solo daily-story/
+# publish-now compartían uno; reel.yml podía correr (disparo manual) al
+# mismo tiempo que publish-scheduled-posts (cron irregular, cada 1-5h por
+# el throttling de GitHub) y levantar la misma foto para dos piezas
+# distintas — hallazgo real de una relectura crítica del pipeline.
 concurrency:
-  group: daily-story
+  group: content-pipeline
   cancel-in-progress: false
 
 permissions:

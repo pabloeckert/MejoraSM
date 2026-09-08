@@ -24,8 +24,14 @@ on:
         type: boolean
         default: true
 
+# Grupo compartido con daily-story/publish-now/publish-scheduled-posts
+# (2026-09-08) — antes tenía su propio grupo (reel), sin ningún lock
+# compartido con los otros 3 workflows que leen/escriben las mismas
+# carpetas de content/inbox/<dimensión>/ — un reel disparado a mano
+# mientras corría una publicación pendiente podía levantar la misma foto
+# para dos piezas distintas. Ver el comentario completo en publish-now.yml.
 concurrency:
-  group: reel
+  group: content-pipeline
   cancel-in-progress: false
 
 permissions:

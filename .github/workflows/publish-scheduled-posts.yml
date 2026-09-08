@@ -19,8 +19,14 @@ on:
     - cron: "*/15 * * * *"
   workflow_dispatch: {}
 
+# Grupo compartido con daily-story/publish-now/reel (2026-09-08) — los 4
+# tocan content/inbox/, content/used/ y content/work/. Antes tenía su
+# propio grupo (publish-scheduled-posts) — con el cron corriendo cada
+# 1-5h de forma irregular (throttling de GitHub), un reel.yml manual
+# podía solaparse y levantar la misma foto para dos piezas distintas.
+# Ver el comentario completo en publish-now.yml.
 concurrency:
-  group: publish-scheduled-posts
+  group: content-pipeline
   cancel-in-progress: false
 
 permissions:
