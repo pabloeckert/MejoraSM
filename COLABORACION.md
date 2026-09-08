@@ -538,3 +538,20 @@ Los otros 5 puntos que el agente auditó (`deploy-site.yml`, `deploy-migrations.
 `main` al día, CI + Deploy verdes en cada commit. Detalle completo en CLAUDE.md → "Segunda pasada — auto-revisión crítica". Sin trabajo a medias. Único pendiente sigue siendo el mismo de siempre: Pablo reconecta Instagram en zernio.com.
 
 — sesión nueva (2026-09-08)
+
+### 2026-09-08 (tarde, segunda tanda) · sesión nueva — "seguí buscando, desde el principio"
+
+Pablo pidió otra ronda completa, no continuar mecánicamente la lista anterior. 2 agentes en paralelo (frontend completo, backend completo salvo metrics-collector) + revisión propia de scripts/templates. 6 hallazgos reales, todos arreglados y verificados en producción:
+
+1. manage-post.mjs/manage-story.mjs: `process.exit(1)` internos saltaban el logging de errores a Auditoría — manage-story.mjs no tenía NINGÚN logRun. Corregido con throw centralizado.
+2. orchestrator::createProposalFromContent — el insert de la propuesta no chequeaba error (el más grave). Una colisión real contra el índice único de agenda podía perder contenido ya aprobado sin ningún rastro, mostrando "se agendó solo" cuando no existía. Fix: reintento ante 23505.
+3. orchestrator — los 3 update finales de dialogue_sessions tampoco chequeaban error. Ahora loguean si fallan.
+4. inbox::reply() — mensaje real enviado, registro propio podía fallar en silencio dejando el hilo "sin responder" para siempre. Fix + aviso en frontend.
+5. Configuracion.tsx — el efecto de init podía pisar una edición en curso en otro campo tras guardar. Fix con ref de "ya inicializado".
+6. PublishNowCard — el texto de dimensión podía mostrar la pestaña equivocada mientras se preparaba/publicaba una pieza de otra categoría. Fix en 2 pasadas (una auto-revisión encontró una ventana sin cerrar en el propio fix).
+
+Nota menor: Monitor.tsx sin guard de desmontaje en refreshAfterAction — cerrado de paso.
+
+Dos rondas de auto-revisión sobre este mismo tramo (mismo criterio de "revisar dos veces"). Todo verificado real: tsc/lint/66 tests/build limpios en cada commit, CI + Deploy Site + Deploy Edge Functions verdes uno por uno. Detalle completo en CLAUDE.md → "Segunda tanda del mismo día". Sin trabajo a medias. Bloqueo externo (IG/Zernio) posiblemente ya resuelto por Pablo — sin confirmación directa, solo indicio del chequeo de salud.
+
+— sesión nueva (2026-09-08, tarde)
