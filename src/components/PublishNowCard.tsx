@@ -57,6 +57,15 @@ export function PublishNowCard({ dimension }: { dimension: string }) {
   const pollStopRef = useRef<() => void>(() => {});
   const stateRef = useRef<UiState>("idle");
   stateRef.current = state;
+  // Laguna real encontrada en una auto-revisión (2026-09-08) del fix de
+  // activeDimLabel: durante "preparing", `manifest` sigue null hasta que
+  // llega el primer resultado del polling — si Pablo cambia de pestaña de
+  // dimensión mientras espera, el fallback a `dimension` (la pestaña ACTUAL)
+  // seguía mostrando la dimensión equivocada para esa ventana. Este ref
+  // guarda la dimensión real de la pieza en curso desde el momento en que
+  // se dispara (handlePrepare) o se recupera (resume), sin depender de que
+  // el manifest ya haya llegado.
+  const activeOfertaRef = useRef<string | null>(null);
   const qc = useQueryClient();
 
   const inboxPath = `content/inbox/${dimension}`;
@@ -80,6 +89,7 @@ export function PublishNowCard({ dimension }: { dimension: string }) {
         const resumable = m.phase === "prepared" || m.phase === "published" || m.phase === "error";
         if (fresh && m.oferta === dimension && resumable && stateRef.current === "idle") {
           nonceRef.current = m.nonce || "";
+          activeOfertaRef.current = m.oferta ?? null;
           setManifest(m);
           if (m.phase === "error") {
             setErrorMsg(m.error || "La preparación anterior falló. Probá de nuevo.");
@@ -152,6 +162,7 @@ export function PublishNowCard({ dimension }: { dimension: string }) {
     setManifest(null);
     const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     nonceRef.current = nonce;
+    activeOfertaRef.current = dimension;
     setState("preparing");
     try {
       await github.triggerWorkflow("publish-now.yml", {
@@ -193,6 +204,7 @@ export function PublishNowCard({ dimension }: { dimension: string }) {
         .putJsonFile(MANIFEST_PATH, { ...manifest, phase: "discarded", updatedAt: new Date().toISOString() }, "publicar ahora: descartado")
         .catch(() => {});
     }
+    activeOfertaRef.current = null;
     setState("idle");
     setManifest(null);
     setErrorMsg(null);
@@ -213,7 +225,7 @@ export function PublishNowCard({ dimension }: { dimension: string }) {
   // "Personal". Con un manifest activo, se muestra su dimensión real
   // (`manifest.oferta`); en idle (sin nada en curso todavía) sigue
   // mostrando la pestaña actual, que ahí sí es la que corresponde.
-  const activeDimLabel = dimensionLabel(state === "idle" ? dimension : manifest?.oferta || dimension);
+  const activeDimLabel = dimensionLabel(state === "idle" ? dimension : manifest?.oferta || activeOfertaRef.current || dimension);
 
   return (
     <Card>
