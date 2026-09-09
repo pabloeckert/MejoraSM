@@ -237,11 +237,38 @@
     opacity: 0.06;
     pointer-events: none;
   }
+
+  /* Molde "pregunta directa" (2026-09-09) - uno de 9 moldes de un
+     brainstorm de diseno externo (handoff de Claude Design), elegido por
+     ser el de mayor impacto con menor riesgo: no cambia el prompt del
+     Creativo ni inventa contenido - reusa el mismo hook que ya se genera
+     hoy, solo con un layout distinto cuando ese hook es una pregunta real
+     (termina en "?", ver render-scheduled-posts.mjs). El "?" gigante
+     detras del texto, en un gris casi invisible, es un gancho de scroll
+     mas agresivo sin subir el tono de marca ni competir con el texto -
+     mismo criterio que ya usa el isotipo de fondo. Oculto por default;
+     solo la variante solo-texto+pregunta lo muestra (con foto, el "?"
+     competiria con la imagen - se deja fuera del alcance por prudencia). */
+  .qmark { display: none; }
+  .post.solo-texto.pregunta .qmark {
+    display: block;
+    position: absolute;
+    top: -40px;
+    right: 40px;
+    font-family: "Bw Modelica", "League Spartan", sans-serif;
+    font-weight: 500;
+    font-size: 460px;
+    line-height: 1;
+    color: var(--gris);
+    opacity: 0.55;
+    pointer-events: none;
+  }
 </style>
 </head>
 <body>
   <div class="post {{MODE_CLASS}}">
     <div class="watermark"></div>
+    <div class="qmark">?</div>
     <div class="photo-backdrop"></div>
     <div class="photo"></div>
     <div class="scrim"></div>

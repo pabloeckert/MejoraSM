@@ -279,17 +279,26 @@ async function main() {
 
   async function renderSlide(template, { photo, ofertaLabel, kicker, headline, subtext }) {
     const photoStyle = photo ? await photoStyleFor(photo) : "";
+    const truncatedHeadline = truncateHeadline(headline);
+    // Molde "pregunta directa" (2026-09-09, uno de 9 moldes de un
+    // brainstorm de diseño externo, elegido por reusar el mismo contenido
+    // de siempre sin inventar nada) — se activa solo sin foto (con foto el
+    // "?" decorativo competiría con la imagen) y solo si el headline YA
+    // TRUNCADO termina en "?" — chequear el original arriesgaría activar
+    // el modo con un texto que, después de truncar, ya no termina en
+    // pregunta (truncateHeadline puede cortar en una coma intermedia).
+    const modeClass = photo ? "" : truncatedHeadline.trim().endsWith("?") ? "solo-texto pregunta" : "solo-texto";
     // Reemplazo vía función, no string directo: si el texto generado por IA
     // contuviera literalmente "$&"/"$$"/"$`"/"$'", String.replace() los
     // interpreta como patrones especiales (inserta el propio match, etc.)
     // incluso con un patrón de búsqueda que es un string plano, no un regex
     // — un replacer función nunca sufre esa interpretación.
     return template
-      .replace("{{MODE_CLASS}}", () => (photo ? "" : "solo-texto"))
+      .replace("{{MODE_CLASS}}", () => modeClass)
       .replace("{{PHOTO_STYLE}}", () => photoStyle)
       .replace("{{OFERTA_LABEL}}", () => escapeHtml(ofertaLabel))
       .replace("{{KICKER}}", () => escapeHtml(kicker))
-      .replace("{{HEADLINE}}", () => escapeHtml(truncateHeadline(headline)))
+      .replace("{{HEADLINE}}", () => escapeHtml(truncatedHeadline))
       .replace("{{SUBTEXT}}", () => escapeHtml(truncateWords(subtext)));
   }
 

@@ -91,14 +91,22 @@ export function PiecePreview({
   // en el hook/body generado por IA dispararía la interpretación especial de
   // patrones de String.replace() (aplica con un patrón de búsqueda string
   // plano igual, no solo con regex) — una función replacer no la sufre.
+  // Molde "pregunta directa" (2026-09-09): mismo criterio que
+  // render-scheduled-posts.mjs — si el hook termina en "?", el preview
+  // muestra el mismo layout que va a salir publicado. No trunca el hook
+  // acá (a diferencia del render real) porque este preview nunca truncó
+  // nada — el hook real casi siempre entra dentro del límite que ya le
+  // pide el prompt del Creativo, así que la diferencia es marginal.
+  const cleanHeadline = (hook || "").replace(/\*\*/g, "");
+  const modeClass = cleanHeadline.trim().endsWith("?") ? "solo-texto pregunta" : "solo-texto";
   const html =
     template &&
     template
-      .replace("{{MODE_CLASS}}", () => "solo-texto")
+      .replace("{{MODE_CLASS}}", () => modeClass)
       .replace("{{PHOTO_STYLE}}", () => "")
       .replace("{{OFERTA_LABEL}}", () => esc(dimensionLabel(oferta) || "Mejora Continua"))
       .replace("{{KICKER}}", () => esc(dimensionLabel(oferta) || ""))
-      .replace("{{HEADLINE}}", () => esc((hook || "").replace(/\*\*/g, "")))
+      .replace("{{HEADLINE}}", () => esc(cleanHeadline))
       .replace("{{SUBTEXT}}", () => esc(firstWords(body || "", 22)));
 
   return (
