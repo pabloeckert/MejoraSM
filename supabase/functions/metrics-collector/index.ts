@@ -234,6 +234,102 @@ async function checkAccountsHealth(apiKey: string): Promise<{ disconnected: stri
   }
 }
 
+// ═══════════════════════════════════════
+// AVISO PROACTIVO ANTES DE QUE EL TOKEN VENZA (2026-09-09)
+// ═══════════════════════════════════════
+// Sugerencia real de una auditoría externa (Claude Design, revisión del
+// 2026-09-07): hasta ahora el sistema solo avisa DESPUÉS de que el token de
+// Meta ya venció (checkAccountsHealth de arriba). Los tokens long-lived de
+// Instagram/Facebook vencen cada ~60 días si Zernio no los refresca — ya
+// pasó dos veces (documentado en CLAUDE.md). Zernio no expone una fecha de
+// vencimiento en /v1/accounts (no hay campo confirmado para eso), así que
+// no se puede calcular una cuenta regresiva exacta — en cambio, se usa
+// run_log como ancla: cada vez que una cuenta pasa de "disconnected" a
+// conectada (detectado acá mismo, comparando contra el último estado
+// conocido), se loguea `account-reconnected` con la fecha real. Si después
+// pasan >=50 días desde esa reconexión sin una desconexión nueva en el
+// medio, se loguea un aviso único `account-token-aging` (una sola vez por
+// ciclo, no en cada corrida de 6h) para que el Dashboard/copiloto puedan
+// avisar "puede estar por vencer" con semanas de margen, no minutos.
+// Mismo criterio de "mejor esfuerzo" que el resto de este archivo: el
+// margen real es de hasta 6h (el intervalo del cron) alrededor del momento
+// exacto de reconexión, y si nunca hubo una desconexión conocida en el
+// historial de run_log, simplemente no hay ancla — no se avisa nada.
+const TOKEN_AGING_THRESHOLD_DAYS = 50;
+const TOKEN_AGING_LOOKBACK_ROWS = 60; // ~15 días de historial a 4 corridas/día
+
+interface RunLogRow {
+  created_at: string;
+  metadata: { reason?: string; platforms?: string[] } | null;
+}
+
+async function checkTokenAging(currentlyDisconnected: string[]) {
+  try {
+    const { data } = await supabase
+      .from("run_log")
+      .select("created_at, metadata")
+      .eq("source", "metrics-collector")
+      .eq("step", "health-check")
+      .order("created_at", { ascending: false })
+      .limit(TOKEN_AGING_LOOKBACK_ROWS);
+    const rows = (data ?? []) as RunLogRow[];
+
+    for (const { platform } of ZERNIO_ACCOUNTS) {
+      const nowDisconnected = currentlyDisconnected.includes(platform);
+
+      const lastDisconnectedRow = rows.find(
+        (r) => r.metadata?.reason === "account-disconnected" && r.metadata?.platforms?.includes(platform)
+      );
+      const lastReconnectedRow = rows.find(
+        (r) => r.metadata?.reason === "account-reconnected" && r.metadata?.platforms?.includes(platform)
+      );
+      const lastAgingWarningRow = rows.find(
+        (r) => r.metadata?.reason === "account-token-aging" && r.metadata?.platforms?.includes(platform)
+      );
+
+      const wasDisconnectedBefore =
+        lastDisconnectedRow && (!lastReconnectedRow || lastDisconnectedRow.created_at > lastReconnectedRow.created_at);
+
+      // Transición real: estaba desconectada según el historial reciente,
+      // ahora la vemos conectada — marca el momento de reconexión.
+      if (!nowDisconnected && wasDisconnectedBefore) {
+        await logRun({
+          source: "metrics-collector",
+          step: "health-check",
+          status: "skipped",
+          metadata: { reason: "account-reconnected", platforms: [platform], via: "accounts-health-check" },
+        });
+        continue; // recién reconectada — no tiene sentido avisar vencimiento en la misma corrida
+      }
+
+      if (nowDisconnected) continue; // ya está cubierto por el aviso de desconexión real
+
+      if (!lastReconnectedRow) continue; // sin ancla real, no se puede estimar nada
+
+      const daysSinceReconnect = (Date.now() - new Date(lastReconnectedRow.created_at).getTime()) / 86_400_000;
+      if (daysSinceReconnect < TOKEN_AGING_THRESHOLD_DAYS) continue;
+
+      // Ya se avisó una vez para este mismo ciclo de conexión — no repetir
+      // en cada corrida de 6h hasta que se reconecte de nuevo.
+      if (lastAgingWarningRow && lastAgingWarningRow.created_at > lastReconnectedRow.created_at) continue;
+
+      await logRun({
+        source: "metrics-collector",
+        step: "health-check",
+        status: "skipped",
+        metadata: {
+          reason: "account-token-aging",
+          platforms: [platform],
+          daysSinceReconnect: Math.floor(daysSinceReconnect),
+          via: "accounts-health-check",
+        },
+      });
+    }
+  } catch {
+    // best-effort — nunca afecta el resultado del cron
+  }
+}
+
 async function collectAllPending() {
   const apiKey = Deno.env.get("ZERNIO_API_KEY");
   if (!apiKey) {
@@ -270,6 +366,12 @@ async function collectAllPending() {
       status: "skipped",
       metadata: { reason: "account-disconnected", platforms: health.disconnected, via: "accounts-health-check" },
     });
+  }
+  // Solo con un resultado real de /v1/accounts (health !== null) — si Zernio
+  // no respondió, "disconnected: []" sería un dato falso, no evidencia real
+  // de reconexión.
+  if (health) {
+    await checkTokenAging(health.disconnected);
   }
 
   // zernio_post_id es lo que efectivamente llena el pipeline actual

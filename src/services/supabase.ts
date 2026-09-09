@@ -325,6 +325,21 @@ export const runLogApi = {
       .gte("created_at", sinceIso)
       .order("created_at", { ascending: false })
       .limit(1),
+
+  // Aviso proactivo (2026-09-09, sugerencia de una auditoría externa): el
+  // token de Meta vence cada ~60 días — metrics-collector::checkTokenAging
+  // loguea esto una sola vez por ciclo de conexión cuando ya pasaron 50+
+  // días desde la última reconexión detectada. Todavía funciona (a
+  // diferencia de account-disconnected), por eso el Dashboard lo muestra en
+  // amarillo, no en rojo.
+  accountTokenAgingRecently: (sinceIso: string) =>
+    supabase
+      .from("run_log")
+      .select("created_at, metadata")
+      .eq("metadata->>reason", "account-token-aging")
+      .gte("created_at", sinceIso)
+      .order("created_at", { ascending: false })
+      .limit(1),
 };
 
 // ═══════════════════════════════════════

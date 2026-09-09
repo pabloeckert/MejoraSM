@@ -239,7 +239,9 @@ async function gatherDataSummary(): Promise<DataSummary> {
   const sevenDaysFromNowIso = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
   const fortyEightHoursAgoIso = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
 
-  const [metricsRes, rulesRes, runLogErrorsRes, scheduledRes, publishedRes, disconnectRes] = await Promise.all([
+  const twentyDaysAgoIso = new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [metricsRes, rulesRes, runLogErrorsRes, scheduledRes, publishedRes, disconnectRes, tokenAgingRes] = await Promise.all([
     supabase
       .from("metrics")
       .select("engagement_rate, likes, reach, impressions, proposals(format, is_test)")
@@ -278,6 +280,15 @@ async function gatherDataSummary(): Promise<DataSummary> {
       .eq("metadata->>reason", "account-disconnected")
       .gte("created_at", fortyEightHoursAgoIso)
       .limit(1),
+    // Aviso proactivo (2026-09-09): mismo mecanismo que accountDisconnected
+    // pero sin bloquear nada todavía — ver metrics-collector::checkTokenAging.
+    supabase
+      .from("run_log")
+      .select("created_at, metadata")
+      .eq("metadata->>reason", "account-token-aging")
+      .gte("created_at", twentyDaysAgoIso)
+      .order("created_at", { ascending: false })
+      .limit(1),
   ]);
 
   const realMetrics = ((metricsRes.data as MetricRow[] | null) || []).filter((m) => !m.proposals?.is_test);
@@ -291,6 +302,8 @@ async function gatherDataSummary(): Promise<DataSummary> {
   const scheduledCount = scheduledRes.data?.length || 0;
   const publishedCount = publishedRes.data?.length || 0;
   const accountDisconnected = (disconnectRes.data?.length || 0) > 0;
+  const tokenAgingRow = tokenAgingRes.data?.[0] as { metadata?: { daysSinceReconnect?: number } } | undefined;
+  const tokenAgingDays = !accountDisconnected ? (tokenAgingRow?.metadata?.daysSinceReconnect ?? null) : null;
 
   const evidence = {
     realMetricsCount: realMetrics.length,
@@ -300,12 +313,15 @@ async function gatherDataSummary(): Promise<DataSummary> {
     scheduledNext7Days: scheduledCount,
     publishedLast7Days: publishedCount,
     accountDisconnected,
+    tokenAgingDays,
   };
 
   const lines = [
     accountDisconnected
       ? "🔴 URGENTE: la cuenta de Instagram/Facebook está DESCONECTADA en Zernio (el token de Meta venció). NADA se está publicando — ni stories, ni carruseles, ni autopilot. Pablo tiene que entrar a zernio.com y reconectar la cuenta. Esto es lo primero que hay que mencionar."
-      : null,
+      : tokenAgingDays !== null
+        ? `Aviso preventivo: pasaron ${tokenAgingDays} días desde la última reconexión de Instagram/Facebook en Zernio (el token suele vencer cerca de los 60). Todavía publica normal, pero vale la pena sugerirle a Pablo que revise la conexión en zernio.com antes de que se corte solo.`
+        : null,
     `Métricas reales disponibles: ${realMetrics.length} (filas de prueba excluidas).`,
     avgEngagement !== null
       ? `Engagement promedio real: ${Math.round(avgEngagement * 100) / 100}%.`

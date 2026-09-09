@@ -202,12 +202,14 @@ function AttentionStrip({
   failedDocs,
   unanswered,
   accountDisconnected,
+  tokenAgingDays,
 }: {
   pendingHistorias: number;
   soon: number;
   failedDocs: number;
   unanswered: number;
   accountDisconnected: boolean;
+  tokenAgingDays: number | null;
 }) {
   const items: { text: string; href: string }[] = [];
   if (pendingHistorias > 0)
@@ -225,7 +227,12 @@ function AttentionStrip({
   if (failedDocs > 0)
     items.push({ text: `${failedDocs} ${failedDocs === 1 ? "documento" : "documentos"} sin procesar en el Manual de Marca`, href: "/boveda" });
 
-  if (items.length === 0 && !accountDisconnected) return null;
+  // El aviso de vencimiento solo tiene sentido si la cuenta no está YA
+  // desconectada — accountDisconnected es estrictamente más urgente y ya
+  // cubre el mismo mensaje de fondo ("andá a zernio.com").
+  const showTokenAging = !accountDisconnected && tokenAgingDays !== null;
+
+  if (items.length === 0 && !accountDisconnected && !showTokenAging) return null;
 
   return (
     <div className="flex flex-col gap-2">
@@ -236,6 +243,18 @@ function AttentionStrip({
             <span className="text-sm text-foreground">
               El token de Meta venció — nada se está publicando. Reconectá la cuenta en{" "}
               <a href="https://zernio.com" target="_blank" rel="noreferrer" className="underline">zernio.com</a>. Las piezas agendadas salen solas al reconectar.
+            </span>
+          </CardContent>
+        </Card>
+      )}
+      {showTokenAging && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="flex flex-wrap items-center gap-x-3 gap-y-1 p-4">
+            <span className="text-sm font-semibold text-amber-700">El token de Meta puede estar por vencer</span>
+            <span className="text-sm text-foreground">
+              Pasaron {tokenAgingDays} días desde la última reconexión (suele vencer cerca de los 60). Todavía publica normal —
+              conviene revisar la conexión en{" "}
+              <a href="https://zernio.com" target="_blank" rel="noreferrer" className="underline">zernio.com</a> antes de que se corte solo.
             </span>
           </CardContent>
         </Card>
@@ -331,6 +350,22 @@ function DashboardContent() {
       return (data?.length ?? 0) > 0;
     },
     staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
+  // Aviso proactivo (2026-09-09): el token puede estar por vencer (50+ días
+  // desde la última reconexión detectada), pero todavía funciona — a
+  // diferencia de accountDisconnected, esto no bloquea nada hoy.
+  const { data: tokenAgingDays } = useQuery({
+    queryKey: ["account-token-aging"],
+    queryFn: async () => {
+      const sinceIso = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await runLogApi.accountTokenAgingRecently(sinceIso);
+      if (error) throw error;
+      const row = data?.[0] as { metadata?: { daysSinceReconnect?: number } } | undefined;
+      return row?.metadata?.daysSinceReconnect ?? null;
+    },
+    staleTime: 30 * 60 * 1000,
     retry: 1,
   });
 
@@ -724,6 +759,7 @@ function DashboardContent() {
         failedDocs={(documents || []).filter((d: { processing_status?: string }) => d.processing_status === "error").length}
         unanswered={unansweredConversations}
         accountDisconnected={!!accountDisconnected}
+        tokenAgingDays={tokenAgingDays ?? null}
       />
 
       {/* Quick start banner for new users */}
