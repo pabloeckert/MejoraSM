@@ -420,6 +420,41 @@ function snapToPreferredHour(from: Date, hoursUtc: number[]): Date {
   return d;
 }
 
+// Preferir foto real sobre solo-texto (2026-09-09, sugerencia de una
+// auditoría externa de diseño, confirmada por Pablo: "falta contenido,
+// activar la variante con foto"). Hasta ahora pickNextOferta elegía la
+// oferta por rotación de menor uso, ciega a si content/inbox/<oferta>/
+// tenía una foto real esperando — así que un post podía caer a la
+// variante solo-texto (render-scheduled-posts.mjs) aunque OTRA carpeta sí
+// tuviera fotos listas, solo porque le tocó el turno a esa dimensión.
+// orchestrator es una Edge Function (Deno) sin acceso directo al repo de
+// GitHub — se consulta vía la Edge Function `repo` (mismo camino que ya
+// usa el frontend, server-to-server con la service-role key, sin
+// necesitar ningún secret nuevo). Mismo criterio de "mejor esfuerzo" que
+// checkAccountsHealth/checkTokenAging: si la consulta falla, no rompe
+// nada — cae al criterio de rotación de siempre.
+const INBOX_IMG_RE = /\.(jpe?g|png|webp)$/i;
+
+async function ofertaHasPhoto(oferta: string): Promise<boolean> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceKey) return false;
+    const res = await fetch(`${supabaseUrl}/functions/v1/repo`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "listDir", path: `content/inbox/${oferta}` }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    const entries: { name: string; type: string }[] = Array.isArray(data?.entries) ? data.entries : [];
+    return entries.some((e) => e.type === "file" && INBOX_IMG_RE.test(e.name));
+  } catch {
+    return false;
+  }
+}
+
 async function pickNextOferta(): Promise<string> {
   const since = new Date(Date.now() - ROLLING_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const { data } = await supabase
@@ -435,7 +470,23 @@ async function pickNextOferta(): Promise<string> {
   for (const row of data || []) {
     if (row.oferta in counts) counts[row.oferta]++;
   }
-  return OFERTAS.reduce((best, o) => (counts[o] < counts[best] ? o : best), OFERTAS[0]);
+
+  // Orden por menor uso reciente — mismo criterio de rotación de siempre.
+  const byUsage = [...OFERTAS].sort((a, b) => counts[a] - counts[b]);
+
+  // Dentro de esa rotación, preferir la primera que ya tenga una foto real
+  // esperando — sin esto era pura casualidad si la oferta elegida tenía
+  // contenido fotográfico. Si ninguna tiene foto (el caso más común hoy) o
+  // la consulta falla, cae exactamente al criterio de antes.
+  try {
+    const withPhoto = await Promise.all(byUsage.map(async (o) => ({ oferta: o, hasPhoto: await ofertaHasPhoto(o) })));
+    const preferred = withPhoto.find((x) => x.hasPhoto);
+    if (preferred) return preferred.oferta;
+  } catch {
+    // best-effort — cae al criterio de siempre
+  }
+
+  return byUsage[0];
 }
 
 // Fase 4 — Loop de aprendizaje activo. Sin una regla de timing aprendida,
