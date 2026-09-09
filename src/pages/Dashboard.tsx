@@ -237,13 +237,16 @@ function AttentionStrip({
   return (
     <div className="flex flex-col gap-2">
       {accountDisconnected && (
-        <Card className="border-destructive/50 bg-destructive/5">
-          <CardContent className="flex flex-wrap items-center gap-x-3 gap-y-1 p-4">
-            <span className="text-sm font-semibold text-destructive">🔴 Instagram/Facebook desconectado de Zernio</span>
-            <span className="text-sm text-foreground">
-              El token de Meta venció — nada se está publicando. Reconectá la cuenta en{" "}
-              <a href="https://zernio.com" target="_blank" rel="noreferrer" className="underline">zernio.com</a>. Las piezas agendadas salen solas al reconectar.
-            </span>
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="p-4">
+            <p className="text-base font-bold text-destructive [font-family:var(--font-display)]">
+              Instagram/Facebook desconectado
+            </p>
+            <p className="mt-1 text-sm text-foreground">
+              Nada se está publicando — el token de Meta venció en Zernio. Reconectá en{" "}
+              <a href="https://zernio.com" target="_blank" rel="noreferrer" className="underline">zernio.com</a> — 1 acción,
+              resuelve todo lo demás de esta franja. Las piezas agendadas salen solas al reconectar.
+            </p>
           </CardContent>
         </Card>
       )}
@@ -272,6 +275,52 @@ function AttentionStrip({
         </Card>
       )}
     </div>
+  );
+}
+
+// Jerarquía visual real sobre los 8 KPIs de rendimiento (2026-09-09,
+// sugerencia de una auditoría externa de diseño): antes los 8 tiles pesaban
+// exactamente igual pese a que hay una jerarquía real de importancia — un
+// tile con "—" (sin dato) pesaba lo mismo en la grilla que uno con un
+// número grande y real. Nada se saca ni se calcula distinto (mismos
+// kpiTiles de siempre, con el mismo onClick que abre el detalle real) —
+// solo cambia qué entra primero al ojo: una métrica hero (el estándar de
+// comparación histórica de la plataforma), dos de contexto inmediato, y el
+// resto plegado a un clic — mismo patrón que ya usa la card de "KPIs sin
+// fuente de datos conectada", unas líneas más abajo.
+function KpiHero({
+  label,
+  value,
+  sub,
+  tooltip,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  tooltip: string;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          className="flex h-full w-full flex-col gap-2 rounded-xl border-2 border-primary/30 bg-primary/5 p-6 text-left transition-colors hover:bg-primary/10"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+            <Info className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/50" />
+          </div>
+          <p className="text-[44px] font-medium leading-none text-primary [font-family:var(--font-display)]">
+            {value}
+          </p>
+          <p className="text-xs text-muted-foreground">{sub}</p>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs text-xs">{tooltip}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -602,6 +651,16 @@ function DashboardContent() {
     },
   ];
 
+  // Ver el comentario en KpiHero (arriba) — "engagement sobre impresión" es
+  // la métrica que el propio tooltip ya marcaba como "estándar de la
+  // plataforma para comparar histórico", así que es la hero natural.
+  // Alcance/impresiones son el contexto inmediato que casi siempre importa;
+  // el resto (mucho más específico o intermitente — clics no siempre tiene
+  // dato) va plegado, no escondido.
+  const heroKpi = kpiTiles.find((t) => t.key === "eng-impression");
+  const secondaryKpis = kpiTiles.filter((t) => t.key === "reach" || t.key === "impressions");
+  const restKpis = kpiTiles.filter((t) => t.key !== "eng-impression" && t.key !== "reach" && t.key !== "impressions");
+
   // Rendimiento por formato (2do KPI calculable: alcance/engagement
   // promedio por formato) — se muestra como tabla, no como tile único,
   // porque es inherentemente una comparación entre formatos.
@@ -811,11 +870,26 @@ function DashboardContent() {
       {/* KPIs reales de rendimiento social (Fase A, 2026-08-07) */}
       <div>
         <h2 className="mb-3 text-[17px] font-medium">Rendimiento real (Instagram + Facebook)</h2>
-        <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-          {kpiTiles.map((t) => (
+        <div className="grid gap-3.5 lg:grid-cols-[1.3fr_1fr_1fr]">
+          {heroKpi && (
+            <KpiHero label={heroKpi.label} value={heroKpi.value} sub={heroKpi.sub} tooltip={heroKpi.tooltip} onClick={heroKpi.onClick} />
+          )}
+          {secondaryKpis.map((t) => (
             <KpiTile key={t.key} label={t.label} value={t.value} sub={t.sub} tooltip={t.tooltip} onClick={t.onClick} />
           ))}
         </div>
+        {restKpis.length > 0 && (
+          <details className="group mt-3.5 rounded-xl border border-border bg-card">
+            <summary className="cursor-pointer list-none px-5 py-3 text-xs font-medium text-muted-foreground hover:text-foreground">
+              Ver el resto de los KPIs ({restKpis.map((t) => t.label).join(", ")})
+            </summary>
+            <div className="grid gap-3.5 border-t border-border p-3.5 sm:grid-cols-2 lg:grid-cols-4">
+              {restKpis.map((t) => (
+                <KpiTile key={t.key} label={t.label} value={t.value} sub={t.sub} tooltip={t.tooltip} onClick={t.onClick} />
+              ))}
+            </div>
+          </details>
+        )}
       </div>
 
       {/* KPIs sin fuente conectada */}
