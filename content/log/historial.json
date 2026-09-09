@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-09-09T16:03:54.504Z",
+  "syncedAt": "2026-09-09T20:35:09.706Z",
   "posts": [
+    {
+      "id": "6aa19085edc398c20e4fb746",
+      "date": "2026-09-09",
+      "status": "published",
+      "content": "¿Cuántas reuniones de tu semana terminan sin ninguna decisión tomada? Empezá por ahí. Si querés ordenar tu agenda, te leemos.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-09-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3982518240962619159"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6aa03f84b56891b2985cdff9",
       "date": "2026-09-08",
