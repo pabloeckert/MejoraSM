@@ -57,6 +57,12 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # 2026-09-09: pickBestPhotos() en render-scheduled-posts.mjs usa
+          # visión para elegir, de las fotos del depósito, cuál conviene más
+          # para el hook/body real — antes se tomaba la más vieja subida sin
+          # mirar el contenido. Sin ANTHROPIC_API_KEY simplemente cae al
+          # orden de siempre (mejor esfuerzo, nunca rompe el render).
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: node scripts/render-scheduled-posts.mjs
 
       - name: Commitear imágenes renderizadas (públicas vía raw.githubusercontent.com)

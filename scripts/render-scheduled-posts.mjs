@@ -21,6 +21,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
 import { logRun, startTimer } from "./lib/run-log.mjs";
+import { askClaude } from "./lib/claude.mjs";
 
 const ROOT = process.cwd();
 const INBOX_DIR = path.join(ROOT, "content/inbox");
@@ -117,15 +118,6 @@ async function fetchDueProposals() {
   return res.json();
 }
 
-async function findPhoto(oferta) {
-  if (!oferta) return null;
-  const dir = path.join(INBOX_DIR, oferta);
-  if (!existsSync(dir)) return null;
-  const files = (await readdir(dir)).sort();
-  const photo = files.find((f) => Object.keys(EXT_TO_MIME).includes(path.extname(f).toLowerCase()));
-  return photo ? { dir, name: photo, path: path.join(dir, photo) } : null;
-}
-
 // Para un carrusel, hasta `count` fotos de la misma oferta (una por slide) —
 // si hay menos fotos que slides, los slides sobrantes salen en solo-texto
 // (mismo criterio de fallback que un post simple sin foto).
@@ -137,6 +129,63 @@ async function findPhotos(oferta, count) {
     .filter((f) => Object.keys(EXT_TO_MIME).includes(path.extname(f).toLowerCase()))
     .sort();
   return files.slice(0, count).map((name) => ({ dir, name, path: path.join(dir, name) }));
+}
+
+// Máximo de fotos candidatas que se le mandan a Claude en un solo llamado
+// para elegir cuál conviene más — un tope, no para ahorrar (las fotos ya
+// están subidas, no hay costo de generarlas), sino para no mandar un
+// payload gigante si algún día el depósito de una dimensión acumula
+// muchas fotos sin usar.
+const MAX_PHOTO_CANDIDATES = 8;
+
+// Pedido real de Pablo (2026-09-09): "un depósito donde MejoraSM consulte
+// y vea la que más conviene" — hasta acá `findPhotos()` devolvía las fotos
+// en orden alfabético de nombre de archivo (rotación FIFO simple, la más
+// vieja subida primero), sin mirar si esa foto tenía algo que ver con lo
+// que se iba a publicar. Ahora, cuando hay más candidatas de las que hacen
+// falta, se le muestran todas a Claude (visión) junto con el hook/body ya
+// generado y elige cuáles ilustran mejor ese texto puntual.
+//
+// Mismo criterio de "mejor esfuerzo" que ofertaHasPhoto()/checkAccountsHealth
+// en el resto del proyecto: si la llamada falla por cualquier motivo (red,
+// límite, respuesta rara), cae al orden original sin romper el render — la
+// elección de foto nunca puede tumbar una pieza que ya pasó por el Crítico.
+async function pickBestPhotos(photos, proposal, count) {
+  if (photos.length <= count) return photos;
+  const candidates = photos.slice(0, MAX_PHOTO_CANDIDATES);
+  try {
+    const images = await Promise.all(
+      candidates.map(async (p) => ({
+        media_type: EXT_TO_MIME[path.extname(p.name).toLowerCase()],
+        base64: (await readFile(p.path)).toString("base64"),
+      }))
+    );
+    const hook = proposal.hook || proposal.title || "";
+    const body = (proposal.body || "").slice(0, 500);
+    const userText =
+      `Estas son ${candidates.length} fotos numeradas del 0 al ${candidates.length - 1}, en el mismo orden en que te las mando.\n\n` +
+      `El texto que van a acompañar es:\nHOOK: ${hook}\nCUERPO: ${body}\n\n` +
+      `Elegí las ${count} foto(s) que mejor ilustran o se relacionan con ese texto — no por calidad técnica, por relevancia real del contenido de la imagen. ` +
+      `Respondé ÚNICAMENTE con los números de las fotos elegidas, en orden de mejor a peor, separados por coma (ej: "2, 0"). Nada más.`;
+    const answer = await askClaude({
+      system: "Elegís qué foto real conviene usar para una pieza de Instagram/Facebook, mirando el contenido de cada imagen. Nunca inventes qué hay en una foto que no puedas ver.",
+      userText,
+      images,
+      maxTokens: 64,
+    });
+    const picked = [...new Set((answer.match(/\d+/g) || []).map(Number))].filter(
+      (i) => Number.isInteger(i) && i >= 0 && i < candidates.length
+    );
+    const result = picked.map((i) => candidates[i]);
+    for (const p of candidates) {
+      if (result.length >= count) break;
+      if (!result.includes(p)) result.push(p);
+    }
+    return result.slice(0, count);
+  } catch (e) {
+    console.warn(`[render-scheduled-posts] no se pudo elegir la mejor foto (${e.message}) — se usa el orden de siempre.`);
+    return photos.slice(0, count);
+  }
 }
 
 // Divide el body en oraciones — fallback para cuando el Creativo escribió
@@ -379,7 +428,12 @@ async function main() {
     // la misma oferta, en vez de forzar siempre una sola imagen de fondo se
     // usa el template de 2 fotos — más variedad real, sin intervención
     // humana. Con 1 sola foto (el caso más común) sigue el post clásico.
-    const twoPhotos = await findPhotos(proposal.oferta, 2);
+    // Depósito de fotos con matching real (2026-09-09): se traen TODAS las
+    // candidatas disponibles (hasta el tope) y pickBestPhotos() elige, no
+    // el orden en que se subieron.
+    const allPhotos = await findPhotos(proposal.oferta, MAX_PHOTO_CANDIDATES);
+    const wantsCollage = allPhotos.length >= 2;
+    const twoPhotos = wantsCollage ? await pickBestPhotos(allPhotos, proposal, 2) : [];
     let photo = null;
     let html;
     if (twoPhotos.length >= 2) {
@@ -392,7 +446,8 @@ async function main() {
         subtext: proposal.body || "",
       });
     } else {
-      photo = await findPhoto(proposal.oferta);
+      const best = allPhotos.length ? await pickBestPhotos(allPhotos, proposal, 1) : [];
+      photo = best[0] || null;
       html = await renderSlide(templateBase, {
         photo,
         ofertaLabel,
