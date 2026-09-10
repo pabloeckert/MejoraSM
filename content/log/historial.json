@@ -1,6 +1,59 @@
 {
-  "syncedAt": "2026-09-10T03:29:34.283Z",
+  "syncedAt": "2026-09-10T20:30:28.773Z",
   "posts": [
+    {
+      "id": "6aa2e7bd7f06d9ef326e74e8",
+      "date": "2026-09-10",
+      "status": "partial",
+      "content": "Estás cansado. Pero cansado de qué: ¿de laburar mal o de laburar bien?\n¿No sabés cuál de los dos cansancios es el tuyo? Escribinos \"CLARIDAD\" y lo vemos en una Sesión de Claridad.\n#MejoraOK\n#OrdenarNoEsFrenar\n#EmprendedoresArgentina\n#GestiónDeNegocios\n#ClaridadEstratégica\n#CrecimientoSano\n#PymesArgentinas\n#LiderazgoReal",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": null,
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DdHXcskjQKd/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1365515425667939"
+        },
+        {
+          "platform": "linkedin",
+          "status": "failed",
+          "url": null
+        }
+      ]
+    },
+    {
+      "id": "6aa2e03a7f240454c93836a5",
+      "date": "2026-09-10",
+      "status": "published",
+      "content": "La mayoría de las reuniones largas no fallan por falta de tiempo, fallan por falta de objetivo. Probá esto la próxima vez que convoques una. Contanos qué cambió.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": null,
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3983239166313761121"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6aa19085edc398c20e4fb746",
       "date": "2026-09-09",
