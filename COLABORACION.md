@@ -28,7 +28,7 @@ Pablo cerró esta sesión por límite de la cuenta. **No hay ningún trabajo a m
 - **`mejorasm-01`** cerró: backend de diálogo (`orchestrator`/`vault-process`/`copilot`/`insights`/`classify-photo` + Mesa/Bóveda/Configuración), frontend común (`Dashboard`/`Propuestas`/`Calendario`/`Monitor`/`Hub`/`Conversaciones`/`Auditoria`/`supabase.ts`/`AppSidebar`), y una tercera pasada por auth + componentes sueltos + `useGithubUpload`/`export.ts`. Hallazgos: `sanitizeTopic` nunca invocado + `ValidationError` inexistente, `classifyDocument` normalización, `InsightsSection` estado optimista, `Boveda` dropzone sin reset, `SystemDecisions` sin rama `forceApprove`, `Monitor.handleDelete` falso éxito, `Propuestas.handleCopy` sin chequear promesa, `Onboarding.tsx` localStorage fuera del ErrorBoundary. Detalle: `CLAUDE.md` bitácora Partes 17/18/21.
 - **`mejorasm-03`** (esta) cerró: `scripts/lib/**` + los 17 scripts del pipeline uno por uno + Edge Functions `inbox`/`recycle`/`ads`/`metrics-collector`/`rule-engine`/`repo` + CI + los 20 workflows + docs. Hallazgos: bandeja de conversaciones 84/84 (`unc: 0`), `autopilot.mjs` fail-safe, `publish-scheduled-posts.markError` pisaba metadata, `manage-post.markRejected` sin chequear, código muerto en `metrics-collector`/`rule-engine`, `repo` sha-retry + input-cast, `sync-history` paginación sin tope, timeouts en todo, `permissions`/`concurrency`/`timeout-minutes` en los 20 workflows, `deploy-migrations` reparado, `daily-story` roto por el wipe → arreglado y confirmado end-to-end. Detalle: `CLAUDE.md` bitácora, "Mandato 'arreglar todo'" + "Pase 'mejorar'" + Parte 19/20 de `MejoraSM.md`.
 
-**Estado real del repo:** `main` verde (CI + Deploy EDA + Deploy Functions). Baseline: `tsc` limpio, lint 0 errores (6 warnings preexistentes, documentados), 66 tests, build limpio, `node --check` en los 17 scripts. `db push --dry-run` = `upToDate: true`. Próxima migración libre: **026**.
+**Estado real del repo (nota 2026-09-10: esta sección quedó fechada 2026-09-03, ver bitácora de `CLAUDE.md` para el estado real más reciente — el tablero no se actualizó desde el 2026-09-05).** `main` verde (CI + Deploy EDA + Deploy Functions) al 2026-09-03. Baseline de esa fecha: `tsc` limpio, lint 0 errores (6 warnings preexistentes, documentados), 66 tests, build limpio, `node --check` en los 17 scripts. `db push --dry-run` = `upToDate: true`. Migración 026 ya se aplicó el 2026-09-08 (`026_fix_dimension_check_and_run_log_index.sql`, ver `CLAUDE.md`) — próxima migración libre: **027**.
 
 **Pendiente:**
 1. ~~DNS del dominio propio~~ ✅ **HECHO 2026-09-03**: `https://mejorasm.mejoraok.com` activo (hub en `/`, EDA en `/app/`), cert + HTTPS forzado, dominio viejo hace 301. Ver "Dominio propio activado" en `CLAUDE.md`.
@@ -50,7 +50,7 @@ Archivos que las dos sesiones tienden a tocar. Antes de editar: `git log --oneli
 - `src/services/supabase.ts`
 - `src/pages/Dashboard.tsx`
 - `CLAUDE.md` / `MejoraSM.md`
-- `supabase/migrations/` (el próximo número es **026** — lo reserva quien lo anuncie acá primero)
+- `supabase/migrations/` (026 ya aplicada 2026-09-08 — el próximo número libre es **027**, lo reserva quien lo anuncie acá primero)
 - `.github/workflows/deploy-functions.yml` (deploya TODAS las funciones; ojo con `concurrency` cancelando el deploy de la otra)
 
 ---

@@ -389,7 +389,7 @@ Páginas (`src/pages/`):
 
 | Pantalla | Ruta | Qué hace |
 |---|---|---|
-| **Login** | `/login` | Email/contraseña contra Supabase Auth, con alta de cuenta. Gatea todo lo demás vía `AuthGate.tsx`. |
+| **Login** | `/login` | Email/contraseña contra Supabase Auth, sin alta de cuenta ni OTP (una sola cuenta compartida, blanqueo por email). Gatea todo lo demás vía `AuthGate.tsx`. |
 | **Dashboard** | `/` | 4 métricas clicables (documentos, diálogos, contenidos, publicaciones programadas), Copiloto Reflexivo (consejo del día + chat sobre datos propios, Fase 4), KPIs reales de rendimiento social, gráfico de engagement por post, distribución por formato. |
 | **Bóveda de Conocimiento** | `/boveda` | Subís documentos (PDF/doc/txt/md) de marca. Dispara `vault-process`: extrae texto, lo trocea en chunks, genera embeddings. Buscador y borrado de documentos. |
 | **Mesa de Diálogo** | `/mesa` | Le das un tema (elección manual, ver "decisiones explícitas de no automatizar" arriba) y dispara `orchestrator`: Estratega propone → Creativo redacta → Crítico evalúa contra los documentos de la Bóveda (RAG). Si aprueba y el formato tiene pipeline autónomo (`post`/`carrusel`), la propuesta se autoagenda sola — ver overhaul de autonomía arriba. |
