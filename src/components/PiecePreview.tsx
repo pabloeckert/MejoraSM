@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { dimensionLabel } from "@/shared/constants";
+import { github } from "@/services/github";
 
 // Fase B del plan de continuación (2026-08-31) — preview visual real de la
 // pieza, del brief de rediseño ("el resultado tiene que incluir preview visual
@@ -14,9 +15,14 @@ import { dimensionLabel } from "@/shared/constants";
 // Se rinde la variante "solo-texto" (sin foto): la foto real se elige recién
 // al publicar, así que el preview muestra el diseño y cómo cae el texto.
 
-// Se trae vía la API de contents de GitHub (api.github.com ya está en el
-// connect-src del CSP; raw.githubusercontent.com no) — repo público, sin token.
-const GH_CONTENTS = "https://api.github.com/repos/pabloeckert/MejoraSM/contents/templates";
+// Hallazgo real 2026-09-09 (Pablo: "no tengo vistas previas de nada"): esto
+// le pegaba directo a api.github.com SIN TOKEN desde el browser — el límite
+// de GitHub sin autenticación es 60 req/hora por IP, y se agotaba fácil con
+// varias aperturas de Mesa de Diálogo en la misma sesión de trabajo, dejando
+// el preview en blanco en silencio. Ahora pasa por la Edge Function `repo`
+// (mismo camino ya establecido para todo lo demás desde 2026-09-01), que
+// tiene el token real del lado del servidor.
+const TEMPLATES_DIR = "templates";
 
 const CANVAS: Record<string, { w: number; h: number; file: string }> = {
   historia: { w: 1080, h: 1920, file: "story-template.html" },
@@ -42,14 +48,9 @@ function useTemplate(file: string) {
   return useQuery({
     queryKey: ["render-template", file],
     queryFn: async () => {
-      const res = await fetch(`${GH_CONTENTS}/${file}`, {
-        headers: { Accept: "application/vnd.github+json" },
-      });
-      if (!res.ok) throw new Error(`No se pudo traer el template (${res.status})`);
-      const json = (await res.json()) as { content?: string; encoding?: string };
-      if (json.encoding !== "base64" || !json.content) throw new Error("Template en un formato inesperado");
-      const bytes = Uint8Array.from(atob(json.content.replace(/\n/g, "")), (c) => c.charCodeAt(0));
-      return new TextDecoder("utf-8").decode(bytes);
+      const text = await github.getTextFile(`${TEMPLATES_DIR}/${file}`);
+      if (!text) throw new Error("No se pudo traer el template");
+      return text;
     },
     staleTime: 24 * 60 * 60 * 1000,
     retry: 1,

@@ -651,8 +651,16 @@ Incluí:
 1. Ángulo/propuesta (por qué debería publicar esto)
 2. 3 hooks en tono argentino directo
 3. Buyer persona objetivo
-4. Formato recomendado (post, carrusel, historia)
-5. Momento ideal de publicación`;
+4. Momento ideal de publicación
+
+Y, como última línea de tu respuesta, exactamente así (sin nada más en esa línea):
+FORMATO: post
+o
+FORMATO: carrusel
+o
+FORMATO: historia
+
+Elegí carrusel cuando el tema tenga 3-4 ideas separables que se explican mejor una por slide (un proceso, una lista de señales, un antes/después). Elegí post cuando sea una sola idea concentrada. No uses siempre el mismo formato — variá según lo que pida el tema.`;
 
   return callAgent("estratega", false, config.temperature, system, [
     { role: "user", content: `Tema: ${topic}` },
@@ -660,10 +668,24 @@ Incluí:
 }
 
 // Detecta el formato recomendado a partir del texto de la Estrategia (o del
-// feedback en una revisión) — misma heurística que ya usaba extractProposal,
-// factorizada acá para poder avisarle al Creativo ANTES de que escriba, no
-// solo para clasificar después.
+// feedback en una revisión) — factorizada acá para poder avisarle al
+// Creativo ANTES de que escriba, no solo para clasificar después.
+//
+// Hallazgo real 2026-09-09 (Pablo: "no hay diferencia entre carrusel y
+// post, todo sale post fijo, el carrusel no se genera"): el prompt del
+// Estratega solo pedía "Formato recomendado (post, carrusel, historia)"
+// como ítem de una lista en prosa libre — y esta función buscaba la
+// palabra "carrusel" en cualquier parte de ese texto con `.includes()`.
+// El Estratega casi nunca usa la palabra exacta en su prosa (dice "una
+// serie de puntos", "varias ideas", etc.), así que el heurístico caía casi
+// siempre al default "post". Ahora el prompt le pide una línea estructurada
+// "FORMATO: post|carrusel|historia" — se busca esa primero (determinístico,
+// no depende de cómo redacte el resto), y solo si no aparece (respuesta
+// vieja en el historial de una revisión, o el LLM no la incluyó) se cae al
+// heurístico de palabra suelta de antes, nunca se rompe.
 function detectFormat(text: string): "carrusel" | "historia" | "post" {
+  const structured = text.match(/FORMATO:\s*(post|carrusel|historia)/i)?.[1]?.toLowerCase();
+  if (structured === "carrusel" || structured === "historia" || structured === "post") return structured;
   const lower = text.toLowerCase();
   if (lower.includes("carrusel")) return "carrusel";
   if (lower.includes("historia")) return "historia";
@@ -1062,35 +1084,48 @@ async function continueSession(sessionId: string, feedback: string) {
     autoPublished = created.autoPublished;
     scheduledAt = created.scheduledAt;
     oferta = created.oferta;
+  }
 
-    const { error: updateError } = await supabase
-      .from("dialogue_sessions")
-      .update({
-        status: "approved",
-        final_proposal: contenido,
-        metadata: {
-          ...(session.metadata || {}),
-          evaluacion,
-          proposal: created.proposal,
-          proposalId,
-          autoPublished,
-          scheduledAt,
-          oferta,
-        },
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", sessionId);
-
-    // Mismo hallazgo que en runDebate — ver el comentario de arriba.
-    if (updateError) {
-      await logRun({
-        source: "orchestrator",
-        step: "continueSession-update-session",
-        status: "error",
+  // Hallazgo real 2026-09-09 (Pablo: "cuando le doy mis devoluciones, las
+  // correcciones no aparecen, es muy lento"): este update solo corría
+  // dentro del `if (evaluacion.aprobado)` de arriba — si el Crítico volvía
+  // a RECHAZAR en la revisión (el caso más común, dado que el feedback
+  // suele pedir un ajuste puntual, no aprobar de una), la tarjeta de
+  // evaluación y el preview de la pieza en Mesa de Diálogo se quedaban
+  // clavados con el veredicto y el contenido de la ronda ANTERIOR — Pablo
+  // veía "nada cambió" pese a que el Creativo sí reescribió y el Crítico sí
+  // volvió a evaluar (los mensajes del chat sí se guardan siempre, arriba).
+  // Ahora la evaluación/preview se actualizan SIEMPRE tras cada ronda —
+  // solo la creación de la propuesta real (arriba) sigue condicionada a que
+  // apruebe.
+  const proposal = extractProposal(contenido, estrategia);
+  const { error: updateError } = await supabase
+    .from("dialogue_sessions")
+    .update({
+      status: evaluacion.aprobado ? "approved" : "needs_review",
+      final_proposal: evaluacion.aprobado ? contenido : session.final_proposal,
+      metadata: {
+        ...(session.metadata || {}),
+        evaluacion,
+        proposal,
         proposalId,
-        error: `dialogue_sessions.update falló tras crear la propuesta: ${updateError.message}`,
-      });
-    }
+        autoPublished,
+        scheduledAt,
+        oferta,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sessionId);
+
+  // Mismo hallazgo que en runDebate — ver el comentario de arriba.
+  if (updateError) {
+    await logRun({
+      source: "orchestrator",
+      step: "continueSession-update-session",
+      status: "error",
+      proposalId,
+      error: `dialogue_sessions.update falló tras la ronda de revisión: ${updateError.message}`,
+    });
   }
 
   return {

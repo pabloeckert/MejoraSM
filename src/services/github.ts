@@ -82,11 +82,23 @@ async function listDir(path: string): Promise<GhFileEntry[]> {
   return entries;
 }
 
+// Lee un archivo de texto plano tal cual (HTML de un template, por ejemplo)
+// — sin parsear nada. Usado por PiecePreview para traer post-template.html/
+// story-template.html sin pegarle directo a api.github.com sin token desde
+// el browser (60 req/hora por IP sin auth — se agotaba rápido con varias
+// aperturas seguidas de Mesa de Diálogo, causa real de "no tengo vistas
+// previas de nada", hallazgo 2026-09-09). Mismo camino que el resto del
+// repo desde 2026-09-01: el token real vive server-side en la función `repo`.
+async function getTextFile(path: string): Promise<string | null> {
+  const { exists, text } = await call<{ exists: boolean; text?: string }>("readFile", { path });
+  return exists && text ? text : null;
+}
+
 // Lee un archivo JSON. Usado para pollear content/work/publish-now.json en
 // el flujo "Publicar ahora".
 async function getJsonFile<T = unknown>(path: string): Promise<T | null> {
-  const { exists, text } = await call<{ exists: boolean; text?: string }>("readFile", { path });
-  if (!exists || !text) return null;
+  const text = await getTextFile(path);
+  if (!text) return null;
   try {
     return JSON.parse(text) as T;
   } catch {
@@ -133,5 +145,6 @@ export const github = {
   commitPhoto,
   triggerWorkflow,
   getJsonFile,
+  getTextFile,
   rawUrl,
 };

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,9 @@ const agentColors: Record<string, string> = {
 };
 
 const AGENT_SEQUENCE = ["estratega", "creativo", "critico"];
+// Una ronda de revisión (continueSession) solo corre Creativo → Crítico —
+// el Estratega no vuelve a intervenir sobre el mismo tema ya definido.
+const REVIEW_SEQUENCE = ["creativo", "critico"];
 
 const agentLabels: Record<string, string> = {
   estratega: "Estratega",
@@ -195,8 +198,7 @@ function MesaDialogoContent() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Mesa de Diálogo</h1>
           <p className="mt-1 text-muted-foreground">
-            Le das un tema (o el sistema te propone uno) y los 3 agentes debatan turno a turno
-            (Estratega → Creativo → Crítico). Si el Crítico aprueba un post o carrusel, se agenda y publica solo.
+            Dale un tema o dejá que el sistema elija uno. Si se aprueba, sale a publicarse solo.
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -236,7 +238,7 @@ function MesaDialogoContent() {
               <div className="rounded-lg border border-border p-3">
                 <p className="text-sm font-medium">Proponeme un tema</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  El sistema elige un tema desde lo que ya funcionó, los buyer personas y lo que no se tocó hace poco.
+                  El sistema elige un tema nuevo, basado en lo que ya funcionó.
                 </p>
                 <div className="mt-2 flex justify-end">
                   <Button variant="outline" onClick={() => handleStart("auto")} disabled={startMutation.isPending}>
@@ -294,22 +296,31 @@ function MesaDialogoContent() {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {(sessions as DialogueSession[]).map((session) => (
-            <SessionCard
-              key={session.id}
-              session={session}
-              isSelected={selectedSession === session.id}
-              onSelect={() =>
-                setSelectedSession(
-                  selectedSession === session.id ? null : session.id
-                )
-              }
-              onContinue={handleContinue}
-              isContinuing={continueMutation.isPending}
-              onForceApprove={handleForceApprove}
-              isForcingApprove={forceApproveMutation.isPending}
-            />
-          ))}
+          {(sessions as DialogueSession[]).map((session) => {
+            // Hallazgo real 2026-09-09: antes `isContinuing` era un booleano
+            // compartido por TODAS las tarjetas — acá se filtra a la sesión
+            // realmente en curso, para que el indicador "revisando…" y el
+            // polling extra de useDialogueMessages solo se activen donde
+            // corresponde.
+            const thisIsContinuing =
+              continueMutation.isPending && continueMutation.variables?.sessionId === session.id;
+            return (
+              <SessionCard
+                key={session.id}
+                session={session}
+                isSelected={selectedSession === session.id}
+                onSelect={() =>
+                  setSelectedSession(
+                    selectedSession === session.id ? null : session.id
+                  )
+                }
+                onContinue={handleContinue}
+                isContinuing={thisIsContinuing}
+                onForceApprove={handleForceApprove}
+                isForcingApprove={forceApproveMutation.isPending}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -334,16 +345,42 @@ function SessionCard({
   isForcingApprove: boolean;
 }) {
   const [feedback, setFeedback] = useState("");
+  // Hallazgo real 2026-09-09 (Pablo: "las correcciones deben ser
+  // instantáneas como si habláramos en un chat, es muy lento"): el
+  // Creativo y el Crítico guardan cada mensaje suyo apenas terminan
+  // (server-side, uno tras el otro) — pero acá el polling solo corría con
+  // `session.status === "active"`, y durante una revisión el status sigue
+  // siendo el de la ronda anterior ("needs_review") hasta que TODO el
+  // debate de la ronda nueva termina. Resultado: el usuario mandaba
+  // feedback y no veía nada moverse en pantalla durante 15-40s (dos
+  // llamadas a LLM secuenciales), hasta que de golpe aparecía todo junto.
+  // Ahora el polling también corre mientras `isContinuing` es true para
+  // esta tarjeta puntual — el turno del Creativo aparece apenas está
+  // guardado, sin esperar al Crítico.
   const { data: messages } = useDialogueMessages(session.id, {
     enabled: isSelected,
-    isActive: session.status === "active",
+    isActive: session.status === "active" || isContinuing,
   });
 
   // UX3 (auditoría 2026-08-31): en una sesión ya aprobada (se publicó/agendó)
   // o con error (el cartel dice "probá una sesión nueva"), la caja de feedback
   // no tiene sentido — mandarla no hace nada útil.
   const feedbackUsable = session.status !== "approved" && session.status !== "error";
-  const send = () => onContinue(session.id, feedback, () => setFeedback(""));
+
+  // Cuántos mensajes había ANTES de mandar el feedback — con eso se sabe si
+  // el turno nuevo que va apareciendo es del Creativo o del Crítico (ver
+  // REVIEW_SEQUENCE más abajo). Se resetea solo cuando la mutación termina.
+  const [reviewBaseline, setReviewBaseline] = useState<number | null>(null);
+  const wasContinuing = useRef(false);
+  useEffect(() => {
+    if (wasContinuing.current && !isContinuing) setReviewBaseline(null);
+    wasContinuing.current = isContinuing;
+  }, [isContinuing]);
+
+  const send = () => {
+    setReviewBaseline(messages?.length ?? 0);
+    onContinue(session.id, feedback, () => setFeedback(""));
+  };
 
   const statusVariant =
     session.status === "approved"
@@ -418,6 +455,19 @@ function SessionCard({
                   {agentLabels[AGENT_SEQUENCE[messages.length]]} trabajando…
                 </div>
               )}
+              {/* Ventana de revisión (Creativo re-escribe → Crítico re-evalúa)
+                  — antes acá no aparecía nada hasta que las dos llamadas
+                  terminaban del todo, dando la sensación de "no pasa nada".
+                  reviewBaseline queda fijo desde que se manda el feedback;
+                  cada mensaje nuevo que llega por polling avanza el indicador
+                  al agente siguiente. */}
+              {isContinuing && reviewBaseline !== null && Math.max(0, messages.length - reviewBaseline) < REVIEW_SEQUENCE.length && (
+                <div className="flex items-center gap-2 py-2 pl-11 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {agentLabels[REVIEW_SEQUENCE[Math.max(0, messages.length - reviewBaseline)]]}{" "}
+                  {REVIEW_SEQUENCE[Math.max(0, messages.length - reviewBaseline)] === "creativo" ? "reescribiendo…" : "revisando…"}
+                </div>
+              )}
             </div>
           ) : session.status !== "error" ? (
             <div className="flex flex-col items-center justify-center gap-1.5 py-8">
@@ -461,9 +511,7 @@ function SessionCard({
                   )}
                   <div>
                     <p className="text-sm font-medium">
-                      {session.metadata.evaluacion.aprobado
-                        ? "El Crítico la aprobó — vale la pena mandarla"
-                        : "El Crítico la frenó — todavía no vale la pena"}
+                      {session.metadata.evaluacion.aprobado ? "Aprobada — se publica sola" : "Frenada — no cumple el criterio de marca"}
                     </p>
                     <p className="text-xs text-muted-foreground">{session.metadata.evaluacion.feedback}</p>
                   </div>
@@ -551,7 +599,7 @@ function SessionCard({
             <div className="flex gap-2">
               <Textarea
                 rows={2}
-                placeholder="Dale feedback a los agentes (qué ajustar del hook, el tono, el CTA…). Enter para enviar, Shift+Enter para salto de línea."
+                placeholder="Qué cambiar (hook, tono, CTA…). Enter para enviar."
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
                 className="min-h-[44px] resize-none"
