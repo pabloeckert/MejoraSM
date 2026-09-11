@@ -1,6 +1,35 @@
 {
-  "syncedAt": "2026-09-10T20:30:28.773Z",
+  "syncedAt": "2026-09-11T03:27:07.510Z",
   "posts": [
+    {
+      "id": "6aa3461c68bfc113a738bcaf",
+      "date": "2026-09-11",
+      "status": "partial",
+      "content": "no sabés qué es importante\n¿Cómo está tu empresa hoy? Agendá tu reunión de evaluación y encontrá el criterio que te falta.\n#EmprendedoresArgentina\n#GestiónDeNegocios\n#Productividad\n#LiderazgoReal\n#MejoraOK\n#ClaridadEstratégica\n#PYMEargentina\n#OrdenParaCrecer",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": null,
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DdIFj0cCNzk/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1365728198979995"
+        },
+        {
+          "platform": "linkedin",
+          "status": "failed",
+          "url": null
+        }
+      ]
+    },
     {
       "id": "6aa2e7bd7f06d9ef326e74e8",
       "date": "2026-09-10",
