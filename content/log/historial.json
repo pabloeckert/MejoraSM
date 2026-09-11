@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-09-11T16:00:51.917Z",
+  "syncedAt": "2026-09-11T20:36:09.570Z",
   "posts": [
+    {
+      "id": "6aa4319d718d5ea227cf0d80",
+      "date": "2026-09-11",
+      "status": "published",
+      "content": "Las reuniones sin agenda son horas perdidas disfrazadas de trabajo. Definí el objetivo antes de mandar el invite y vas a notar la diferencia. ¿Con cuál reunión de esta semana lo probás?",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-11-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3983963705804630153"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6aa3461c68bfc113a738bcaf",
       "date": "2026-09-11",
@@ -11,7 +35,7 @@
       "headline": null,
       "kicker": null,
       "oferta": null,
-      "imageUrl": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-11-1.jpg",
       "platforms": [
         {
           "platform": "instagram",
