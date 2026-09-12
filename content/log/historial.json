@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-09-12T15:08:56.319Z",
+  "syncedAt": "2026-09-12T20:16:46.596Z",
   "posts": [
+    {
+      "id": "6aa576a624c1570cc353e5d7",
+      "date": "2026-09-12",
+      "status": "published",
+      "content": "El feedback vago suena amable, pero no mueve nada. Contá el hecho, el impacto y el paso siguiente — ahí se vuelve dirección real. ¿Cuándo diste tu último feedback así?",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-12-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3984661719493907861"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6aa4319d718d5ea227cf0d80",
       "date": "2026-09-11",
