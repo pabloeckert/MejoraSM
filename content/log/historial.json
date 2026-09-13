@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-09-13T15:44:44.232Z",
+  "syncedAt": "2026-09-13T20:26:25.437Z",
   "posts": [
+    {
+      "id": "6aa6d3bba49b35a905adcb62",
+      "date": "2026-09-13",
+      "status": "published",
+      "content": "Las reuniones no fallan por falta de tiempo, fallan por falta de foco. ¿Cuál es la decisión que necesita tu próxima reunión?",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-13-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3985411361115449046"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6aa576a624c1570cc353e5d7",
       "date": "2026-09-12",
