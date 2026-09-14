@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-09-14T12:02:26.092Z",
+  "syncedAt": "2026-09-14T21:35:22.368Z",
   "posts": [
+    {
+      "id": "6aa83ab44592b548813937ca",
+      "date": "2026-09-14",
+      "status": "published",
+      "content": "Las reuniones sin objetivo claro terminan comiéndose la agenda de todos. Probá esto: no convoques hasta poder escribir el propósito en una sola línea. ¿Querés ordenar cómo se manejan las reuniones en tu equipo? Hablemos.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-14-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3986182251657873715"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6aa6d3bba49b35a905adcb62",
       "date": "2026-09-13",
