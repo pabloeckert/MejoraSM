@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-09-15T16:27:18.136Z",
+  "syncedAt": "2026-09-15T20:56:46.438Z",
   "posts": [
+    {
+      "id": "6aa97ff95c2c9aa48adf9d73",
+      "date": "2026-09-15",
+      "status": "published",
+      "content": "La mayoría de las reuniones no fallan por falta de tiempo, fallan por falta de objetivo claro antes de empezar. ¿Cuál es la tuya esta semana que podría resolverse con un mensaje en vez de una hora en calendario?",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-15-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3986880765232711379"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6aa83ab44592b548813937ca",
       "date": "2026-09-14",
