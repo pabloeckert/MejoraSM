@@ -1,6 +1,35 @@
 {
-  "syncedAt": "2026-09-16T20:58:01.164Z",
+  "syncedAt": "2026-09-17T03:50:10.823Z",
   "posts": [
+    {
+      "id": "6aab2b68bea415cf3a16e462",
+      "date": "2026-09-16",
+      "status": "published",
+      "content": "Si tu argumento de venta es \"te lo dejo más barato\", no estás vendiendo: estás regalando plata.\nGuardá este carrusel y la próxima vez que quieras bajar el precio, preguntate: ¿estoy vendiendo valor o estoy regalando margen? Contanos en los comentarios cuál fue la última vez que caíste en la trampa del descuento.\n#VentasArgentina\n#MejoraOK\n#TécnicasDeVenta\n#ValorNoPrecio\n#Emprendedores\n#PymeArgentina\n#VendedorProfesional\n#NegociaciónEfectiva",
+      "kind": "post",
+      "proposalId": "0a30e3b1-ccfb-4003-967a-f79e457b8687",
+      "headline": "Si tu argumento de venta es \"te lo dejo más barato\", no estás vendiendo: estás regalando plata.",
+      "kicker": null,
+      "oferta": "empresarial",
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-09-16-0a30e3b1-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DdXge5aDCTQ/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1370664211819727"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7506137710848409601/"
+        }
+      ]
+    },
     {
       "id": "6aaad14f3a4a6869b52ccd64",
       "date": "2026-09-16",
