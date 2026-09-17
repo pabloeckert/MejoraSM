@@ -13,6 +13,7 @@ import {
   Send,
   Archive,
   CheckCircle2,
+  UserCheck,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -28,7 +29,9 @@ import {
   type InboxThread,
 } from "@/hooks/useInbox";
 import { useConfirm } from "@/hooks/useConfirm";
+import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { enviarLeadACRM, extraerDatosDeTexto } from "@/services/contactosService";
 
 const PLATFORM_LABEL: Record<string, string> = { instagram: "Instagram", facebook: "Facebook" };
 
@@ -168,6 +171,9 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
   const platformLabel = PLATFORM_LABEL[incoming.platform] ?? incoming.platform;
   const sent = incoming.sentiment ? SENTIMENT_STYLE[incoming.sentiment] : null;
 
+  const [sendingToCRM, setSendingToCRM] = useState(false);
+  const [crmSent, setCrmSent] = useState(false);
+
   async function handleSend() {
     if (!draft.trim()) return;
     const ok = await confirm({
@@ -179,6 +185,42 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
     await sendMut.mutateAsync({ itemId: incoming.id, message: draft.trim() });
     setReplyOpen(false);
     setDraft("");
+  }
+
+  async function handleEnviarCRM() {
+    try {
+      setSendingToCRM(true);
+      const fullText = history.map((h) => h.text).join(" ");
+      const extraidos = extraerDatosDeTexto(fullText);
+      const nombre = incoming.author_name || incoming.author_username || `Lead ${platformLabel}`;
+
+      const res = await enviarLeadACRM({
+        source: "mejora_sm",
+        nombre,
+        email: extraidos.email,
+        telefono: extraidos.telefono,
+        metadata: {
+          red: incoming.platform,
+          thread_id: incoming.thread_id,
+          sentiment: incoming.sentiment,
+        },
+        nota_referencia: `[MejoraSM] Derivado desde ${platformLabel}. Mensaje: "${(incoming.text || '').slice(0, 120)}"`,
+      });
+
+      setCrmSent(true);
+      toast({
+        title: "Enviado a CRM",
+        description: `Contacto ${nombre} registrado exitosamente en la fuente central (ID: ${res.persona_id.slice(0, 8)}…)`,
+      });
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Error enviando a CRM",
+        description: err.message || "No se pudo conectar con contactos-api",
+      });
+    } finally {
+      setSendingToCRM(false);
+    }
   }
 
   return (
@@ -251,6 +293,22 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
             >
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />
               {answered ? "Responder de nuevo" : "Redactar respuesta"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 border-primary/30 hover:bg-primary/5 text-primary"
+              onClick={handleEnviarCRM}
+              disabled={sendingToCRM || crmSent}
+            >
+              {sendingToCRM ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : crmSent ? (
+                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-green-600" />
+              ) : (
+                <UserCheck className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              {crmSent ? "Enviado a CRM" : "Enviar a CRM"}
             </Button>
             <Button
               variant="ghost"

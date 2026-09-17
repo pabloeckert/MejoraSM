@@ -430,6 +430,70 @@ async function reply(itemId: string, message: string) {
 }
 
 // ═══════════════════════════════════════
+// CRM EXPORT / DERIVACIÓN A CONTACTOS-API
+// ═══════════════════════════════════════
+
+async function sendToCRM(lead: {
+  itemId?: string;
+  source?: string;
+  email?: string;
+  nombre?: string;
+  telefono?: string;
+  metadata?: { red?: string; [key: string]: unknown };
+  nota_referencia?: string;
+}) {
+  let nombre = lead.nombre;
+  let email = lead.email;
+  let telefono = lead.telefono;
+  let red = lead.metadata?.red;
+
+  if (lead.itemId) {
+    const { data: item } = await supabase.from("inbox_items").select("*").eq("id", lead.itemId).single();
+    if (item) {
+      if (!nombre) nombre = item.author_name || item.author_username;
+      if (!red) red = item.platform;
+      if (!email && item.text) {
+        const m = item.text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+        if (m) email = m[0];
+      }
+      if (!telefono && item.text) {
+        const m = item.text.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}/);
+        if (m) telefono = m[0].trim();
+      }
+    }
+  }
+
+  const url = Deno.env.get("CONTACTOS_API_URL") || "https://tzatuvxatsduuslxqdtm.supabase.co/functions/v1/contactos-api";
+  const key = Deno.env.get("CONTACTOS_API_KEY") || "b06fb0a66d0db70562e0c11c7f7399614976b3fa31e30181f479a7b5a80ce398";
+
+  const payload = {
+    source: lead.source || "mejora_sm",
+    email,
+    nombre: nombre || "Lead Redes Sociales",
+    telefono,
+    metadata: { red: red || "instagram", ...(lead.metadata || {}) },
+    nota_referencia: lead.nota_referencia || `[MejoraSM] Prospecto derivado desde ${red || "redes"}`,
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Api-Key": key,
+      "Authorization": `Bearer ${key}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`contactos-api error (${res.status}): ${err}`);
+  }
+
+  return await res.json();
+}
+
+// ═══════════════════════════════════════
 // HANDLER
 // ═══════════════════════════════════════
 
@@ -450,6 +514,7 @@ Deno.serve(async (req) => {
     if (action === "sync") result = await sync();
     else if (action === "draft") result = await draft(body.itemId);
     else if (action === "reply") result = await reply(body.itemId, body.message);
+    else if (action === "send_to_crm") result = await sendToCRM(body.lead || { itemId: body.itemId });
     else throw new Error("Acción no válida");
 
     await logRun({ source: "inbox", step: action, status: "success", durationMs: Date.now() - startedAt, metadata: result as Record<string, unknown> });
