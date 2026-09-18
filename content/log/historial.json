@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-09-18T15:58:19.253Z",
+  "syncedAt": "2026-09-18T20:32:37.031Z",
   "posts": [
+    {
+      "id": "6aad6cdc3129b2c1905d8fe9",
+      "date": "2026-09-18",
+      "status": "published",
+      "content": "Las reuniones no fallan por falta de tiempo, fallan por falta de objetivo claro. Probalo en la próxima que convoques y fijate qué cambia.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-18-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3989038725237458710"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6aac22bf5a696c273c16aafb",
       "date": "2026-09-17",
