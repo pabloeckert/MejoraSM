@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-09-17T11:08:59.820Z",
+  "syncedAt": "2026-09-18T10:42:51.475Z",
   "posts": [
+    {
+      "id": "6aac22bf5a696c273c16aafb",
+      "date": "2026-09-17",
+      "status": "published",
+      "content": "El feedback que más incomoda no es el más duro, es el que no tiene dirección. Si te cuesta darlo sin que se sienta un ataque, hablemos.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-17-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3988329812523288358"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6aab2b68bea415cf3a16e462",
       "date": "2026-09-16",
