@@ -1,6 +1,30 @@
 {
-  "syncedAt": "2026-09-19T15:30:35.203Z",
+  "syncedAt": "2026-09-19T20:09:42.797Z",
   "posts": [
+    {
+      "id": "6aaeb46423b4ae0f01a615b0",
+      "date": "2026-09-19",
+      "status": "published",
+      "content": "Callar un feedback no protege a nadie, solo pospone el problema. ¿Qué conversación tenés pendiente? Contanos en los comentarios.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/story-2026-09-19-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/stories/mejoraok/3989742097905104105"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/stories/362865850499895"
+        }
+      ]
+    },
     {
       "id": "6aad6cdc3129b2c1905d8fe9",
       "date": "2026-09-18",
