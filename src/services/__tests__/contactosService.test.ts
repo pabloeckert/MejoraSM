@@ -17,6 +17,7 @@ describe("contactosService en MejoraSM", () => {
       telefono: "+5493764999999",
       metadata: {
         red: "instagram",
+        handle: "cliente_demo",
         thread_id: "thread_test_123",
       },
       nota_referencia: "[MejoraSM] Prueba de integración Día 5",
@@ -24,6 +25,7 @@ describe("contactosService en MejoraSM", () => {
 
     expect(resultado).toBeDefined();
     expect(resultado.persona_id).toBeDefined();
+    expect(resultado.persona_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     expect(typeof resultado.creado).toBe("boolean");
   });
 });

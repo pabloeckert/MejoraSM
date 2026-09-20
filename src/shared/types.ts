@@ -30,4 +30,5 @@ export interface DocRow {
   processing_status?: string | null;
   processing_error?: string | null;
   category?: string | null;
+  metadata?: Record<string, unknown> | null;
 }

@@ -7,6 +7,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import type { ProposalDetail } from "@/components/ProposalDetailDialog";
+import type { DocRow } from "@/shared/types";
 
 export { supabase };
 
@@ -72,6 +73,74 @@ export const documentsApi = {
       .select()
       .single();
     if (dbError) throw dbError;
+
+    return doc;
+  },
+
+  // Ingesta de literatura de gestión con metadatos y chunks semánticos
+  ingestBook: async ({
+    file,
+    title,
+    author,
+    content,
+    wordCount,
+    chunks,
+    tags,
+  }: {
+    file: File;
+    title: string;
+    author: string;
+    content: string;
+    wordCount: number;
+    chunks: { chunkIndex: number; wordCount: number; content: string }[];
+    tags: string[];
+  }) => {
+    const filePath = `biblioteca/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const { error: uploadError } = await supabase.storage
+      .from("vault")
+      .upload(filePath, file);
+    if (uploadError) {
+      console.warn("[vault] Aviso al subir a storage:", uploadError.message);
+    }
+
+    const { data: doc, error: dbError } = await (supabase.from("documents") as unknown as {
+      insert: (values: Record<string, unknown>) => {
+        select: () => {
+          single: () => Promise<{ data: DocRow | null; error: Error | null }>;
+        };
+      };
+    })
+      .insert({
+        title,
+        file_path: filePath,
+        file_type: file.type || "text/plain",
+        content,
+        word_count: wordCount,
+        category: "biblioteca_gestion",
+        processing_status: "ready",
+        metadata: {
+          autor: author,
+          titulo: title,
+          categoria: "biblioteca_gestion",
+          tags,
+          chunks_count: chunks.length,
+          total_words: wordCount,
+        },
+      })
+      .select()
+      .single();
+
+    if (dbError) throw dbError;
+
+    if (doc?.id && chunks.length > 0) {
+      const chunkRows = chunks.map((c) => ({
+        document_id: doc.id,
+        chunk_index: c.chunkIndex,
+        content: c.content,
+        token_count: Math.round(c.wordCount * 1.3),
+      }));
+      await supabase.from("doc_chunks").insert(chunkRows);
+    }
 
     return doc;
   },
@@ -399,6 +468,7 @@ export interface InboxItem {
   item_time: string | null;
   replied_at: string | null;
   archived: boolean;
+  persona_id?: string | null;
 }
 
 export const inboxApi = {
@@ -420,6 +490,15 @@ export const inboxApi = {
 
   markReplied: (id: string) =>
     supabase.from("inbox_items").update({ replied_at: new Date().toISOString() }).eq("id", id),
+
+  setPersonaId: (id: string, personaId: string) =>
+    (supabase.from("inbox_items") as unknown as {
+      update: (values: Record<string, unknown>) => {
+        eq: (col: string, val: string) => Promise<unknown>;
+      };
+    })
+      .update({ persona_id: personaId })
+      .eq("id", id),
 };
 
 // ═══════════════════════════════════════

@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Menu,
   LogOut,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,29 +21,30 @@ import lockup from "@/assets/lockup-horizontal-color.png";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 
-// D6 (auditoría 2026-08-31): antes 11 ítems en una lista plana sin jerarquía, y
-// "Subir material" 7º pese a ser el arranque del flujo real. Ahora agrupados
-// por rol y "Subir material" arriba, en "Crear".
-const navGroups: { label: string; items: { label: string; icon: typeof LayoutDashboard; path: string }[] }[] = [
+const navGroups: {
+  label: string;
+  items: { label: string; sublabel?: string; icon: typeof LayoutDashboard; path: string }[];
+}[] = [
   {
     label: "Panel",
     items: [{ label: "Dashboard", icon: LayoutDashboard, path: "/" }],
   },
   {
-    label: "Crear contenido",
+    label: "Estrategia y Creación",
     items: [
+      { label: "Mesa Ejecutiva", sublabel: "Crear contenido", icon: MessageSquare, path: "/mesa" },
+      { label: "Citas y Stories", sublabel: "Fin de semana", icon: Sparkles, path: "/citas" },
+      { label: "Biblioteca y Bóveda", sublabel: "Documentos y libros", icon: BookOpen, path: "/boveda" },
       { label: "Subir material", icon: Upload, path: "/hub" },
-      { label: "Manual de Marca", icon: BookOpen, path: "/boveda" },
-      { label: "Mesa de Diálogo", icon: MessageSquare, path: "/mesa" },
     ],
   },
   {
-    label: "Publicar y gestionar",
+    label: "Operación y CRM",
     items: [
+      { label: "Conversaciones", sublabel: "Inbox social y CRM", icon: MessagesSquare, path: "/conversaciones" },
       { label: "Propuestas", icon: FileCheck, path: "/propuestas" },
       { label: "Calendario", icon: CalendarDays, path: "/calendario" },
       { label: "Monitor", icon: MonitorPlay, path: "/monitor" },
-      { label: "Conversaciones", icon: MessagesSquare, path: "/conversaciones" },
     ],
   },
   {
@@ -81,14 +83,21 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                   onClick={onNavigate}
                   aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                    "flex items-start gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                     isActive
                       ? "bg-sidebar-accent text-sidebar-primary"
                       : "text-sidebar-foreground/70 hover:bg-muted hover:text-sidebar-foreground"
                   )}
                 >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
+                  <item.icon className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div className="flex flex-col min-w-0">
+                    <span className="leading-tight">{item.label}</span>
+                    {item.sublabel && (
+                      <span className="text-[10px] font-normal text-muted-foreground leading-tight mt-0.5">
+                        {item.sublabel}
+                      </span>
+                    )}
+                  </div>
                 </Link>
               );
             })}

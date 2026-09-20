@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ import {
   isUnanswered,
   type InboxThread,
 } from "@/hooks/useInbox";
+import { inboxApi, type InboxItem } from "@/services/supabase";
 import { useConfirm } from "@/hooks/useConfirm";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -160,6 +162,7 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
 
 function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedView: boolean }) {
   const { incoming, history } = thread;
+  const qc = useQueryClient();
   const [replyOpen, setReplyOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const draftMut = useDraftReply();
@@ -173,6 +176,7 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
 
   const [sendingToCRM, setSendingToCRM] = useState(false);
   const [crmSent, setCrmSent] = useState(false);
+  const isDerived = Boolean(incoming.persona_id || crmSent);
 
   async function handleSend() {
     if (!draft.trim()) return;
@@ -193,6 +197,7 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
       const fullText = history.map((h) => h.text).join(" ");
       const extraidos = extraerDatosDeTexto(fullText);
       const nombre = incoming.author_name || incoming.author_username || `Lead ${platformLabel}`;
+      const handle = incoming.author_username || incoming.author_name || "";
 
       const res = await enviarLeadACRM({
         source: "mejora_sm",
@@ -201,22 +206,40 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
         telefono: extraidos.telefono,
         metadata: {
           red: incoming.platform,
+          handle,
           thread_id: incoming.thread_id,
-          sentiment: incoming.sentiment,
+          sentiment: incoming.sentiment ?? undefined,
         },
-        nota_referencia: `[MejoraSM] Derivado desde ${platformLabel}. Mensaje: "${(incoming.text || '').slice(0, 120)}"`,
+        nota_referencia: `[MejoraSM] Derivado desde ${platformLabel}${handle ? ` (@${handle})` : ""}. Mensaje: "${(incoming.text || '').slice(0, 120)}"`,
       });
 
       setCrmSent(true);
+
+      // Persistir persona_id en base de datos en la fila de inbox_items
+      try {
+        await inboxApi.setPersonaId(incoming.id, res.persona_id);
+      } catch (errDb) {
+        console.warn("[inbox] No se pudo persistir persona_id en BD:", errDb);
+      }
+
+      // Actualizar cache local de React Query para persistencia visual inmediata sin refresco
+      qc.setQueryData<InboxItem[]>(["inbox"], (old) => {
+        if (!old) return old;
+        return old.map((item) =>
+          item.id === incoming.id ? { ...item, persona_id: res.persona_id } : item
+        );
+      });
+
       toast({
         title: "Enviado a CRM",
         description: `Contacto ${nombre} registrado exitosamente en la fuente central (ID: ${res.persona_id.slice(0, 8)}…)`,
       });
-    } catch (err: any) {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "No se pudo conectar con contactos-api";
       toast({
         variant: "destructive",
         title: "Error enviando a CRM",
-        description: err.message || "No se pudo conectar con contactos-api",
+        description: msg,
       });
     } finally {
       setSendingToCRM(false);
@@ -237,6 +260,12 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
             {incoming.author_is_follower && <span className="text-muted-foreground/70">· sigue la cuenta</span>}
           </span>
           {sent && <Badge className={cn("border-0", sent.className)}>{sent.label}</Badge>}
+          {incoming.persona_id && (
+            <Badge variant="outline" className="border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 font-medium">
+              <CheckCircle2 className="mr-1 h-3 w-3 inline text-emerald-600 dark:text-emerald-400" />
+              Derivado a CRM
+            </Badge>
+          )}
           {incoming.sentiment_note && <span className="text-muted-foreground/80">{incoming.sentiment_note}</span>}
           {incoming.item_time && (
             <span className="ml-auto text-muted-foreground/70">
@@ -297,18 +326,23 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
             <Button
               variant="outline"
               size="sm"
-              className="h-9 border-primary/30 hover:bg-primary/5 text-primary"
+              className={cn(
+                "h-9",
+                isDerived
+                  ? "border-emerald-500/40 text-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20 dark:text-emerald-400 font-medium"
+                  : "border-primary/30 hover:bg-primary/5 text-primary"
+              )}
               onClick={handleEnviarCRM}
-              disabled={sendingToCRM || crmSent}
+              disabled={sendingToCRM || isDerived}
             >
               {sendingToCRM ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : crmSent ? (
-                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-green-600" />
+              ) : isDerived ? (
+                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
               ) : (
                 <UserCheck className="mr-1.5 h-3.5 w-3.5" />
               )}
-              {crmSent ? "Enviado a CRM" : "Enviar a CRM"}
+              {isDerived ? "Derivado a CRM" : "Enviar a CRM"}
             </Button>
             <Button
               variant="ghost"

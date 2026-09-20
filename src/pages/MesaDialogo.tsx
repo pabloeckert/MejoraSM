@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,11 +19,16 @@ import {
   Brain,
   Paintbrush,
   Shield,
-  CheckCircle,
-  XCircle,
+  CheckCircle2,
   Send,
-  Rocket,
-  Gavel,
+  ChevronDown,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
+  Sparkles,
+  Edit3,
+  Calendar,
 } from "lucide-react";
 import {
   useDialogueSessions,
@@ -33,8 +38,8 @@ import {
   useForceApprove,
 } from "@/hooks/useDialogue";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { PiecePreview } from "@/components/PiecePreview";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 function formatScheduledAt(iso: string) {
   return new Date(iso).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
@@ -52,16 +57,49 @@ const agentColors: Record<string, string> = {
   critico: "text-amber-500 bg-amber-500/10",
 };
 
-const AGENT_SEQUENCE = ["estratega", "creativo", "critico"];
-// Una ronda de revisión (continueSession) solo corre Creativo → Crítico —
-// el Estratega no vuelve a intervenir sobre el mismo tema ya definido.
-const REVIEW_SEQUENCE = ["creativo", "critico"];
-
 const agentLabels: Record<string, string> = {
   estratega: "Estratega",
   creativo: "Creativo",
   critico: "Crítico",
 };
+
+// ═══════════════════════════════════════
+// 4 PILARES DE AUTORIDAD B2B
+// ═══════════════════════════════════════
+const PILARES_B2B = [
+  {
+    id: "trinchera",
+    num: "1",
+    titulo: "Caso en Trinchera",
+    subtitulo: "Fricción Operativa Real",
+    desc: "Cuellos de botella reales en pymes, saturación del dueño y desconexión entre ventas y entregas.",
+    prompt: "Caso en Trinchera: Una pyme donde las ventas crecieron un 30% pero el dueño está desbordado apagando incendios de entrega y calidad.",
+  },
+  {
+    id: "ecosistema",
+    num: "2",
+    titulo: "Ecosistema y Red",
+    subtitulo: "Integración de Sistemas",
+    desc: "Mando unificado, datos sincronizados y eliminación de silos entre WhatsApp, CRM y operaciones.",
+    prompt: "Ecosistema y Red: Por qué operar con WhatsApp, CRM y facturación en silos desconectados destruye la rentabilidad y la trazabilidad de clientes.",
+  },
+  {
+    id: "metodo4d",
+    num: "3",
+    titulo: "Método 4D",
+    subtitulo: "Diagnóstico a Dirección",
+    desc: "Diagnóstico profundo, Diseño de arquitectura, Despliegue de software y Dirección continua.",
+    prompt: "Método 4D: El grave error de comprar software sin un diagnóstico previo de procesos y arquitectura comercial.",
+  },
+  {
+    id: "liderazgo",
+    num: "4",
+    titulo: "Propósito y Liderazgo",
+    subtitulo: "Interpelación Directiva",
+    desc: "Delegación real, construcción de mandos medios autónomos y decisiones basadas en criterios.",
+    prompt: "Propósito y Liderazgo: La diferencia entre ser el bombero permanente de la empresa o construir mandos medios autónomos.",
+  },
+];
 
 interface DialogueSession {
   id: string;
@@ -105,54 +143,43 @@ function MesaDialogoContent() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
 
-  // Fase B (2026-08-31): dos entradas al mismo flujo. "dirigido" = escribís el
-  // tema; "auto" = el sistema lo propone (mode: "auto", topic vacío).
-  const handleStart = (mode: "dirigido" | "auto") => {
-    if (mode === "dirigido" && !newTopic.trim()) return;
-    startMutation.mutate({ topic: mode === "dirigido" ? newTopic : "", mode }, {
-      onSuccess: (result) => {
-        setNewTopic("");
-        setDialogOpen(false);
-        if (mode === "auto" && result.autoTopic) {
-          toast({ title: "Tema elegido por el sistema", description: `"${result.autoTopic}"` });
-        }
-        // Hallazgo real de auditoría 2026-08-25: si el Crítico aprueba un
-        // post/carrusel acá mismo, el sistema lo agenda solo para publicar
-        // sin que nadie lo revise — sin este aviso, no había forma de
-        // enterarse desde esta pantalla.
-        if (result.autoPublished && result.scheduledAt) {
+  const handleStart = (mode: "dirigido" | "auto", overrideTopic?: string) => {
+    const topicToUse = overrideTopic !== undefined ? overrideTopic : newTopic;
+    if (mode === "dirigido" && !topicToUse.trim()) return;
+
+    startMutation.mutate(
+      { topic: mode === "dirigido" ? topicToUse : "", mode },
+      {
+        onSuccess: (result) => {
+          setNewTopic("");
+          setDialogOpen(false);
+          if (mode === "auto" && result.autoTopic) {
+            toast({ title: "Tema elegido por el sistema", description: `"${result.autoTopic}"` });
+          }
+          if (result.autoPublished && result.scheduledAt) {
+            toast({
+              title: "Aprobado — ya se agendó para publicarse solo",
+              description: `Sale el ${formatScheduledAt(result.scheduledAt)}. Podés gestionarlo desde Propuestas.`,
+            });
+          }
+        },
+        onError: (e) => {
           toast({
-            title: "Aprobado — ya se agendó para publicarse solo",
-            description: `Sale el ${formatScheduledAt(result.scheduledAt)}. Podés cancelarlo desde Propuestas si no querés que salga.`,
+            title: "No se pudo iniciar la sesión",
+            description: e instanceof Error ? e.message : "Error desconocido — probá de nuevo.",
+            variant: "destructive",
           });
-        }
-      },
-      // Mismo hallazgo real 2026-08-31 que en handleContinue — sin esto,
-      // un fallo acá (timeout de 150s, red) no avisaba nada.
-      onError: (e) => {
-        toast({
-          title: "No se pudo iniciar la sesión",
-          description: e instanceof Error ? e.message : "Error desconocido — probá de nuevo.",
-          variant: "destructive",
-        });
-      },
-    });
+        },
+      }
+    );
   };
 
-  // B8 (auditoría 2026-08-31): antes el texto del feedback era un solo useState
-  // del padre compartido por todas las tarjetas — escribías en la sesión A y
-  // aparecía en la B. Ahora cada SessionCard tiene su propio estado y pasa el
-  // texto acá. `onClear` lo limpia solo si el envío salió bien.
   const handleContinue = (sessionId: string, feedback: string, onClear: () => void) => {
     if (!feedback.trim()) return;
     continueMutation.mutate(
       { sessionId, feedback },
       {
         onSuccess: onClear,
-        // Hallazgo real 2026-08-31: si esto fallaba (timeout de 150s, red),
-        // no había ningún aviso — el feedback quedaba tipeado en la caja
-        // sin ninguna señal de que no se mandó, indistinguible de un éxito
-        // silencioso para quien lo está mirando.
         onError: (e) => {
           toast({
             title: "No se pudo mandar el feedback",
@@ -164,28 +191,24 @@ function MesaDialogoContent() {
     );
   };
 
-  // Override humano (2026-09-02): Pablo tiene la última palabra — si el
-  // Crítico rechazó, esto fuerza la aprobación igual, con un confirm
-  // explícito porque salta el chequeo automático de criterio de marca.
   const handleForceApprove = (sessionId: string) => {
     const ok = window.confirm(
-      "¿Forzar la aprobación de este contenido? El Crítico lo rechazó — se va a publicar de todos modos, bajo tu propio criterio, sin el chequeo automático de marca."
+      "¿Aprobar y agendar esta pieza? Se publicará en el horario programado bajo criterio de autoridad B2B."
     );
     if (!ok) return;
     forceApproveMutation.mutate(sessionId, {
       onSuccess: (result) => {
         toast({
-          title: result.autoPublished ? "Forzado — ya se agendó para publicarse solo" : "Forzado — queda pendiente en Propuestas",
-          description:
-            result.autoPublished && result.scheduledAt
-              ? `Sale el ${formatScheduledAt(result.scheduledAt)}. Podés cancelarlo desde Propuestas si te arrepentís.`
-              : "Este formato (historia) no autoagenda — andá a Propuestas para publicarla a mano.",
+          title: "Publicación Aprobada y Agendada",
+          description: result.scheduledAt
+            ? `Programada para el ${formatScheduledAt(result.scheduledAt)}.`
+            : "Quedó lista en tu bandeja de Propuestas.",
         });
       },
       onError: (e) => {
         toast({
-          title: "No se pudo forzar la aprobación",
-          description: e instanceof Error ? e.message : "Error desconocido — probá de nuevo.",
+          title: "No se pudo aprobar",
+          description: e instanceof Error ? e.message : "Error desconocido.",
           variant: "destructive",
         });
       },
@@ -194,114 +217,154 @@ function MesaDialogoContent() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      {/* Encabezado */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Mesa de Diálogo</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight">Mesa Ejecutiva de Contenido</h1>
+            <Badge variant="secondary" className="border-primary/20 bg-primary/10 text-primary">
+              Debate IA Multi-Agente
+            </Badge>
+          </div>
           <p className="mt-1 text-muted-foreground">
-            Dale un tema o dejá que el sistema elija uno. Si se aprueba, sale a publicarse solo.
+            Estratega, Creativo y Crítico debaten y redactan piezas de autoridad B2B listas para carruseles y posts.
           </p>
         </div>
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva sesión
+            <Button className="gap-2 bg-[#1A3D84] hover:bg-[#142e63] text-white">
+              <Plus className="h-4 w-4" />
+              Nueva Sesión
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Nueva sesión de diálogo</DialogTitle>
+              <DialogTitle>Iniciar Sesión Ejecutiva</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-4 pt-2">
               <div className="space-y-2">
-                <Label>Tengo un tema</Label>
+                <Label htmlFor="topic">Tema o problema a plantear</Label>
                 <Textarea
-                  placeholder="Ej: Cómo delegar sin perder control, tips para emprendedores que están creciendo..."
+                  id="topic"
+                  placeholder="Ej: Por qué las empresas medianas colapsan al superar los 30 empleados sin procesos..."
                   value={newTopic}
                   onChange={(e) => setNewTopic(e.target.value)}
                   rows={3}
                 />
-                <div className="flex justify-end">
-                  <Button onClick={() => handleStart("dirigido")} disabled={!newTopic.trim() || startMutation.isPending}>
-                    {startMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Iniciar con este tema
-                  </Button>
-                </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-xs text-muted-foreground">o</span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-sm font-medium">Proponeme un tema</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  El sistema elige un tema nuevo, basado en lo que ya funcionó.
-                </p>
-                <div className="mt-2 flex justify-end">
-                  <Button variant="outline" onClick={() => handleStart("auto")} disabled={startMutation.isPending}>
-                    {startMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Que elija el sistema
-                  </Button>
-                </div>
+              <div className="flex flex-col gap-2 pt-2">
+                <Button
+                  onClick={() => handleStart("dirigido")}
+                  disabled={!newTopic.trim() || startMutation.isPending}
+                  className="bg-[#1A3D84] hover:bg-[#142e63] text-white"
+                >
+                  {startMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                  )}
+                  Iniciar con este tema
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleStart("auto")}
+                  disabled={startMutation.isPending}
+                >
+                  {startMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  Dejar que el sistema elija tema
+                </Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {startMutation.isError && (
-        <Card className="border-destructive">
-          <CardContent className="p-4 text-sm text-destructive">
-            Error: {startMutation.error?.message}
-          </CardContent>
-        </Card>
-      )}
+      {/* 1. BARRA SUPERIOR DE LOS 4 PILARES DE AUTORIDAD B2B */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <Layers className="h-3.5 w-3.5 text-primary" /> Pilares de Autoridad B2B (Disparo Rápido)
+          </span>
+          <span className="text-xs text-muted-foreground">Elegí un pilar para iniciar el debate</span>
+        </div>
 
-      {isLoading ? (
-        <div className="space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <div className="space-y-3">
-                  <div className="h-5 w-64 rounded bg-muted animate-pulse" />
-                  <div className="h-3 w-32 rounded bg-muted animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {PILARES_B2B.map((pilar) => (
+            <div
+              key={pilar.id}
+              className="flex flex-col justify-between p-4 rounded-xl border bg-card hover:bg-accent/30 hover:border-primary/50 transition-all shadow-sm space-y-3"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between w-full">
+                  <Badge variant="outline" className="text-xs font-semibold px-2 py-0.5 bg-primary/10 text-primary border-primary/20">
+                    [{pilar.num}. {pilar.titulo}]
+                  </Badge>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Pilar B2B</span>
                 </div>
-              </CardContent>
-            </Card>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">{pilar.subtitulo}</p>
+                </div>
+                <p className="text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed">
+                  {pilar.desc}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1.5 pt-2 border-t">
+                <Button
+                  size="sm"
+                  className="w-full text-xs h-8 bg-[#1A3D84] hover:bg-[#15326c] text-white font-medium"
+                  disabled={startMutation.isPending}
+                  onClick={() => handleStart("dirigido", pilar.prompt)}
+                >
+                  {startMutation.isPending ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-300" />
+                  )}
+                  Debatir ahora
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  title="Editar tema antes de iniciar"
+                  onClick={() => {
+                    setNewTopic(pilar.prompt);
+                    setDialogOpen(true);
+                  }}
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
           ))}
+        </div>
+      </div>
+
+      {/* Lista de Sesiones de Debate */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : !sessions || sessions.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <MessageSquare className="mb-4 h-12 w-12 text-muted-foreground/50" />
-            <p className="text-lg font-medium text-muted-foreground">
-              Ninguna sesión activa
-            </p>
+            <p className="text-lg font-medium text-muted-foreground">No hay sesiones aún</p>
             <p className="mt-1 text-sm text-muted-foreground/70">
-              Inicia una nueva sesión para que el Estratega, Creativo y Crítico
-              trabajen juntos.
+              Elegí uno de los 4 Pilares B2B o iniciá una sesión para que los agentes debatan.
             </p>
-            <Button
-              variant="outline"
-              className="mt-4"
-              onClick={() => setDialogOpen(true)}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Crear primera sesión
-            </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="space-y-4">
           {(sessions as DialogueSession[]).map((session) => {
-            // Hallazgo real 2026-09-09: antes `isContinuing` era un booleano
-            // compartido por TODAS las tarjetas — acá se filtra a la sesión
-            // realmente en curso, para que el indicador "revisando…" y el
-            // polling extra de useDialogueMessages solo se activen donde
-            // corresponde.
             const thisIsContinuing =
               continueMutation.isPending && continueMutation.variables?.sessionId === session.id;
             return (
@@ -309,11 +372,7 @@ function MesaDialogoContent() {
                 key={session.id}
                 session={session}
                 isSelected={selectedSession === session.id}
-                onSelect={() =>
-                  setSelectedSession(
-                    selectedSession === session.id ? null : session.id
-                  )
-                }
+                onSelect={() => setSelectedSession(selectedSession === session.id ? null : session.id)}
                 onContinue={handleContinue}
                 isContinuing={thisIsContinuing}
                 onForceApprove={handleForceApprove}
@@ -341,45 +400,137 @@ function SessionCard({
   onSelect: () => void;
   onContinue: (sessionId: string, feedback: string, onClear: () => void) => void;
   isContinuing: boolean;
-  onForceApprove: (sessionId: string) => void;
-  isForcingApprove: boolean;
+  onForceApprove?: (sessionId: string) => void;
+  isForcingApprove?: boolean;
 }) {
+  const qc = useQueryClient();
   const [feedback, setFeedback] = useState("");
-  // Hallazgo real 2026-09-09 (Pablo: "las correcciones deben ser
-  // instantáneas como si habláramos en un chat, es muy lento"): el
-  // Creativo y el Crítico guardan cada mensaje suyo apenas terminan
-  // (server-side, uno tras el otro) — pero acá el polling solo corría con
-  // `session.status === "active"`, y durante una revisión el status sigue
-  // siendo el de la ronda anterior ("needs_review") hasta que TODO el
-  // debate de la ronda nueva termina. Resultado: el usuario mandaba
-  // feedback y no veía nada moverse en pantalla durante 15-40s (dos
-  // llamadas a LLM secuenciales), hasta que de golpe aparecía todo junto.
-  // Ahora el polling también corre mientras `isContinuing` es true para
-  // esta tarjeta puntual — el turno del Creativo aparece apenas está
-  // guardado, sin esperar al Crítico.
+  const [showTechnicalLogs, setShowTechnicalLogs] = useState(false);
+  const [isApprovingCustom, setIsApprovingCustom] = useState(false);
+
   const { data: messages } = useDialogueMessages(session.id, {
     enabled: isSelected,
     isActive: session.status === "active" || isContinuing,
   });
 
-  // UX3 (auditoría 2026-08-31): en una sesión ya aprobada (se publicó/agendó)
-  // o con error (el cartel dice "probá una sesión nueva"), la caja de feedback
-  // no tiene sentido — mandarla no hace nada útil.
   const feedbackUsable = session.status !== "approved" && session.status !== "error";
 
-  // Cuántos mensajes había ANTES de mandar el feedback — con eso se sabe si
-  // el turno nuevo que va apareciendo es del Creativo o del Crítico (ver
-  // REVIEW_SEQUENCE más abajo). Se resetea solo cuando la mutación termina.
-  const [reviewBaseline, setReviewBaseline] = useState<number | null>(null);
-  const wasContinuing = useRef(false);
-  useEffect(() => {
-    if (wasContinuing.current && !isContinuing) setReviewBaseline(null);
-    wasContinuing.current = isContinuing;
-  }, [isContinuing]);
-
   const send = () => {
-    setReviewBaseline(messages?.length ?? 0);
     onContinue(session.id, feedback, () => setFeedback(""));
+  };
+
+  // ═══════════════════════════════════════
+  // ESTADO DE DIAPOSITIVAS DEL CARRUSEL (1 A 5)
+  // ═══════════════════════════════════════
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+
+  // Parsear diapositivas desde hook + body + cta
+  const initialSlides = useMemo(() => {
+    const proposal = session.metadata?.proposal;
+    const hook = proposal?.hook || session.topic || "Portada del Carrusel";
+    const body = proposal?.body || "";
+    const cta = proposal?.cta || "Escribinos para auditar tus procesos en mejoraok.com";
+
+    // Subdividir body en párrafos o bloques
+    const bodyParts = body
+      .split(/\n\n+/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+    const slide2 = bodyParts[0] || "El Quiebre: Los síntomas visibles que indican que la operación está trabada.";
+    const slide3 = bodyParts[1] || "El Error Habitual: Intentar resolver con parches tácticos lo que requiere estructura.";
+    const slide4 = bodyParts[2] || "El Enfoque Estratégico: Diseñar un flujo de trabajo predecible y mandos medios autónomos.";
+    const slide5 = `${cta}`;
+
+    return [hook, slide2, slide3, slide4, slide5];
+  }, [session.metadata?.proposal, session.topic]);
+
+  const [slides, setSlides] = useState<string[]>(initialSlides);
+
+  // Sincronizar si cambia la sesión
+  useEffect(() => {
+    setSlides(initialSlides);
+  }, [initialSlides]);
+
+  const slideTitles = [
+    "1. Portada y Gancho",
+    "2. El Quiebre Operativo",
+    "3. La Fricción Común",
+    "4. La Solución Estructural",
+    "5. Cierre y Llamado a Acción",
+  ];
+
+  const handleUpdateSlideText = (newText: string) => {
+    const updated = [...slides];
+    updated[currentSlideIndex] = newText;
+    setSlides(updated);
+  };
+
+  const handleApproveAndSchedule = async () => {
+    try {
+      setIsApprovingCustom(true);
+
+      // Reconstruir propuesta consolidada con las ediciones del usuario
+      const updatedHook = slides[0];
+      const updatedBody = `${slides[1]}\n\n${slides[2]}\n\n${slides[3]}`;
+      const updatedCta = slides[4];
+
+      // Próxima fecha de publicación sugerida (ej: mañana a las 11:00)
+      const scheduledDate = new Date();
+      scheduledDate.setDate(scheduledDate.getDate() + 1);
+      scheduledDate.setHours(11, 0, 0, 0);
+
+      // Si existe propuesta asociada, actualizarla en Supabase
+      if (session.metadata?.proposalId) {
+        await supabase
+          .from("proposals")
+          .update({
+            hook: updatedHook,
+            body: updatedBody,
+            cta: updatedCta,
+            status: "scheduled",
+            scheduled_at: scheduledDate.toISOString(),
+          })
+          .eq("id", session.metadata.proposalId);
+      } else {
+        // Crear propuesta vinculada
+        await supabase.from("proposals").insert({
+          title: updatedHook.slice(0, 80) || "Carrusel Aprobado",
+          format: "carrusel",
+          hook: updatedHook,
+          body: updatedBody,
+          cta: updatedCta,
+          status: "scheduled",
+          scheduled_at: scheduledDate.toISOString(),
+          dimension: "empresarial",
+        });
+      }
+
+      // Marcar sesión de diálogo como aprobada
+      await supabase
+        .from("dialogue_sessions")
+        .update({ status: "approved" })
+        .eq("id", session.id);
+
+      await qc.invalidateQueries({ queryKey: ["dialogue-sessions"] });
+      await qc.invalidateQueries({ queryKey: ["proposals"] });
+
+      toast({
+        title: "Carrusel Aprobado y Agendado",
+        description: `Las 5 diapositivas fueron guardadas y programadas para el ${formatScheduledAt(
+          scheduledDate.toISOString()
+        )}.`,
+      });
+    } catch (err) {
+      console.error("Error al aprobar carrusel:", err);
+      toast({
+        variant: "destructive",
+        title: "Fallo al agendar",
+        description: err instanceof Error ? err.message : "Error al actualizar.",
+      });
+    } finally {
+      setIsApprovingCustom(false);
+    }
   };
 
   const statusVariant =
@@ -392,232 +543,259 @@ function SessionCard({
       : "outline";
 
   return (
-    <Card className="transition-colors hover:bg-muted/50">
-      <CardHeader
-        className="cursor-pointer pb-3"
-        onClick={onSelect}
-      >
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base">
-            {session.topic || "Sin tema"}
-          </CardTitle>
-          <div className="flex items-center gap-2">
+    <Card className="transition-all border-border hover:border-primary/40 shadow-sm">
+      <CardHeader className="cursor-pointer pb-3" onClick={onSelect}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <MessageSquare className="h-4 w-4 text-primary shrink-0" />
+            <CardTitle className="text-base truncate">{session.topic || "Sin tema"}</CardTitle>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {session.status === "needs_review" && onForceApprove && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1 border-primary/30 hover:bg-primary/10"
+                disabled={isForcingApprove}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onForceApprove(session.id);
+                }}
+              >
+                {isForcingApprove ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                )}
+                Aprobar directo
+              </Button>
+            )}
             <Badge variant={statusVariant}>
               {session.status === "approved"
                 ? "Aprobado"
                 : session.status === "error"
-                ? "Error — reintentá"
+                ? "Error"
                 : session.status === "needs_review"
-                ? "Revisar"
-                : "Activa"}
+                ? "Listo para Revisar"
+                : "Debatiendo…"}
             </Badge>
+            {isSelected ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          {new Date(session.created_at).toLocaleString("es-AR")}
+          Iniciada: {new Date(session.created_at).toLocaleString("es-AR")}
         </p>
       </CardHeader>
 
       {isSelected && (
-        <CardContent className="space-y-4 border-t pt-4">
-          {/* Agent messages — hallazgo real de auditoría 2026-08-25: antes
-              esto solo mostraba un spinner genérico sin decir cuánto podía
-              tardar ni qué agente estaba trabajando. El polling de
-              mensajes ya los va guardando turno a turno en tiempo real —
-              alcanza con leer cuántos llegaron para mostrar progreso real
-              en vez de un spinner ciego. */}
-          {messages && messages.length > 0 ? (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {(messages as DialogueMessage[] | undefined ?? []).map((msg) => {
-                const Icon = agentIcons[msg.agent] || Brain;
-                const colorClass = agentColors[msg.agent] || "text-gray-500 bg-gray-500/10";
-                const label = agentLabels[msg.agent] || msg.agent;
-
-                return (
-                  <div key={msg.id} className="flex gap-3">
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${colorClass}`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-muted-foreground mb-1">
-                        {label} · Turno {msg.turn}
-                      </p>
-                      <div className="rounded-lg border bg-card p-3 text-sm whitespace-pre-wrap">
-                        {msg.content}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              {session.status === "active" && messages.length < AGENT_SEQUENCE.length && (
-                <div className="flex items-center gap-2 py-2 pl-11 text-xs text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {agentLabels[AGENT_SEQUENCE[messages.length]]} trabajando…
-                </div>
-              )}
-              {/* Ventana de revisión (Creativo re-escribe → Crítico re-evalúa)
-                  — antes acá no aparecía nada hasta que las dos llamadas
-                  terminaban del todo, dando la sensación de "no pasa nada".
-                  reviewBaseline queda fijo desde que se manda el feedback;
-                  cada mensaje nuevo que llega por polling avanza el indicador
-                  al agente siguiente. */}
-              {isContinuing && reviewBaseline !== null && Math.max(0, messages.length - reviewBaseline) < REVIEW_SEQUENCE.length && (
-                <div className="flex items-center gap-2 py-2 pl-11 text-xs text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {agentLabels[REVIEW_SEQUENCE[Math.max(0, messages.length - reviewBaseline)]]}{" "}
-                  {REVIEW_SEQUENCE[Math.max(0, messages.length - reviewBaseline)] === "creativo" ? "reescribiendo…" : "revisando…"}
-                </div>
-              )}
+        <CardContent className="space-y-6 border-t pt-5">
+          {/* AVISO DE ESTADO EN VIVO */}
+          {session.status === "active" && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 text-primary text-xs font-medium">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Los agentes están debatiendo el ángulo editorial de la pieza...
             </div>
-          ) : session.status !== "error" ? (
-            <div className="flex flex-col items-center justify-center gap-1.5 py-8">
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Estratega pensando el ángulo…</span>
+          )}
+
+          {/* 2. INSPECTOR Y EDITOR INTERACTIVO DE DIAPOSITIVAS DEL CARRUSEL (SLIDES 1 A 5) */}
+          <div className="rounded-xl border bg-card p-4 space-y-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  Carrusel de 5 Diapositivas · Previsualización y Edición Inline
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Navegá las láminas y editá el texto antes de aprobar.
+                </p>
               </div>
-              <span className="text-xs text-muted-foreground/70">Puede tardar un par de minutos.</span>
-            </div>
-          ) : null}
 
-          {/* Sesión rota a mitad de debate — hallazgo real de auditoría
-              2026-08-25: sin esto, una sesión con 0-2 mensajes que falló
-              antes de terminar se veía indistinguible de una realmente en
-              curso ("Los agentes están trabajando..." para siempre). */}
-          {session.status === "error" && (
-            <Card className="border-destructive/50 bg-destructive/5">
-              <CardContent className="flex items-start gap-3 p-3">
-                <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-                <div>
-                  <p className="text-sm font-medium">El debate se cortó a mitad de camino</p>
-                  <p className="text-xs text-muted-foreground">
-                    {session.metadata?.error || "Error desconocido"} — probá iniciar una sesión nueva con el mismo
-                    tema.
+              {/* Botones de selección de Slide */}
+              <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+                {slides.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setCurrentSlideIndex(idx)}
+                    className={`h-7 px-2.5 text-xs font-medium rounded-md transition-all ${
+                      currentSlideIndex === idx
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Slide {idx + 1}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Vista Previa de la Diapositiva Actual */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+              {/* Tarjeta Visual de Diapositiva */}
+              <div className="md:col-span-5 flex flex-col justify-between h-[230px] rounded-xl bg-gradient-to-br from-[#1A3D84] to-[#0F2552] text-white p-4 shadow-md relative overflow-hidden">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-white/80">
+                  <Badge variant="outline" className="text-[10px] border-white/20 bg-white/10 text-white font-normal">
+                    {slideTitles[currentSlideIndex]}
+                  </Badge>
+                  <span>SLIDE {currentSlideIndex + 1} / 5</span>
+                </div>
+
+                <div className="my-auto pr-2">
+                  <p className="text-[14.5px] font-medium leading-snug line-clamp-5 text-white">
+                    {slides[currentSlideIndex] || "Texto de la diapositiva..."}
                   </p>
                 </div>
-              </CardContent>
-            </Card>
-          )}
 
-          {/* Evaluation result — Fase B (2026-08-31): + valoración de "vale la
-              pena" y preview visual real de la pieza. */}
-          {session.metadata?.evaluacion && (
-            <Card className={session.metadata.evaluacion.aprobado ? "border-green-500/50" : "border-amber-500/50"}>
-              <CardContent className="space-y-3 p-3">
-                <div className="flex items-start gap-3">
-                  {session.metadata.evaluacion.aprobado ? (
-                    <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-green-500" />
-                  ) : (
-                    <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
-                  )}
-                  <div>
-                    <p className="text-sm font-medium">
-                      {session.metadata.evaluacion.aprobado ? "Aprobada — se publica sola" : "Frenada — no cumple el criterio de marca"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{session.metadata.evaluacion.feedback}</p>
+                <div className="flex items-center justify-between text-[10px] text-white/60 border-t border-white/10 pt-2">
+                  <span>Mejora Continua</span>
+                  <span>mejoraok.com</span>
+                </div>
+              </div>
+
+              {/* Editor Inline de la Diapositiva */}
+              <div className="md:col-span-7 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold flex items-center gap-1.5">
+                    <Edit3 className="h-3.5 w-3.5 text-primary" />
+                    Editar contenido de {slideTitles[currentSlideIndex]}
+                  </Label>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      disabled={currentSlideIndex === 0}
+                      onClick={() => setCurrentSlideIndex(currentSlideIndex - 1)}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-[11px] text-muted-foreground px-1">
+                      {currentSlideIndex + 1} de 5
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      disabled={currentSlideIndex === 4}
+                      onClick={() => setCurrentSlideIndex(currentSlideIndex + 1)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
 
-                {session.metadata.proposal && (
-                  <div className="grid gap-3 sm:grid-cols-[minmax(0,220px)_1fr]">
-                    <PiecePreview
-                      format={session.metadata.proposal.format}
-                      oferta={session.metadata.oferta}
-                      hook={session.metadata.proposal.hook}
-                      body={session.metadata.proposal.body}
-                    />
-                    <div className="space-y-1.5 text-sm">
-                      {session.metadata.proposal.hook && (
-                        <p><span className="text-[11px] font-semibold text-muted-foreground">HOOK</span><br />{session.metadata.proposal.hook}</p>
-                      )}
-                      {session.metadata.proposal.cta && (
-                        <p><span className="text-[11px] font-semibold text-muted-foreground">CTA</span><br />{session.metadata.proposal.cta}</p>
-                      )}
-                      {session.metadata.scheduledAt && (
-                        <p className="text-xs text-muted-foreground">
-                          Sugerencia de horario: {formatScheduledAt(session.metadata.scheduledAt)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                <Textarea
+                  rows={5}
+                  value={slides[currentSlideIndex]}
+                  onChange={(e) => handleUpdateSlideText(e.target.value)}
+                  className="text-xs resize-none"
+                  placeholder="Escribí el texto para esta diapositiva..."
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Los cambios se reflejan al instante en la tarjeta visual de la izquierda.
+                </p>
+              </div>
+            </div>
+
+            {/* BOTÓN PROMINENTE DE APROBACIÓN Y AGENDADO */}
+            <div className="pt-2 border-t flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-primary" /> Se programará automáticamente en el próximo horario sugerido
+              </span>
+
+              <Button
+                size="default"
+                className="bg-[#1A3D84] hover:bg-[#142e63] text-white font-semibold shadow gap-2"
+                disabled={isApprovingCustom || session.status === "approved"}
+                onClick={handleApproveAndSchedule}
+              >
+                {isApprovingCustom ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
                 )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Forzar aprobación — override humano (2026-09-02): Pablo pidió
-              explícitamente tener la última palabra sobre el Crítico. Solo
-              tiene sentido con una evaluación real ya rechazada
-              ("needs_review") — una sesión recién iniciada o ya aprobada no
-              lo necesita. */}
-          {session.status === "needs_review" && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full border-destructive/40 text-destructive hover:bg-destructive/5"
-              disabled={isForcingApprove}
-              onClick={() => onForceApprove(session.id)}
-            >
-              {isForcingApprove ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Gavel className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              Forzar aprobación — publicar de todos modos
-            </Button>
-          )}
-
-          {/* Aviso de autopublicación — hallazgo real de auditoría 2026-08-25:
-              esta sesión ya quedó agendada para publicarse sola, sin
-              revisión humana; sin este aviso persistente, alguien que
-              vuelve a mirar la sesión más tarde no tiene forma de saberlo
-              desde acá (solo yendo a Propuestas/Calendario a adivinar). */}
-          {session.metadata?.autoPublished && (
-            <Card className="border-blue-500/50 bg-blue-500/5">
-              <CardContent className="flex items-center justify-between gap-3 p-3">
-                <div className="flex items-center gap-3">
-                  <Rocket className="h-5 w-5 shrink-0 text-blue-500" />
-                  <div>
-                    <p className="text-sm font-medium">Se agendó sola para publicarse</p>
-                    <p className="text-xs text-muted-foreground">
-                      {session.metadata.scheduledAt
-                        ? `Sale el ${formatScheduledAt(session.metadata.scheduledAt)}, sin revisión previa.`
-                        : "Sin revisión previa."}
-                    </p>
-                  </div>
-                </div>
-                {session.metadata?.proposalId && (
-                  <Button asChild variant="outline" size="sm" className="shrink-0">
-                    <Link to={`/propuestas?id=${session.metadata.proposalId}`}>Ver / cancelar</Link>
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Feedback input */}
-          {feedbackUsable ? (
-            <div className="flex gap-2">
-              <Textarea
-                rows={2}
-                placeholder="Qué cambiar (hook, tono, CTA…). Enter para enviar."
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                className="min-h-[44px] resize-none"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    send();
-                  }
-                }}
-              />
-              <Button size="icon" className="shrink-0" onClick={send} disabled={!feedback.trim() || isContinuing}>
-                {isContinuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {session.status === "approved" ? "Carrusel Ya Aprobado" : "Aprobar y Agendar Publicación"}
               </Button>
             </div>
-          ) : session.status === "error" ? null : (
-            <p className="text-xs text-muted-foreground">
-              Esta sesión ya cerró. Para probar otro ángulo, iniciá una sesión nueva.
-            </p>
+          </div>
+
+          {/* 3. ACORDEÓN COLAPSABLE PARA OCULTAR LA COMPLEJIDAD TÉCNICA DE LOGS */}
+          <div className="rounded-xl border bg-muted/20 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowTechnicalLogs(!showTechnicalLogs)}
+              className="w-full flex items-center justify-between p-3.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <Brain className="h-4 w-4 text-primary" />
+                Detalle técnico del debate de agentes ({messages?.length || 0} intervenciones registradas)
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-normal text-muted-foreground/70">
+                  {showTechnicalLogs ? "Ocultar logs" : "Ver deliberación interna"}
+                </span>
+                {showTechnicalLogs ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </div>
+            </button>
+
+            {showTechnicalLogs && (
+              <div className="p-4 border-t space-y-3 bg-background/60 max-h-96 overflow-y-auto">
+                {messages && messages.length > 0 ? (
+                  (messages as DialogueMessage[]).map((msg: DialogueMessage) => {
+                    const Icon = agentIcons[msg.agent] || Brain;
+                    const colorClass = agentColors[msg.agent] || "text-gray-500 bg-gray-500/10";
+                    const label = agentLabels[msg.agent] || msg.agent;
+
+                    return (
+                      <div key={msg.id} className="flex gap-3 text-xs">
+                        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${colorClass}`}>
+                          <Icon className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-muted-foreground mb-1">
+                            {label} · Turno {msg.turn}
+                          </p>
+                          <div className="rounded-lg border bg-card p-3 text-foreground whitespace-pre-wrap leading-relaxed">
+                            {msg.content}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-3">
+                    No hay mensajes técnicos registrados todavía.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Caja de Feedback para re-debate con agentes */}
+          {feedbackUsable && (
+            <div className="space-y-2 pt-1">
+              <Label className="text-xs font-medium text-muted-foreground">
+                ¿Querés pedirle un ajuste al equipo de agentes?
+              </Label>
+              <div className="flex gap-2">
+                <Textarea
+                  rows={2}
+                  placeholder="Ej: Hacé el problema más crudo, o enfatizá la falta de números en la pyme... (Enter para enviar)"
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  className="text-xs resize-none"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      send();
+                    }
+                  }}
+                />
+                <Button size="icon" className="shrink-0 h-auto" onClick={send} disabled={!feedback.trim() || isContinuing}>
+                  {isContinuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       )}

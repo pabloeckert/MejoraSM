@@ -132,24 +132,6 @@ async function analyzeMetrics(): Promise<RuleCandidate[]> {
         action: { prefer: true, reason: "Los hooks con pregunta rinden mejor" },
         confidence: Math.min(0.85, 0.5 + (questionHooks.length / 10)),
         evidence: `${questionHooks.length}/${highPerformers.length} posts de alto rendimiento usan hooks con pregunta`,
-      });
-    }
-
-    // Check for emoji usage — antes no cubría Dingbats (✨✅❤️ quedaban sin
-    // detectar, solo emojis del plano suplementario como 🚀). Fase 0 del
-    // plan estratégico 2026-08-16, hallazgo ya documentado desde la
-    // corrida real de rule-engine del 2026-08-05.
-    const emojiPattern =
-      /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/u;
-    const emojiHooks = highPerformers.filter((m) => emojiPattern.test(m.proposals?.hook || ""));
-    if (emojiHooks.length >= 2) {
-      rules.push({
-        rule_type: "hook",
-        condition: { pattern: "emoji" },
-        action: { prefer: true, reason: "Los hooks con emojis generan más engagement" },
-        confidence: Math.min(0.8, 0.5 + (emojiHooks.length / 10)),
-        evidence: `${emojiHooks.length}/${highPerformers.length} posts exitosos usan emojis en el hook`,
-      });
     }
   }
 
@@ -187,7 +169,8 @@ async function analyzeMetrics(): Promise<RuleCandidate[]> {
     });
   }
 
-  // 4. Analyze hashtag count
+  // 4. Analyze hashtag count — enfocado a autoridad institucional B2B
+  // (máx 2-3 hashtags institucionales sobrios: ej #Pymes #GestionEmpresarial #MejoraContinua)
   const withHashtags = metrics.filter((m) => (m.proposals?.hashtags?.length || 0) > 0);
   const withoutHashtags = metrics.filter((m) => !m.proposals?.hashtags?.length);
   if (withHashtags.length >= 3 && withoutHashtags.length >= 3) {
@@ -196,10 +179,10 @@ async function analyzeMetrics(): Promise<RuleCandidate[]> {
     if (withAvg > withoutAvg * 1.2) {
       rules.push({
         rule_type: "hashtag",
-        condition: { min_count: 5 },
-        action: { prefer: true, reason: "Usar hashtags mejora el engagement" },
+        condition: { max_count: 3 },
+        action: { prefer: true, reason: "Usar un máximo de 2-3 hashtags institucionales sobrios (ej: #Pymes #GestionEmpresarial #MejoraContinua)" },
         confidence: 0.7,
-        evidence: `Con hashtags: ${Math.round(withAvg * 100) / 100}% vs Sin: ${Math.round(withoutAvg * 100) / 100}%`,
+        evidence: `Con hashtags institucionales moderados: ${Math.round(withAvg * 100) / 100}% vs Sin: ${Math.round(withoutAvg * 100) / 100}%`,
       });
     }
   }

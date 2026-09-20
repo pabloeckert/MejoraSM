@@ -4,8 +4,9 @@
 name: Daily Story
 
 on:
-  schedule:
-    - cron: "0 13 * * *" # 13:00 UTC = 10:00 ART
+  # Desactivado 2026-09-19 como parte de la reestructuración B2B de autoridad.
+  # schedule:
+  #   - cron: "0 13 * * *" # 13:00 UTC = 10:00 ART
   workflow_dispatch:
     inputs:
       publish:

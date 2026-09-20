@@ -4,11 +4,13 @@
  */
 
 export const CONTACTOS_API_URL =
-  import.meta.env.VITE_CONTACTOS_API_URL ||
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CONTACTOS_API_URL) ||
+  (typeof process !== 'undefined' && (process.env?.VITE_CONTACTOS_API_URL || process.env?.CONTACTOS_API_URL)) ||
   'https://tzatuvxatsduuslxqdtm.supabase.co/functions/v1/contactos-api';
 
 export const CONTACTOS_API_KEY =
-  import.meta.env.VITE_CONTACTOS_API_KEY ||
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CONTACTOS_API_KEY) ||
+  (typeof process !== 'undefined' && (process.env?.VITE_CONTACTOS_API_KEY || process.env?.CONTACTOS_API_KEY)) ||
   'b06fb0a66d0db70562e0c11c7f7399614976b3fa31e30181f479a7b5a80ce398';
 
 export interface LeadPayload {
@@ -18,6 +20,7 @@ export interface LeadPayload {
   telefono?: string;
   metadata?: {
     red?: string;
+    handle?: string;
     thread_id?: string;
     sentiment?: string;
     [key: string]: unknown;
@@ -51,15 +54,22 @@ export async function enviarLeadACRM(lead: LeadPayload): Promise<EnviarLeadRespo
   const url = CONTACTOS_API_URL;
   const key = CONTACTOS_API_KEY;
 
+  const red = lead.metadata?.red || 'instagram';
+  const handle = lead.metadata?.handle || '';
+
   const body = {
     source: lead.source || 'mejora_sm',
     email: lead.email,
     nombre: lead.nombre,
     telefono: lead.telefono,
-    metadata: lead.metadata || { red: 'instagram' },
+    metadata: {
+      red,
+      handle,
+      ...(lead.metadata || {}),
+    },
     nota_referencia:
       lead.nota_referencia ||
-      `[MejoraSM] Lead derivado desde ${lead.metadata?.red || 'redes'}`,
+      `[MejoraSM] Lead derivado desde ${red}${handle ? ` (@${handle})` : ''}`,
   };
 
   const res = await fetch(url, {

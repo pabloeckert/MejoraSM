@@ -726,11 +726,17 @@ ${history ? `HISTORIAL DEL DEBATE:\n${history}` : ""}
 INSTRUCCIONES:
 Basándote en la estrategia del Agente Estratega, redactá el contenido completo. El formato de esta pieza es "${format}".
 
+CRITERIO Y TONO EDITORIAL OBLIGATORIO (AUTORIDAD B2B):
+- Tono: consultor de gestión y estrategia empresarial sobrio, directo, argentino y reflexivo.
+- PROHIBIDO estrictamente: tono de infoproductor o gurú, urgencia artificial ("últimos cupos", "hacelo ya"), promesas mágicas, exceso de signos de exclamación y estructuras sensacionalistas ("el hack definitivo", "el secreto que nadie te cuenta").
+- Señalar problemas de proceso, liderazgo y números con respeto y agudeza analítica.
+- El contenido debe interpelar a dueños de pymes y directores generales, no a consumidores ni público masivo.
+
 Formato de salida:
-HOOK: [hook principal]
+HOOK: [hook principal de alto impacto reflexivo, sin clickbait ni emojis de relleno]
 ${bodyFormatInstructions(format)}
-CTA: [call to action]
-HASHTAGS: [5-10 hashtags relevantes]
+CTA: [call to action sobrio, de conversación o diagnóstico]
+HASHTAGS: [máximo 2 a 3 hashtags institucionales sobrios, ej: #Pymes #GestionEmpresarial #MejoraContinua]
 NOTAS VISUALES: [qué imagen/video necesitás — esto es solo para referencia interna, nunca aparece en la pieza publicada]`;
 
   return callAgent("creativo", isReevaluation, config.temperature, system, [
@@ -753,12 +759,20 @@ ${contextDocs}
 ${history ? `HISTORIAL DEL DEBATE:\n${history}` : ""}
 
 INSTRUCCIONES:
-Evaluá este contenido contra los documentos de marca.
+Evaluá este contenido contra los documentos de marca y el estándar de consultoría de gestión B2B seria.
+
+CRITERIOS DE RECHAZO INMEDIATO:
+- Tono de infoproductor, gurú de marketing digital o coaching genérico.
+- Urgencia artificial ("hacelo ya", "no te quedes afuera") o sensacionalismo ("hack", "secreto", "revelación").
+- Abuso de emojis en el hook o en el cuerpo.
+- Falta de sustancia operativa o desconexión con los problemas reales de gestión pyme.
+- Más de 3 hashtags o presencia de hashtags genéricos masivos (#exito #emprendedores).
+
 Respondé ÚNICAMENTE en este formato:
 
 DECISION: APROBADO | RECHAZADO
-RAZON: [explicación breve]
-SUGERENCIAS: [si fue rechazado, qué cambiar]`;
+RAZON: [explicación breve y técnica del veredicto]
+SUGERENCIAS: [si fue rechazado, qué cambiar exactamente para elevar la autoridad B2B]`;
 
   const response = await callAgent("critico", isReevaluation, config.temperature, system, [
     { role: "user", content: contenido },

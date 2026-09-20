@@ -50,6 +50,7 @@ export const dimensionLabel = (key?: string | null) =>
 // la corrige desde /boveda. Espejo del lado servidor: DOC_CATEGORIES en
 // supabase/functions/vault-process/index.ts.
 export const DOC_CATEGORIES = [
+  { key: "biblioteca_gestion", label: "Biblioteca de Gestión (Libros)" },
   { key: "manual", label: "Manual y criterio" },
   { key: "buyer_persona", label: "Buyer personas" },
   { key: "tono", label: "Tono y voz" },

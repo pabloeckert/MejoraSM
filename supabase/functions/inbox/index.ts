@@ -353,6 +353,31 @@ async function sync() {
       for (const [id, v] of Object.entries(res)) {
         await supabase.from("inbox_items").update({ sentiment: v.s, sentiment_note: v.n }).eq("id", id);
         classified++;
+
+        // Envío asíncrono hacia contactos-api si contiene datos de contacto o interés comercial
+        const itemObj = batch.find((b) => b.id === id);
+        if (itemObj) {
+          const rawText = itemObj.text || "";
+          const emailMatch = rawText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+          const telMatch = rawText.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,4}/);
+          const tieneContacto = !!(emailMatch || telMatch);
+          const tieneInteresComercial =
+            v.s === "pregunta" ||
+            /(precio|costo|cuanto|info|informaci[oó]n|interes|interesa|asesor|consultor|servicio|contratar|propuesta)/i.test(
+              `${v.n} ${rawText}`
+            );
+
+          if (tieneContacto || tieneInteresComercial) {
+            // Envío asíncrono sin bloquear el ciclo de sincronización
+            sendToCRM({
+              itemId: id,
+              email: emailMatch ? emailMatch[0] : undefined,
+              telefono: telMatch ? telMatch[0].trim() : undefined,
+            }).catch((err) => {
+              console.warn(`[inbox] Envío asíncrono a contactos-api falló para item ${id}:`, errMsg(err));
+            });
+          }
+        }
       }
     } catch (e) {
       console.warn(`[inbox] clasificación falló: ${errMsg(e)}`);
@@ -439,18 +464,20 @@ async function sendToCRM(lead: {
   email?: string;
   nombre?: string;
   telefono?: string;
-  metadata?: { red?: string; [key: string]: unknown };
+  metadata?: { red?: string; handle?: string; [key: string]: unknown };
   nota_referencia?: string;
 }) {
   let nombre = lead.nombre;
   let email = lead.email;
   let telefono = lead.telefono;
   let red = lead.metadata?.red;
+  let handle = lead.metadata?.handle;
 
   if (lead.itemId) {
     const { data: item } = await supabase.from("inbox_items").select("*").eq("id", lead.itemId).single();
     if (item) {
       if (!nombre) nombre = item.author_name || item.author_username;
+      if (!handle) handle = item.author_username || item.author_name || "";
       if (!red) red = item.platform;
       if (!email && item.text) {
         const m = item.text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
@@ -471,8 +498,12 @@ async function sendToCRM(lead: {
     email,
     nombre: nombre || "Lead Redes Sociales",
     telefono,
-    metadata: { red: red || "instagram", ...(lead.metadata || {}) },
-    nota_referencia: lead.nota_referencia || `[MejoraSM] Prospecto derivado desde ${red || "redes"}`,
+    metadata: {
+      red: red || "instagram",
+      handle: handle || "",
+      ...(lead.metadata || {}),
+    },
+    nota_referencia: lead.nota_referencia || `[MejoraSM] Prospecto derivado desde ${red || "redes"}${handle ? ` (@${handle})` : ""}`,
   };
 
   const res = await fetch(url, {
@@ -490,7 +521,21 @@ async function sendToCRM(lead: {
     throw new Error(`contactos-api error (${res.status}): ${err}`);
   }
 
-  return await res.json();
+  const result = await res.json();
+
+  // Persistir persona_id devuelto por contactos-api en inbox_items
+  if (lead.itemId && result?.persona_id) {
+    try {
+      await supabase
+        .from("inbox_items")
+        .update({ persona_id: result.persona_id })
+        .eq("id", lead.itemId);
+    } catch (e) {
+      console.warn(`[inbox] no se pudo persistir persona_id en inbox_items (${lead.itemId}): ${errMsg(e)}`);
+    }
+  }
+
+  return result;
 }
 
 // ═══════════════════════════════════════

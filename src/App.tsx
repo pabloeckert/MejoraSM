@@ -22,6 +22,7 @@ const Propuestas = lazy(() => import("./pages/Propuestas"));
 const Hub = lazy(() => import("./pages/Hub"));
 const Monitor = lazy(() => import("./pages/Monitor"));
 const Conversaciones = lazy(() => import("./pages/Conversaciones"));
+const CitasStudio = lazy(() => import("./pages/CitasStudio"));
 const Auditoria = lazy(() => import("./pages/Auditoria"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -69,6 +70,8 @@ const App = () => (
                   <Route path="/hub" element={<Hub />} />
                   <Route path="/monitor" element={<Monitor />} />
                   <Route path="/conversaciones" element={<Conversaciones />} />
+                  <Route path="/citas" element={<CitasStudio />} />
+                  <Route path="/citas-studio" element={<Navigate to="/citas" replace />} />
                   {/* 2026-09-01: Biblioteca se sacó (no encajaba en el objetivo del
                       proyecto — Pablo). La línea de tiempo pasó a Propuestas. */}
                   <Route path="/biblioteca" element={<Navigate to="/propuestas" replace />} />
