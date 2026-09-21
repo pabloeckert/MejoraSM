@@ -132,6 +132,7 @@ async function analyzeMetrics(): Promise<RuleCandidate[]> {
         action: { prefer: true, reason: "Los hooks con pregunta rinden mejor" },
         confidence: Math.min(0.85, 0.5 + (questionHooks.length / 10)),
         evidence: `${questionHooks.length}/${highPerformers.length} posts de alto rendimiento usan hooks con pregunta`,
+      });
     }
   }
 

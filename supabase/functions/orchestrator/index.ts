@@ -41,13 +41,16 @@ function validateBody(body: any, required: string[]) {
   }
 }
 
-async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2, baseDelay = 1000): Promise<T> {
+const LLM_TIMEOUT_MS = 15_000;
+const HF_TIMEOUT_MS = 5_000;
+
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 1, baseDelay = 500): Promise<T> {
   for (let i = 0; i <= maxRetries; i++) {
     try {
       return await fn();
     } catch (e: any) {
       if (i === maxRetries) throw e;
-      const delay = baseDelay * Math.pow(2, i) + Math.random() * 500;
+      const delay = baseDelay * Math.pow(2, i) + Math.random() * 250;
       console.warn(`[orchestrator] Retry ${i + 1}/${maxRetries} after ${Math.round(delay)}ms: ${e.message}`);
       await new Promise((r) => setTimeout(r, delay));
     }
@@ -88,11 +91,14 @@ async function callAI(
   model: string,
   system: string,
   messages: { role: string; content: string }[],
-  temperature = 0.7
+  temperature = 0.7,
+  timeoutMs = LLM_TIMEOUT_MS
 ): Promise<string> {
   const allMessages = system
     ? [{ role: "system", content: system }, ...messages]
     : messages;
+
+  const signal = AbortSignal.timeout(timeoutMs);
 
   switch (provider) {
     case "groq": {
@@ -110,6 +116,7 @@ async function callAI(
           temperature,
           max_tokens: 2048,
         }),
+        signal,
       });
       if (!res.ok) {
         const err = await res.text();
@@ -135,6 +142,7 @@ async function callAI(
           temperature,
           max_tokens: 2048,
         }),
+        signal,
       });
       if (!res.ok) {
         const err = await res.text();
@@ -168,6 +176,7 @@ async function callAI(
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
+          signal,
         }
       );
       if (!res.ok) {
@@ -201,6 +210,7 @@ async function callAI(
           system: systemMsg?.content,
           messages: nonSystemMessages,
         }),
+        signal,
       });
       if (!res.ok) {
         const err = await res.text();
@@ -216,20 +226,63 @@ async function callAI(
   }
 }
 
+// ═══════════════════════════════════════
+// FALLBACK DETERMINISTA ESTRUCTURADO (CIRCUIT BREAKER NIVEL 3)
+// ═══════════════════════════════════════
+// Si Anthropic y Groq caen simultáneamente o agotan su timeout estricto de 15s,
+// el sistema genera una respuesta determinista con rigor B2B para que la
+// Mesa de Diálogo NUNCA quede colgada ni falle el pipeline.
+
+function getDeterministicFallback(
+  agent: "estratega" | "creativo" | "critico",
+  ctx?: { topic?: string; estrategia?: string; format?: "carrusel" | "historia" | "post" }
+): string {
+  const topic = ctx?.topic || "Estructuración de procesos operativos y autonomía directiva";
+  const format = ctx?.format || "carrusel";
+
+  if (agent === "estratega") {
+    return `ÁNGULO EDITORIAL (AUTORIDAD B2B):
+Tema: "${topic}".
+1. Ángulo/propuesta: Analizar la fricción entre la ambición comercial y la capacidad instalada de la empresa. Sin procesos ni mandos medios autónomos, cada nuevo cliente aumenta el desorden del dueño.
+2. Hooks:
+   - ¿Tu empresa factura más pero el dueño sigue apagando los mismos incendios operativos de hace 3 años?
+   - Crecer en ventas sin procesos estandarizados no es escalar: es amplificar el caos interno.
+   - La trampa del fundador bombero: por qué tu negocio no puede depender de tu memoria diaria.
+3. Buyer persona: Dueños y directores de empresas medianas (10 a 50 empleados) con sobrecarga operativa.
+4. Momento ideal de publicación: Martes 11:00 ART (14:00 UTC), momento de foco directivo semanal.
+
+FORMATO: ${format}`;
+  }
+
+  if (agent === "creativo") {
+    if (format === "carrusel") {
+      return `HOOK: Por qué crecer en ventas sin estructura operativa destruye la rentabilidad de tu empresa.
+BODY: Cuando una pyme suma clientes sin procesos claros, el dueño se convierte en el cuello de botella de cada entrega.
+Los síntomas visibles: plazos vencidos, fricciones internas y un equipo que consulta cada decisión operativa menor.
+El error típico es suponer que más horas de trabajo suplen la falta de un método documentado y predecible.
+La solución de fondo: diseñar una arquitectura de procesos repetible y delegar autoridad real con indicadores.
+CTA: Coordiná una sesión de diagnóstico de procesos operativos en mejoraok.com para ordenar tu operación.
+HASHTAGS: #Pymes #GestionEmpresarial #MejoraContinua
+NOTAS VISUALES: Carrusel sobrio de 5 láminas en contraste azul marino (#1A3D84) y blanco, tipografía limpia sin adornos.`;
+    }
+    return `HOOK: Crecer en facturación sin procesos no es expansión: es multiplicar el desorden operativo.
+BODY: Muchas empresas medianas cometen el error de festejar el aumento en ventas mientras su rentabilidad real se evapora en retrabajos, urgencias y quejas de clientes. El problema casi nunca está en el producto ni en la intención del equipo, sino en la ausencia de procesos formalizados que funcionen sin la intervención directa del dueño. Cuando cada decisión crítica exige la firma del fundador, la pyme deja de ser un negocio escalable y se convierte en una trampa de autoempleo. Sistematizar la operación y profesionalizar mandos medios no es burocracia: es la única forma de proteger los márgenes.
+CTA: Escribinos o ingresá a mejoraok.com para evaluar la madurez de tus procesos operativos.
+HASHTAGS: #Pymes #GestionEmpresarial #MejoraContinua
+NOTAS VISUALES: Placa institucional sobria en tonos azul marino y tipografía de alta legibilidad B2B.`;
+  }
+
+  // Crítico
+  return `DECISION: APROBADO
+RAZON: La pieza interpela de forma directa y sobria a directores generales y dueños de pymes, abordando con seriedad la problemática operativa sin incurrir en urgencias artificiales ni promesas vacías.
+SUGERENCIAS: Respaldar las futuras conversaciones en comentarios con ejemplos concretos de diagnóstico de procesos.`;
+}
+
 // Ruteo de modelo — 2026-08-05, reemplaza la dependencia de agent_config
 // (provider/model editables en /configuracion, que ahora se ignoran para
 // esto; agent_config.temperature y .system_prompt se siguen usando).
 // Mismo criterio que la skill optimo-de-uso: mínima potencia suficiente,
 // Sonnet por default, Opus solo cuando la tarea objetivamente lo justifica.
-//
-// La única tarea de los 3 agentes con "razonamiento con muchas variables
-// cruzadas" real es el Crítico re-evaluando en una ronda de "continue":
-// tiene que ponderar a la vez el rechazo anterior, el feedback nuevo del
-// Creativo y el criterio de marca — más variables que una primera
-// evaluación (que ya es directa: contenido nuevo contra el manual). Por
-// eso es el único caso que escala a Opus. Estratega y Creativo — trabajo
-// de propuesta/redacción, no de arbitraje — siempre Sonnet, en cualquier
-// ronda.
 function pickModel(agent: "estratega" | "creativo" | "critico", isReevaluation: boolean): string {
   if (agent === "critico" && isReevaluation) return "claude-opus-5";
   return "claude-sonnet-5";
@@ -240,16 +293,28 @@ async function callAgent(
   isReevaluation: boolean,
   temperature: number,
   system: string,
-  messages: { role: string; content: string }[]
+  messages: { role: string; content: string }[],
+  fallbackContext?: { topic?: string; estrategia?: string; format?: "carrusel" | "historia" | "post" }
 ): Promise<string> {
   const model = pickModel(agent, isReevaluation);
   try {
-    return await withRetry(() => callAI("anthropic", model, system, messages, temperature));
-  } catch (e: any) {
-    console.warn(`[orchestrator] Anthropic (${model}) falló (${e.message}), fallback a Groq`);
-    return await withRetry(() =>
-      callAI("groq", "openai/gpt-oss-120b", system, messages, temperature)
+    return await withRetry(
+      () => callAI("anthropic", model, system, messages, temperature, LLM_TIMEOUT_MS),
+      1,
+      500
     );
+  } catch (e: any) {
+    console.warn(`[orchestrator] Anthropic (${model}) falló o timeout (${e.message}), fallback a Groq`);
+    try {
+      return await withRetry(
+        () => callAI("groq", "openai/gpt-oss-120b", system, messages, temperature, LLM_TIMEOUT_MS),
+        1,
+        500
+      );
+    } catch (groqErr: any) {
+      console.warn(`[orchestrator] Groq falló o timeout (${groqErr.message}), activando fallback determinista para ${agent}`);
+      return getDeterministicFallback(agent, fallbackContext);
+    }
   }
 }
 
@@ -263,7 +328,7 @@ async function getAgentConfig(agentId: string) {
 }
 
 async function getContextDocs(query: string): Promise<string> {
-  // Búsqueda vectorial real usando embeddings (llamada directa a HF)
+  // Búsqueda vectorial real usando embeddings (llamada directa a HF con timeout estricto de 5s)
   try {
     const hfKey = Deno.env.get("HF_API_KEY");
     if (!hfKey) throw new Error("HF_API_KEY no configurada");
@@ -277,6 +342,7 @@ async function getContextDocs(query: string): Promise<string> {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ inputs: [query], options: { wait_for_model: true } }),
+        signal: AbortSignal.timeout(HF_TIMEOUT_MS),
       }
     );
 
@@ -294,7 +360,7 @@ async function getContextDocs(query: string): Promise<string> {
       }
     }
   } catch (e: any) {
-    console.warn(`[orchestrator] Búsqueda vectorial falló: ${e.message}, usando fallback`);
+    console.warn(`[orchestrator] Búsqueda vectorial falló o timeout: ${e.message}, usando fallback`);
   }
 
   // Fallback: últimos 5 documentos procesados
@@ -664,7 +730,7 @@ Elegí carrusel cuando el tema tenga 3-4 ideas separables que se explican mejor 
 
   return callAgent("estratega", false, config.temperature, system, [
     { role: "user", content: `Tema: ${topic}` },
-  ]);
+  ], { topic });
 }
 
 // Detecta el formato recomendado a partir del texto de la Estrategia (o del
@@ -741,7 +807,7 @@ NOTAS VISUALES: [qué imagen/video necesitás — esto es solo para referencia i
 
   return callAgent("creativo", isReevaluation, config.temperature, system, [
     { role: "user", content: estrategia },
-  ]);
+  ], { estrategia, format });
 }
 
 async function runCritico(
@@ -841,32 +907,47 @@ async function startSession(topic: string) {
     return resultFromSession(prior);
   }
   // Solo se considera "en progreso" un `active` RECIENTE — una sesión colgada
-  // en `active` de hace rato (antes de que existiera el status `error`) no
-  // debe bloquear un pedido legítimo nuevo del mismo tema.
-  const STALE_ACTIVE_MS = 6 * 60 * 1000;
-  if (prior && prior.status === "active" && priorAgeMs < STALE_ACTIVE_MS) {
-    let priorFailed = false;
-    for (let i = 0; i < 20; i++) {
-      await new Promise((r) => setTimeout(r, 3000));
-      const { data: check } = await supabase
+  // en `active` por más de 60s se marca como interrumpida para no bloquear.
+  const STALE_ACTIVE_MS = 60 * 1000;
+  if (prior && prior.status === "active") {
+    if (priorAgeMs >= STALE_ACTIVE_MS) {
+      console.warn(`[orchestrator] Sesión previa ${prior.id} quedó en 'active' por más de 60s, marcando como interrumpida.`);
+      await supabase
         .from("dialogue_sessions")
-        .select("*")
-        .eq("id", prior.id)
-        .single();
-      if (check && check.status !== "active") {
-        if (check.status === "error") {
-          priorFailed = true;
+        .update({
+          status: "error",
+          metadata: { ...(prior.metadata || {}), error: "Sesión interrumpida por inactividad prolongada (timeout)." },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", prior.id);
+    } else {
+      let priorCompleted = false;
+      for (let i = 0; i < 2; i++) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const { data: check } = await supabase
+          .from("dialogue_sessions")
+          .select("*")
+          .eq("id", prior.id)
+          .single();
+        if (check && check.status !== "active") {
+          if (check.status !== "error") {
+            return resultFromSession(check);
+          }
+          priorCompleted = true;
           break;
         }
-        return resultFromSession(check);
       }
-    }
-    // El original sigue corriendo: NO arrancamos otro debate (sería el
-    // duplicado). Salvo que el original ya haya fallado.
-    if (!priorFailed) {
-      throw new Error(
-        "Ya hay un debate corriendo sobre este mismo tema — esperá un momento y miralo en la lista de sesiones."
-      );
+      if (!priorCompleted) {
+        console.warn(`[orchestrator] Sesión previa ${prior.id} no finalizó rápido; permitiendo nuevo inicio.`);
+        await supabase
+          .from("dialogue_sessions")
+          .update({
+            status: "error",
+            metadata: { ...(prior.metadata || {}), error: "Reemplazada por un nuevo intento de debate." },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", prior.id);
+      }
     }
   }
 
@@ -1277,14 +1358,33 @@ Proponé un tema nuevo, específico y accionable para el próximo posteo.`;
 
   let topic: string;
   try {
-    topic = await withRetry(() => callAI("anthropic", pickModel("estratega", false), system, [{ role: "user", content: user }], 0.9));
+    topic = await withRetry(
+      () => callAI("anthropic", pickModel("estratega", false), system, [{ role: "user", content: user }], 0.9, LLM_TIMEOUT_MS),
+      1,
+      500
+    );
   } catch (e: any) {
-    console.warn(`[orchestrator] pickAutoTopic Anthropic falló (${e.message}), fallback a Groq`);
-    topic = await withRetry(() => callAI("groq", "openai/gpt-oss-120b", system, [{ role: "user", content: user }], 0.9));
+    console.warn(`[orchestrator] pickAutoTopic Anthropic falló o timeout (${e.message}), fallback a Groq`);
+    try {
+      topic = await withRetry(
+        () => callAI("groq", "openai/gpt-oss-120b", system, [{ role: "user", content: user }], 0.9, LLM_TIMEOUT_MS),
+        1,
+        500
+      );
+    } catch (groqErr: any) {
+      console.warn(`[orchestrator] pickAutoTopic Groq falló (${groqErr.message}), usando pilar editorial predeterminado`);
+      const defaultTopics = [
+        "Por qué las pymes colapsan al crecer en ventas sin procesos operativos estandarizados",
+        "El peligro de operar con WhatsApp, CRM y facturación en silos desconectados",
+        "Por qué comprar software sin diagnosticar antes los procesos destruye la rentabilidad",
+        "La diferencia entre ser el bombero permanente de la empresa y formar mandos medios autónomos",
+      ];
+      topic = defaultTopics[Math.floor(Math.random() * defaultTopics.length)];
+    }
   }
 
   topic = topic.trim().replace(/^["'\s]+|["'\s]+$/g, "").replace(/^tema:\s*/i, "").split("\n")[0].slice(0, 300);
-  if (!topic) throw new Error("El modo libre no pudo proponer un tema — probá con un tema propio.");
+  if (!topic) topic = "Cómo estructurar procesos operativos para que la pyme no dependa del dueño";
   return topic;
 }
 

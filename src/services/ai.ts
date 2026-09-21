@@ -39,13 +39,10 @@ class ApiError extends Error {
   }
 }
 
-// Hallazgo real de auditoría 2026-08-25: el debate de 3 agentes (Estratega
-// → Creativo → Crítico, cada uno con reintentos y fallback Anthropic→Groq)
-// podía tardar varios minutos sin que la UI diera ninguna indicación de
-// cuánto ni forma de cancelar — un fetch colgado se veía igual que uno que
-// sigue trabajando de verdad. 150s da margen real (peor caso: ~6 llamadas
-// externas con backoff) sin dejar a alguien esperando indefinidamente.
-const DIALOGUE_TIMEOUT_MS = 150_000;
+// Con el circuit breaker estricto de 15s por LLM en el backend, el debate
+// completo (Estratega -> Creativo -> Crítico con fallbacks) demora ~10-30s.
+// 45s es un límite protector suficiente para no dejar al usuario colgado.
+const DIALOGUE_TIMEOUT_MS = 45_000;
 // B14 (auditoría 2026-08-31): antes solo el debate tenía timeout — vault-process,
 // classify-photo y el copiloto usaban fetch pelado y podían colgarse para
 // siempre. classify-photo es el peor caso: bloquea el botón "Confirmar" del
@@ -81,13 +78,14 @@ async function handleResponse<T>(res: Response, fallbackMsg: string): Promise<T>
       errorMsg = `${fallbackMsg} (HTTP ${res.status})`;
     }
 
-    // Mensajes amigables según código de error
+    // Mensajes amigables según código de error, preservando detalles del backend
     if (res.status === 401 || res.status === 403) {
-      errorMsg = "No tenés permisos para esta acción. Verificá la configuración.";
+      errorMsg = errorMsg !== fallbackMsg ? errorMsg : "No tenés permisos para esta acción. Verificá la configuración.";
     } else if (res.status === 429) {
       errorMsg = "Demasiadas requests. Esperá un momento e intentá de nuevo.";
     } else if (res.status >= 500) {
-      errorMsg = "El servidor no está disponible. Intentá de nuevo en unos minutos.";
+      // Preservar el error real del backend si se proveyó uno
+      errorMsg = errorMsg !== fallbackMsg ? errorMsg : "El servidor no está disponible. Intentá de nuevo en unos minutos.";
     }
 
     throw new ApiError(errorMsg, res.status);

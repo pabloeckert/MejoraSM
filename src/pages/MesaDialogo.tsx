@@ -29,6 +29,8 @@ import {
   Sparkles,
   Edit3,
   Calendar,
+  AlertTriangle,
+  RotateCw,
 } from "lucide-react";
 import {
   useDialogueSessions,
@@ -254,6 +256,17 @@ function MesaDialogoContent() {
                 />
               </div>
 
+              {startMutation.isError && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>
+                    {startMutation.error instanceof Error
+                      ? startMutation.error.message
+                      : "Error iniciando el debate. Probá de nuevo."}
+                  </span>
+                </div>
+              )}
+
               <div className="flex flex-col gap-2 pt-2">
                 <Button
                   onClick={() => handleStart("dirigido")}
@@ -377,6 +390,8 @@ function MesaDialogoContent() {
                 isContinuing={thisIsContinuing}
                 onForceApprove={handleForceApprove}
                 isForcingApprove={forceApproveMutation.isPending}
+                onRetry={(topic) => handleStart("dirigido", topic)}
+                isRetrying={startMutation.isPending}
               />
             );
           })}
@@ -394,6 +409,8 @@ function SessionCard({
   isContinuing,
   onForceApprove,
   isForcingApprove,
+  onRetry,
+  isRetrying,
 }: {
   session: DialogueSession;
   isSelected: boolean;
@@ -402,11 +419,15 @@ function SessionCard({
   isContinuing: boolean;
   onForceApprove?: (sessionId: string) => void;
   isForcingApprove?: boolean;
+  onRetry?: (topic: string) => void;
+  isRetrying?: boolean;
 }) {
   const qc = useQueryClient();
   const [feedback, setFeedback] = useState("");
   const [showTechnicalLogs, setShowTechnicalLogs] = useState(false);
   const [isApprovingCustom, setIsApprovingCustom] = useState(false);
+
+  const isStale = session.status === "active" && (Date.now() - new Date(session.created_at).getTime()) > 90_000;
 
   const { data: messages } = useDialogueMessages(session.id, {
     enabled: isSelected,
@@ -589,12 +610,71 @@ function SessionCard({
 
       {isSelected && (
         <CardContent className="space-y-6 border-t pt-5">
-          {/* AVISO DE ESTADO EN VIVO */}
-          {session.status === "active" && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 text-primary text-xs font-medium">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Los agentes están debatiendo el ángulo editorial de la pieza...
+          {/* AVISO DE ERROR CON REINTENTO VISIBLE */}
+          {session.status === "error" && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-xs">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">El debate se interrumpió o no pudo completarse:</p>
+                  <p className="text-muted-foreground mt-0.5">
+                    {session.metadata?.error || "Los agentes tardaron más de lo esperado o hubo un fallo de conectividad temporal."}
+                  </p>
+                </div>
+              </div>
+              {onRetry && session.topic && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 h-8 gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/15 font-medium"
+                  disabled={isRetrying}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRetry(session.topic!);
+                  }}
+                >
+                  <RotateCw className={`h-3.5 w-3.5 ${isRetrying ? "animate-spin" : ""}`} />
+                  Reintentar debate
+                </Button>
+              )}
             </div>
+          )}
+
+          {/* AVISO DE ESTADO EN VIVO O TIMEOUT */}
+          {session.status === "active" && (
+            isStale ? (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-xs">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                  <div>
+                    <p className="font-semibold">El debate está tardando más de 90 segundos.</p>
+                    <p className="text-muted-foreground mt-0.5">
+                      Podés esperar unos instantes más o reiniciar el debate si la conexión se interrumpió.
+                    </p>
+                  </div>
+                </div>
+                {onRetry && session.topic && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 h-8 gap-1.5 border-amber-500/40 text-amber-800 dark:text-amber-200 hover:bg-amber-500/20 font-medium"
+                    disabled={isRetrying}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRetry(session.topic!);
+                    }}
+                  >
+                    <RotateCw className={`h-3.5 w-3.5 ${isRetrying ? "animate-spin" : ""}`} />
+                    Reiniciar debate
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 text-primary text-xs font-medium">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Los agentes están debatiendo el ángulo editorial de la pieza...
+              </div>
+            )
           )}
 
           {/* 2. INSPECTOR Y EDITOR INTERACTIVO DE DIAPOSITIVAS DEL CARRUSEL (SLIDES 1 A 5) */}
