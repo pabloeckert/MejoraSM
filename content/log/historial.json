@@ -1,6 +1,64 @@
 {
-  "syncedAt": "2026-09-21T12:12:42.923Z",
+  "syncedAt": "2026-09-21T21:46:10.369Z",
   "posts": [
+    {
+      "id": "6ab13961ecd7b32670daace2",
+      "date": "2026-09-21",
+      "status": "published",
+      "content": "Si tu equipo no te trae problemas hace 3 meses, tenés un problema.\nGuardá esto y pensalo antes de tu próxima reunión de equipo. Después contame: ¿tu equipo te cuenta todo, o aprendió a esconderte todo?",
+      "kind": "post",
+      "proposalId": "b9fbf431-a82c-4de9-862b-4fd60764bba4",
+      "headline": "Si tu equipo no te trae problemas hace 3 meses, tenés un problema.",
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-09-21-b9fbf431-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DdjVULJjgpg/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1374441268108688"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7507801947811291138/"
+        }
+      ]
+    },
+    {
+      "id": "6ab13925d0be57e75931a037",
+      "date": "2026-09-21",
+      "status": "published",
+      "content": "Si te vas 15 días y tu negocio se prende fuego, no tenés una empresa: tenés un laburo con más quilombo.\nContanos en los comentarios: ¿te fuiste de vacaciones y trabajaste igual? Si te identificaste, guardá este posteo y compartilo con ese socio o colega que necesita leerlo.",
+      "kind": "post",
+      "proposalId": "a4f1aa84-531d-49e8-91a1-0c5bf32aff12",
+      "headline": "Si te vas 15 días y tu negocio se prende fuego, no tenés una empresa: tenés un laburo con más quilombo.",
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-09-21-a4f1aa84-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DdjVMxODWST/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1374440444775437"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7507801694919995392/"
+        }
+      ]
+    },
     {
       "id": "6aaeb46423b4ae0f01a615b0",
       "date": "2026-09-19",
