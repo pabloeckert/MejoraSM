@@ -481,7 +481,7 @@ export default function CitasStudio() {
                 style={{
                   background: isLightMode
                     ? "radial-gradient(circle, rgba(26, 61, 132, 0.05) 0%, transparent 70%)"
-                    : "radial-gradient(circle, rgba(245, 158, 11, 0.12) 0%, transparent 70%)",
+                    : "radial-gradient(circle, rgba(247, 204, 19, 0.12) 0%, transparent 70%)",
                 }}
               />
 
@@ -517,7 +517,7 @@ export default function CitasStudio() {
                 <div className="relative">
                   <span
                     className="absolute -top-7 -left-2 text-6xl font-serif select-none pointer-events-none opacity-25"
-                    style={{ color: isLightMode ? "#1A3D84" : "#F59E0B" }}
+                    style={{ color: isLightMode ? "#1A3D84" : "#F7CC13" }}
                   >
                     “
                   </span>
@@ -531,7 +531,7 @@ export default function CitasStudio() {
                 </div>
 
                 <div className="flex items-center gap-2 pt-1">
-                  <div className="w-8 h-1 bg-[#F59E0B] rounded-full shrink-0" />
+                  <div className="w-8 h-1 bg-[#F7CC13] rounded-full shrink-0" />
                   <span
                     className={`text-[11.5px] font-semibold uppercase tracking-wider ${
                       isLightMode ? "text-slate-700" : "text-white/90"
@@ -546,15 +546,15 @@ export default function CitasStudio() {
                   )}
                 </div>
 
-                {/* Caja de Reflexión Operativa con borde amarillo */}
+                {/* Caja de Reflexión Operativa con borde amarillo institucional */}
                 <div
-                  className={`rounded-r-xl border-l-[4px] border-[#F59E0B] p-3.5 text-left backdrop-blur-sm ${
+                  className={`rounded-r-xl border-l-[4px] border-[#F7CC13] p-3.5 text-left backdrop-blur-sm ${
                     isLightMode
                       ? "bg-[#1A3D84]/5 border-t border-r border-b border-[#1A3D84]/10 text-slate-800"
                       : "bg-white/10 border-t border-r border-b border-white/15 text-white/95"
                   }`}
                 >
-                  <span className="block text-[9px] font-bold uppercase tracking-wider text-[#F59E0B] mb-1">
+                  <span className="block text-[9px] font-bold uppercase tracking-wider text-[#F7CC13] mb-1">
                     Reflexión Operativa
                   </span>
                   <p className="text-[12px] leading-relaxed font-normal">
@@ -570,8 +570,8 @@ export default function CitasStudio() {
                 }`}
               >
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#EF4444]" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#E1061E]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#F7CC13]" />
                   <span
                     className={`text-[11px] font-semibold tracking-wide ${
                       isLightMode ? "text-[#1A3D84]" : "text-white"
