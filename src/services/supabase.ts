@@ -491,6 +491,12 @@ export const inboxApi = {
   markReplied: (id: string) =>
     supabase.from("inbox_items").update({ replied_at: new Date().toISOString() }).eq("id", id),
 
+  archiveAll: () =>
+    supabase
+      .from("inbox_items")
+      .update({ archived: true, replied_at: new Date().toISOString() })
+      .or("archived.eq.false,replied_at.is.null"),
+
   setPersonaId: (id: string, personaId: string) =>
     (supabase.from("inbox_items") as unknown as {
       update: (values: Record<string, unknown>) => {

@@ -36,6 +36,7 @@ vi.mock("@/hooks/useInbox", async (importActual) => {
     useDraftReply: () => draftMut,
     useSendReply: () => sendMut,
     useArchiveInboxItem: () => ({ mutate: vi.fn() }),
+    useArchiveAllInbox: () => ({ mutate: vi.fn(), isPending: false }),
   };
 });
 
@@ -70,5 +71,11 @@ describe("Conversaciones Page", () => {
     renderPage(<Conversaciones />);
     fireEvent.click(screen.getByRole("button", { name: /Redactar respuesta/i }));
     expect(draftMut.mutate).toHaveBeenCalledWith("i-1", expect.anything());
+  });
+
+  it("renders the Archivar todas button", async () => {
+    const { default: Conversaciones } = await import("@/pages/Conversaciones");
+    renderPage(<Conversaciones />);
+    expect(screen.getByRole("button", { name: /Archivar todas/i })).toBeInTheDocument();
   });
 });

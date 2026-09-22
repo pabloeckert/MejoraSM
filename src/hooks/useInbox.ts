@@ -103,6 +103,25 @@ export function useArchiveInboxItem() {
   });
 }
 
+export function useArchiveAllInbox() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await inboxApi.archiveAll();
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["inbox"] });
+      toast({
+        title: "Bandeja archivada",
+        description: "Todas las conversaciones históricas fueron archivadas correctamente.",
+      });
+    },
+    onError: (err: Error) =>
+      toast({ variant: "destructive", title: "No se pudo archivar la bandeja", description: err.message }),
+  });
+}
+
 // Agrupa las filas planas en hilos: un incoming + sus outgoing del mismo
 // thread_id. Devuelve solo hilos cuyo último mensaje entrante todavía no
 // tiene respuesta nuestra posterior, salvo que se pida includeAll.

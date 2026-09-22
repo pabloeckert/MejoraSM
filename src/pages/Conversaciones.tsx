@@ -25,6 +25,7 @@ import {
   useDraftReply,
   useSendReply,
   useArchiveInboxItem,
+  useArchiveAllInbox,
   buildThreads,
   isUnanswered,
   type InboxThread,
@@ -51,6 +52,8 @@ export default function Conversaciones() {
   const { data: items = [], isLoading } = useInbox();
   const { data: syncState } = useInboxSyncState();
   const sync = useSyncInbox();
+  const archiveAllMut = useArchiveAllInbox();
+  const [confirmArchiveAll, ConfirmArchiveAllUI] = useConfirm();
 
   const [onlyUnanswered, setOnlyUnanswered] = useState(true);
   const [sentiment, setSentiment] = useState<SentimentFilter>("todos");
@@ -82,10 +85,33 @@ export default function Conversaciones() {
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <Button onClick={() => sync.mutate()} disabled={sync.isPending} className="h-11">
-            {sync.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-            Actualizar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                const ok = await confirmArchiveAll({
+                  title: "¿Archivar todas las conversaciones?",
+                  description:
+                    "Todas las conversaciones pendientes pasarán al estado archivado. La bandeja quedará en 0 pendientes (lienzo en blanco), y podrás consultarlas siempre activando el filtro 'Archivadas'.",
+                  confirmText: "Archivar todas",
+                });
+                if (ok) archiveAllMut.mutate();
+              }}
+              disabled={archiveAllMut.isPending || items.length === 0}
+              className="h-11 border-border hover:bg-muted"
+            >
+              {archiveAllMut.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Archive className="mr-2 h-4 w-4" />
+              )}
+              Archivar todas
+            </Button>
+            <Button onClick={() => sync.mutate()} disabled={sync.isPending} className="h-11">
+              {sync.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Actualizar
+            </Button>
+          </div>
           {syncState?.last_synced_at && (
             <span className="text-[11px] text-muted-foreground">
               Última sincronización {formatDistanceToNow(new Date(syncState.last_synced_at), { addSuffix: true, locale: es })}
@@ -140,6 +166,7 @@ export default function Conversaciones() {
           ))}
         </div>
       )}
+      {ConfirmArchiveAllUI}
     </div>
   );
 }
