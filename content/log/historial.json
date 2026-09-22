@@ -1,6 +1,35 @@
 {
-  "syncedAt": "2026-09-22T16:27:12.028Z",
+  "syncedAt": "2026-09-22T20:58:05.330Z",
   "posts": [
+    {
+      "id": "6ab2d249cec15f61361b836d",
+      "date": "2026-09-22",
+      "status": "published",
+      "content": "Si tu único argumento de venta es \"soy más barato\", no tenés una estrategia de precios. Tenés un problema.\nSi no sabés si tu precio refleja tu valor real o el de tu competencia, hablemos. En MejoraOK hacemos ese diagnóstico con vos.\n#Pymes\n#GestionEmpresarial\n#EstrategiaDePrecios",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": null,
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DdmdBYagjf9/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1375461361340012"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7508241002974023680/"
+        }
+      ]
+    },
     {
       "id": "6ab2a23551b391ffd6059df2",
       "date": "2026-09-22",
