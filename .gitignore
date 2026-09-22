@@ -69,3 +69,6 @@ Screenshot*.png
 tsconfig.app.tsbuildinfo
 tsconfig.node.tsbuildinfo
 *.tsbuildinfo
+
+# VS Code workspace files
+*.code-workspace

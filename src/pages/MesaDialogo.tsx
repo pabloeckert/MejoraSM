@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -136,6 +137,7 @@ export default function MesaDialogo() {
 }
 
 function MesaDialogoContent() {
+  const location = useLocation();
   const { data: sessions, isLoading } = useDialogueSessions();
   const startMutation = useStartDialogue();
   const continueMutation = useContinueDialogue();
@@ -144,6 +146,17 @@ function MesaDialogoContent() {
   const [newTopic, setNewTopic] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
+
+  useEffect(() => {
+    const locState = location.state as { prompt?: string } | null;
+    const searchParams = new URLSearchParams(location.search);
+    const incomingPrompt = locState?.prompt || searchParams.get("prompt");
+
+    if (incomingPrompt) {
+      setNewTopic(incomingPrompt);
+      setDialogOpen(true);
+    }
+  }, [location]);
 
   const handleStart = (mode: "dirigido" | "auto", overrideTopic?: string) => {
     const topicToUse = overrideTopic !== undefined ? overrideTopic : newTopic;

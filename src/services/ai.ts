@@ -252,13 +252,18 @@ export async function sendCopilotMessage(
 }
 
 // ═══════════════════════════════════════
-// CLASSIFY PHOTO (sugerencia de dimensión — Taller de la Oferta, 2026-08-17)
+// CLASSIFY PHOTO (clasificación con IA de visión — situación, título operativo y dolor de trinchera)
 // ═══════════════════════════════════════
 
-export interface DimensionSuggestion {
+export interface PhotoClassification {
   dimension: string;
   reason: string;
+  situation: "Taller/Equipo" | "Consultoría 1 a 1" | "Pizarra/Esquema" | string;
+  operationalTitle: string;
+  trenchPain: string;
 }
+
+export type DimensionSuggestion = PhotoClassification;
 
 // ═══════════════════════════════════════
 // INSIGHTS (Fase A del plan de continuación 2026-08-31 — motor de insights
@@ -300,13 +305,20 @@ export async function sendInsightFeedback(insightId: string, weekStart: string, 
   return handleResponse(res, "Error guardando la valoración");
 }
 
-export async function suggestPhotoDimension(imageBase64: string, mimeType: string): Promise<DimensionSuggestion> {
+export async function suggestPhotoDimension(imageBase64: string, mimeType: string): Promise<PhotoClassification> {
   const res = await fetchWithTimeout(
     `${SUPABASE_URL}/functions/v1/classify-photo`,
     { method: "POST", headers: await buildHeaders(), body: JSON.stringify({ action: "suggest", imageBase64, mimeType }) },
     QUICK_TIMEOUT_MS
   );
-  return handleResponse(res, "Error sugiriendo la dimensión de la foto");
+  const data = await handleResponse<PhotoClassification>(res, "Error sugiriendo la dimensión de la foto");
+  return {
+    dimension: data.dimension || "organizacional",
+    reason: data.reason || "Clasificación automática",
+    situation: data.situation || "Taller/Equipo",
+    operationalTitle: data.operationalTitle || `Caso Operativo en ${(data.dimension || "gestión").toUpperCase()}`,
+    trenchPain: data.trenchPain || (data.reason || "Fricción operativa en procesos y alineación de equipos."),
+  };
 }
 
 // ═══════════════════════════════════════

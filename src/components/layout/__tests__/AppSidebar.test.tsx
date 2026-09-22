@@ -48,4 +48,31 @@ describe("AppSidebar", () => {
 
     expect(screen.queryByText("Menú de navegación")).not.toBeInTheDocument();
   });
+
+  it("el botón Subir material apunta a /subir-material y se marca activo", () => {
+    render(
+      <MemoryRouter initialEntries={["/subir-material"]}>
+        <AppSidebar />
+      </MemoryRouter>
+    );
+
+    const subirLinks = screen.getAllByRole("link", { name: /Subir material/i });
+    expect(subirLinks.length).toBeGreaterThan(0);
+    expect(subirLinks[0].getAttribute("href")).toBe("/subir-material");
+    const activeLink = subirLinks.find((el) => el.getAttribute("aria-current") === "page");
+    expect(activeLink).toBeTruthy();
+  });
+
+  it("el botón Subir material también se marca activo en la ruta retrocompatible /hub", () => {
+    render(
+      <MemoryRouter initialEntries={["/hub"]}>
+        <AppSidebar />
+      </MemoryRouter>
+    );
+
+    const subirLinks = screen.getAllByRole("link", { name: /Subir material/i });
+    expect(subirLinks.length).toBeGreaterThan(0);
+    const activeLink = subirLinks.find((el) => el.getAttribute("aria-current") === "page");
+    expect(activeLink).toBeTruthy();
+  });
 });

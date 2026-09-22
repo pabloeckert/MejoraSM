@@ -51,6 +51,9 @@ const VALID_KEYS = new Set(DIMENSIONES.map((d) => d.key));
 interface SuggestResult {
   dimension: string;
   reason: string;
+  situation: "Taller/Equipo" | "Consultoría 1 a 1" | "Pizarra/Esquema" | string;
+  operationalTitle: string;
+  trenchPain: string;
 }
 
 interface AnthropicResponse {
@@ -62,12 +65,28 @@ async function suggestDimension(imageBase64: string, mimeType: string): Promise<
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY no configurada");
 
   const listado = DIMENSIONES.map((d) => `- ${d.key} ("${d.nombre}"): ${d.contexto}`).join("\n");
-  const system = `Sos un clasificador de fotos para el contenido de MejoraOK (consultora de management). Mirá la foto y elegí UNA de estas 6 dimensiones — la que mejor describe lo que se ve:
-
+  const system = `Sos un clasificador de fotos de consultoría de management para MejoraOK (mejora continua en PyMEs y empresas B2B).
+Mirá la foto real y analizá:
+1. Dimensión: Elegí UNA de estas 6 dimensiones — la que mejor describe lo que se ve:
 ${listado}
 
+2. Situación operativa: Identificá la situación visual entre:
+- "Taller/Equipo" (reunión grupal, capacitación, sala de reuniones, mandos medios, dinámica de equipo)
+- "Consultoría 1 a 1" (entrevista individual, diagnóstico con líder, dos personas conversando de trabajo)
+- "Pizarra/Esquema" (diagramas de flujo, post-its, mapas de procesos, KPIs, números, matrices)
+
+3. Título operativo: Un título conciso, profesional y ejecutivo (ej: "Desconexión entre Ventas y Operaciones", "Cuellos de Botella en el Flujo de Valor", "Alineación de Objetivos en Mandos Medios").
+
+4. Dolor de trinchera: Extraé en 1-2 líneas la fricción o dolor real del sistema o proceso observado en la trinchera. Criterio mandatorio de tono MejoraOK: Nunca a la persona (el foco es el proceso, la falta de claridad o el sistema; jamás la capacidad o valor del líder o del equipo). Calidez con verdad.
+
 Respondé ÚNICAMENTE con JSON válido, sin nada antes ni después:
-{"dimension": "<key exacta de la lista>", "reason": "<1 frase corta explicando por qué, en español>"}`;
+{
+  "dimension": "<key exacta de la lista>",
+  "reason": "<1 frase corta explicando por qué, en español>",
+  "situation": "<Taller/Equipo | Consultoría 1 a 1 | Pizarra/Esquema>",
+  "operationalTitle": "<título operativo ejecutivo>",
+  "trenchPain": "<dolor o fricción de trinchera en 1-2 líneas sin culpar personas>"
+}`;
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -78,14 +97,14 @@ Respondé ÚNICAMENTE con JSON válido, sin nada antes ni después:
     },
     body: JSON.stringify({
       model: "claude-sonnet-5",
-      max_tokens: 300,
+      max_tokens: 450,
       system,
       messages: [
         {
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: mimeType, data: imageBase64 } },
-            { type: "text", text: "¿Qué dimensión es esta foto?" },
+            { type: "text", text: "Clasificá esta foto según dimensión, situación, título operativo y dolor de trinchera." },
           ],
         },
       ],
@@ -113,6 +132,16 @@ Respondé ÚNICAMENTE con JSON válido, sin nada antes ni después:
 
   if (!VALID_KEYS.has(parsed.dimension)) {
     throw new Error(`Dimensión sugerida inválida: "${parsed.dimension}"`);
+  }
+
+  if (!parsed.situation) {
+    parsed.situation = "Taller/Equipo";
+  }
+  if (!parsed.operationalTitle) {
+    parsed.operationalTitle = `Caso Operativo en ${parsed.dimension.toUpperCase()}`;
+  }
+  if (!parsed.trenchPain) {
+    parsed.trenchPain = parsed.reason || "Fricción operativa en procesos y alineación de equipo.";
   }
 
   return parsed;

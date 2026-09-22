@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<style>
+  @font-face {
+    font-family: "League Spartan";
+    src: local("League Spartan"), local("LeagueSpartan"), url("fonts/LeagueSpartan-Bold.woff2") format("woff2");
+    font-weight: 700;
+  }
+  @font-face {
+    font-family: "League Spartan";
+    src: local("League Spartan"), local("LeagueSpartan"), url("fonts/LeagueSpartan-SemiBold.woff2") format("woff2");
+    font-weight: 600;
+  }
+
+  :root {
+    --azul: #1A3D84;
+    --rojo: #E1061E;
+    --amarillo: #F7CC13;
+    --blanco: #FFFFFF;
+    --tinta: #2B2B2B;
+    --gris-fondo: #F5F5F5;
+    --gris-borde: #E5E7EB;
+    --gris-sub: #4B5563;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    width: 1080px;
+    background: var(--blanco);
+    font-family: "League Spartan", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--tinta);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Formatos base */
+  .canvas {
+    width: 1080px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--blanco);
+  }
+
+  .canvas.format-story { height: 1920px; }
+  .canvas.format-post { height: 1350px; }
+  .canvas.format-post-square { height: 1080px; }
+  .canvas.format-carrusel { height: 1350px; }
+
+  /* Elementos comunes */
+  .brand-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 12px;
+    background: linear-gradient(90deg, var(--azul) 0%, var(--azul) 60%, var(--rojo) 60%, var(--rojo) 80%, var(--amarillo) 80%);
+    z-index: 40;
+  }
+
+  .tag-container {
+    position: absolute;
+    top: 54px;
+    left: 60px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    z-index: 30;
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 12px 24px;
+    background: var(--blanco);
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--azul);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  }
+
+  .situation-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 20px;
+    background: rgba(26, 61, 132, 0.88);
+    backdrop-filter: blur(8px);
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 20px;
+    letter-spacing: 0.08em;
+    color: var(--blanco);
+    border: 1px solid rgba(255,255,255,0.25);
+  }
+
+  .watermark-logo {
+    position: absolute;
+    bottom: 50px;
+    right: 60px;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    z-index: 35;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .watermark-logo .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--rojo);
+  }
+
+  /* ═══════════════════════════════════════════
+     LAYOUT 1: FULL BLEED (A SANGRE COMPLETA)
+     ═══════════════════════════════════════════ */
+  .layout-1 .photo-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    z-index: 1;
+  }
+
+  .layout-1 .gradient-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(26,61,132,0.1) 0%, rgba(20,25,35,0.4) 40%, rgba(15,20,30,0.92) 100%);
+    z-index: 2;
+  }
+
+  .layout-1 .content-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0 70px 90px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .layout-1 .kicker {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--amarillo);
+    margin-bottom: 18px;
+  }
+
+  .layout-1 .headline {
+    font-size: 60px;
+    line-height: 1.12;
+    font-weight: 700;
+    color: var(--blanco);
+    margin-bottom: 22px;
+  }
+
+  .layout-1 .subtext {
+    font-size: 32px;
+    line-height: 1.35;
+    font-weight: 500;
+    color: rgba(255,255,255,0.92);
+    max-width: 920px;
+  }
+
+  .layout-1 .watermark-logo { color: var(--blanco); }
+
+  /* ═══════════════════════════════════════════
+     LAYOUT 2: FOTO DESTACADA (50/50 O 60/40 EDITORIAL)
+     ═══════════════════════════════════════════ */
+  .layout-2 {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--blanco);
+  }
+
+  .layout-2 .top-photo {
+    width: 100%;
+    flex: 1.15;
+    position: relative;
+    background-size: cover;
+    background-position: center;
+    border-bottom: 4px solid var(--azul);
+  }
+
+  .layout-2 .bottom-panel {
+    flex: 0.95;
+    background: var(--blanco);
+    padding: 60px 70px 70px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
+
+  .layout-2 .kicker {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--rojo);
+    margin-bottom: 16px;
+  }
+
+  .layout-2 .headline {
+    font-size: 56px;
+    line-height: 1.14;
+    font-weight: 700;
+    color: var(--azul);
+    margin-bottom: 20px;
+  }
+
+  .layout-2 .subtext {
+    font-size: 30px;
+    line-height: 1.38;
+    color: var(--tinta);
+  }
+
+  .layout-2 .watermark-logo { color: var(--azul); }
+
+  /* ═══════════════════════════════════════════
+     LAYOUT 3: DOBLE FOCO (SPLIT 2 FOTOS)
+     ═══════════════════════════════════════════ */
+  .layout-3 {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .layout-3 .photos-split {
+    display: flex;
+    width: 100%;
+    height: 60%;
+    gap: 4px;
+    background: var(--azul);
+  }
+
+  .layout-3 .split-photo {
+    flex: 1;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+  }
+
+  .layout-3 .bottom-panel {
+    height: 40%;
+    background: var(--blanco);
+    padding: 50px 70px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
+
+  .layout-3 .kicker {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--azul);
+    margin-bottom: 14px;
+  }
+
+  .layout-3 .headline {
+    font-size: 50px;
+    line-height: 1.15;
+    font-weight: 700;
+    color: var(--tinta);
+    margin-bottom: 16px;
+  }
+
+  .layout-3 .subtext {
+    font-size: 28px;
+    line-height: 1.35;
+    color: var(--gris-sub);
+  }
+
+  .layout-3 .watermark-logo { color: var(--azul); }
+
+  /* ═══════════════════════════════════════════
+     LAYOUT 4: MOSAICO TRÍPTICO (1 HERO + 2 SECUNDARIAS)
+     ═══════════════════════════════════════════ */
+  .layout-4 {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .layout-4 .triptych-grid {
+    display: flex;
+    width: 100%;
+    height: 62%;
+    gap: 6px;
+    background: #E5E7EB;
+  }
+
+  .layout-4 .hero-photo {
+    flex: 1.4;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+  }
+
+  .layout-4 .sub-photos {
+    flex: 0.9;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .layout-4 .sub-photo {
+    flex: 1;
+    background-size: cover;
+    background-position: center;
+  }
+
+  .layout-4 .bottom-panel {
+    height: 38%;
+    background: var(--blanco);
+    padding: 48px 70px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
+
+  .layout-4 .kicker {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--rojo);
+    margin-bottom: 12px;
+  }
+
+  .layout-4 .headline {
+    font-size: 48px;
+    line-height: 1.16;
+    font-weight: 700;
+    color: var(--azul);
+    margin-bottom: 16px;
+  }
+
+  .layout-4 .subtext {
+    font-size: 28px;
+    line-height: 1.35;
+    color: var(--tinta);
+  }
+
+  .layout-4 .watermark-logo { color: var(--azul); }
+
+  /* ═══════════════════════════════════════════
+     LAYOUT 5: COLLAGE MULTIEQUIPO (GRILLA 4 FOTOS)
+     ═══════════════════════════════════════════ */
+  .layout-5 {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--gris-fondo);
+    padding: 40px;
+  }
+
+  .layout-5 .inner-frame {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--blanco);
+    border-radius: 16px;
+    overflow: hidden;
+    border: 3px solid var(--gris-borde);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+  }
+
+  .layout-5 .grid-4 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    height: 60%;
+    gap: 4px;
+    background: var(--gris-borde);
+  }
+
+  .layout-5 .grid-cell {
+    background-size: cover;
+    background-position: center;
+  }
+
+  .layout-5 .bottom-panel {
+    height: 40%;
+    padding: 44px 54px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
+
+  .layout-5 .kicker {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--amarillo);
+    background: var(--azul);
+    padding: 6px 14px;
+    border-radius: 6px;
+    display: inline-block;
+    align-self: flex-start;
+    margin-bottom: 14px;
+  }
+
+  .layout-5 .headline {
+    font-size: 46px;
+    line-height: 1.18;
+    font-weight: 700;
+    color: var(--azul);
+    margin-bottom: 14px;
+  }
+
+  .layout-5 .subtext {
+    font-size: 26px;
+    line-height: 1.38;
+    color: var(--gris-sub);
+  }
+
+  .layout-5 .watermark-logo { color: var(--azul); bottom: 35px; right: 45px; }
+
+  /* Indicador de diapositiva (carrusel) */
+  .slide-counter {
+    position: absolute;
+    top: 54px;
+    right: 60px;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(8px);
+    color: var(--blanco);
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-size: 20px;
+    font-weight: 700;
+    z-index: 35;
+  }
+</style>
+</head>
+<body>
+
+<div class="canvas format-{{FORMAT}} {{LAYOUT}}">
+  <div class="brand-bar"></div>
+
+  <div class="tag-container">
+    <div class="tag">{{OFERTA_LABEL}}</div>
+    <div class="situation-badge">{{SITUATION}}</div>
+  </div>
+
+  {{SLIDE_COUNTER_HTML}}
+
+  <!-- CONTENIDO SEGÚN LAYOUT -->
+
+  <!-- LAYOUT 1: FULL BLEED -->
+  <div class="layout-1-body" style="display: none;">
+    <div class="photo-bg" style="background-image: url('{{PHOTO_1}}');"></div>
+    <div class="gradient-overlay"></div>
+    <div class="content-panel">
+      <div class="kicker">{{KICKER}}</div>
+      <h1 class="headline">{{HEADLINE}}</h1>
+      <p class="subtext">{{SUBTEXT}}</p>
+    </div>
+    <div class="watermark-logo">
+      <span>Mejora Continua</span>
+      <div class="dot"></div>
+    </div>
+  </div>
+
+  <!-- LAYOUT 2: FOTO DESTACADA 50/50 -->
+  <div class="layout-2-body" style="display: none; height: 100%;">
+    <div class="top-photo" style="background-image: url('{{PHOTO_1}}');"></div>
+    <div class="bottom-panel">
+      <div class="kicker">{{KICKER}}</div>
+      <h1 class="headline">{{HEADLINE}}</h1>
+      <p class="subtext">{{SUBTEXT}}</p>
+      <div class="watermark-logo">
+        <span>Mejora Continua</span>
+        <div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LAYOUT 3: DOBLE FOCO SPLIT -->
+  <div class="layout-3-body" style="display: none; height: 100%;">
+    <div class="photos-split">
+      <div class="split-photo" style="background-image: url('{{PHOTO_1}}');"></div>
+      <div class="split-photo" style="background-image: url('{{PHOTO_2}}');"></div>
+    </div>
+    <div class="bottom-panel">
+      <div class="kicker">{{KICKER}}</div>
+      <h1 class="headline">{{HEADLINE}}</h1>
+      <p class="subtext">{{SUBTEXT}}</p>
+      <div class="watermark-logo">
+        <span>Mejora Continua</span>
+        <div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LAYOUT 4: MOSAICO TRÍPTICO -->
+  <div class="layout-4-body" style="display: none; height: 100%;">
+    <div class="triptych-grid">
+      <div class="hero-photo" style="background-image: url('{{PHOTO_1}}');"></div>
+      <div class="sub-photos">
+        <div class="sub-photo" style="background-image: url('{{PHOTO_2}}');"></div>
+        <div class="sub-photo" style="background-image: url('{{PHOTO_3}}');"></div>
+      </div>
+    </div>
+    <div class="bottom-panel">
+      <div class="kicker">{{KICKER}}</div>
+      <h1 class="headline">{{HEADLINE}}</h1>
+      <p class="subtext">{{SUBTEXT}}</p>
+      <div class="watermark-logo">
+        <span>Mejora Continua</span>
+        <div class="dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LAYOUT 5: COLLAGE MULTIEQUIPO -->
+  <div class="layout-5-body" style="display: none; height: 100%;">
+    <div class="inner-frame">
+      <div class="grid-4">
+        <div class="grid-cell" style="background-image: url('{{PHOTO_1}}');"></div>
+        <div class="grid-cell" style="background-image: url('{{PHOTO_2}}');"></div>
+        <div class="grid-cell" style="background-image: url('{{PHOTO_3}}');"></div>
+        <div class="grid-cell" style="background-image: url('{{PHOTO_4}}');"></div>
+      </div>
+      <div class="bottom-panel">
+        <div class="kicker">{{KICKER}}</div>
+        <h1 class="headline">{{HEADLINE}}</h1>
+        <p class="subtext">{{SUBTEXT}}</p>
+        <div class="watermark-logo">
+          <span>Mejora Continua</span>
+          <div class="dot"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Activa dinámicamente el layout correspondiente
+  (function() {
+    const layout = "{{LAYOUT}}" || "layout-1";
+    const el = document.querySelector('.' + layout + '-body');
+    if (el) el.style.display = (layout === 'layout-1') ? 'block' : 'flex';
+  })();
+</script>
+
+</body>
+</html>

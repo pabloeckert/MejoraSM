@@ -35,7 +35,7 @@ const navGroups: {
       { label: "Mesa Ejecutiva", sublabel: "Crear contenido", icon: MessageSquare, path: "/mesa" },
       { label: "Citas y Stories", sublabel: "Fin de semana", icon: Sparkles, path: "/citas" },
       { label: "Biblioteca y Bóveda", sublabel: "Documentos y libros", icon: BookOpen, path: "/boveda" },
-      { label: "Subir material", icon: Upload, path: "/hub" },
+      { label: "Subir material", icon: Upload, path: "/subir-material" },
     ],
   },
   {
@@ -75,7 +75,9 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
               {group.label}
             </p>
             {group.items.map((item) => {
-              const isActive = location.pathname === item.path;
+              const isActive =
+                location.pathname === item.path ||
+                (item.path === "/subir-material" && location.pathname === "/hub");
               return (
                 <Link
                   key={item.path}

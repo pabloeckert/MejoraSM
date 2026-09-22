@@ -8,6 +8,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { ProposalDetail } from "@/components/ProposalDetailDialog";
 import type { DocRow } from "@/shared/types";
+import type { Database } from "@/integrations/supabase/types";
+
+export type ProposalInsert = Database["public"]["Tables"]["proposals"]["Insert"];
 
 export { supabase };
 
@@ -216,6 +219,9 @@ export const dialogueApi = {
 // ═══════════════════════════════════════
 
 export const proposalsApi = {
+  create: (fields: ProposalInsert) =>
+    supabase.from("proposals").insert(fields).select().single(),
+
   // Pagina de a 1000 filas reales — sin esto, pasado ese volumen faltaban
   // propuestas en silencio tanto acá como en el export de Auditoría.
   list: () =>

@@ -19,7 +19,7 @@ const MesaDialogo = lazy(() => import("./pages/MesaDialogo"));
 const Configuracion = lazy(() => import("./pages/Configuracion"));
 const Calendario = lazy(() => import("./pages/Calendario"));
 const Propuestas = lazy(() => import("./pages/Propuestas"));
-const Hub = lazy(() => import("./pages/Hub"));
+const SubirMaterial = lazy(() => import("./pages/SubirMaterial"));
 const Monitor = lazy(() => import("./pages/Monitor"));
 const Conversaciones = lazy(() => import("./pages/Conversaciones"));
 const CitasStudio = lazy(() => import("./pages/CitasStudio"));
@@ -67,7 +67,8 @@ const App = () => (
                   <Route path="/configuracion" element={<Configuracion />} />
                   <Route path="/calendario" element={<Calendario />} />
                   <Route path="/propuestas" element={<Propuestas />} />
-                  <Route path="/hub" element={<Hub />} />
+                  <Route path="/hub" element={<SubirMaterial />} />
+                  <Route path="/subir-material" element={<SubirMaterial />} />
                   <Route path="/monitor" element={<Monitor />} />
                   <Route path="/conversaciones" element={<Conversaciones />} />
                   <Route path="/citas" element={<CitasStudio />} />

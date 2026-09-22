@@ -24,12 +24,6 @@ import { github } from "@/services/github";
 // tiene el token real del lado del servidor.
 const TEMPLATES_DIR = "templates";
 
-const CANVAS: Record<string, { w: number; h: number; file: string }> = {
-  historia: { w: 1080, h: 1920, file: "story-template.html" },
-  post: { w: 1080, h: 1350, file: "post-template.html" },
-  carrusel: { w: 1080, h: 1350, file: "post-template.html" },
-};
-
 function esc(s: string) {
   return String(s ?? "")
     .replace(/&/g, "&amp;")
@@ -57,29 +51,59 @@ function useTemplate(file: string) {
   });
 }
 
+export type VisualLayoutType = "layout-1" | "layout-2" | "layout-3" | "layout-4" | "layout-5";
+
+export interface PiecePreviewProps {
+  format?: string | null;
+  oferta?: string | null;
+  hook?: string | null;
+  body?: string | null;
+  className?: string;
+  layout?: VisualLayoutType;
+  photos?: string[];
+  situation?: string | null;
+  slideIndex?: number;
+  totalSlides?: number;
+}
+
+const DEFAULT_FALLBACK_PHOTO =
+  "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1080' height='1080' viewBox='0 0 1080 1080'%3E%3Crect fill='%231A3D84' width='1080' height='1080'/%3E%3Ctext fill='%23F7CC13' font-family='sans-serif' font-size='42' font-weight='bold' x='50%25' y='50%25' text-anchor='middle'%3EMEJORA CONTINUA %E2%80%94 FOTO REAL%3C/text%3E%3C/svg%3E";
+
 export function PiecePreview({
   format,
   oferta,
   hook,
   body,
   className,
-}: {
-  format?: string | null;
-  oferta?: string | null;
-  hook?: string | null;
-  body?: string | null;
-  className?: string;
-}) {
-  const canvas = CANVAS[format || "post"] || CANVAS.post;
-  const { data: template, isLoading, isError } = useTemplate(canvas.file);
+  layout = "layout-1",
+  photos,
+  situation,
+  slideIndex,
+  totalSlides,
+}: PiecePreviewProps) {
+  const normFormat = (format || "post").toLowerCase();
+  const isStory = normFormat === "historia" || normFormat === "story";
+  const hasPhotosOrLayout = (photos && photos.length > 0) || layout !== "layout-1";
+
+  // Archivo de template a utilizar
+  const templateFile = hasPhotosOrLayout
+    ? "unified-layout-template.html"
+    : isStory
+      ? "story-template.html"
+      : "post-template.html";
+
+  const canvas = {
+    w: 1080,
+    h: isStory ? 1920 : 1350,
+  };
+
+  const { data: template, isLoading, isError } = useTemplate(templateFile);
   const rootRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.25);
 
   useEffect(() => {
     function fit() {
-      // Medimos el contenedor padre, no el wrap: el wrap ahora tiene un ancho
-      // explícito (canvas.w * scale), así que medirlo a él sería un loop.
       const w = rootRef.current?.clientWidth ?? 320;
       setScale(Math.min(1, w / canvas.w));
     }
@@ -88,41 +112,58 @@ export function PiecePreview({
     return () => window.removeEventListener("resize", fit);
   }, [canvas.w]);
 
-  // Reemplazo vía función, no string directo: un "$&"/"$$"/"$`"/"$'" literal
-  // en el hook/body generado por IA dispararía la interpretación especial de
-  // patrones de String.replace() (aplica con un patrón de búsqueda string
-  // plano igual, no solo con regex) — una función replacer no la sufre.
-  // Molde "pregunta directa" (2026-09-09): mismo criterio que
-  // render-scheduled-posts.mjs — si el hook termina en "?", el preview
-  // muestra el mismo layout que va a salir publicado. No trunca el hook
-  // acá (a diferencia del render real) porque este preview nunca truncó
-  // nada — el hook real casi siempre entra dentro del límite que ya le
-  // pide el prompt del Creativo, así que la diferencia es marginal.
-  const cleanHeadline = (hook || "").replace(/\*\*/g, "");
-  const modeClass = cleanHeadline.trim().endsWith("?") ? "solo-texto pregunta" : "solo-texto";
-  const html =
-    template &&
-    template
-      .replace("{{MODE_CLASS}}", () => modeClass)
-      .replace("{{PHOTO_STYLE}}", () => "")
-      .replace("{{OFERTA_LABEL}}", () => esc(dimensionLabel(oferta) || "Mejora Continua"))
-      .replace("{{KICKER}}", () => esc(dimensionLabel(oferta) || ""))
-      .replace("{{HEADLINE}}", () => esc(cleanHeadline))
-      .replace("{{SUBTEXT}}", () => esc(firstWords(body || "", 22)));
+  const cleanHeadline = (hook || "").replace(/\*\*/g, "").trim();
+  const cleanBody = (body || "").replace(/\*\*/g, "").trim();
+  const safeOferta = esc(dimensionLabel(oferta) || "Mejora Continua");
+  const p1 = photos?.[0] || DEFAULT_FALLBACK_PHOTO;
+  const p2 = photos?.[1] || p1;
+  const p3 = photos?.[2] || p1;
+  const p4 = photos?.[3] || p1;
+
+  let html = "";
+  if (template) {
+    if (hasPhotosOrLayout) {
+      const slideCounterHtml =
+        normFormat === "carrusel" && totalSlides
+          ? `<div class="slide-counter">${slideIndex || 1} / ${totalSlides}</div>`
+          : "";
+
+      html = template
+        .replace(/\{\{FORMAT\}\}/g, () => (isStory ? "story" : normFormat === "carrusel" ? "carrusel" : "post"))
+        .replace(/\{\{LAYOUT\}\}/g, () => layout)
+        .replace(/\{\{OFERTA_LABEL\}\}/g, () => safeOferta)
+        .replace(/\{\{SITUATION\}\}/g, () => esc(situation || "Trinchera Operativa"))
+        .replace(/\{\{KICKER\}\}/g, () => safeOferta)
+        .replace(/\{\{HEADLINE\}\}/g, () => esc(cleanHeadline || "El proceso define el resultado"))
+        .replace(/\{\{SUBTEXT\}\}/g, () => esc(firstWords(cleanBody || "Fricción operativa en procesos y mandos medios.", 24)))
+        .replace(/\{\{PHOTO_1\}\}/g, () => p1)
+        .replace(/\{\{PHOTO_2\}\}/g, () => p2)
+        .replace(/\{\{PHOTO_3\}\}/g, () => p3)
+        .replace(/\{\{PHOTO_4\}\}/g, () => p4)
+        .replace(/\{\{SLIDE_COUNTER_HTML\}\}/g, () => slideCounterHtml);
+    } else {
+      const modeClass = cleanHeadline.endsWith("?") ? "solo-texto pregunta" : "solo-texto";
+      html = template
+        .replace("{{MODE_CLASS}}", () => modeClass)
+        .replace("{{PHOTO_STYLE}}", () => "")
+        .replace("{{OFERTA_LABEL}}", () => safeOferta)
+        .replace("{{KICKER}}", () => safeOferta)
+        .replace("{{HEADLINE}}", () => esc(cleanHeadline || "Mejora Continua"))
+        .replace("{{SUBTEXT}}", () => esc(firstWords(cleanBody || "", 22)));
+    }
+  }
 
   return (
     <div ref={rootRef} className={className} style={{ width: "100%", maxWidth: "100%" }}>
       <div
         ref={wrapRef}
-        className="overflow-hidden rounded-md border border-border bg-muted"
-        // El iframe mide canvas.w (1080px) en el layout aunque `transform:
-        // scale()` lo achique visualmente — sin un ancho explícito acá, ese
-        // 1080 estiraba el DialogContent y metía scroll horizontal (bug real
-        // auditoría en vivo 2026-09-07). Fijamos el ancho al tamaño escalado.
+        className="overflow-hidden rounded-md border border-border bg-muted shadow-sm"
         style={{ height: canvas.h * scale, width: canvas.w * scale, maxWidth: "100%" }}
       >
         {isLoading && (
-          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Cargando preview…</div>
+          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+            Cargando previsualización visual…
+          </div>
         )}
         {isError && (
           <div className="flex h-full items-center justify-center px-4 text-center text-xs text-muted-foreground">
@@ -133,7 +174,7 @@ export function PiecePreview({
           <iframe
             title="Preview de la pieza"
             srcDoc={html}
-            sandbox="allow-same-origin"
+            sandbox="allow-same-origin allow-scripts"
             scrolling="no"
             style={{
               width: canvas.w,
@@ -145,8 +186,9 @@ export function PiecePreview({
           />
         )}
       </div>
-      <p className="mt-1 text-[11px] text-muted-foreground">
-        Vista previa del diseño (variante sin foto — la foto real se elige al publicar).
+      <p className="mt-1.5 text-[11px] text-muted-foreground flex items-center justify-between">
+        <span>Previsualización en vivo ({isStory ? "9:16 Story" : "Feed / Carrusel"})</span>
+        {hasPhotosOrLayout && <span className="font-semibold text-primary uppercase text-[10px]">{layout}</span>}
       </p>
     </div>
   );
