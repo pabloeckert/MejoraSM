@@ -1,6 +1,122 @@
 {
-  "syncedAt": "2026-09-22T11:06:30.911Z",
+  "syncedAt": "2026-09-22T16:27:12.028Z",
   "posts": [
+    {
+      "id": "6ab2a23551b391ffd6059df2",
+      "date": "2026-09-22",
+      "status": "published",
+      "content": "El guion de venta que memorizaste no es tuyo. Y se nota.\nSi tu equipo repite frases sin convicción, el problema no es de guion. Escribinos y lo revisamos juntos.",
+      "kind": "post",
+      "proposalId": "23556e90-d44d-433c-bf27-870583b8bf12",
+      "headline": "El guion de venta que memorizaste no es tuyo. Y se nota.",
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-09-22-23556e90-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DdmFf1JjbKB/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1375333024686179"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7508189385247617024/"
+        }
+      ]
+    },
+    {
+      "id": "6ab2a20451b391ffd605935a",
+      "date": "2026-09-22",
+      "status": "published",
+      "content": "Facturó un 30% más. Y por primera vez pensó en cerrar.\nSi esto te suena conocido, hablemos de tu operación antes de que el crecimiento te pase factura.",
+      "kind": "post",
+      "proposalId": "93185724-049c-4859-8ed5-6bf26db78f79",
+      "headline": "Facturó un 30% más. Y por primera vez pensó en cerrar.",
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-09-22-93185724-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DdmFaCnDWsK/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1375332238019591"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7508189174290706432/"
+        }
+      ]
+    },
+    {
+      "id": "6ab2a1cff3f62fa6edb4eb29",
+      "date": "2026-09-22",
+      "status": "published",
+      "content": "Antes de pensar \"este equipo no da más\", contestate esto.\nGuardá este carrusel y la próxima vez que delegués algo, explicá el objetivo antes que la tarea.",
+      "kind": "post",
+      "proposalId": "556083a7-02f0-4635-bc84-ef3f4223bd6e",
+      "headline": "Antes de pensar \"este equipo no da más\", contestate esto.",
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-09-22-556083a7-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DdmFTMWDtDh/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1375331324686349"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7508188955444551680/"
+        }
+      ]
+    },
+    {
+      "id": "6ab2a19af3f62fa6edb4e7c0",
+      "date": "2026-09-22",
+      "status": "published",
+      "content": "Un rehén logró que le trajeran el libro exacto que pedía. Sin hablar el idioma de sus captores.\n¿Tu equipo entiende hacia dónde van, o vos creés que se los explicaste? Contame en comentarios 👇",
+      "kind": "post",
+      "proposalId": "76b13706-47c1-416b-8c82-ff7204f99580",
+      "headline": "Un rehén logró que le trajeran el libro exacto que pedía. Sin hablar el idioma de sus captores.",
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-09-22-76b13706-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DdmFMw8jg0R/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1375330071353141"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7508188730860584961/"
+        }
+      ]
+    },
     {
       "id": "6ab13961ecd7b32670daace2",
       "date": "2026-09-21",
