@@ -1,6 +1,64 @@
 {
-  "syncedAt": "2026-09-23T10:56:22.509Z",
+  "syncedAt": "2026-09-23T16:17:09.217Z",
   "posts": [
+    {
+      "id": "6ab3e1ebee169ad51d884ef7",
+      "date": "2026-09-23",
+      "status": "published",
+      "content": "¿Cansado de ser el bombero de tu propia empresa? Aprendé a apagar el incendio antes de que prenda.”\nEstandarizá el proceso, medí resultados y entregá retroalimentación semanal.  \n",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": null,
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/Ddoho2EiKq3/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1376092477943567"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7508532672395231232/"
+        }
+      ]
+    },
+    {
+      "id": "6ab3e1be6a90a1efa92779bb",
+      "date": "2026-09-23",
+      "status": "published",
+      "content": "No perdiste ese cliente por el precio. Lo perdiste porque nunca lo llamaste como prometiste.\nSi querés revisar dónde se te está escapando la venta después de cerrarla, coordinemos una conversación diagnóstica.",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": null,
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DdohjUuCA9W/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1376091344610347"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7508532476005367809/"
+        }
+      ]
+    },
     {
       "id": "6ab2d249cec15f61361b836d",
       "date": "2026-09-22",
