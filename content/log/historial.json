@@ -1,6 +1,64 @@
 {
-  "syncedAt": "2026-09-23T21:11:50.548Z",
+  "syncedAt": "2026-09-24T03:34:22.932Z",
   "posts": [
+    {
+      "id": "6ab48bfcfe9c9152f050eaa9",
+      "date": "2026-09-24",
+      "status": "published",
+      "content": "Facturás más que el año pasado y trabajás peor que nunca. Eso no es crecimiento.\nSi tu facturación sube pero tu operación no da más, hablemos de dónde está el cuello de botella real.\n#Pymes\n#GestionEmpresarial\n#EstrategiaComercial",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": null,
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/Ddp0rbBiEmP/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1376511431235005"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7508715275093991424/"
+        }
+      ]
+    },
+    {
+      "id": "6ab467547efa28e13034fd05",
+      "date": "2026-09-23",
+      "status": "published",
+      "content": "Facturás más que el año pasado y trabajás peor que nunca. Eso no es crecimiento.\nSi tu facturación sube pero tu operación no da más, hablemos de dónde está el cuello de botella real.\n#Pymes\n#GestionEmpresarial\n#EstrategiaComercial",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": null,
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DdpiynwAuQ2/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1376431991242949"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7508675952315469824/"
+        }
+      ]
+    },
     {
       "id": "6ab3e1ebee169ad51d884ef7",
       "date": "2026-09-23",
