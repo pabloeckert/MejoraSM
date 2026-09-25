@@ -1,6 +1,35 @@
 {
-  "syncedAt": "2026-09-25T11:21:26.580Z",
+  "syncedAt": "2026-09-25T16:44:44.097Z",
   "posts": [
+    {
+      "id": "6ab66804042395d8220ffb1e",
+      "date": "2026-09-25",
+      "status": "published",
+      "content": "Tenés WhatsApp, CRM y facturación. El problema es que ninguno de los tres se habla con el otro.\nSi te pasa esto, hablemos de cómo integrar tus procesos antes de sumar una herramienta más. Escribinos y coordinamos un diagnóstico.\n#GestionEmpresarial\n#Pymes\n#ProcesosDeVenta",
+      "kind": "post",
+      "proposalId": "de92b41e-eef1-4792-b873-2d4385da89da",
+      "headline": "Tenés WhatsApp, CRM y facturación. El problema es que ninguno de los tres se habla con el otro.",
+      "kicker": null,
+      "oferta": "organizacional",
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-09-25-de92b41e-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DdtdFH_jOhC/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1377816691104479"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7509226411757412352/"
+        }
+      ]
+    },
     {
       "id": "6ab48bfcfe9c9152f050eaa9",
       "date": "2026-09-24",
