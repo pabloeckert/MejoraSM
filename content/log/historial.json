@@ -1,6 +1,35 @@
 {
-  "syncedAt": "2026-09-26T15:56:44.137Z",
+  "syncedAt": "2026-09-26T20:44:17.709Z",
   "posts": [
+    {
+      "id": "6ab7f1087c4cd2fb4e63d5f1",
+      "date": "2026-09-26",
+      "status": "published",
+      "content": "No vendés poco. Vendés a ciegas.\nSi hoy no podés responder cuánto te deja cada cliente, hablemos de tu proceso de gestión.\n#Pymes\n#GestionEmpresarial\n#MejoraContinua",
+      "kind": "post",
+      "proposalId": "10c77e9c-2ce6-4661-a7fe-e2ea0290a56d",
+      "headline": "No vendés poco. Vendés a ciegas.",
+      "kicker": null,
+      "oferta": "comercial",
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-09-26-10c77e9c-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/Ddwc-_MjaT9/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1378943670991781"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7509648407905357824/"
+        }
+      ]
+    },
     {
       "id": "6ab7047f2d7c305b42a09df0",
       "date": "2026-09-25",
