@@ -1,6 +1,35 @@
 {
-  "syncedAt": "2026-09-27T21:00:30.796Z",
+  "syncedAt": "2026-09-28T04:08:51.194Z",
   "posts": [
+    {
+      "id": "6ab9b7b5b8392259c6eb2d2f",
+      "date": "2026-09-28",
+      "status": "published",
+      "content": "Tu problema no es que vendés poco. Es que no sabés qué vendiste.\nSi esto te suena conocido, hablemos de cómo ordenar tu proceso comercial. Escribinos y coordinamos un diagnóstico.\n#Pymes\n#GestionComercial\n#MejoraContinua",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": null,
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/Ddz7BkmClOV/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1380178744201607"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7510136613612646400/"
+        }
+      ]
+    },
     {
       "id": "6ab7f1087c4cd2fb4e63d5f1",
       "date": "2026-09-26",
