@@ -1,6 +1,35 @@
 {
-  "syncedAt": "2026-09-29T12:17:44.857Z",
+  "syncedAt": "2026-09-29T21:58:02.961Z",
   "posts": [
+    {
+      "id": "6abbe78d59f055fbce955512",
+      "date": "2026-09-29",
+      "status": "published",
+      "content": "Si el día que te tomás franco se prende fuego todo, no tenés empresa: tenés un rehén con sueldo.\nSi te reconocés en esto, hablemos de cómo empezar a delegar decisiones, no solo tareas.\n#Pymes\n#GestionEmpresarial\n#MejoraContinua",
+      "kind": "post",
+      "proposalId": "642f94ef-880d-4503-8d09-61753d1befd3",
+      "headline": "Si el día que te tomás franco se prende fuego todo, no tenés empresa: tenés un rehén con sueldo.",
+      "kicker": null,
+      "oferta": "profesionalizacion",
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-09-29-642f94ef-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/Dd4MW7TDc8m/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1381744287378386"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7510737748941643776/"
+        }
+      ]
+    },
     {
       "id": "6ab9b7b5b8392259c6eb2d2f",
       "date": "2026-09-28",
