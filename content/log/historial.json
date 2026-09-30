@@ -1,6 +1,35 @@
 {
-  "syncedAt": "2026-09-29T21:58:02.961Z",
+  "syncedAt": "2026-09-30T04:26:05.303Z",
   "posts": [
+    {
+      "id": "6abc51b6cb791f89af3d78de",
+      "date": "2026-09-30",
+      "status": "published",
+      "content": "Por qué crecer en ventas sin estructura operativa destruye la rentabilidad de tu empresa.\nCoordiná una sesión de diagnóstico de procesos operativos en mejoraok.com para ordenar tu operación.\n#Pymes\n#GestionEmpresarial\n#MejoraContinua",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": null,
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/Dd5APCuiDfb/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1382014284018053"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7510851737495248896/"
+        }
+      ]
+    },
     {
       "id": "6abbe78d59f055fbce955512",
       "date": "2026-09-29",
