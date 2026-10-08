@@ -1,6 +1,64 @@
 {
-  "syncedAt": "2026-10-07T22:50:13.982Z",
+  "syncedAt": "2026-10-08T04:56:41.537Z",
   "posts": [
+    {
+      "id": "6ac70d3f38b3d6e0c282a714",
+      "date": "2026-10-08",
+      "status": "published",
+      "content": "",
+      "kind": "post",
+      "proposalId": "c4746877-9114-4a8f-99a7-240bf123c32b",
+      "headline": "Desafío del día: condensá la visión de tu proyecto en una sola imagen y colócala en el tablero del equipo antes de las 16 hs.",
+      "kicker": null,
+      "oferta": "profesionalizacion",
+      "imageUrl": "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/content/published/post-2026-10-08-c4746877-1.jpg",
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DeN9wWgDF-D/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1389390559947092"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7513801871992619008/"
+        }
+      ]
+    },
+    {
+      "id": "6ac6da5e65c3102a863b82ed",
+      "date": "2026-10-07",
+      "status": "published",
+      "content": "",
+      "kind": "story",
+      "proposalId": null,
+      "headline": null,
+      "kicker": null,
+      "oferta": null,
+      "imageUrl": null,
+      "platforms": [
+        {
+          "platform": "instagram",
+          "status": "published",
+          "url": "https://www.instagram.com/p/DeNk-SZCND0/"
+        },
+        {
+          "platform": "facebook",
+          "status": "published",
+          "url": "https://www.facebook.com/362865850499895_1389272639958884"
+        },
+        {
+          "platform": "linkedin",
+          "status": "published",
+          "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7513747237751902209/"
+        }
+      ]
+    },
     {
       "id": "6ac597ad1234dd38a3dc8ac9",
       "date": "2026-10-07",
