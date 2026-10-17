@@ -84,8 +84,8 @@ export function handleSMHttpRequest(
   // BÓVEDA DE CONOCIMIENTO (4 Capas Canónicas)
   // ──────────────────────────────────────────────────────────────────────────
 
-  // GET /api/boveda/fichas
-  if (method === "GET" && pathname === "/api/boveda/fichas") {
+  // GET /api/boveda/fichas o /api/boveda
+  if (method === "GET" && (pathname === "/api/boveda/fichas" || pathname === "/api/boveda")) {
     const dimension = parsedUrl.searchParams.get("dimension") as any;
     const origen_carpeta = parsedUrl.searchParams.get("capa") || undefined;
     const fichas = services.bovedaRepo.listar({ dimension, origen_carpeta });
@@ -125,8 +125,8 @@ export function handleSMHttpRequest(
   // PROPUESTAS MejoraSM (3 Borradores y Lotes)
   // ──────────────────────────────────────────────────────────────────────────
 
-  // GET /api/propuestas
-  if (method === "GET" && pathname === "/api/propuestas") {
+  // GET /api/propuestas o /api/posts
+  if (method === "GET" && (pathname === "/api/propuestas" || pathname === "/api/posts")) {
     const estado = parsedUrl.searchParams.get("estado") as any;
     const canal = parsedUrl.searchParams.get("canal") as any;
     const propuestas = services.propuestaRepo.listar({ estado, canal });
@@ -149,16 +149,38 @@ export function handleSMHttpRequest(
     return;
   }
 
-  // POST /api/propuestas/aprobar-lote
-  if (method === "POST" && pathname === "/api/propuestas/aprobar-lote") {
-    parseJsonBody<{ ids: string[] }>(req)
-      .then(({ ids }) => {
-        if (!Array.isArray(ids)) {
-          sendJson(res, 400, { error: "Formato inválido: se espera { ids: string[] }" });
+  // POST /api/propuestas/aprobar-lote o POST /api/approve
+  if (method === "POST" && (pathname === "/api/propuestas/aprobar-lote" || pathname === "/api/approve")) {
+    parseJsonBody<{ ids?: string[]; id?: string }>(req)
+      .then((body) => {
+        const ids = body.ids ? body.ids : body.id ? [body.id] : null;
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+          sendJson(res, 400, { error: "Formato inválido: se espera { ids: string[] } o { id: string }" });
           return;
         }
         const modificadas = services.propuestaRepo.aprobarLote(ids);
-        sendJson(res, 200, { success: true, modificadas });
+        sendJson(res, 200, { success: true, modificadas, ids });
+      })
+      .catch((err) => sendJson(res, 400, { error: err.message }));
+    return;
+  }
+
+  // POST /api/publish o POST /api/propuestas/:id/publicar
+  if (method === "POST" && (pathname === "/api/publish" || pathname.startsWith("/api/publish/"))) {
+    const idFromPath = pathname.replace(/^\/api\/publish\/?/, "");
+    parseJsonBody<{ id?: string }>(req)
+      .then((body) => {
+        const id = idFromPath || body.id;
+        if (!id) {
+          sendJson(res, 400, { error: "Falta id de propuesta para publicar (se espera { id: string })" });
+          return;
+        }
+        const ok = services.propuestaRepo.publicar(id);
+        if (!ok) {
+          sendJson(res, 404, { error: `Propuesta ${id} no encontrada para publicar` });
+          return;
+        }
+        sendJson(res, 200, { success: true, id, estado: "publicado" });
       })
       .catch((err) => sendJson(res, 400, { error: err.message }));
     return;

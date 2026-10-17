@@ -146,6 +146,16 @@ export class SqlitePropuestaRepository {
     return Number(res.changes || 0) > 0;
   }
 
+  public publicar(id: string): boolean {
+    const stmt = this.db.prepare(`
+      UPDATE propuestas_sm
+      SET estado = 'publicado', actualizado_el = ?
+      WHERE propuesta_id = ?;
+    `);
+    const res = stmt.run(new Date().toISOString(), id);
+    return Number(res.changes || 0) > 0;
+  }
+
   public aprobarLote(ids: string[]): number {
     if (ids.length === 0) return 0;
 
