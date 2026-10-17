@@ -9,10 +9,41 @@ export function useDocuments() {
   return useQuery({
     queryKey: ["documents"],
     queryFn: async () => {
+      // Intento de conexión en vivo al Router HTTP local soberano
+      try {
+        if (typeof fetch !== "undefined") {
+          const res = await fetch("http://localhost:4015/api/boveda");
+          if (res.ok) {
+            const fichas = await res.json();
+            if (Array.isArray(fichas) && fichas.length > 0) {
+              return fichas.map((f: any) => ({
+                id: f.id,
+                title: f.titulo,
+                file_type: "text/markdown",
+                created_at: f.creado_el || new Date().toISOString(),
+                word_count: f.contenido_raw ? f.contenido_raw.split(/\s+/).filter(Boolean).length : 650,
+                content: f.contenido_raw,
+                processing_status: "ready",
+                category: f.capa || "biblioteca_gestion",
+                metadata: {
+                  capa: f.capa,
+                  dimension: f.dimension,
+                  tags: f.tags,
+                  autor: "Pablo Eckert",
+                },
+              }));
+            }
+          }
+        }
+      } catch {
+        // Fallback defensivo a persistencia remota si el servidor local está apagado
+      }
+
       const { data, error } = await documentsApi.list();
       if (error) throw error;
       return data;
     },
+
     // Mientras algún documento sigue procesando (extracción/chunking/
     // embeddings, puede tardar varios segundos), refetch cada 3s para que
     // el badge de estado se actualice solo — hallazgo real de auditoría

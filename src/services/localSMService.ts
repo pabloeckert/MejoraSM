@@ -117,8 +117,22 @@ export function saveLocalProposals(proposals: PropuestaMejoraSMDTO[]): void {
   }
 }
 
+const LOCAL_HTTP_BASE = "http://localhost:4015";
+
+function syncMutationToBackend(endpoint: string, payload: unknown) {
+  if (typeof fetch !== "undefined") {
+    fetch(`${LOCAL_HTTP_BASE}${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch(() => {
+      // Modo defensivo: no interrumpe la UI si el servidor local está desconectado
+    });
+  }
+}
+
 /**
- * Aprueba una propuesta individualmente.
+ * Aprueba una propuesta individualmente y sincroniza con el backend local.
  */
 export function approveLocalProposal(id: string): PropuestaMejoraSMDTO[] {
   const all = getLocalProposals();
@@ -129,15 +143,33 @@ export function approveLocalProposal(id: string): PropuestaMejoraSMDTO[] {
     return p;
   });
   saveLocalProposals(updated);
+  syncMutationToBackend("/api/approve", { id });
   return updated;
 }
 
 /**
- * Aprueba un lote completo de propuestas pendientes.
+ * Publica una propuesta individualmente y sincroniza con el backend local.
+ */
+export function publishLocalProposal(id: string): PropuestaMejoraSMDTO[] {
+  const all = getLocalProposals();
+  const updated = all.map((p) => {
+    if (p.propuesta_id === id || (p as any).id === id) {
+      return { ...p, estado: "publicado" as const };
+    }
+    return p;
+  });
+  saveLocalProposals(updated);
+  syncMutationToBackend("/api/publish", { id });
+  return updated;
+}
+
+/**
+ * Aprueba un lote completo de propuestas pendientes y sincroniza con el backend local.
  */
 export function approveBatchLocalProposals(filterWeek?: number): { updated: PropuestaMejoraSMDTO[]; count: number } {
   const all = getLocalProposals();
   let count = 0;
+  const approvedIds: string[] = [];
   const updated = all.map((p) => {
     // Si se especifica semana, filtrar por coincidencia en el ID (ej: PROP-2026-W01-...)
     const matchesWeek = filterWeek
@@ -146,17 +178,23 @@ export function approveBatchLocalProposals(filterWeek?: number): { updated: Prop
 
     if (matchesWeek && p.estado === "pendiente_revision") {
       count++;
+      approvedIds.push(p.propuesta_id);
       return { ...p, estado: "aprobado" as const };
     }
     return p;
   });
 
   saveLocalProposals(updated);
+  if (approvedIds.length > 0) {
+    syncMutationToBackend("/api/approve", { ids: approvedIds });
+  }
   return { updated, count };
 }
 
 export const approveProposal = approveLocalProposal;
 export const approveAllProposals = approveBatchLocalProposals;
+export const publishProposal = publishLocalProposal;
+
 
 /**
  * Guarda cambios en el texto en 3 pasos, título o imagen de la propuesta.

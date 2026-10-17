@@ -12,17 +12,20 @@ import {
 import {
   getLocalProposals,
   approveLocalProposal,
+  publishLocalProposal,
   approveBatchLocalProposals,
   updateLocalProposal,
   rejectLocalProposal,
   triggerBatchPackageDownload,
 } from "@/services/localSMService";
+import { Grid26Semanas } from "@/components/Grid26Semanas";
 import { ProposalDetailDialog } from "@/components/ProposalDetailDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
+
 import {
   CheckSquare,
   Download,
@@ -247,156 +250,36 @@ export default function TableroSemanal() {
         </div>
       </section>
 
-      {/* GRILLA DE PIEZAS DE LA SEMANA */}
+      {/* GRILLA DE PIEZAS DE LA SEMANA CON FRAMING ENGINE */}
       <section className="space-y-4">
-        {weekProposals.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300 p-8">
-            <Layers className="h-8 w-8 text-slate-400 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-slate-700">No hay propuestas con los filtros seleccionados.</p>
-            <p className="text-xs text-slate-400 mt-1">Elegí otra semana o cambiá los filtros superiores.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {weekProposals.map((propuesta) => {
-              const borrador =
-                propuesta.borradores.find((b) => b.opcion === propuesta.borrador_seleccionado) ||
-                propuesta.borradores[0];
-
-              const isJab = borrador.estrategia !== "right_hook_conversion";
-              const isApproved = propuesta.estado === "aprobado";
-              const isPending = propuesta.estado === "pendiente_revision";
-
-              return (
-                <Card
-                  key={propuesta.propuesta_id}
-                  className="overflow-hidden border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between"
-                >
-                  <CardContent className="p-4 space-y-3">
-                    {/* Top Bar de la Pieza */}
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-[11px] font-bold text-blue-900">
-                        {propuesta.propuesta_id}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] uppercase font-semibold text-slate-700 bg-slate-50"
-                        >
-                          {propuesta.canal_destino}
-                        </Badge>
-                        <Badge
-                          variant={isJab ? "default" : "destructive"}
-                          className={`text-[10px] ${isJab ? "bg-[#1A3D84]" : "bg-[#E1061E]"}`}
-                        >
-                          {isJab ? "Jab (80%)" : "Right Hook (20%)"}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {/* Fecha y Formato */}
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                      <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                      <span>{new Date(propuesta.dia_programado).toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</span>
-                      <span>·</span>
-                      <span className="capitalize">{borrador.tipo_formato.replace("_", " ")}</span>
-                    </div>
-
-                    {/* Título / Hook Principal */}
-                    <h3 className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug">
-                      {borrador.titulo_portada}
-                    </h3>
-
-                    {/* Desglose Copy en 3 Pasos */}
-                    <div className="space-y-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-[11px]">
-                      <div className="border-l-2 border-red-500 pl-2">
-                        <span className="text-[10px] font-bold text-red-700 block uppercase">1. Dolor</span>
-                        <p className="text-slate-700 line-clamp-1">{borrador.copy_tres_pasos.paso1_dolor}</p>
-                      </div>
-                      <div className="border-l-2 border-blue-700 pl-2">
-                        <span className="text-[10px] font-bold text-blue-900 block uppercase">2. Reencuadre</span>
-                        <p className="text-slate-700 line-clamp-1">{borrador.copy_tres_pasos.paso2_reencuadre}</p>
-                      </div>
-                      <div className="border-l-2 border-amber-500 pl-2">
-                        <span className="text-[10px] font-bold text-amber-700 block uppercase">3. Dirección</span>
-                        <p className="text-slate-700 truncate">{borrador.copy_tres_pasos.paso3_direccion_web}</p>
-                      </div>
-                    </div>
-
-                    {/* Badges de 3 Borradores Disponibles */}
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                      <span className="text-[10px] text-slate-400 font-medium">Borradores IA:</span>
-                      <div className="flex gap-1">
-                        {(["A", "B", "C"] as OpcionBorrador[]).map((op) => (
-                          <span
-                            key={op}
-                            className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold ${
-                              propuesta.borrador_seleccionado === op
-                                ? "bg-blue-800 text-white"
-                                : "bg-slate-100 text-slate-500"
-                            }`}
-                          >
-                            {op}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-
-                  {/* Footer con Acción */}
-                  <div className="p-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between">
-                    <Badge
-                      variant={isApproved ? "default" : isPending ? "secondary" : "outline"}
-                      className={`text-[10px] ${
-                        isApproved
-                          ? "bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                          : ""
-                      }`}
-                    >
-                      {propuesta.estado === "pendiente_revision"
-                        ? "Pendiente"
-                        : propuesta.estado === "aprobado"
-                        ? "Aprobada"
-                        : "Publicada"}
-                    </Badge>
-
-                    <div className="flex items-center gap-1.5">
-                      {isPending && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          aria-label={`Aprobar pieza ${propuesta.propuesta_id}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const updated = approveLocalProposal(propuesta.propuesta_id);
-                            setProposals(updated);
-                            toast({
-                              title: "Propuesta Aprobada",
-                              description: `${propuesta.propuesta_id} quedó aprobada para publicación.`,
-                            });
-                          }}
-                          className="h-7 text-xs text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 font-semibold px-2"
-                        >
-                          <CheckCircle2 className="mr-1 h-3 w-3" />
-                          Aprobar
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleOpenDetail(propuesta)}
-                        className="h-7 text-xs bg-white hover:bg-slate-100 text-blue-900 font-semibold"
-                      >
-                        Revisar / Editar
-                        <ArrowRight className="ml-1 h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
+        <Grid26Semanas
+          proposals={weekProposals}
+          activeWeek={activeWeek}
+          onApprove={(id) => {
+            const updated = approveLocalProposal(id);
+            setProposals(updated);
+            toast({
+              title: "Propuesta Aprobada",
+              description: `${id} quedó aprobada para publicación.`,
+            });
+          }}
+          onPublish={(id) => {
+            const updated = publishLocalProposal(id);
+            setProposals(updated);
+            toast({
+              title: "Propuesta Publicada",
+              description: `${id} ha sido despachada y publicada con éxito.`,
+            });
+          }}
+          onSelectDraft={(id, op) => {
+            setProposals((prev) =>
+              prev.map((p) => (p.propuesta_id === id ? { ...p, borrador_seleccionado: op } : p))
+            );
+          }}
+          onOpenDetail={handleOpenDetail}
+        />
       </section>
+
 
       {/* DIÁLOGO DETALLADO CON 3 BORRADORES, EDICIÓN Y APROBACIÓN */}
       {activeProposal && (
