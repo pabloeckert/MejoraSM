@@ -15,6 +15,7 @@ export class SqlitePropuestaRepository {
     if (typeof dbOrPath === "string") {
       this.db = new DatabaseSync(dbOrPath);
       this.db.exec("PRAGMA journal_mode = WAL;");
+      this.db.exec("PRAGMA busy_timeout = 5000;");
       this.db.exec(CREATE_TABLES_SQL);
     } else {
       this.db = dbOrPath;

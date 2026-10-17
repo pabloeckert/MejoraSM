@@ -17,6 +17,7 @@ fs.mkdirSync(path.join(ROOT_DIR, "data"), { recursive: true });
 
 const db = new DatabaseSync(DB_PATH);
 db.exec("PRAGMA journal_mode = WAL;");
+db.exec("PRAGMA busy_timeout = 5000;");
 
 // 1. Crear Esquema
 const CREATE_TABLES_SQL = `
