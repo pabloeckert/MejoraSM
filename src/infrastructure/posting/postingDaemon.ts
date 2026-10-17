@@ -8,6 +8,7 @@ import {
   PropuestaMejoraSMDTO,
   CanalDestino,
 } from "../../domain/types";
+import { ZernioCircuitBreaker } from "./circuitBreaker";
 
 export interface ZernioPlatformConfig {
   platform: string;
@@ -26,6 +27,7 @@ export interface PostingCycleOptions {
   now?: Date;
   sandbox?: boolean;
   apiKey?: string;
+  circuitBreaker?: ZernioCircuitBreaker;
   accountIds?: {
     linkedin?: string;
     instagram?: string;
@@ -100,6 +102,7 @@ export async function runPostingCycle(
     now = new Date(),
     sandbox = process.env.ZERNIO_SANDBOX === "true" || !process.env.ZERNIO_API_KEY,
     apiKey = process.env.ZERNIO_API_KEY || "sandbox_key",
+    circuitBreaker = new ZernioCircuitBreaker(),
     accountIds = {
       linkedin: process.env.ZERNIO_LINKEDIN_ACCOUNT_ID || "acc_li_01",
       instagram: process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID || "acc_ig_01",
@@ -132,27 +135,44 @@ export async function runPostingCycle(
       if (sandbox) {
         // En modo Sandbox, no se realiza llamada de red externa
         postId = `zernio_mock_${Date.now()}_${propuesta.propuesta_id}`;
+        repository.actualizarEstadoPropuesta(propuesta.propuesta_id, "publicado");
       } else {
-        const response = await fetch("https://zernio.com/api/v1/posts", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
+        const execution = await circuitBreaker.execute(
+          async (signal) => {
+            const response = await fetch("https://zernio.com/api/v1/posts", {
+              method: "POST",
+              signal,
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+              const errBody = await response.text();
+              throw new Error(`Zernio API error ${response.status}: ${errBody}`);
+            }
+
+            const data = (await response.json()) as any;
+            return data.post?.id || data.id || `zernio_${Date.now()}`;
           },
-          body: JSON.stringify(payload),
-        });
+          (fallbackErr) => {
+            // Fallback resiliente a SQLite: registrar para no perder la pieza
+            repository.actualizarEstadoPropuesta(
+              propuesta.propuesta_id,
+              "aprobado",
+              `Fallback local (Zernio offline): ${fallbackErr.message}`
+            );
+            return `fallback_sqlite_${Date.now()}_${propuesta.propuesta_id}`;
+          }
+        );
 
-        if (!response.ok) {
-          const errBody = await response.text();
-          throw new Error(`Zernio API error ${response.status}: ${errBody}`);
+        postId = execution.result;
+        if (!execution.fromFallback) {
+          repository.actualizarEstadoPropuesta(propuesta.propuesta_id, "publicado");
         }
-
-        const data = (await response.json()) as any;
-        postId = data.post?.id || data.id || `zernio_${Date.now()}`;
       }
-
-      // Actualizar estado en el repositorio SQLite local
-      repository.actualizarEstadoPropuesta(propuesta.propuesta_id, "publicado");
 
       result.publicadasExitosamente++;
       result.detalles.push({

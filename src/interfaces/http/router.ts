@@ -4,11 +4,72 @@
 // 100% nativo sobre node:http sin dependencias de Express o Fastify.
 
 import { IncomingMessage, ServerResponse } from "node:http";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { SqliteBovedaRepository } from "../../infrastructure/sqlite/SqliteBovedaRepository";
 import { SqlitePropuestaRepository } from "../../infrastructure/sqlite/SqlitePropuestaRepository";
 import { SqliteSMRepository } from "../../infrastructure/sqlite/SqliteSMRepository";
 import { generarGrillaEvergreen26Semanas } from "../../domain/gridGenerator";
 import { type FichaBovedaDTO, type PropuestaMejoraSMDTO } from "../../domain/types";
+
+const MIME_TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".mjs": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ico": "image/x-icon",
+};
+
+export function serveStaticDistFile(
+  res: ServerResponse,
+  pathname: string,
+  distDir: string = path.resolve(process.cwd(), "dist")
+): boolean {
+  if (!fs.existsSync(distDir)) {
+    return false;
+  }
+
+  const safePath = path.normalize(pathname).replace(/^(\.\.[/\\])+/, "");
+  let filePath = path.join(distDir, safePath);
+
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+    filePath = path.join(filePath, "index.html");
+  }
+
+  if (!fs.existsSync(filePath)) {
+    const indexPath = path.join(distDir, "index.html");
+    if (fs.existsSync(indexPath) && !pathname.includes(".")) {
+      filePath = indexPath;
+    } else {
+      return false;
+    }
+  }
+
+  try {
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = MIME_TYPES[ext] || "application/octet-stream";
+    const content = fs.readFileSync(filePath);
+
+    res.writeHead(200, {
+      "Content-Type": contentType,
+      "Content-Length": content.length,
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": ext === ".html" ? "no-cache" : "public, max-age=31536000, immutable",
+    });
+    res.end(content);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 
 export interface SMAppServices {
   bovedaRepo: SqliteBovedaRepository;
@@ -237,6 +298,13 @@ export function handleSMHttpRequest(
     return;
   }
 
+  // Servidor de estáticos de producción si existe dist/
+  if (method === "GET" && !pathname.startsWith("/api") && pathname !== "/health") {
+    const served = serveStaticDistFile(res, pathname);
+    if (served) return;
+  }
+
   // Ruta no encontrada
   sendJson(res, 404, { error: `Endpoint no encontrado: ${method} ${pathname}` });
 }
+
