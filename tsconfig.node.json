@@ -16,7 +16,17 @@
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    /* Path Aliases */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
-  "include": ["vite.config.ts", "scratch/**/*.ts"]
+  "include": [
+    "vite.config.ts",
+    "scratch/stress-production-audit.ts",
+    "scratch/e2e-probes.ts"
+  ]
 }
