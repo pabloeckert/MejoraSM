@@ -372,6 +372,8 @@ export async function publishPost(imageUrl, caption = "") {
   // apenas exista, los posts de feed salen también a LinkedIn sin tocar nada
   // más. LinkedIn no tiene "stories", así que publishStory() no lo incluye.
   const liAccountId = process.env.ZERNIO_LINKEDIN_ACCOUNT_ID;
+  // Integración canal WhatsApp (Zernio API) — Soporte de distribución y listas de difusión
+  const waAccountId = process.env.ZERNIO_WHATSAPP_ACCOUNT_ID;
 
   if (!apiKey) {
     return { success: false, error: "Falta ZERNIO_API_KEY en el entorno." };
@@ -398,15 +400,38 @@ export async function publishPost(imageUrl, caption = "") {
       accountId: liAccountId,
     });
   }
+  if (waAccountId) {
+    platforms.push({
+      platform: "whatsapp",
+      accountId: waAccountId,
+    });
+  }
 
   if (platforms.length === 0) {
     return {
       success: false,
-      error: "Falta configurar ZERNIO_INSTAGRAM_ACCOUNT_ID y/o ZERNIO_FACEBOOK_ACCOUNT_ID.",
+      error: "Falta configurar cuentas de destino en Zernio (Instagram, Facebook, LinkedIn o WhatsApp).",
     };
   }
 
   return createPostAndPoll({ apiKey, content: caption, imageUrl, platforms });
+}
+
+// Publicación directa autónoma a canal WhatsApp vía Zernio
+export async function publishWhatsApp(content, mediaUrl = null) {
+  const apiKey = process.env.ZERNIO_API_KEY;
+  const waAccountId = process.env.ZERNIO_WHATSAPP_ACCOUNT_ID;
+
+  if (!apiKey) {
+    return { success: false, error: "Falta ZERNIO_API_KEY en el entorno." };
+  }
+  if (!waAccountId) {
+    return { success: false, error: "Falta ZERNIO_WHATSAPP_ACCOUNT_ID en el entorno." };
+  }
+
+  const platforms = [{ platform: "whatsapp", accountId: waAccountId }];
+  const imageUrls = mediaUrl ? (Array.isArray(mediaUrl) ? mediaUrl : [mediaUrl]) : [];
+  return createPostAndPoll({ apiKey, content, imageUrl: imageUrls, platforms });
 }
 
 // Plataformas que Zernio permite despublicar vía API (docs.zernio.com,
@@ -414,7 +439,7 @@ export async function publishPost(imageUrl, caption = "") {
 // están soportados — hay que verificarlo ahí antes de llamar, no asumir.
 export const UNPUBLISH_SOPORTADO = [
   "threads", "facebook", "twitter", "linkedin", "youtube",
-  "pinterest", "reddit", "bluesky", "googlebusiness", "telegram",
+  "pinterest", "reddit", "bluesky", "googlebusiness", "telegram", "whatsapp",
 ];
 
 export async function unpublishPost(postId, platform, apiKey) {

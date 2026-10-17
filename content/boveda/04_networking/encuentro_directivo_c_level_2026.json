@@ -1,0 +1,25 @@
+{
+  "id": "BOV-2026-NET-001",
+  "origen_carpeta": "networking_y_autoridad",
+  "dimension": "networking_y_autoridad",
+  "tipo_activo": "imagen_con_texto",
+  "titulo": "Mesa Directiva C-Level Rosario: Gobierno Corporativo en PyMEs Industriales",
+  "contenido_raw": "Encuentro reservado de 14 directores generales y presidentes de compañías del cordón industrial. Debate central: cómo transicionar de la empresa conducida por instinto a la corporación estructurada con directorio profesional.",
+  "metadatos_multimedia": {
+    "ruta_archivo_local": "/content/boveda/04_networking/img_clevel_rosario_2026.jpg",
+    "personas_presentes": [
+      "Pablo (Director Mejora Continua)",
+      "Guillermo R. (Presidente Grupo Metal)",
+      "Mariana V. (CEO AgroLog)",
+      "Carlos M. (Director Ejecutivo)"
+    ],
+    "orientacion_original": "horizontal",
+    "resolucion": {
+      "ancho": 1920,
+      "alto": 1080
+    },
+    "locacion": "Bolsa de Comercio de Rosario / Espacio Ejecutivo"
+  },
+  "fase_comercial_sugerida": "mofu_educacion",
+  "creado_el": "2026-10-15T18:30:00.000Z"
+}

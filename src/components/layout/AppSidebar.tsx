@@ -3,17 +3,12 @@ import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   BookOpen,
-  MessageSquare,
   Settings,
   CalendarDays,
-  FileCheck,
   Upload,
   MonitorPlay,
-  MessagesSquare,
-  ShieldCheck,
   Menu,
   LogOut,
-  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,32 +21,19 @@ const navGroups: {
   items: { label: string; sublabel?: string; icon: typeof LayoutDashboard; path: string }[];
 }[] = [
   {
-    label: "Panel",
-    items: [{ label: "Dashboard", icon: LayoutDashboard, path: "/" }],
-  },
-  {
-    label: "Estrategia y Creación",
+    label: "Mesa de Control",
     items: [
-      { label: "Mesa Ejecutiva", sublabel: "Crear contenido", icon: MessageSquare, path: "/mesa" },
-      { label: "Citas y Stories", sublabel: "Fin de semana", icon: Sparkles, path: "/citas" },
-      { label: "Biblioteca y Bóveda", sublabel: "Documentos y libros", icon: BookOpen, path: "/boveda" },
-      { label: "Subir material", icon: Upload, path: "/subir-material" },
+      { label: "Tablero Semanal", sublabel: "Revisión y aprobación", icon: LayoutDashboard, path: "/" },
+      { label: "Biblioteca y Bóveda", sublabel: "Activos y fotos RAG", icon: BookOpen, path: "/boveda" },
     ],
   },
   {
-    label: "Operación y CRM",
+    label: "Operación MVP",
     items: [
-      { label: "Conversaciones", sublabel: "Inbox social y CRM", icon: MessagesSquare, path: "/conversaciones" },
-      { label: "Propuestas", icon: FileCheck, path: "/propuestas" },
-      { label: "Calendario", icon: CalendarDays, path: "/calendario" },
-      { label: "Monitor", icon: MonitorPlay, path: "/monitor" },
-    ],
-  },
-  {
-    label: "Sistema",
-    items: [
-      { label: "Auditoría", icon: ShieldCheck, path: "/auditoria" },
-      { label: "Configuración", icon: Settings, path: "/configuracion" },
+      { label: "Subir material", sublabel: "Ingesta de activos", icon: Upload, path: "/subir-material" },
+      { label: "Calendario", sublabel: "Vista de despacho", icon: CalendarDays, path: "/calendario" },
+      { label: "Monitor", sublabel: "Publicación y cola", icon: MonitorPlay, path: "/monitor" },
+      { label: "Configuración", sublabel: "Ajustes y Zernio", icon: Settings, path: "/configuracion" },
     ],
   },
 ];

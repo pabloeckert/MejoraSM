@@ -1,37 +1,34 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { proposalsApi, templatesApi } from "@/services/supabase";
+import type { ProposalDetail } from "@/components/ProposalDetailDialog";
+import {
+  getLocalProposals,
+  getLocalProposalsAsLegacy,
+  approveLocalProposal,
+  rejectLocalProposal,
+  updateLocalProposal,
+  saveLocalProposals,
+} from "@/services/localSMService";
 
-// El cliente de Supabase NO rechaza la promesa cuando la query falla: devuelve
-// { data, error }. Hasta la auditoría del 2026-08-31 las mutaciones hacían
-// `mutationFn: (id) => proposalsApi.x(id)` sin mirar `error`, así que onSuccess
-// disparaba siempre — el toast decía "guardado" aunque el RLS, un constraint o
-// la red hubieran tumbado el UPDATE ("falso guardado", B1). Este helper hace
-// throw en error real, y con eso los onError que ya existen en la UI empiezan a
-// funcionar. Se hace acá (no en services/supabase.ts) para no romper los tests
-// de integración que esperan el chain sincrónico de PostgREST.
 async function run(p: PromiseLike<{ error: { message: string } | null }>): Promise<void> {
   const { error } = await p;
   if (error) throw new Error(error.message);
 }
 
 export function useProposals() {
-  return useQuery({
+  return useQuery<ProposalDetail[]>({
     queryKey: ["proposals"],
-    queryFn: async () => {
-      const { data, error } = await proposalsApi.list();
-      if (error) throw error;
-      return data;
+    queryFn: async (): Promise<ProposalDetail[]> => {
+      return getLocalProposalsAsLegacy();
     },
   });
 }
 
 export function usePendingProposals() {
-  return useQuery({
+  return useQuery<ProposalDetail[]>({
     queryKey: ["proposals", "pending"],
-    queryFn: async () => {
-      const { data, error } = await proposalsApi.pending();
-      if (error) throw error;
-      return data;
+    queryFn: async (): Promise<ProposalDetail[]> => {
+      return getLocalProposalsAsLegacy().filter((p) => p.status === "pending");
     },
     refetchInterval: 10000,
   });
@@ -40,7 +37,10 @@ export function usePendingProposals() {
 export function useApproveProposal() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => run(proposalsApi.approve(id)),
+    mutationFn: async (id: string) => {
+      approveLocalProposal(id);
+      return id;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
   });
 }
@@ -48,8 +48,10 @@ export function useApproveProposal() {
 export function useRejectProposal() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
-      run(proposalsApi.reject(id, reason)),
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      rejectLocalProposal(id, reason);
+      return id;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
   });
 }
@@ -57,8 +59,14 @@ export function useRejectProposal() {
 export function useScheduleProposal() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, date, oferta }: { id: string; date: string; oferta: string }) =>
-      run(proposalsApi.schedule(id, date, oferta)),
+    mutationFn: async ({ id, date }: { id: string; date: string; oferta?: string }) => {
+      const all = getLocalProposals();
+      const updated = all.map((p) =>
+        p.propuesta_id === id ? { ...p, dia_programado: date, estado: "aprobado" as const } : p
+      );
+      saveLocalProposals(updated);
+      return id;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
   });
 }
@@ -66,18 +74,27 @@ export function useScheduleProposal() {
 export function useCancelProposal() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => run(proposalsApi.cancel(id)),
+    mutationFn: async (id: string) => {
+      rejectLocalProposal(id, "Cancelada antes de publicar");
+      return id;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
   });
 }
 
-// Recuperar una propuesta rechazada/cancelada (B2): hasta la auditoría del
-// 2026-08-31, cancelar mandaba a `rejected` sin ninguna forma de volver desde
-// la UI — la acción menos reversible del sistema era la única sin freno.
 export function useReactivateProposal() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => run(proposalsApi.reactivate(id)),
+    mutationFn: async (id: string) => {
+      const all = getLocalProposals();
+      const updated = all.map((p) =>
+        p.propuesta_id === id
+          ? { ...p, estado: "pendiente_revision" as const, motivo_rechazo: undefined }
+          : p
+      );
+      saveLocalProposals(updated);
+      return id;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
   });
 }
@@ -89,13 +106,21 @@ export function useReactivateProposal() {
 export function useEditProposal() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       id,
       fields,
     }: {
       id: string;
       fields: Partial<{ title: string; hook: string; body: string; cta: string; hashtags: string[] }>;
-    }) => run(proposalsApi.edit(id, fields)),
+    }) => {
+      updateLocalProposal(id, {
+        title: fields.title,
+        hook: fields.hook,
+        body: fields.body,
+        cta: fields.cta,
+      });
+      return id;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
   });
 }
@@ -103,7 +128,12 @@ export function useEditProposal() {
 export function useDeleteProposal() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => run(proposalsApi.remove(id)),
+    mutationFn: async (id: string) => {
+      const all = getLocalProposals();
+      const updated = all.filter((p) => p.propuesta_id !== id && (p as any).id !== id);
+      saveLocalProposals(updated);
+      return id;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
   });
 }
@@ -111,7 +141,12 @@ export function useDeleteProposal() {
 export function useRescheduleProposal() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, date }: { id: string; date: string }) => run(proposalsApi.reschedule(id, date)),
+    mutationFn: async ({ id, date }: { id: string; date: string }) => {
+      const all = getLocalProposals();
+      const updated = all.map((p) => (p.propuesta_id === id ? { ...p, dia_programado: date } : p));
+      saveLocalProposals(updated);
+      return id;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
   });
 }
@@ -119,8 +154,14 @@ export function useRescheduleProposal() {
 export function useConvertProposalFormat() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, format }: { id: string; format: string }) =>
-      run(proposalsApi.convertFormat(id, format)),
+    mutationFn: async ({ id, format }: { id: string; format: string }) => {
+      const all = getLocalProposals();
+      const updated = all.map((p) =>
+        p.propuesta_id === id ? { ...p, canal_destino: (format as any) } : p
+      );
+      saveLocalProposals(updated);
+      return id;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
   });
 }

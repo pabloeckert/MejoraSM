@@ -25,8 +25,15 @@ dist-ssr
 
 # Environment variables
 .env
+.env.*
 .env.local
 .env.*.local
+
+# SQLite local data (databases & wal files, keep schema)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/test_*.db
 
 # OpenClaw workspace
 .openclaw/

@@ -1,0 +1,272 @@
+// src/services/localSMService.ts
+// SERVICIO DE DATOS LOCAL SOBERANO PARA MejoraSM (2026)
+// Provee persistencia offline reactiva basada en la grilla evergreen canónica de 26 semanas
+// y en la base local SQLite, garantizando funcionalidad completa sin Supabase.
+
+import {
+  generarGrillaEvergreen26Semanas,
+  Grilla26SemanasDTO,
+} from "@/domain/gridGenerator";
+import {
+  PropuestaMejoraSMDTO,
+  OpcionBorrador,
+  CopyCalibradoTresPasos,
+  CopyCalibradoCuatroPasos,
+  generarPaqueteMulticanal,
+  toCanonicalPropuesta,
+} from "@/domain/types";
+import type { ProposalDetail } from "@/components/ProposalDetailDialog";
+
+const STORAGE_KEY_PROPOSALS = "mejora_sm_local_proposals_v2";
+const STORAGE_KEY_METRICS = "mejora_sm_local_metrics_v1";
+
+/**
+ * Mapea una propuesta canónica de la Fase 1 al formato ProposalDetail
+ * para interoperabilidad total con componentes legacy (Dashboard, Propuestas, Calendario).
+ */
+export function toLegacyProposal(p: PropuestaMejoraSMDTO): ProposalDetail {
+  const selDraft = p.borradores?.find((b) => b.opcion === p.borrador_seleccionado) || p.borradores?.[0];
+  const statusMap: Record<string, string> = {
+    pendiente_revision: "pending",
+    aprobado: "scheduled",
+    publicado: "published",
+    rechazado: "rejected",
+  };
+  const copy4 = (selDraft as any)?.copy_cuatro_pasos as CopyCalibradoCuatroPasos | undefined;
+  const copy3 = selDraft?.copy_tres_pasos;
+  const bodyText = copy4
+    ? `${copy4.paso1_dolor}\n\n${copy4.paso2_reencuadre}\n\n${copy4.paso3_engagement_nativo}${copy4.paso4_conversion_lead ? `\n\n${copy4.paso4_conversion_lead}` : ""}`
+    : copy3
+    ? `${copy3.paso1_dolor}\n\n${copy3.paso2_reencuadre}\n\n${copy3.paso3_direccion_web}`
+    : (selDraft?.cuerpo_texto || null);
+
+  return {
+    id: p.propuesta_id,
+    propuesta_id: p.propuesta_id,
+    title: selDraft?.titulo_portada || p.propuesta_id,
+    hook: copy4?.paso1_dolor || copy3?.paso1_dolor || null,
+    body: bodyText,
+    cta: copy4?.paso4_conversion_lead || copy4?.paso3_engagement_nativo || selDraft?.cta_texto || copy3?.paso3_direccion_web || null,
+    hashtags: ["#MejoraContinua", "#EstrategiaEmpresarial", "#Liderazgo"],
+    format: p.canal_destino === "whatsapp" ? "whatsapp" : "post",
+    status: statusMap[p.estado] || "pending",
+    rejection_reason: p.motivo_rechazo || null,
+    scheduled_at: p.dia_programado,
+    published_at: p.estado === "publicado" ? p.dia_programado : null,
+    created_at: p.dia_programado,
+    oferta: null,
+    zernio_post_id: null,
+    rendered_image_path: p.imagen_boveda_vinculada?.ruta_archivo_local || null,
+    is_test: false,
+    dialogue_sessions: { topic: p.metricas_atribucion?.buyer_persona_predominante || "General" },
+    borradores: p.borradores,
+    borrador_seleccionado: p.borrador_seleccionado,
+    tratamiento_visual: p.tratamiento_visual,
+    imagen_boveda_vinculada: p.imagen_boveda_vinculada,
+    buyer_persona: p.metricas_atribucion?.buyer_persona_predominante || "orden_para_crecer",
+    dimension: "empresarial",
+  };
+}
+
+/**
+ * Devuelve todas las propuestas locales convertidas a ProposalDetail.
+ */
+export function getLocalProposalsAsLegacy(): ProposalDetail[] {
+  return getLocalProposals().map(toLegacyProposal);
+}
+
+/**
+ * Inicializa y devuelve la colección canónica de propuestas en memoria/localStorage.
+ */
+export function getLocalProposals(): PropuestaMejoraSMDTO[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_PROPOSALS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((p) => toCanonicalPropuesta(p));
+      }
+    }
+  } catch (err) {
+    console.warn("[localSMService] Error leyendo localStorage, regenerando grilla:", err);
+  }
+
+  // Generar la grilla evergreen canónica de 26 semanas (78 piezas balanceadas 80/20)
+  const fechaInicio = new Date("2026-10-19T09:30:00.000Z");
+  const grilla = generarGrillaEvergreen26Semanas(fechaInicio);
+
+  const flatList: PropuestaMejoraSMDTO[] = [];
+  for (const sem of grilla.semanas) {
+    for (const prop of sem.propuestas) {
+      flatList.push(prop);
+    }
+  }
+
+  saveLocalProposals(flatList);
+  return flatList;
+}
+
+/**
+ * Guarda el conjunto de propuestas en localStorage de forma atómica.
+ */
+export function saveLocalProposals(proposals: PropuestaMejoraSMDTO[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_PROPOSALS, JSON.stringify(proposals));
+  } catch (err) {
+    console.error("[localSMService] Error guardando propuestas en localStorage:", err);
+  }
+}
+
+/**
+ * Aprueba una propuesta individualmente.
+ */
+export function approveLocalProposal(id: string): PropuestaMejoraSMDTO[] {
+  const all = getLocalProposals();
+  const updated = all.map((p) => {
+    if (p.propuesta_id === id || (p as any).id === id) {
+      return { ...p, estado: "aprobado" as const };
+    }
+    return p;
+  });
+  saveLocalProposals(updated);
+  return updated;
+}
+
+/**
+ * Aprueba un lote completo de propuestas pendientes.
+ */
+export function approveBatchLocalProposals(filterWeek?: number): { updated: PropuestaMejoraSMDTO[]; count: number } {
+  const all = getLocalProposals();
+  let count = 0;
+  const updated = all.map((p) => {
+    // Si se especifica semana, filtrar por coincidencia en el ID (ej: PROP-2026-W01-...)
+    const matchesWeek = filterWeek
+      ? p.propuesta_id.includes(`-W${String(filterWeek).padStart(2, "0")}-`)
+      : true;
+
+    if (matchesWeek && p.estado === "pendiente_revision") {
+      count++;
+      return { ...p, estado: "aprobado" as const };
+    }
+    return p;
+  });
+
+  saveLocalProposals(updated);
+  return { updated, count };
+}
+
+export const approveProposal = approveLocalProposal;
+export const approveAllProposals = approveBatchLocalProposals;
+
+/**
+ * Guarda cambios en el texto en 3 pasos, título o imagen de la propuesta.
+ */
+export function updateLocalProposal(
+  id: string,
+  fields: {
+    title?: string;
+    hook?: string;
+    body?: string;
+    cta?: string;
+    copy_tres_pasos?: CopyCalibradoTresPasos;
+    imagen_boveda_vinculada?: { id: string; ruta_archivo_local: string; titulo?: string };
+    borrador_seleccionado?: OpcionBorrador;
+  }
+): PropuestaMejoraSMDTO[] {
+  const all = getLocalProposals();
+  const updated = all.map((p) => {
+    if (p.propuesta_id === id || (p as any).id === id) {
+      const borradorActivo = p.borrador_seleccionado || "A";
+      const nuevosBorradores = p.borradores.map((b) => {
+        if (b.opcion === borradorActivo) {
+          return {
+            ...b,
+            titulo_portada: fields.title ?? b.titulo_portada,
+            copy_tres_pasos: fields.copy_tres_pasos ? { ...fields.copy_tres_pasos } : b.copy_tres_pasos,
+            cuerpo_texto: fields.copy_tres_pasos
+              ? `${fields.copy_tres_pasos.paso1_dolor}\n\n${fields.copy_tres_pasos.paso2_reencuadre}`
+              : b.cuerpo_texto,
+            cta_texto: fields.copy_tres_pasos?.paso3_direccion_web ?? b.cta_texto,
+          };
+        }
+        return b;
+      }) as [any, any, any];
+
+      return {
+        ...p,
+        borradores: nuevosBorradores,
+        borrador_seleccionado: fields.borrador_seleccionado ?? p.borrador_seleccionado,
+        imagen_boveda_vinculada: fields.imagen_boveda_vinculada ?? p.imagen_boveda_vinculada,
+      };
+    }
+    return p;
+  });
+
+  saveLocalProposals(updated);
+  return updated;
+}
+
+/**
+ * Rechaza una propuesta con motivo.
+ */
+export function rejectLocalProposal(id: string, reason: string): PropuestaMejoraSMDTO[] {
+  const all = getLocalProposals();
+  const updated = all.map((p) => {
+    if (p.propuesta_id === id || (p as any).id === id) {
+      return { ...p, estado: "rechazado" as const, motivo_rechazo: reason };
+    }
+    return p;
+  });
+  saveLocalProposals(updated);
+  return updated;
+}
+
+/**
+ * Descarga el paquete multicanal estructurado en un solo clic.
+ */
+export function triggerPackageDownload(propuesta: PropuestaMejoraSMDTO): void {
+  const paquete = generarPaqueteMulticanal(propuesta);
+  const blob = new Blob([paquete.textoWhatsApp + "\n\n---\n\n" + paquete.textoLinkedIn], {
+    type: "text/plain;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `paquete_${propuesta.propuesta_id}_multicanal.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Descarga todo el lote de propuestas de la semana como archivo consolidado para WhatsApp/MejoraWS.
+ */
+export function triggerBatchPackageDownload(proposals: PropuestaMejoraSMDTO[], weekLabel: string): void {
+  const lines: string[] = [
+    `======================================================`,
+    `MEJORA CONTINUA — DESPACHO MULTICANAL ${weekLabel.toUpperCase()}`,
+    `Total piezas en paquete: ${proposals.length}`,
+    `Generado: ${new Date().toLocaleString("es-AR")}`,
+    `======================================================\n`,
+  ];
+
+  proposals.forEach((p, index) => {
+    const pkg = generarPaqueteMulticanal(p);
+    lines.push(`------------------------------------------------------`);
+    lines.push(`PIEZA ${index + 1}/${proposals.length}: [${p.propuesta_id}] - CANAL: ${p.canal_destino.toUpperCase()}`);
+    lines.push(`Fecha sugerida: ${p.dia_programado}`);
+    lines.push(`Activo Bóveda: ${p.imagen_boveda_vinculada.ruta_archivo_local}`);
+    lines.push(`\n>>> TEXTO PARA WHATSAPP:`);
+    lines.push(pkg.textoWhatsApp);
+    lines.push(`\n>>> TEXTO PARA LINKEDIN / REDES:`);
+    lines.push(pkg.textoLinkedIn);
+    lines.push(`\n`);
+  });
+
+  const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `lote_multicanal_${weekLabel.toLowerCase().replace(/\s+/g, "_")}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}

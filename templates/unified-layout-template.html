@@ -124,6 +124,44 @@
   }
 
   /* ═══════════════════════════════════════════
+     TRATAMIENTO DE ENCUADRE SRE: MARCO DESENFOCADO EXPANDIDO
+     (Prohibido el recorte agresivo de bordes o caras)
+     ═══════════════════════════════════════════ */
+  .framed-mode {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--blanco);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .framed-bg-blur {
+    position: absolute;
+    inset: -30px;
+    background-size: cover;
+    background-position: center;
+    filter: blur(28px) brightness(0.85);
+    transform: scale(1.15);
+    z-index: 1;
+    opacity: 0.65;
+  }
+
+  .framed-image-contain {
+    position: relative;
+    max-width: 94%;
+    max-height: 94%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    z-index: 2;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.20);
+    border: 4px solid var(--blanco);
+  }
+
+  /* ═══════════════════════════════════════════
      LAYOUT 1: FULL BLEED (A SANGRE COMPLETA)
      ═══════════════════════════════════════════ */
   .layout-1 .photo-bg {

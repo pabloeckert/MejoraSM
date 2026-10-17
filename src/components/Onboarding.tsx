@@ -28,7 +28,8 @@ export function Onboarding() {
     } catch {
       /* storage bloqueado — se trata como "no completado", se ofrece igual */
     }
-    if (!completed) {
+    // En modo local no bloquear con onboarding obsoleto
+    if (!completed && !import.meta.env.DEV) {
       // Small delay so the page loads first
       const timer = setTimeout(() => setOpen(true), 800);
       return () => clearTimeout(timer);

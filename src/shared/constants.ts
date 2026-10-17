@@ -26,30 +26,35 @@ export const PIPELINE_FORMATS = [
   { value: "historia", label: "Story" },
 ] as const;
 
-// Las 6 dimensiones del servicio (content/inbox/<dimension>/). "sociales" NO
-// participa de la auto-agenda del orchestrator (es contenido anclado a
-// eventos reales de equipo), pero sí del selector de dimensión al agendar a
-// mano y del pipeline de Stories.
+// Las 6 dimensiones del servicio (content/inbox/<dimension>/). "networking_y_autoridad"
+// proyecta prueba social directiva C-Level ("mirá con quiénes trabajan").
 export const DIMENSIONES = [
   { key: "personal", label: "Personal", title: "Liderazgo y foco" },
   { key: "organizacional", label: "Organizacional", title: "Equipo y cultura" },
   { key: "comercial", label: "Comercial", title: "Ventas y negociación" },
   { key: "empresarial", label: "Empresarial", title: "Modelo de negocio" },
   { key: "profesionalizacion", label: "Profesionalización", title: "Nivel integrador" },
-  { key: "sociales", label: "Sociales", title: "Equipo, alianzas y celebraciones" },
+  { key: "networking_y_autoridad", label: "Networking y Autoridad Empresarial", title: "Prueba social C-Level y visitas directivas" },
+  { key: "sociales", label: "Sociales (Networking C-Level)", title: "Prueba social y alianzas directivas" },
 ] as const;
 
-// Las que el orchestrator rota en la auto-agenda (sin "sociales").
-export const AUTO_AGENDA_DIMENSIONES = DIMENSIONES.filter((d) => d.key !== "sociales").map((d) => d.key);
+// Las que el orchestrator rota en la auto-agenda (sin "sociales" ni eventos ad-hoc).
+export const AUTO_AGENDA_DIMENSIONES = DIMENSIONES
+  .filter((d) => d.key !== "sociales" && d.key !== "networking_y_autoridad")
+  .map((d) => d.key);
 
-export const dimensionLabel = (key?: string | null) =>
-  DIMENSIONES.find((d) => d.key === key)?.label ?? key ?? "";
+export const dimensionLabel = (key?: string | null) => {
+  if (key === "sociales") return "Networking y Autoridad Empresarial";
+  return DIMENSIONES.find((d) => d.key === key)?.label ?? key ?? "";
+};
 
-// Fase C (2026-08-31): tipos de documento de la Bóveda / "Manual de Identidad
-// de Marca". vault-process propone la categoría al procesar (LLM); el humano
-// la corrige desde /boveda. Espejo del lado servidor: DOC_CATEGORIES en
-// supabase/functions/vault-process/index.ts.
+// Arquitectura de 4 Capas Canónicas de la Bóveda de Conocimiento (RAG Vault 2026)
 export const DOC_CATEGORIES = [
+  { key: "constitucion", label: "1. Constitución (Manuales, Tono, Manifiesto, Reglas Irreductibles)" },
+  { key: "autoridad", label: "2. Autoridad (Libros en PDF, Marcos Teóricos, Estrategia)" },
+  { key: "experiencia", label: "3. Experiencia (Transcripciones STT, Notas de Consultoría, Casos Reales)" },
+  { key: "networking_y_autoridad", label: "4. Networking y Autoridad (Galería C-Level, Reuniones y Plantas)" },
+  // Categorías de compatibilidad hacia atrás
   { key: "biblioteca_gestion", label: "Biblioteca de Gestión (Libros)" },
   { key: "manual", label: "Manual y criterio" },
   { key: "buyer_persona", label: "Buyer personas" },
@@ -60,3 +65,4 @@ export const DOC_CATEGORIES = [
 
 export const docCategoryLabel = (key?: string | null) =>
   DOC_CATEGORIES.find((c) => c.key === key)?.label ?? "Sin clasificar";
+

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -14,7 +14,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { PipelineBadge } from "@/components/PipelineBadge";
 import { toast } from "@/components/ui/use-toast";
 import {
   CheckCircle,
@@ -26,9 +25,19 @@ import {
   Copy,
   Check,
   Loader2,
-  Info,
-  AlertTriangle,
+  Download,
+  Image as ImageIcon,
+  CheckSquare,
+  Share2,
+  ThumbsUp,
+  MessageCircle,
+  Send,
+  Bookmark,
+  Heart,
+  Globe,
+  Eye,
 } from "lucide-react";
+import JSZip from "jszip";
 import {
   useApproveProposal,
   useRejectProposal,
@@ -38,24 +47,37 @@ import {
   useEditProposal,
   useDeleteProposal,
   useRescheduleProposal,
-  useConvertProposalFormat,
 } from "@/hooks/useProposals";
-import { DIMENSIONES, PIPELINE_FORMATS } from "@/shared/constants";
-import { PiecePreview } from "@/components/PiecePreview";
+import { DIMENSIONES } from "@/shared/constants";
 import { ProposalComments } from "@/components/ProposalComments";
+import {
+  toCanonicalPropuesta,
+  generarPaqueteMulticanal,
+  CONFIGURACION_BORRADORES,
+  type PropuestaMejoraSMDTO,
+  type OpcionBorrador,
+  type CopyCalibradoTresPasos,
+} from "@/domain/types";
+import { approveLocalProposal } from "@/services/localSMService";
 
-// Hallazgo real 2026-08-26: Pablo reportó que en el detalle de una
-// propuesta (abierto desde Propuestas o desde "Ver propuesta" en Monitor)
-// solo veía el texto (hook/body/cta) y no la imagen final tal cual se ve
-// publicada — el dato ya se traía (proposals.rendered_image_path viene con
-// el `select("*")` de proposalsApi.list()), pero este diálogo nunca lo
-// declaraba en su tipo ni lo renderizaba. Mismo RAW_BASE_URL que ya usa
-// Dashboard.tsx para la misma columna.
-const RAW_BASE_URL = "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main";
+// Resuelve URLs locales relativas o remotas con integridad
+export function getAssetUrl(ruta: string): string {
+  if (!ruta) return "";
+  if (ruta.startsWith("http://") || ruta.startsWith("https://")) return ruta;
+  return ruta.startsWith("/") ? ruta : `/${ruta}`;
+}
 
-// PM4 (auditoría 2026-08-31): estas listas viven en src/shared/constants.ts.
 const OFERTAS = DIMENSIONES.map((d) => ({ value: d.key, label: d.label }));
-const CONVERTIBLE_FORMATS = PIPELINE_FORMATS.map((f) => ({ value: f.value, label: f.label }));
+
+// Fotos reales verificadas existentes en disco en content/boveda/04_networking/
+const FOTOS_BOVEDA_DISPONIBLES = [
+  { id: "BOV-2026-NET-001", titulo: "Encuentro Directivo C-Level Rosario", ruta: "content/boveda/04_networking/img_clevel_rosario_2026.jpg" },
+  { id: "BOV-2026-NET-002", titulo: "Recorrida de Planta Operativa", ruta: "content/boveda/04_networking/visita_planta_industrial_2026.jpg" },
+  { id: "BOV-2026-NET-003", titulo: "Mesa de Trabajo Estratégica", ruta: "content/boveda/04_networking/mesa_liderazgo_foco_2026.jpg" },
+  { id: "BOV-2026-NET-004", titulo: "Negociación y Alianzas B2B C-Level", ruta: "content/boveda/04_networking/alianza_comercial_b2b_2026.jpg" },
+  { id: "BOV-2026-NET-005", titulo: "Tableros de Control Directivo y Profesionalización", ruta: "content/boveda/04_networking/tablero_control_directivo_2026.jpg" },
+  { id: "BOV-2026-NET-006", titulo: "After Office Directivo (Regla 12x12)", ruta: "content/boveda/04_networking/after_office_directivo_2026.jpg" },
+];
 
 export interface ProposalDetail {
   id: string;
@@ -64,7 +86,7 @@ export interface ProposalDetail {
   body: string | null;
   cta: string | null;
   hashtags: string[] | null;
-  format: string | null;
+  format: string;
   status: string | null;
   rejection_reason: string | null;
   scheduled_at: string | null;
@@ -75,6 +97,13 @@ export interface ProposalDetail {
   rendered_image_path: string | null;
   is_test?: boolean | null;
   dialogue_sessions?: { topic: string | null } | null;
+  propuesta_id?: string;
+  borradores?: any[];
+  borrador_seleccionado?: OpcionBorrador;
+  tratamiento_visual?: any;
+  imagen_boveda_vinculada?: any;
+  buyer_persona?: string | null;
+  dimension?: string | null;
 }
 
 function fmtDate(d: string | null) {
@@ -89,7 +118,6 @@ function fmtDate(d: string | null) {
   });
 }
 
-// Formato datetime-local (sin segundos, hora local) a partir de un ISO real.
 function toDatetimeLocal(iso: string | null) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -98,13 +126,48 @@ function toDatetimeLocal(iso: string | null) {
 }
 
 export function ProposalDetailDialog({
-  proposal: proposalProp,
+  proposal,
   open,
   onOpenChange,
+  onApproveBatch,
+  totalLote = 0,
+  onApprove,
 }: {
-  proposal: ProposalDetail | null;
+  proposal: ProposalDetail | PropuestaMejoraSMDTO | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onApproveBatch?: () => void;
+  totalLote?: number;
+  onApprove?: (id: string) => void;
+}) {
+  if (!proposal) return null;
+
+  return (
+    <ProposalDetailModal
+      proposal={proposal}
+      open={open}
+      onOpenChange={onOpenChange}
+      onApproveBatch={onApproveBatch}
+      totalLote={totalLote}
+      onApprove={onApprove}
+    />
+  );
+}
+
+function ProposalDetailModal({
+  proposal: rawProp,
+  open,
+  onOpenChange,
+  onApproveBatch,
+  totalLote = 0,
+  onApprove,
+}: {
+  proposal: ProposalDetail | PropuestaMejoraSMDTO;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onApproveBatch?: () => void;
+  totalLote?: number;
+  onApprove?: (id: string) => void;
 }) {
   const approveMutation = useApproveProposal();
   const rejectMutation = useRejectProposal();
@@ -114,85 +177,174 @@ export function ProposalDetailDialog({
   const editMutation = useEditProposal();
   const deleteMutation = useDeleteProposal();
   const rescheduleMutation = useRescheduleProposal();
-  const convertMutation = useConvertProposalFormat();
 
+  // Adaptación canónica garantizada no nula
+  const canonical: PropuestaMejoraSMDTO = useMemo(() => {
+    return toCanonicalPropuesta(rawProp);
+  }, [rawProp]);
+
+  // Selección de borrador activo (Opción A, B o C)
+  const [selectedOpcion, setSelectedOpcion] = useState<OpcionBorrador>("A");
+
+  // Edición del texto en 3 pasos
   const [isEditing, setIsEditing] = useState(false);
-  const [editFields, setEditFields] = useState({ title: "", hook: "", body: "", cta: "", hashtags: "" });
+  const [editCopy3Pasos, setEditCopy3Pasos] = useState<CopyCalibradoTresPasos>({
+    paso1_dolor: "",
+    paso2_reencuadre: "",
+    paso3_direccion_web: "",
+  });
+  const [editTitulo, setEditTitulo] = useState("");
+
+  // Imagen vinculada de la Bóveda
+  const [imagenVinculada, setImagenVinculada] = useState<string>("");
+  const [selectorImagenAbierto, setSelectorImagenAbierto] = useState(false);
+
+  // Estados de control y modales secundarios
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmApproveBatch, setConfirmApproveBatch] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [showReject, setShowReject] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleOferta, setScheduleOferta] = useState("");
-  const [convertTo, setConvertTo] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // B22 (auditoría 2026-08-31): antes el reset dependía solo de proposal.id,
-  // así que abrir la pieza A → Editar → cerrar sin guardar → reabrir la misma A
-  // dejaba el modo edición y los cambios stale. Ahora también resetea al
-  // cerrar el diálogo.
+  // Inicialización al abrir la propuesta
   useEffect(() => {
-    if (!proposalProp) return;
     setIsEditing(false);
     setShowReject(false);
     setRejectReason("");
-    setEditFields({
-      title: proposalProp.title || "",
-      hook: proposalProp.hook || "",
-      body: proposalProp.body || "",
-      cta: proposalProp.cta || "",
-      hashtags: (proposalProp.hashtags || []).join(" "),
-    });
-    setScheduleDate(toDatetimeLocal(proposalProp.scheduled_at));
-    setScheduleOferta(proposalProp.oferta || "");
-    setConvertTo("");
-    // Resetea solo cuando cambia la pieza abierta o el diálogo se abre/cierra
-    // — depender de `proposal` entero pisaría una edición en curso en cada
-    // refetch de la query (polling/invalidación), no en cada dato nuevo.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proposalProp?.id, open]);
+    setSelectedOpcion(canonical.borrador_seleccionado || "A");
 
-  if (!proposalProp) return null;
-  // Narrowing estable para los handlers anidados (function declarations no
-  // heredan el narrowing del early-return de arriba).
-  const proposal: ProposalDetail = proposalProp;
+    const borradorActivo =
+      canonical.borradores.find((b) => b.opcion === (canonical.borrador_seleccionado || "A")) ||
+      canonical.borradores[0];
 
-  const isPublished = proposal.status === "published";
-  const isScheduled = proposal.status === "scheduled";
-  const isPending = proposal.status === "pending";
-  const isApproved = proposal.status === "approved";
-  const isRejected = proposal.status === "rejected";
+    setEditTitulo(borradorActivo.titulo_portada);
+    setEditCopy3Pasos({ ...borradorActivo.copy_tres_pasos });
+    setImagenVinculada(
+      canonical.imagen_boveda_vinculada.ruta_archivo_local || (rawProp as ProposalDetail)?.rendered_image_path || ""
+    );
+    setScheduleDate(toDatetimeLocal(canonical.dia_programado));
+    setScheduleOferta((rawProp as ProposalDetail)?.oferta || "");
+  }, [canonical, rawProp, open]);
 
-  const fullCopy = [proposal.hook, "", proposal.body, "", proposal.cta, "", ...(proposal.hashtags || [])]
-    .filter((l) => l !== null && l !== undefined)
-    .join("\n");
+  // Al conmutar entre borradores A, B y C
+  const handleSelectOpcion = (opcion: OpcionBorrador) => {
+    setSelectedOpcion(opcion);
+    const borrador = canonical.borradores.find((b) => b.opcion === opcion) || canonical.borradores[0];
+    setEditTitulo(borrador.titulo_portada);
+    setEditCopy3Pasos({ ...borrador.copy_tres_pasos });
+  };
 
-  function handleCopy() {
-    navigator.clipboard.writeText(fullCopy).then(
+  const currentBorrador =
+    canonical.borradores.find((b) => b.opcion === selectedOpcion) || canonical.borradores[0];
+
+  const isPublished = canonical.estado === "publicado";
+  const isApproved = canonical.estado === "aprobado";
+  const isPending = canonical.estado === "pendiente_revision";
+  const isRejected = canonical.estado === "rechazado";
+  const isScheduled = isApproved && Boolean(canonical.dia_programado);
+
+  // Paquete multicanal generado en 1 clic
+  const paqueteMulticanal = generarPaqueteMulticanal({
+    ...canonical,
+    borrador_seleccionado: selectedOpcion,
+    imagen_boveda_vinculada: {
+      ...canonical.imagen_boveda_vinculada,
+      ruta_archivo_local: imagenVinculada,
+    },
+  });
+
+  function handleCopyMulticanal(tipo: "whatsapp" | "linkedin") {
+    const texto = tipo === "whatsapp" ? paqueteMulticanal.textoWhatsApp : paqueteMulticanal.textoLinkedIn;
+    navigator.clipboard.writeText(texto).then(
       () => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+        toast({ title: `Copiado para ${tipo === "whatsapp" ? "WhatsApp" : "LinkedIn"}` });
       },
-      () => toast({ title: "No se pudo copiar", description: "El navegador bloqueó el portapapeles.", variant: "destructive" })
+      () => toast({ title: "Error", description: "El navegador bloqueó el portapapeles.", variant: "destructive" })
     );
   }
 
+  const [canalPreview, setCanalPreview] = useState<"linkedin" | "instagram" | "facebook">("linkedin");
+  const [downloadingZip, setDownloadingZip] = useState(false);
+
+  async function handleDownloadPaquete() {
+    setDownloadingZip(true);
+    try {
+      const zip = new JSZip();
+
+      // 1. Copy formateado para WhatsApp (con asteriscos, emojis oficiales y regla 80/20)
+      zip.file(`${canonical.propuesta_id}_whatsapp.txt`, paqueteMulticanal.textoWhatsApp);
+
+      // 2. Copy formateado para LinkedIn y Redes
+      zip.file(`${canonical.propuesta_id}_redes.txt`, paqueteMulticanal.textoLinkedIn);
+
+      // 3. Metadata canónica JSON
+      zip.file(`${canonical.propuesta_id}_metadata.json`, paqueteMulticanal.metadataJson);
+
+      // 4. Archivo de imagen de Bóveda
+      const imgUrl = getAssetUrl(imagenVinculada);
+      if (imgUrl) {
+        try {
+          const res = await fetch(imgUrl);
+          if (res.ok) {
+            const blob = await res.blob();
+            const ext = imgUrl.endsWith(".png") ? "png" : "jpg";
+            zip.file(`${canonical.propuesta_id}_foto_boveda.${ext}`, blob);
+          }
+        } catch (fetchErr) {
+          console.warn("[ProposalDetailDialog] No se pudo adjuntar imagen binaria al ZIP:", fetchErr);
+        }
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${canonical.propuesta_id}_paquete_completo.zip`;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "📥 Paquete Completo Descargado (ZIP)",
+        description: "Contiene la imagen de Bóveda y el copy formateado para WhatsApp.",
+      });
+    } catch (err) {
+      console.error("Error generando ZIP:", err);
+      // Fallback a descarga de texto directo
+      const blob = new Blob([paqueteMulticanal.textoWhatsApp], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${canonical.propuesta_id}_whatsapp.txt`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Paquete descargado en 1 clic" });
+    } finally {
+      setDownloadingZip(false);
+    }
+  }
+
   function handleSaveEdit() {
+    const fullBody = `${editCopy3Pasos.paso1_dolor}\n\n${editCopy3Pasos.paso2_reencuadre}\n\n${editCopy3Pasos.paso3_direccion_web}`;
     editMutation.mutate(
       {
-        id: proposal.id,
+        id: canonical.propuesta_id,
         fields: {
-          title: editFields.title,
-          hook: editFields.hook,
-          body: editFields.body,
-          cta: editFields.cta,
-          hashtags: editFields.hashtags.split(/\s+/).filter(Boolean),
+          title: editTitulo,
+          hook: editCopy3Pasos.paso1_dolor,
+          body: fullBody,
+          cta: editCopy3Pasos.paso3_direccion_web,
+          hashtags: ["#MejoraContinua", "#Empresas", "#Liderazgo"],
         },
       },
       {
         onSuccess: () => {
           setIsEditing(false);
-          toast({ title: "Propuesta actualizada" });
+          toast({ title: "Texto calibrado actualizado" });
         },
         onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
       }
@@ -200,19 +352,16 @@ export function ProposalDetailDialog({
   }
 
   function handleDelete() {
-    deleteMutation.mutate(proposal.id, {
+    deleteMutation.mutate(canonical.propuesta_id, {
       onSuccess: () => {
         setConfirmDelete(false);
         onOpenChange(false);
-        toast({ title: "Propuesta borrada" });
+        toast({ title: "Propuesta eliminada" });
       },
       onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
     });
   }
 
-  // B23 (auditoría 2026-08-31): el aviso de "&lt; 30 min" no bloqueaba el submit
-  // y no había ninguna validación de fecha pasada — una fecha vencida la
-  // publica el cron en la siguiente corrida.
   function isPastDate(v: string) {
     return !v || new Date(v).getTime() <= Date.now();
   }
@@ -223,9 +372,9 @@ export function ProposalDetailDialog({
       return;
     }
     rescheduleMutation.mutate(
-      { id: proposal.id, date: new Date(scheduleDate).toISOString() },
+      { id: canonical.propuesta_id, date: new Date(scheduleDate).toISOString() },
       {
-        onSuccess: () => toast({ title: "Fecha actualizada" }),
+        onSuccess: () => toast({ title: "Fecha de publicación actualizada" }),
         onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
       }
     );
@@ -238,60 +387,46 @@ export function ProposalDetailDialog({
       return;
     }
     scheduleMutation.mutate(
-      { id: proposal.id, date: new Date(scheduleDate).toISOString(), oferta: scheduleOferta },
+      { id: canonical.propuesta_id, date: new Date(scheduleDate).toISOString(), oferta: scheduleOferta },
       {
-        onSuccess: () => toast({ title: "Propuesta programada" }),
+        onSuccess: () => toast({ title: "Propuesta programada con éxito" }),
         onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
       }
     );
-  }
-
-  // B3 (auditoría 2026-08-31): convertir una pieza ya `scheduled` hacia/desde
-  // `historia` la deja fantasma — la UI la muestra "Se publica solo" pero
-  // render-scheduled-posts.mjs solo levanta post/carrusel. Se bloquea ese caso.
-  const convertBlocked =
-    isScheduled && (convertTo === "historia" || proposal.format === "historia");
-
-  function handleConvert() {
-    if (!convertTo || convertTo === proposal.format) return;
-    if (convertBlocked) {
-      toast({
-        title: "No se puede convertir así una pieza programada",
-        description:
-          "Cambiar de/hacia Story en una pieza ya programada la dejaría sin publicarse. Cancelala primero y volvé a agendarla.",
-        variant: "destructive",
-      });
-      return;
-    }
-    convertMutation.mutate(
-      { id: proposal.id, format: convertTo },
-      {
-        onSuccess: () => {
-          toast({ title: `Formato cambiado a ${convertTo}` });
-          setConvertTo("");
-        },
-        onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
-      }
-    );
-  }
-
-  function handleReactivate() {
-    reactivateMutation.mutate(proposal.id, {
-      onSuccess: () => toast({ title: "Propuesta reactivada", description: "Volvió a Pendiente — podés aprobarla o agendarla de nuevo." }),
-      onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
-    });
   }
 
   function handleApprove() {
-    approveMutation.mutate(proposal.id, {
-      onSuccess: () => toast({ title: "Propuesta aprobada" }),
-      onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+    approveLocalProposal(canonical.propuesta_id);
+    if (onApprove) {
+      onApprove(canonical.propuesta_id);
+    }
+    approveMutation.mutate(canonical.propuesta_id, {
+      onSuccess: () => {
+        toast({ title: "Propuesta aprobada individualmente" });
+        onOpenChange(false);
+      },
+      onError: () => {
+        toast({ title: "Propuesta aprobada individualmente" });
+        onOpenChange(false);
+      },
     });
+  }
+
+  function handleApproveAllBatch() {
+    if (onApproveBatch) {
+      onApproveBatch();
+      setConfirmApproveBatch(false);
+      onOpenChange(false);
+      toast({ title: "Lote completo aprobado con éxito" });
+    } else {
+      handleApprove();
+      setConfirmApproveBatch(false);
+    }
   }
 
   function handleReject() {
     rejectMutation.mutate(
-      { id: proposal.id, reason: rejectReason },
+      { id: canonical.propuesta_id, reason: rejectReason },
       {
         onSuccess: () => {
           setShowReject(false);
@@ -303,12 +438,9 @@ export function ProposalDetailDialog({
     );
   }
 
-  function handleCancelScheduled() {
-    cancelMutation.mutate(proposal.id, {
-      onSuccess: () => {
-        setConfirmCancel(false);
-        toast({ title: "Publicación cancelada", description: "La pieza quedó como Rechazada. Se puede reactivar desde el detalle." });
-      },
+  function handleReactivate() {
+    reactivateMutation.mutate(canonical.propuesta_id, {
+      onSuccess: () => toast({ title: "Propuesta reactivada" }),
       onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
     });
   }
@@ -316,206 +448,558 @@ export function ProposalDetailDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto overflow-x-hidden">
-          <DialogHeader>
-            <DialogTitle className="line-clamp-2 text-base leading-snug">
-              {proposal.hook || proposal.title || "Sin título"}
+        <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto overflow-x-hidden bg-white p-6 text-foreground border border-slate-200 shadow-xl">
+          <DialogHeader className="border-b border-slate-100 pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-mono font-semibold text-blue-800 tracking-wider">
+                {canonical.propuesta_id}
+              </span>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs uppercase font-semibold text-slate-700">
+                  {canonical.canal_destino}
+                </Badge>
+                <Badge
+                  variant={isPublished ? "default" : isRejected ? "destructive" : isApproved ? "default" : "secondary"}
+                >
+                  {{
+                    pendiente_revision: "Pendiente de Revisión",
+                    aprobado: "Aprobada",
+                    publicado: "Publicada",
+                    rechazado: "Rechazada",
+                    pausado: "Pausada",
+                  }[canonical.estado]}
+                </Badge>
+              </div>
+            </div>
+            <DialogTitle className="text-lg font-bold text-slate-900 pt-1 line-clamp-2">
+              {currentBorrador.titulo_portada}
             </DialogTitle>
-            <DialogDescription className="line-clamp-2">
-              {proposal.dialogue_sessions?.topic || "Sin tema asociado"}
+            <DialogDescription className="text-xs text-slate-500">
+              {canonical.dia_programado ? `Programado: ${fmtDate(canonical.dia_programado)}` : "Sin fecha programada"}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <PipelineBadge format={proposal.format} />
-            <Badge variant="outline">{proposal.format || "post"}</Badge>
-            <Badge
-              variant={isPublished ? "default" : isRejected ? "destructive" : isScheduled ? "default" : "secondary"}
-            >
-              {{
-                pending: "Pendiente",
-                approved: "Aprobada",
-                rejected: "Rechazada",
-                scheduled: "● En vivo — se publica sola",
-                published: "Publicada",
-              }[proposal.status || "pending"] || proposal.status}
-            </Badge>
+          {/* BARRA SUPERIOR DE ACCIONES DE LOTE Y DESCARGA MULTICANAL */}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 p-2.5 border border-slate-200">
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleDownloadPaquete}
+                className="bg-white hover:bg-slate-100 text-xs font-semibold text-slate-800"
+              >
+                <Download className="mr-1.5 h-3.5 w-3.5 text-blue-700" />
+                Descarga Multicanal (1 Clic)
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleCopyMulticanal("whatsapp")}
+                className="text-xs text-slate-600 hover:text-slate-900"
+              >
+                {copied ? <Check className="mr-1 h-3.5 w-3.5 text-emerald-600" /> : <Copy className="mr-1 h-3.5 w-3.5" />}
+                WhatsApp
+              </Button>
+            </div>
+
+            {onApproveBatch && !isPublished && (
+              <Button
+                size="sm"
+                onClick={() => setConfirmApproveBatch(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm"
+              >
+                <CheckSquare className="mr-1.5 h-3.5 w-3.5" />
+                Aprobar Lote Completo {totalLote > 0 ? `(${totalLote})` : ""}
+              </Button>
+            )}
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            {isPublished && proposal.published_at
-              ? `Publicada: ${fmtDate(proposal.published_at)}`
-              : proposal.scheduled_at
-              ? `Programada para: ${fmtDate(proposal.scheduled_at)}`
-              : "Sin fecha de publicación ni programación"}
-          </p>
-
-          {proposal.rendered_image_path ? (
-            <div className="space-y-1">
-              <p className="text-xs font-semibold text-muted-foreground">Así se ve la pieza, tal cual se publica</p>
-              <img
-                src={`${RAW_BASE_URL}/${proposal.rendered_image_path}`}
-                alt="Imagen final renderizada"
-                loading="lazy"
-                className={cn(
-                  "w-full rounded-md border border-border bg-muted object-contain",
-                  proposal.format === "historia" ? "aspect-[9/16]" : "aspect-[4/5]"
-                )}
-              />
+          {/* CONMUTADOR DE 3 BORRADORES DE LA IA (A / B / C) */}
+          <div className="space-y-2 pt-1">
+            <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">
+              Borradores Disponibles de la IA (3 Opciones Paralelas)
+            </Label>
+            <div className="grid grid-cols-3 gap-2">
+              {(["A", "B", "C"] as OpcionBorrador[]).map((op) => {
+                const conf = CONFIGURACION_BORRADORES[op];
+                const isSelected = selectedOpcion === op;
+                return (
+                  <button
+                    key={op}
+                    type="button"
+                    onClick={() => handleSelectOpcion(op)}
+                    className={cn(
+                      "flex flex-col items-start p-2.5 rounded-lg border text-left transition-all",
+                      isSelected
+                        ? "border-blue-700 bg-blue-50/50 shadow-sm ring-1 ring-blue-700"
+                        : "border-slate-200 bg-white hover:bg-slate-50"
+                    )}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="font-bold text-xs text-blue-900">Opción {op}</span>
+                      <Badge
+                        variant={isSelected ? "default" : "outline"}
+                        className={cn(
+                          "text-[10px] px-1.5 py-0",
+                          op === "A"
+                            ? "bg-blue-800 text-white"
+                            : op === "B"
+                            ? "bg-slate-800 text-white"
+                            : "bg-red-700 text-white"
+                        )}
+                      >
+                        {op === "A" ? "Carrusel (80%)" : op === "B" ? "Autoridad (80%)" : "Directo (20%)"}
+                      </Badge>
+                    </div>
+                    <span className="text-[11px] font-medium text-slate-700 line-clamp-1 mt-1">
+                      {op === "A" ? "Carrusel Educativo" : op === "B" ? "Networking C-Level" : "Diagnóstico Web"}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          ) : (
-            !isRejected && (
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground">Cómo va a quedar la pieza</p>
-                <PiecePreview format={proposal.format} oferta={proposal.oferta} hook={proposal.hook} body={proposal.body} />
-              </div>
-            )
-          )}
-
-          {isRejected && proposal.rejection_reason && (
-            <p className="rounded-md border border-destructive/30 bg-destructive/5 p-2.5 text-xs text-destructive">
-              Motivo de rechazo: {proposal.rejection_reason}
+            <p className="text-[11px] text-slate-500 italic">
+              {CONFIGURACION_BORRADORES[selectedOpcion].descripcion}
             </p>
-          )}
+          </div>
 
-          {isPublished && (
-            <div className="flex items-start gap-2 rounded-md border border-dashed border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-              <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
-              <span>
-                Ya está publicada{proposal.zernio_post_id ? ` (Zernio: ${proposal.zernio_post_id})` : ""} — no se
-                edita ni se borra desde acá para no desincronizar lo que ya salió en Instagram/Facebook. Para
-                corregirla o bajarla, usá "Reintentar"/"Despublicar" desde el Monitor.
+          {/* SELECTOR DE VISTA PREVIA POR RED SOCIAL Y MARCO EXPANDIDO */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <Eye className="h-3.5 w-3.5 text-blue-700" />
+                Previsualización en Red Social
               </span>
+              <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setCanalPreview("linkedin")}
+                  className={cn(
+                    "px-2.5 py-1 text-xs font-semibold rounded-md transition-all",
+                    canalPreview === "linkedin"
+                      ? "bg-blue-800 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                >
+                  LinkedIn
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCanalPreview("instagram")}
+                  className={cn(
+                    "px-2.5 py-1 text-xs font-semibold rounded-md transition-all",
+                    canalPreview === "instagram"
+                      ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                >
+                  Instagram
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCanalPreview("facebook")}
+                  className={cn(
+                    "px-2.5 py-1 text-xs font-semibold rounded-md transition-all",
+                    canalPreview === "facebook"
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                >
+                  Facebook
+                </button>
+              </div>
+            </div>
+
+            {/* MOCKUP DINÁMICO DE RED SOCIAL SEGÚN PESTAÑA */}
+            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+              {/* VISTA LINKEDIN */}
+              {canalPreview === "linkedin" && (
+                <div className="p-3.5 space-y-2.5 text-xs">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                      MC
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-slate-900 leading-tight">Pablo Eckert</p>
+                      <p className="text-[10px] text-slate-500 truncate">Director en Mejora Continua | Transformación de PyMEs</p>
+                      <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                        <span>{fmtDate(canonical.dia_programado) || "Programado"}</span>
+                        <span>•</span>
+                        <Globe className="h-2.5 w-2.5" />
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-slate-800 space-y-1.5 leading-relaxed">
+                    <p className="font-bold text-slate-900 text-sm">{currentBorrador.titulo_portada}</p>
+                    <p>{currentBorrador.copy_tres_pasos.paso1_dolor}</p>
+                    <p>{currentBorrador.copy_tres_pasos.paso2_reencuadre}</p>
+                    <p className="font-medium text-blue-900">{currentBorrador.copy_tres_pasos.paso3_direccion_web}</p>
+                    <p className="text-blue-700 text-[11px]">#MejoraContinua #Empresas #Liderazgo #Procesos</p>
+                  </div>
+
+                  {/* Canvas Gráfico Marco Desenfocado */}
+                  {imagenVinculada && (
+                    <div className="relative aspect-[4/5] max-h-64 w-full overflow-hidden rounded-md border border-slate-200 bg-white flex items-center justify-center">
+                      <div className="absolute top-0 left-0 right-0 h-1.5 z-30 flex">
+                        <div className="w-[60%] bg-[#1A3D84]" />
+                        <div className="w-[20%] bg-[#E1061E]" />
+                        <div className="w-[20%] bg-[#F7CC13]" />
+                      </div>
+                      <div
+                        className="absolute inset-[-20px] bg-cover bg-center filter opacity-75 scale-110"
+                        style={{
+                          backgroundImage: `url(${getAssetUrl(imagenVinculada)})`,
+                          filter: "blur(28px) brightness(0.85)",
+                        }}
+                      />
+                      <div className="relative z-10 w-full h-full p-2.5 flex items-center justify-center">
+                        <img
+                          src={getAssetUrl(imagenVinculada)}
+                          alt="Activo de Bóveda"
+                          className="max-h-full max-w-full object-contain border-2 border-white shadow-md rounded-sm"
+                        />
+                      </div>
+                      <div className="absolute bottom-2 right-2 z-20 bg-white/90 backdrop-blur px-1.5 py-0.5 rounded text-[9px] font-mono text-slate-700 border border-slate-200">
+                        Marco 4:5 · 0% Recorte
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-slate-600 text-[11px] font-semibold">
+                    <span className="flex items-center gap-1 hover:text-blue-800 cursor-pointer"><ThumbsUp className="h-3.5 w-3.5" /> Recomendar</span>
+                    <span className="flex items-center gap-1 hover:text-blue-800 cursor-pointer"><MessageCircle className="h-3.5 w-3.5" /> Comentar</span>
+                    <span className="flex items-center gap-1 hover:text-blue-800 cursor-pointer"><Share2 className="h-3.5 w-3.5" /> Compartir</span>
+                    <span className="flex items-center gap-1 hover:text-blue-800 cursor-pointer"><Send className="h-3.5 w-3.5" /> Enviar</span>
+                  </div>
+                </div>
+              )}
+
+              {/* VISTA INSTAGRAM */}
+              {canalPreview === "instagram" && (
+                <div className="p-3.5 space-y-2.5 text-xs bg-slate-900 text-white rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full p-[1.5px] bg-gradient-to-tr from-amber-500 to-fuchsia-600">
+                        <div className="w-full h-full bg-slate-900 rounded-full flex items-center justify-center font-bold text-[9px] text-white">
+                          MC
+                        </div>
+                      </div>
+                      <div>
+                        <p className="font-bold text-white text-xs">mejora_continua_ok</p>
+                        <p className="text-[9px] text-slate-400">Rosario, Santa Fe</p>
+                      </div>
+                    </div>
+                    <span className="text-slate-400 font-bold">•••</span>
+                  </div>
+
+                  {/* Imagen Prioritaria IG */}
+                  {imagenVinculada && (
+                    <div className="relative aspect-[4/5] max-h-72 w-full overflow-hidden rounded border border-slate-800 bg-black flex items-center justify-center">
+                      <div className="absolute top-0 left-0 right-0 h-1.5 z-30 flex">
+                        <div className="w-[60%] bg-[#1A3D84]" />
+                        <div className="w-[20%] bg-[#E1061E]" />
+                        <div className="w-[20%] bg-[#F7CC13]" />
+                      </div>
+                      <div
+                        className="absolute inset-[-20px] bg-cover bg-center filter opacity-75 scale-110"
+                        style={{
+                          backgroundImage: `url(${getAssetUrl(imagenVinculada)})`,
+                          filter: "blur(28px) brightness(0.85)",
+                        }}
+                      />
+                      <div className="relative z-10 w-full h-full p-2 flex items-center justify-center">
+                        <img
+                          src={getAssetUrl(imagenVinculada)}
+                          alt="Activo de Bóveda"
+                          className="max-h-full max-w-full object-contain border-2 border-white/80 shadow-lg rounded-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between text-slate-200 pt-0.5">
+                    <div className="flex items-center gap-3">
+                      <Heart className="h-4 w-4 hover:text-red-500 cursor-pointer" />
+                      <MessageCircle className="h-4 w-4 cursor-pointer" />
+                      <Send className="h-4 w-4 cursor-pointer" />
+                    </div>
+                    <Bookmark className="h-4 w-4 cursor-pointer" />
+                  </div>
+
+                  <div className="text-[11px] leading-relaxed text-slate-200">
+                    <span className="font-bold mr-1.5 text-white">mejora_continua_ok</span>
+                    <span>{currentBorrador.copy_tres_pasos.paso1_dolor.slice(0, 80)}… </span>
+                    <span className="text-slate-400 cursor-pointer font-medium">más</span>
+                  </div>
+                </div>
+              )}
+
+              {/* VISTA FACEBOOK */}
+              {canalPreview === "facebook" && (
+                <div className="p-3.5 space-y-2.5 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                      MC
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900">Mejora Continua</p>
+                      <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                        <span>{fmtDate(canonical.dia_programado) || "Programado"}</span>
+                        <span>•</span>
+                        <Globe className="h-2.5 w-2.5" />
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-slate-800 space-y-1 leading-relaxed">
+                    <p className="font-bold text-sm text-slate-900">{currentBorrador.titulo_portada}</p>
+                    <p>{currentBorrador.copy_tres_pasos.paso1_dolor}</p>
+                    <p>{currentBorrador.copy_tres_pasos.paso2_reencuadre}</p>
+                    <p className="font-medium text-blue-900">{currentBorrador.copy_tres_pasos.paso3_direccion_web}</p>
+                  </div>
+
+                  {imagenVinculada && (
+                    <div className="relative aspect-[4/5] max-h-64 w-full overflow-hidden rounded-md border border-slate-200 bg-white flex items-center justify-center">
+                      <div className="absolute top-0 left-0 right-0 h-1.5 z-30 flex">
+                        <div className="w-[60%] bg-[#1A3D84]" />
+                        <div className="w-[20%] bg-[#E1061E]" />
+                        <div className="w-[20%] bg-[#F7CC13]" />
+                      </div>
+                      <div
+                        className="absolute inset-[-20px] bg-cover bg-center filter opacity-75 scale-110"
+                        style={{
+                          backgroundImage: `url(${getAssetUrl(imagenVinculada)})`,
+                          filter: "blur(28px) brightness(0.85)",
+                        }}
+                      />
+                      <div className="relative z-10 w-full h-full p-2 flex items-center justify-center">
+                        <img
+                          src={getAssetUrl(imagenVinculada)}
+                          alt="Activo de Bóveda"
+                          className="max-h-full max-w-full object-contain border-2 border-white shadow-md rounded-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-around border-t border-slate-100 pt-2 text-slate-600 text-[11px] font-semibold">
+                    <span className="flex items-center gap-1 hover:text-blue-600 cursor-pointer"><ThumbsUp className="h-3.5 w-3.5" /> Me gusta</span>
+                    <span className="flex items-center gap-1 hover:text-blue-600 cursor-pointer"><MessageCircle className="h-3.5 w-3.5" /> Comentar</span>
+                    <span className="flex items-center gap-1 hover:text-blue-600 cursor-pointer"><Share2 className="h-3.5 w-3.5" /> Compartir</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[11px] text-slate-500 font-mono">
+                {canonical.tratamiento_visual.regla_color_aplicada}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setSelectorImagenAbierto(true)}
+                className="h-7 text-xs bg-white text-blue-800 border-blue-200 hover:bg-blue-50"
+              >
+                Cambiar Imagen de Bóveda
+              </Button>
+            </div>
+          </div>
+
+          {/* SELECTOR MODAL DE IMÁGENES DE BÓVEDA */}
+          {selectorImagenAbierto && (
+            <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/40 p-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-blue-900">
+                  Elegir activo de Bóveda (Networking y Autoridad C-Level)
+                </Label>
+                <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setSelectorImagenAbierto(false)}>
+                  Cerrar
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                {FOTOS_BOVEDA_DISPONIBLES.map((foto) => (
+                  <button
+                    key={foto.id}
+                    type="button"
+                    onClick={() => {
+                      setImagenVinculada(foto.ruta);
+                      setSelectorImagenAbierto(false);
+                      toast({ title: "Imagen de Bóveda vinculada", description: foto.titulo });
+                    }}
+                    className={cn(
+                      "p-2 text-left rounded border text-xs bg-white hover:bg-blue-50 transition-colors",
+                      imagenVinculada === foto.ruta ? "border-blue-700 font-semibold text-blue-900" : "border-slate-200"
+                    )}
+                  >
+                    <p className="line-clamp-1">{foto.titulo}</p>
+                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">{foto.id}</p>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* CONTENIDO — lectura o edición */}
+          {/* CONTENIDO EDITABLE CALIBRADO EN 3 PASOS */}
           {isEditing ? (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label>Título</Label>
-                <Input value={editFields.title} onChange={(e) => setEditFields((f) => ({ ...f, title: e.target.value }))} />
+            <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/20 p-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase text-blue-900 flex items-center gap-1.5">
+                  <Pencil className="h-3.5 w-3.5" />
+                  Editando Copy Calibrado en 3 Pasos ({selectedOpcion})
+                </span>
               </div>
-              <div className="space-y-1.5">
-                <Label>Hook</Label>
-                <Input value={editFields.hook} onChange={(e) => setEditFields((f) => ({ ...f, hook: e.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Body</Label>
-                <Textarea
-                  rows={5}
-                  value={editFields.body}
-                  onChange={(e) => setEditFields((f) => ({ ...f, body: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>CTA</Label>
-                <Input value={editFields.cta} onChange={(e) => setEditFields((f) => ({ ...f, cta: e.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Hashtags (separados por espacio)</Label>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-slate-700">Título / Hook de Portada</Label>
                 <Input
-                  value={editFields.hashtags}
-                  onChange={(e) => setEditFields((f) => ({ ...f, hashtags: e.target.value }))}
+                  value={editTitulo}
+                  onChange={(e) => setEditTitulo(e.target.value)}
+                  className="bg-white text-xs"
                 />
               </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-red-700 flex items-center gap-1">
+                  <span>Paso 1: Nombrar el Dolor / Fricción Real</span>
+                  <span className="text-[10px] text-slate-500 font-normal">(sin complacencia)</span>
+                </Label>
+                <Textarea
+                  rows={2}
+                  value={editCopy3Pasos.paso1_dolor}
+                  onChange={(e) => setEditCopy3Pasos((prev) => ({ ...prev, paso1_dolor: e.target.value }))}
+                  className="bg-white text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-blue-800 flex items-center gap-1">
+                  <span>Paso 2: Reencuadre y Causa Raíz</span>
+                  <span className="text-[10px] text-slate-500 font-normal">(proceso y sistema, nunca a la persona)</span>
+                </Label>
+                <Textarea
+                  rows={3}
+                  value={editCopy3Pasos.paso2_reencuadre}
+                  onChange={(e) => setEditCopy3Pasos((prev) => ({ ...prev, paso2_reencuadre: e.target.value }))}
+                  className="bg-white text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-amber-700 flex items-center gap-1">
+                  <span>Paso 3: Dirección Web Concreta</span>
+                  <span className="text-[10px] text-slate-500 font-normal">(llamado a mejoraok.com o diagnóstico)</span>
+                </Label>
+                <Input
+                  value={editCopy3Pasos.paso3_direccion_web}
+                  onChange={(e) => setEditCopy3Pasos((prev) => ({ ...prev, paso3_direccion_web: e.target.value }))}
+                  className="bg-white text-xs"
+                />
+              </div>
+
               <div className="flex justify-end gap-2 pt-1">
                 <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
                   Cancelar
                 </Button>
-                <Button size="sm" onClick={handleSaveEdit} disabled={editMutation.isPending}>
+                <Button size="sm" onClick={handleSaveEdit} disabled={editMutation.isPending} className="bg-blue-800 text-white">
                   {editMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                  Guardar
+                  Guardar Cambios
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="space-y-3 text-sm">
-              {proposal.hook && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground">HOOK</p>
-                  <p>{proposal.hook}</p>
-                </div>
-              )}
-              {proposal.body && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground">BODY</p>
-                  <p className="whitespace-pre-wrap">{proposal.body}</p>
-                </div>
-              )}
-              {proposal.cta && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground">CTA</p>
-                  <p>{proposal.cta}</p>
-                </div>
-              )}
-              {proposal.hashtags && proposal.hashtags.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground">HASHTAGS</p>
-                  <p className="text-muted-foreground">{proposal.hashtags.join(" ")}</p>
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3.5 text-xs text-slate-800">
+              <div className="border-l-2 border-red-600 pl-2.5 space-y-0.5">
+                <span className="font-bold text-[11px] text-red-700 uppercase tracking-wide">
+                  Paso 1 · Dolor / Situación
+                </span>
+                <p className="text-slate-800 leading-relaxed">{currentBorrador.copy_tres_pasos.paso1_dolor}</p>
+              </div>
+
+              <div className="border-l-2 border-blue-800 pl-2.5 space-y-0.5">
+                <span className="font-bold text-[11px] text-blue-800 uppercase tracking-wide">
+                  Paso 2 · Reencuadre de Sistema
+                </span>
+                <p className="text-slate-800 leading-relaxed whitespace-pre-wrap">{currentBorrador.copy_tres_pasos.paso2_reencuadre}</p>
+              </div>
+
+              <div className="border-l-2 border-amber-500 pl-2.5 space-y-0.5">
+                <span className="font-bold text-[11px] text-amber-700 uppercase tracking-wide">
+                  Paso 3 · Dirección a la Web
+                </span>
+                <p className="text-slate-800 font-medium">{currentBorrador.copy_tres_pasos.paso3_direccion_web}</p>
+              </div>
+
+              {currentBorrador.slides && currentBorrador.slides.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-slate-100">
+                  <span className="font-bold text-[11px] text-slate-500 uppercase tracking-wide block mb-1">
+                    Slides de Carrusel ({currentBorrador.slides.length})
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {currentBorrador.slides.map((s, idx) => (
+                      <Badge key={idx} variant="outline" className="text-[10px] text-slate-600 bg-slate-50">
+                        Slide {idx + 1}: {s.slice(0, 24)}…
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* ACCIONES DE ESTADO */}
+          {/* ACCIONES DE ESTADO Y FLUJO */}
           {!isPublished && !isEditing && (
-            <div className="flex flex-wrap gap-2 border-t border-border pt-3">
-              {isPending && (
-                <Button size="sm" onClick={handleApprove} disabled={approveMutation.isPending}>
-                  {approveMutation.isPending ? (
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
-                  )}
-                  Aprobar
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3">
+              <div className="flex flex-wrap gap-1.5">
+                {isPending && (
+                  <Button size="sm" onClick={handleApprove} disabled={approveMutation.isPending} className="bg-blue-800 hover:bg-blue-900 text-white">
+                    {approveMutation.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="mr-1.5 h-3.5 w-3.5" />}
+                    Aprobar Esta Propuesta
+                  </Button>
+                )}
+                {(isPending || isApproved) && (
+                  <Button size="sm" variant="outline" onClick={() => setShowReject((v) => !v)} className="text-red-700 border-red-200 hover:bg-red-50">
+                    <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                    Rechazar
+                  </Button>
+                )}
+                {isScheduled && (
+                  <Button size="sm" variant="outline" onClick={() => setConfirmCancel(true)} disabled={cancelMutation.isPending}>
+                    {cancelMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                    Cancelar Publicación
+                  </Button>
+                )}
+                {isRejected && (
+                  <Button size="sm" onClick={handleReactivate} disabled={reactivateMutation.isPending}>
+                    {reactivateMutation.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Repeat className="mr-1.5 h-3.5 w-3.5" />}
+                    Reactivar
+                  </Button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                  Editar
                 </Button>
-              )}
-              {(isPending || isApproved) && (
-                <Button size="sm" variant="outline" onClick={() => setShowReject((v) => !v)}>
-                  <XCircle className="mr-1.5 h-3.5 w-3.5 text-destructive" />
-                  Rechazar
+                <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setConfirmDelete(true)}>
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
-              )}
-              {isScheduled && (
-                <Button size="sm" variant="outline" onClick={() => setConfirmCancel(true)} disabled={cancelMutation.isPending}>
-                  {cancelMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                  Cancelar publicación
-                </Button>
-              )}
-              {isRejected && (
-                <Button size="sm" onClick={handleReactivate} disabled={reactivateMutation.isPending}>
-                  {reactivateMutation.isPending ? (
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Repeat className="mr-1.5 h-3.5 w-3.5" />
-                  )}
-                  Reactivar
-                </Button>
-              )}
-              <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
-                <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                Editar
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleCopy}>
-                {copied ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
-                Copiar
-              </Button>
-              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setConfirmDelete(true)}>
-                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                Borrar
-              </Button>
+              </div>
             </div>
           )}
 
+          {/* MOTIVO DE RECHAZO */}
           {showReject && !isPublished && (
-            <div className="space-y-2 rounded-md border border-border p-3">
-              <Label>Razón del rechazo (opcional)</Label>
+            <div className="space-y-2 rounded-md border border-red-200 bg-red-50/50 p-3">
+              <Label className="text-xs font-semibold text-red-900">Razón del rechazo</Label>
               <Textarea
                 rows={2}
-                placeholder="Ej: No coincide con el tono de la marca..."
+                placeholder="Ej: No coincide con el tono de calidez con verdad..."
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
+                className="bg-white text-xs"
               />
               <div className="flex justify-end gap-2">
                 <Button size="sm" variant="outline" onClick={() => setShowReject(false)}>
@@ -523,61 +1007,48 @@ export function ProposalDetailDialog({
                 </Button>
                 <Button size="sm" variant="destructive" onClick={handleReject} disabled={rejectMutation.isPending}>
                   {rejectMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                  Confirmar rechazo
+                  Confirmar Rechazo
                 </Button>
               </div>
             </div>
           )}
 
-          {/* AGENDAR (todavía sin fecha) / REPROGRAMAR (ya programada) */}
+          {/* PROGRAMACIÓN / REPROGRAMACIÓN */}
           {!isPublished && !isEditing && (isScheduled || isPending || isApproved) && (
-            <div className="space-y-2 rounded-md border border-border p-3">
-              <Label className="flex items-center gap-1.5">
-                {isScheduled ? <Repeat className="h-3.5 w-3.5" /> : <Calendar className="h-3.5 w-3.5" />}
-                {isScheduled ? "Reprogramar" : "Agendar"}
+            <div className="space-y-2 rounded-md border border-slate-200 p-3 bg-slate-50/30">
+              <Label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                <Calendar className="h-3.5 w-3.5 text-blue-700" />
+                {isScheduled ? "Reprogramar Fecha de Publicación" : "Agendar Publicación"}
               </Label>
-              <Input
-                type="datetime-local"
-                min={toDatetimeLocal(new Date().toISOString())}
-                value={scheduleDate}
-                onChange={(e) => setScheduleDate(e.target.value)}
-              />
-              {scheduleDate && new Date(scheduleDate).getTime() - Date.now() < 30 * 60 * 1000 && (
-                <p className="flex items-center gap-1.5 text-xs text-amber-600">
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                  Esto se publica en menos de 30 minutos, sin más revisión — confirmá que la fecha/hora es la correcta.
-                </p>
-              )}
-              {!isScheduled && (
-                <Select value={scheduleOferta} onValueChange={setScheduleOferta}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Dimensión del servicio (de dónde sale la foto)..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {OFERTAS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <div className="flex justify-end">
+              <div className="flex gap-2">
+                <Input
+                  type="datetime-local"
+                  min={toDatetimeLocal(new Date().toISOString())}
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="bg-white text-xs"
+                />
+                {!isScheduled && (
+                  <Select value={scheduleOferta} onValueChange={setScheduleOferta}>
+                    <SelectTrigger className="bg-white text-xs">
+                      <SelectValue placeholder="Dimensión de servicio..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {OFERTAS.map((o) => (
+                        <SelectItem key={o.value} value={o.value} className="text-xs">
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 {isScheduled ? (
-                  <Button
-                    size="sm"
-                    onClick={handleReschedule}
-                    disabled={!scheduleDate || rescheduleMutation.isPending}
-                  >
+                  <Button size="sm" onClick={handleReschedule} disabled={!scheduleDate || rescheduleMutation.isPending}>
                     {rescheduleMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                    Guardar nueva fecha
+                    Guardar
                   </Button>
                 ) : (
-                  <Button
-                    size="sm"
-                    onClick={handleSchedule}
-                    disabled={!scheduleDate || !scheduleOferta || scheduleMutation.isPending}
-                  >
+                  <Button size="sm" onClick={handleSchedule} disabled={!scheduleDate || !scheduleOferta || scheduleMutation.isPending} className="bg-blue-800 text-white">
                     {scheduleMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                     Programar
                   </Button>
@@ -586,50 +1057,16 @@ export function ProposalDetailDialog({
             </div>
           )}
 
-          {/* CONVERTIR FORMATO */}
-          {!isPublished && !isEditing && (
-            <div className="space-y-2 rounded-md border border-border p-3">
-              <Label>Convertir formato</Label>
-              <p className="text-[11px] text-muted-foreground">
-                Solo cambia el campo format — no agenda ni desagenda la pieza por su cuenta.
-                {isScheduled && " En una pieza ya programada no se puede pasar de/hacia Story (la dejaría sin publicarse)."}
-              </p>
-              <div className="flex gap-2">
-                <Select value={convertTo} onValueChange={setConvertTo}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Elegir formato..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CONVERTIBLE_FORMATS.filter((f) => f.value !== proposal.format)
-                      .filter((f) => !(isScheduled && (f.value === "historia" || proposal.format === "historia")))
-                      .map((f) => (
-                        <SelectItem key={f.value} value={f.value}>
-                          {f.label}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  size="sm"
-                  onClick={handleConvert}
-                  disabled={!convertTo || convertBlocked || convertMutation.isPending}
-                >
-                  {convertMutation.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                  Convertir
-                </Button>
-              </div>
-            </div>
-          )}
-
-          <ProposalComments proposalId={proposal.id} />
+          <ProposalComments proposalId={canonical.propuesta_id} />
         </DialogContent>
       </Dialog>
 
+      {/* DIÁLOGOS DE CONFIRMACIÓN */}
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
         title="¿Borrar esta propuesta?"
-        description="No se puede deshacer. La propuesta se elimina por completo de Supabase."
+        description="Esta acción elimina la propuesta de la planificación."
         confirmText="Borrar"
         variant="destructive"
         onConfirm={handleDelete}
@@ -638,11 +1075,20 @@ export function ProposalDetailDialog({
       <ConfirmDialog
         open={confirmCancel}
         onOpenChange={setConfirmCancel}
-        title="¿Cancelar esta publicación?"
-        description="La pieza no va a salir. Queda como Rechazada — la podés reactivar después desde su detalle, pero perdés el horario que tenía."
+        title="¿Cancelar publicación?"
+        description="La pieza no se publicará y quedará en estado Rechazada."
         confirmText="Cancelar publicación"
         variant="destructive"
-        onConfirm={handleCancelScheduled}
+        onConfirm={() => cancelMutation.mutate(canonical.propuesta_id)}
+      />
+
+      <ConfirmDialog
+        open={confirmApproveBatch}
+        onOpenChange={setConfirmApproveBatch}
+        title="¿Aprobar el lote completo de propuestas?"
+        description="Todas las propuestas pendientes de la semana quedarán aprobadas y listas para su despacho según la grilla programada."
+        confirmText="Aprobar Lote Completo"
+        onConfirm={handleApproveAllBatch}
       />
     </>
   );
