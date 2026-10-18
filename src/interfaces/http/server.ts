@@ -7,13 +7,17 @@ import { handleSMHttpRequest, type SMAppServices } from "./router";
 import { SqliteBovedaRepository } from "../../infrastructure/sqlite/SqliteBovedaRepository";
 import { SqlitePropuestaRepository } from "../../infrastructure/sqlite/SqlitePropuestaRepository";
 import { SqliteSMRepository } from "../../infrastructure/sqlite/SqliteSMRepository";
+import { SqliteProspectoRepository } from "../../infrastructure/sqlite/SqliteProspectoRepository";
+import { SlidingWindowRateLimiter } from "./rateLimiter";
 
 export function createDefaultServices(dbPath: string = "data/mejora_sm.db"): SMAppServices {
   const smRepo = new SqliteSMRepository(dbPath);
   const bovedaRepo = new SqliteBovedaRepository(dbPath);
   const propuestaRepo = new SqlitePropuestaRepository(dbPath);
+  const prospectoRepo = new SqliteProspectoRepository(dbPath);
+  const leadRateLimiter = new SlidingWindowRateLimiter(5, 60_000);
 
-  return { bovedaRepo, propuestaRepo, smRepo };
+  return { bovedaRepo, propuestaRepo, smRepo, prospectoRepo, leadRateLimiter };
 }
 
 export function createSMServer(customServices?: SMAppServices): Server {

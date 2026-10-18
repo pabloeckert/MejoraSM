@@ -8,9 +8,29 @@
 export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 
 export interface CircuitBreakerOptions {
-  failureThreshold?: number; // Número de fallas consecutivas para abrir el circuito (default: 3)
+  failureThreshold?: number; // Fallas dentro de la ventana para abrir el circuito (default: 3)
+  failureWindowMs?: number;  // Ventana deslizante de conteo de fallas (default: 60000ms)
   timeoutMs?: number;        // Fast-Window timeout para petición de red externa (default: 1500ms)
   cooldownMs?: number;       // Tiempo en estado OPEN antes de permitir prueba HALF_OPEN (default: 5000ms)
+  now?: () => number;        // Reloj inyectable (default: Date.now) para tests deterministas
+}
+
+export interface BackoffOptions {
+  baseMs?: number; // default 1000
+  capMs?: number;  // default 300000 (5 min)
+  rng?: () => number; // [0,1) inyectable; default Math.random
+}
+
+/**
+ * Backoff exponencial con "full jitter": uniform(0, min(cap, base * 2^intento)).
+ * `intento` empieza en 1 (primer reintento).
+ */
+export function calcularBackoffConJitter(intento: number, opts: BackoffOptions = {}): number {
+  const base = opts.baseMs ?? 1000;
+  const cap = opts.capMs ?? 300_000;
+  const rng = opts.rng ?? Math.random;
+  const techo = Math.min(cap, base * 2 ** Math.max(0, intento));
+  return Math.floor(rng() * techo);
 }
 
 export interface CircuitBreakerMetrics {
@@ -39,15 +59,20 @@ export class ZernioCircuitBreaker {
   private lastSuccessTime: number | null = null;
   private fallbackCount = 0;
   private lastFallbackDurationMs = 0;
+  private failureTimestamps: number[] = [];
+  private readonly clock: () => number;
 
   public readonly failureThreshold: number;
+  public readonly failureWindowMs: number;
   public readonly timeoutMs: number;
   public readonly cooldownMs: number;
 
   constructor(options: CircuitBreakerOptions = {}) {
     this.failureThreshold = options.failureThreshold ?? 3;
+    this.failureWindowMs = options.failureWindowMs ?? 60_000;
     this.timeoutMs = options.timeoutMs ?? 1500;
     this.cooldownMs = options.cooldownMs ?? 5000;
+    this.clock = options.now ?? Date.now;
   }
 
   public getState(): CircuitState {
@@ -69,9 +94,8 @@ export class ZernioCircuitBreaker {
   }
 
   private checkCooldown(): void {
-    if (this.state === "OPEN" && this.lastFailureTime) {
-      const now = Date.now();
-      if (now - this.lastFailureTime >= this.cooldownMs) {
+    if (this.state === "OPEN" && this.lastFailureTime !== null) {
+      if (this.clock() - this.lastFailureTime >= this.cooldownMs) {
         this.state = "HALF_OPEN";
       }
     }
@@ -154,13 +178,17 @@ export class ZernioCircuitBreaker {
   private onSuccess(): void {
     this.successCount++;
     this.failureCount = 0;
+    this.failureTimestamps = [];
     this.state = "CLOSED";
-    this.lastSuccessTime = Date.now();
+    this.lastSuccessTime = this.clock();
   }
 
   private onFailure(): void {
-    this.failureCount++;
-    this.lastFailureTime = Date.now();
+    const now = this.clock();
+    this.lastFailureTime = now;
+    this.failureTimestamps.push(now);
+    this.failureTimestamps = this.failureTimestamps.filter((t) => now - t <= this.failureWindowMs);
+    this.failureCount = this.failureTimestamps.length;
     if (this.state === "HALF_OPEN" || this.failureCount >= this.failureThreshold) {
       this.state = "OPEN";
     }
@@ -168,12 +196,13 @@ export class ZernioCircuitBreaker {
 
   public trip(): void {
     this.state = "OPEN";
-    this.lastFailureTime = Date.now();
+    this.lastFailureTime = this.clock();
   }
 
   public reset(): void {
     this.state = "CLOSED";
     this.failureCount = 0;
+    this.failureTimestamps = [];
     this.successCount = 0;
     this.lastFailureTime = null;
     this.lastSuccessTime = null;

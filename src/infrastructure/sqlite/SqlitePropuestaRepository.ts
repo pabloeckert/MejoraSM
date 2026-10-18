@@ -1,6 +1,8 @@
 // src/infrastructure/sqlite/SqlitePropuestaRepository.ts
 import { DatabaseSync } from "node:sqlite";
 import { CREATE_TABLES_SQL } from "./schema";
+import { withImmediateTransaction } from "./transaction";
+import { SqliteOutboxRepository } from "./SqliteOutboxRepository";
 import {
   type PropuestaMejoraSMDTO,
   type EstadoPropuesta,
@@ -10,6 +12,7 @@ import {
 
 export class SqlitePropuestaRepository {
   private db: DatabaseSync;
+  private outbox: SqliteOutboxRepository;
 
   constructor(dbOrPath: DatabaseSync | string = "data/mejora_sm.db") {
     if (typeof dbOrPath === "string") {
@@ -20,6 +23,19 @@ export class SqlitePropuestaRepository {
     } else {
       this.db = dbOrPath;
     }
+    this.outbox = new SqliteOutboxRepository(this.db);
+  }
+
+  /** Encola en outbox_posts la propuesta recién aprobada. Debe invocarse dentro de la transacción de aprobación. */
+  private encolarEnOutbox(id: string, now: Date): void {
+    const row = this.db
+      .prepare("SELECT canal_destino, borrador_seleccionado FROM propuestas_sm WHERE propuesta_id = ?")
+      .get(id) as { canal_destino: string; borrador_seleccionado: string } | undefined;
+    if (!row) return;
+    this.outbox.encolarAprobado(
+      { propuesta_id: id, canal: row.canal_destino, borrador_opcion: row.borrador_seleccionado },
+      now
+    );
   }
 
   public guardar(propuesta: PropuestaMejoraSMDTO): void {
@@ -62,16 +78,11 @@ export class SqlitePropuestaRepository {
   }
 
   public guardarLote(propuestas: PropuestaMejoraSMDTO[]): void {
-    this.db.exec("BEGIN TRANSACTION;");
-    try {
+    withImmediateTransaction(this.db, () => {
       for (const p of propuestas) {
         this.guardar(p);
       }
-      this.db.exec("COMMIT;");
-    } catch (err) {
-      this.db.exec("ROLLBACK;");
-      throw err;
-    }
+    });
   }
 
   public obtenerPorId(id: string): PropuestaMejoraSMDTO | null {
@@ -132,8 +143,13 @@ export class SqlitePropuestaRepository {
       SET estado = 'aprobado', actualizado_el = ?
       WHERE propuesta_id = ? AND estado != 'publicado';
     `);
-    const res = stmt.run(new Date().toISOString(), id);
-    return Number(res.changes || 0) > 0;
+    return withImmediateTransaction(this.db, () => {
+      const now = new Date();
+      const res = stmt.run(now.toISOString(), id);
+      const ok = Number(res.changes || 0) > 0;
+      if (ok) this.encolarEnOutbox(id, now);
+      return ok;
+    });
   }
 
   public rechazar(id: string, motivo: string): boolean {
@@ -159,26 +175,25 @@ export class SqlitePropuestaRepository {
   public aprobarLote(ids: string[]): number {
     if (ids.length === 0) return 0;
 
-    let modificadas = 0;
-    const now = new Date().toISOString();
+    const nowDate = new Date();
+    const now = nowDate.toISOString();
     const stmt = this.db.prepare(`
       UPDATE propuestas_sm
       SET estado = 'aprobado', actualizado_el = ?
       WHERE propuesta_id = ? AND estado = 'pendiente_revision';
     `);
 
-    this.db.exec("BEGIN TRANSACTION;");
-    try {
+    return withImmediateTransaction(this.db, () => {
+      let modificadas = 0;
       for (const id of ids) {
         const res = stmt.run(now, id);
-        modificadas += Number(res.changes || 0);
+        if (Number(res.changes || 0) > 0) {
+          modificadas++;
+          this.encolarEnOutbox(id, nowDate);
+        }
       }
-      this.db.exec("COMMIT;");
       return modificadas;
-    } catch (err) {
-      this.db.exec("ROLLBACK;");
-      throw err;
-    }
+    });
   }
 
   public eliminar(id: string): boolean {

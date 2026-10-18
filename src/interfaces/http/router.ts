@@ -11,6 +11,7 @@ import { SqlitePropuestaRepository } from "../../infrastructure/sqlite/SqlitePro
 import { SqliteSMRepository } from "../../infrastructure/sqlite/SqliteSMRepository";
 import { generarGrillaEvergreen26Semanas } from "../../domain/gridGenerator";
 import { type FichaBovedaDTO, type PropuestaMejoraSMDTO } from "../../domain/types";
+import { handleCrmRequest, type CrmServices } from "./crmRoutes";
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -71,7 +72,7 @@ export function serveStaticDistFile(
 }
 
 
-export interface SMAppServices {
+export interface SMAppServices extends Partial<CrmServices> {
   bovedaRepo: SqliteBovedaRepository;
   propuestaRepo: SqlitePropuestaRepository;
   smRepo: SqliteSMRepository;
@@ -88,13 +89,13 @@ function sendJson(res: ServerResponse, statusCode: number, data: unknown): void 
   res.end(json);
 }
 
-function parseJsonBody<T>(req: IncomingMessage): Promise<T> {
+function parseJsonBody<T>(req: IncomingMessage, maxBytes: number = 5 * 1024 * 1024): Promise<T> {
   return new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 5 * 1024 * 1024) {
-        reject(new Error("Payload too large (> 5MB)"));
+      if (body.length > maxBytes) {
+        reject(new Error(`Payload too large (> ${maxBytes} bytes)`));
       }
     });
     req.on("end", () => {
@@ -159,13 +160,34 @@ export function handleSMHttpRequest(
   }
 
   // Control de acceso Zero-Trust: exigir Authorization Bearer para toda mutación en /api/*
-  if (pathname.startsWith("/api") && ["POST", "PATCH", "DELETE", "PUT"].includes(method)) {
+  // Única excepción: POST /api/crm/lead (formulario público; protegido por anti-bot + rate limit).
+  const esLeadPublico = method === "POST" && pathname === "/api/crm/lead";
+  if (pathname.startsWith("/api") && !esLeadPublico && ["POST", "PATCH", "DELETE", "PUT"].includes(method)) {
     if (!isAuthorized(req)) {
       sendJson(res, 401, {
         error: "No autorizado: se requiere header Authorization: Bearer <token>",
       });
       return;
     }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // CRM: captura de leads y máquina de estados de prospectos
+  // ──────────────────────────────────────────────────────────────────────────
+  if (pathname.startsWith("/api/crm/")) {
+    if (!services.prospectoRepo || !services.leadRateLimiter) {
+      sendJson(res, 503, { error: "Módulo CRM no configurado en este servidor" });
+      return;
+    }
+    const atendido = handleCrmRequest(
+      req,
+      res,
+      pathname,
+      parsedUrl.searchParams,
+      { prospectoRepo: services.prospectoRepo, leadRateLimiter: services.leadRateLimiter },
+      { sendJson, parseJsonBody }
+    );
+    if (atendido) return;
   }
 
   // ──────────────────────────────────────────────────────────────────────────

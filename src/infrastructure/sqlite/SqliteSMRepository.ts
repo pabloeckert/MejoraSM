@@ -4,6 +4,8 @@
 
 import { DatabaseSync } from "node:sqlite";
 import { CREATE_TABLES_SQL } from "./schema";
+import { withImmediateTransaction } from "./transaction";
+import { SqliteOutboxRepository } from "./SqliteOutboxRepository";
 import {
   type FichaBovedaDTO,
   type PropuestaMejoraSMDTO,
@@ -269,7 +271,6 @@ export class SqliteSMRepository {
   public aprobarLoteCompleto(ids: string[]): number {
     if (ids.length === 0) return 0;
 
-    let modificadas = 0;
     const now = new Date().toISOString();
     const stmt = this.db.prepare(`
       UPDATE propuestas_sm
@@ -277,18 +278,26 @@ export class SqliteSMRepository {
       WHERE propuesta_id = ? AND estado = 'pendiente_revision';
     `);
 
-    this.db.exec("BEGIN TRANSACTION;");
-    try {
+    return withImmediateTransaction(this.db, () => {
+      let modificadas = 0;
+      const outbox = new SqliteOutboxRepository(this.db);
+      const nowDate = new Date(now);
+      const datos = this.db.prepare("SELECT canal_destino, borrador_seleccionado FROM propuestas_sm WHERE propuesta_id = ?");
       for (const id of ids) {
         const res = stmt.run(now, id);
-        modificadas += Number(res.changes || 0);
+        if (Number(res.changes || 0) > 0) {
+          modificadas++;
+          const row = datos.get(id) as { canal_destino: string; borrador_seleccionado: string } | undefined;
+          if (row) {
+            outbox.encolarAprobado(
+              { propuesta_id: id, canal: row.canal_destino, borrador_opcion: row.borrador_seleccionado },
+              nowDate
+            );
+          }
+        }
       }
-      this.db.exec("COMMIT;");
       return modificadas;
-    } catch (err) {
-      this.db.exec("ROLLBACK;");
-      throw err;
-    }
+    });
   }
 
   // ──────────────────────────────────────────────────────────────────────────
