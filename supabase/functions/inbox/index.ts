@@ -1,3 +1,4 @@
+/// <reference path="../deno.d.ts" />
 // supabase/functions/inbox/index.ts
 // Fase 1 del plan de publicación 2026 — Bandeja de conversaciones.
 //
@@ -10,6 +11,15 @@
 //   { action: "sync" }                       → cron / botón "Actualizar"
 //   { action: "draft", itemId }              → respuesta sugerida (no envía)
 //   { action: "reply", itemId, message }     → manda a Zernio + marca respondido
+
+// Declaración ambiental defensiva para LSPs que no ejecutan Deno runtime
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+    set(key: string, value: string): void;
+  };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+};
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.116.0";
@@ -331,7 +341,7 @@ async function sync() {
       .eq("id", (r as { id: string }).id);
     classified++;
   }
-  const sinTextoIds = new Set(sinTexto.map((r) => (r as { id: string }).id));
+  const sinTextoIds = new Set(sinTexto.map((r: any) => (r as { id: string }).id));
   toClassify = toClassify.filter((r: { id: string }) => !sinTextoIds.has(r.id));
   for (let i = 0; i < toClassify.length; i += 10) {
     const batch = toClassify.slice(i, i + 10) as { id: string; text: string }[];
@@ -545,7 +555,7 @@ async function sendToCRM(lead: {
 // HANDLER
 // ═══════════════════════════════════════
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
