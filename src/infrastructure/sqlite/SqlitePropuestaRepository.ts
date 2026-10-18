@@ -130,7 +130,7 @@ export class SqlitePropuestaRepository {
     const stmt = this.db.prepare(`
       UPDATE propuestas_sm
       SET estado = 'aprobado', actualizado_el = ?
-      WHERE propuesta_id = ?;
+      WHERE propuesta_id = ? AND estado != 'publicado';
     `);
     const res = stmt.run(new Date().toISOString(), id);
     return Number(res.changes || 0) > 0;
@@ -150,7 +150,7 @@ export class SqlitePropuestaRepository {
     const stmt = this.db.prepare(`
       UPDATE propuestas_sm
       SET estado = 'publicado', actualizado_el = ?
-      WHERE propuesta_id = ?;
+      WHERE propuesta_id = ? AND estado = 'aprobado';
     `);
     const res = stmt.run(new Date().toISOString(), id);
     return Number(res.changes || 0) > 0;

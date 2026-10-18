@@ -39,6 +39,7 @@ export interface PostingCycleOptions {
 export interface PostingCycleResult {
   propuestasProcesadas: number;
   publicadasExitosamente: number;
+  encoladasFallbackLocal: number;
   fallidas: number;
   detalles: Array<{
     propuestaId: string;
@@ -91,6 +92,8 @@ export function buildZernioPayload(
   };
 }
 
+export const defaultZernioCircuitBreaker = new ZernioCircuitBreaker();
+
 /**
  * Ejecuta un ciclo de despacho de propuestas aprobadas listas para publicación.
  */
@@ -102,7 +105,7 @@ export async function runPostingCycle(
     now = new Date(),
     sandbox = process.env.ZERNIO_SANDBOX === "true" || !process.env.ZERNIO_API_KEY,
     apiKey = process.env.ZERNIO_API_KEY || "sandbox_key",
-    circuitBreaker = new ZernioCircuitBreaker(),
+    circuitBreaker = defaultZernioCircuitBreaker,
     accountIds = {
       linkedin: process.env.ZERNIO_LINKEDIN_ACCOUNT_ID || "acc_li_01",
       instagram: process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID || "acc_ig_01",
@@ -122,6 +125,7 @@ export async function runPostingCycle(
   const result: PostingCycleResult = {
     propuestasProcesadas: aDespachar.length,
     publicadasExitosamente: 0,
+    encoladasFallbackLocal: 0,
     fallidas: 0,
     detalles: [],
   };
@@ -136,6 +140,7 @@ export async function runPostingCycle(
         // En modo Sandbox, no se realiza llamada de red externa
         postId = `zernio_mock_${Date.now()}_${propuesta.propuesta_id}`;
         repository.actualizarEstadoPropuesta(propuesta.propuesta_id, "publicado");
+        result.publicadasExitosamente++;
       } else {
         const execution = await circuitBreaker.execute(
           async (signal) => {
@@ -171,10 +176,12 @@ export async function runPostingCycle(
         postId = execution.result;
         if (!execution.fromFallback) {
           repository.actualizarEstadoPropuesta(propuesta.propuesta_id, "publicado");
+          result.publicadasExitosamente++;
+        } else {
+          result.encoladasFallbackLocal++;
         }
       }
 
-      result.publicadasExitosamente++;
       result.detalles.push({
         propuestaId: propuesta.propuesta_id,
         canal: propuesta.canal_destino,

@@ -79,15 +79,35 @@ export function getLocalProposalsAsLegacy(): ProposalDetail[] {
  * Inicializa y devuelve la colección canónica de propuestas en memoria/localStorage.
  */
 export function getLocalProposals(): PropuestaMejoraSMDTO[] {
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_PROPOSALS);
+    raw = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY_PROPOSALS) : null;
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed.map((p) => toCanonicalPropuesta(p));
       }
+      // Si parsed no es un array válido no vacío, se considera estructura corrupta
+      if (typeof localStorage !== "undefined") {
+        const backupKey = `mejora_sm_proposals_corrupted_backup_${Date.now()}`;
+        try {
+          localStorage.setItem(backupKey, raw);
+          console.warn(`[localSMService] Contenido inválido en localStorage respaldado en '${backupKey}'`);
+        } catch {
+          // ignore storage quota error
+        }
+      }
     }
   } catch (err) {
+    if (raw && typeof localStorage !== "undefined") {
+      const backupKey = `mejora_sm_proposals_corrupted_backup_${Date.now()}`;
+      try {
+        localStorage.setItem(backupKey, raw);
+        console.warn(`[localSMService] JSON corrupto respaldado en '${backupKey}'`);
+      } catch {
+        // ignore storage quota error
+      }
+    }
     console.warn("[localSMService] Error leyendo localStorage, regenerando grilla:", err);
   }
 
@@ -117,25 +137,44 @@ export function saveLocalProposals(proposals: PropuestaMejoraSMDTO[]): void {
   }
 }
 
-const LOCAL_HTTP_BASE = "http://localhost:4015";
+export const LOCAL_HTTP_BASE =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_LOCAL_API_URL) ||
+  (typeof process !== "undefined" && process.env?.VITE_LOCAL_API_URL) ||
+  "http://127.0.0.1:4002";
+
+export const LOCAL_AUTH_BEARER =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_LOCAL_AUTH_TOKEN) ||
+  (typeof process !== "undefined" && process.env?.MEJORA_SM_AUTH_TOKEN) ||
+  "mejora_sm_local_bearer_2026";
 
 function syncMutationToBackend(endpoint: string, payload: unknown) {
   if (typeof fetch !== "undefined") {
     fetch(`${LOCAL_HTTP_BASE}${endpoint}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${LOCAL_AUTH_BEARER}`,
+      },
       body: JSON.stringify(payload),
-    }).catch(() => {
-      // Modo defensivo: no interrumpe la UI si el servidor local está desconectado
+    }).catch((err) => {
+      // Diagnóstico explícito SRE sin silenciar errores
+      console.warn("[localSMService] Aviso: backend local no respondió a la sincronización:", err?.message || err);
     });
   }
 }
 
 /**
  * Aprueba una propuesta individualmente y sincroniza con el backend local.
+ * Guardrail DOM-01: Prohibido revertir propuestas ya publicadas.
  */
 export function approveLocalProposal(id: string): PropuestaMejoraSMDTO[] {
   const all = getLocalProposals();
+  const target = all.find((p) => p.propuesta_id === id || (p as any).id === id);
+  if (target && target.estado === "publicado") {
+    console.warn(`[localSMService] Transición rechazada: propuesta ${id} ya está en estado 'publicado'`);
+    return all;
+  }
+
   const updated = all.map((p) => {
     if (p.propuesta_id === id || (p as any).id === id) {
       return { ...p, estado: "aprobado" as const };
@@ -149,9 +188,18 @@ export function approveLocalProposal(id: string): PropuestaMejoraSMDTO[] {
 
 /**
  * Publica una propuesta individualmente y sincroniza con el backend local.
+ * Guardrail DOM-01: Exige que la propuesta esté previamente en estado 'aprobado'.
  */
 export function publishLocalProposal(id: string): PropuestaMejoraSMDTO[] {
   const all = getLocalProposals();
+  const target = all.find((p) => p.propuesta_id === id || (p as any).id === id);
+  if (target && target.estado !== "aprobado") {
+    console.warn(
+      `[localSMService] Transición rechazada: propuesta ${id} debe estar en estado 'aprobado' para publicarse (actual: '${target?.estado}')`
+    );
+    return all;
+  }
+
   const updated = all.map((p) => {
     if (p.propuesta_id === id || (p as any).id === id) {
       return { ...p, estado: "publicado" as const };
@@ -214,17 +262,31 @@ export function updateLocalProposal(
   const all = getLocalProposals();
   const updated = all.map((p) => {
     if (p.propuesta_id === id || (p as any).id === id) {
-      const borradorActivo = p.borrador_seleccionado || "A";
+      const borradorActivo = fields.borrador_seleccionado || p.borrador_seleccionado || "A";
       const nuevosBorradores = p.borradores.map((b) => {
         if (b.opcion === borradorActivo) {
+          const nuevoCopyTresPasos: CopyCalibradoTresPasos = fields.copy_tres_pasos
+            ? { ...fields.copy_tres_pasos }
+            : {
+                paso1_dolor: fields.hook !== undefined ? fields.hook : b.copy_tres_pasos.paso1_dolor,
+                paso2_reencuadre: fields.body !== undefined ? fields.body : b.copy_tres_pasos.paso2_reencuadre,
+                paso3_direccion_web: fields.cta !== undefined ? fields.cta : b.copy_tres_pasos.paso3_direccion_web,
+              };
+
+          const nuevoCuerpo = fields.copy_tres_pasos
+            ? `${fields.copy_tres_pasos.paso1_dolor}\n\n${fields.copy_tres_pasos.paso2_reencuadre}`
+            : fields.body !== undefined
+            ? fields.body
+            : b.cuerpo_texto;
+
+          const nuevoCta = fields.copy_tres_pasos?.paso3_direccion_web ?? (fields.cta !== undefined ? fields.cta : b.cta_texto);
+
           return {
             ...b,
             titulo_portada: fields.title ?? b.titulo_portada,
-            copy_tres_pasos: fields.copy_tres_pasos ? { ...fields.copy_tres_pasos } : b.copy_tres_pasos,
-            cuerpo_texto: fields.copy_tres_pasos
-              ? `${fields.copy_tres_pasos.paso1_dolor}\n\n${fields.copy_tres_pasos.paso2_reencuadre}`
-              : b.cuerpo_texto,
-            cta_texto: fields.copy_tres_pasos?.paso3_direccion_web ?? b.cta_texto,
+            copy_tres_pasos: nuevoCopyTresPasos,
+            cuerpo_texto: nuevoCuerpo,
+            cta_texto: nuevoCta,
           };
         }
         return b;

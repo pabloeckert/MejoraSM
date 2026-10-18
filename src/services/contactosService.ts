@@ -11,7 +11,7 @@ export const CONTACTOS_API_URL =
 export const CONTACTOS_API_KEY =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CONTACTOS_API_KEY) ||
   (typeof process !== 'undefined' && (process.env?.VITE_CONTACTOS_API_KEY || process.env?.CONTACTOS_API_KEY)) ||
-  'b06fb0a66d0db70562e0c11c7f7399614976b3fa31e30181f479a7b5a80ce398';
+  '';
 
 export interface LeadPayload {
   source?: string;
@@ -72,13 +72,17 @@ export async function enviarLeadACRM(lead: LeadPayload): Promise<EnviarLeadRespo
       `[MejoraSM] Lead derivado desde ${red}${handle ? ` (@${handle})` : ''}`,
   };
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (key) {
+    headers['X-Api-Key'] = key;
+    headers['Authorization'] = `Bearer ${key}`;
+  }
+
   const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Api-Key': key,
-      'Authorization': `Bearer ${key}`,
-    },
+    headers,
     body: JSON.stringify(body),
   });
 

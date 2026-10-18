@@ -491,7 +491,10 @@ async function sendToCRM(lead: {
   }
 
   const url = Deno.env.get("CONTACTOS_API_URL") || "https://tzatuvxatsduuslxqdtm.supabase.co/functions/v1/contactos-api";
-  const key = Deno.env.get("CONTACTOS_API_KEY") || "b06fb0a66d0db70562e0c11c7f7399614976b3fa31e30181f479a7b5a80ce398";
+  const key = Deno.env.get("CONTACTOS_API_KEY");
+  if (!key) {
+    throw new Error("CONTACTOS_API_KEY no configurada en las variables de entorno de Supabase Edge Function");
+  }
 
   const payload = {
     source: lead.source || "mejora_sm",

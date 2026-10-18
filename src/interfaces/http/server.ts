@@ -28,8 +28,9 @@ export function createSMServer(customServices?: SMAppServices): Server {
 if (process.argv[1] && process.argv[1].endsWith("server.ts")) {
   const PORT = Number(process.env.MEJORA_SM_PORT) || 4002;
   const server = createSMServer();
-  server.listen(PORT, () => {
-    console.log(`[MejoraSM] Servidor local soberano corriendo en http://localhost:${PORT}`);
+  const HOST = "127.0.0.1";
+  server.listen(PORT, HOST, () => {
+    console.log(`[MejoraSM] Servidor local soberano corriendo en http://${HOST}:${PORT}`);
     console.log(`[MejoraSM] Endpoints disponibles: /health, /api/boveda/fichas, /api/propuestas, /api/kpis/optimizacion`);
   });
 }

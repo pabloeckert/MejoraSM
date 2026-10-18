@@ -164,4 +164,34 @@ describe("Subfase 1.6: Auto-Posting Local con Zernio y Canal WhatsApp", () => {
     const pPend = repo.obtenerPropuesta("P-PENDIENTE");
     expect(pPend?.estado).toBe("pendiente_revision");
   });
+
+  it("RES-01: ante caída de Zernio (fallback local), computa encoladasFallbackLocal y 0 publicadas (cero falsos positivos)", async () => {
+    const ahora = new Date("2026-10-16T12:00:00Z");
+    const pasada = "2026-10-16T10:00:00Z";
+
+    repo.guardarPropuesta(crearPropuesta("P-FALLA-ZERNIO", "linkedin", "aprobado", pasada));
+
+    // Mock global de fetch que falla con error de red simulando caída de Zernio
+    const mockFetch = vi.fn().mockRejectedValue(new Error("Network connection refused to zernio.com"));
+    vi.stubGlobal("fetch", mockFetch);
+
+    const res = await runPostingCycle({
+      repository: repo,
+      now: ahora,
+      sandbox: false,
+      apiKey: "test_key",
+    });
+
+    expect(res.propuestasProcesadas).toBe(1);
+    expect(res.publicadasExitosamente).toBe(0); // CERO falsos positivos
+    expect(res.encoladasFallbackLocal).toBe(1); // Computado explícitamente
+    expect(res.fallidas).toBe(0);
+
+    // La propuesta debe mantenerse en aprobado con la nota de fallback en SQLite
+    const propEnDb = repo.obtenerPropuesta("P-FALLA-ZERNIO");
+    expect(propEnDb?.estado).toBe("aprobado");
+    expect(propEnDb?.motivo_rechazo).toContain("Fallback local");
+
+    vi.restoreAllMocks();
+  });
 });

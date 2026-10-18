@@ -108,6 +108,23 @@ function parseJsonBody<T>(req: IncomingMessage): Promise<T> {
   });
 }
 
+export const LOCAL_AUTH_TOKEN =
+  process.env.MEJORA_SM_AUTH_TOKEN || "mejora_sm_local_bearer_2026";
+
+function isAuthorized(req: IncomingMessage): boolean {
+  const authHeader = req.headers["authorization"] || req.headers["Authorization"];
+  if (!authHeader || typeof authHeader !== "string") {
+    return false;
+  }
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!match) {
+    return false;
+  }
+  const token = match[1].trim();
+  const expectedToken = process.env.MEJORA_SM_AUTH_TOKEN || "mejora_sm_local_bearer_2026";
+  return token === expectedToken;
+}
+
 export function handleSMHttpRequest(
   req: IncomingMessage,
   res: ServerResponse,
@@ -129,7 +146,7 @@ export function handleSMHttpRequest(
     return;
   }
 
-  // Healthcheck local
+  // Healthcheck local (público para monitores de salud y liveness)
   if (method === "GET" && pathname === "/health") {
     sendJson(res, 200, {
       status: "ok",
@@ -139,6 +156,16 @@ export function handleSMHttpRequest(
       timestamp: new Date().toISOString(),
     });
     return;
+  }
+
+  // Control de acceso Zero-Trust: exigir Authorization Bearer para toda mutación en /api/*
+  if (pathname.startsWith("/api") && ["POST", "PATCH", "DELETE", "PUT"].includes(method)) {
+    if (!isAuthorized(req)) {
+      sendJson(res, 401, {
+        error: "No autorizado: se requiere header Authorization: Bearer <token>",
+      });
+      return;
+    }
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -236,9 +263,20 @@ export function handleSMHttpRequest(
           sendJson(res, 400, { error: "Falta id de propuesta para publicar (se espera { id: string })" });
           return;
         }
+        const propuestaExistente = services.propuestaRepo.obtenerPorId(id);
+        if (!propuestaExistente) {
+          sendJson(res, 404, { error: `Propuesta ${id} no encontrada para publicar` });
+          return;
+        }
+        if (propuestaExistente.estado !== "aprobado") {
+          sendJson(res, 409, {
+            error: `Transición inválida: la propuesta ${id} debe estar en estado 'aprobado' para ser publicada (estado actual: '${propuestaExistente.estado}')`,
+          });
+          return;
+        }
         const ok = services.propuestaRepo.publicar(id);
         if (!ok) {
-          sendJson(res, 404, { error: `Propuesta ${id} no encontrada para publicar` });
+          sendJson(res, 500, { error: `No se pudo actualizar el estado a 'publicado' para ${id}` });
           return;
         }
         sendJson(res, 200, { success: true, id, estado: "publicado" });
@@ -269,9 +307,20 @@ export function handleSMHttpRequest(
   const matchAprobar = pathname.match(/^\/api\/propuestas\/([^/]+)\/aprobar$/);
   if (method === "PATCH" && matchAprobar) {
     const id = decodeURIComponent(matchAprobar[1]);
+    const propuestaExistente = services.propuestaRepo.obtenerPorId(id);
+    if (!propuestaExistente) {
+      sendJson(res, 404, { error: "Propuesta no encontrada para aprobar" });
+      return;
+    }
+    if (propuestaExistente.estado === "publicado") {
+      sendJson(res, 409, {
+        error: `Transición inválida: la propuesta ${id} ya ha sido publicada y no puede ser revertida a 'aprobado'`,
+      });
+      return;
+    }
     const ok = services.propuestaRepo.aprobar(id);
     if (!ok) {
-      sendJson(res, 404, { error: "Propuesta no encontrada para aprobar" });
+      sendJson(res, 500, { error: `Error al aprobar propuesta ${id}` });
       return;
     }
     sendJson(res, 200, { success: true, id, estado: "aprobado" });

@@ -55,7 +55,10 @@ describe("Subfase 1.1: Servidor HTTP Local y Persistencia Soberana en SQLite", (
 
     const resPost = await fetch(`${baseUrl}/api/boveda/fichas`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer mejora_sm_local_bearer_2026",
+      },
       body: JSON.stringify(ficha),
     });
     expect(resPost.status).toBe(201);
@@ -66,6 +69,17 @@ describe("Subfase 1.1: Servidor HTTP Local y Persistencia Soberana en SQLite", (
     expect(dataGet.id).toBe("BOV-E2E-001");
     expect(dataGet.origen_carpeta).toBe("constitucion");
     expect(dataGet.titulo).toBe("Manifiesto de Marca 2026");
+  });
+
+  it("rechaza mutaciones POST sin Authorization Bearer con 401 Unauthorized", async () => {
+    const resSinAuth = await fetch(`${baseUrl}/api/propuestas`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(resSinAuth.status).toBe(401);
+    const err = await resSinAuth.json();
+    expect(err.error).toContain("No autorizado");
   });
 
   it("permite registrar propuestas, consultar listado y aprobar lote completo", async () => {
@@ -116,15 +130,32 @@ describe("Subfase 1.1: Servidor HTTP Local y Persistencia Soberana en SQLite", (
 
     const resPost = await fetch(`${baseUrl}/api/propuestas`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer mejora_sm_local_bearer_2026",
+      },
       body: JSON.stringify(p1),
     });
     expect(resPost.status).toBe(201);
 
+    // Guardrail: publicar directamente desde pendiente_revision debe arrojar 409 Conflict
+    const resPublishInvalido = await fetch(`${baseUrl}/api/publish`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer mejora_sm_local_bearer_2026",
+      },
+      body: JSON.stringify({ id: "PROP-E2E-01" }),
+    });
+    expect(resPublishInvalido.status).toBe(409);
+
     // Aprobar lote completo
     const resAprobarLote = await fetch(`${baseUrl}/api/propuestas/aprobar-lote`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer mejora_sm_local_bearer_2026",
+      },
       body: JSON.stringify({ ids: ["PROP-E2E-01"] }),
     });
     expect(resAprobarLote.status).toBe(200);
@@ -136,12 +167,36 @@ describe("Subfase 1.1: Servidor HTTP Local y Persistencia Soberana en SQLite", (
     expect(resGetProp.status).toBe(200);
     const dataProp = await resGetProp.json();
     expect(dataProp.estado).toBe("aprobado");
+
+    // Publicar ahora sí debe ser exitoso (200 OK)
+    const resPublishOk = await fetch(`${baseUrl}/api/publish`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer mejora_sm_local_bearer_2026",
+      },
+      body: JSON.stringify({ id: "PROP-E2E-01" }),
+    });
+    expect(resPublishOk.status).toBe(200);
+
+    // Guardrail: revertir a aprobado una propuesta ya publicada debe arrojar 409 Conflict
+    const resRevertir = await fetch(`${baseUrl}/api/propuestas/PROP-E2E-01/aprobar`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer mejora_sm_local_bearer_2026",
+      },
+    });
+    expect(resRevertir.status).toBe(409);
   });
 
   it("genera la grilla de 26 semanas y la persiste en base de datos en una llamada", async () => {
     const resGrilla = await fetch(`${baseUrl}/api/propuestas/generar-grilla`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer mejora_sm_local_bearer_2026",
+      },
       body: JSON.stringify({ fechaInicio: "2026-10-19T00:00:00.000Z", guardarEnDb: true }),
     });
 
