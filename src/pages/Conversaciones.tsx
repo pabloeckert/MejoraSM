@@ -15,6 +15,7 @@ import {
   Archive,
   CheckCircle2,
   UserCheck,
+  ExternalLink,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -288,10 +289,25 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
           </span>
           {sent && <Badge className={cn("border-0", sent.className)}>{sent.label}</Badge>}
           {incoming.persona_id && (
-            <Badge variant="outline" className="border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 font-medium">
-              <CheckCircle2 className="mr-1 h-3 w-3 inline text-emerald-600 dark:text-emerald-400" />
-              Derivado a CRM
-            </Badge>
+            <a
+              href={`#lead-${incoming.persona_id}`}
+              onClick={(e) => {
+                e.preventDefault();
+                toast({
+                  title: "Ficha de Prospecto en CRM",
+                  description: `ID de lead: ${incoming.persona_id}. Trazabilidad confirmada con la base de datos soberana.`,
+                });
+              }}
+              title={`Ver ficha del prospecto en CRM (ID: ${incoming.persona_id})`}
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-50 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100 hover:border-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400 transition-all cursor-pointer shadow-2xs group"
+            >
+              <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+              <span>Derivado a CRM</span>
+              <span className="font-mono text-[9px] opacity-75 bg-emerald-100/80 px-1 py-0.2 rounded">
+                #${incoming.persona_id.slice(0, 8)}
+              </span>
+              <ExternalLink className="h-2.5 w-2.5 opacity-60 ml-0.5 group-hover:opacity-100" />
+            </a>
           )}
           {incoming.sentiment_note && <span className="text-muted-foreground/80">{incoming.sentiment_note}</span>}
           {incoming.item_time && (

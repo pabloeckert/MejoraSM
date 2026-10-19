@@ -1,6 +1,7 @@
 // src/components/Grid26Semanas.tsx
 // GRILLA EVERGREEN DE 26 SEMANAS Y MOTOR VISUAL DE ENCUADRE (FRAMING ENGINE)
 // Cumplimiento estricto: Regla 80% Jabs / 20% Right Hooks · 0% Recorte de Rostros · blur(28px)
+// Ergonomía táctil mobile (min-h-[44px]), loaders animados y divulgación progresiva.
 
 import { useState } from "react";
 import {
@@ -12,22 +13,30 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Calendar,
   CheckCircle2,
   Send,
   ArrowRight,
   Eye,
   Layers,
+  Loader2,
 } from "lucide-react";
 import { getAssetUrl } from "@/components/ProposalDetailDialog";
 
 export interface Grid26SemanasProps {
   proposals: PropuestaMejoraSMDTO[];
   activeWeek: number;
-  onApprove: (id: string) => void;
-  onPublish: (id: string) => void;
+  onApprove: (id: string) => void | Promise<unknown>;
+  onPublish: (id: string) => void | Promise<unknown>;
   onSelectDraft: (id: string, opcion: OpcionBorrador) => void;
   onOpenDetail: (propuesta: PropuestaMejoraSMDTO) => void;
+  isProcessingId?: string;
 }
 
 const DEFAULT_PHOTO = "content/boveda/04_networking/img_clevel_rosario_2026.jpg";
@@ -39,9 +48,14 @@ export function Grid26Semanas({
   onPublish,
   onSelectDraft,
   onOpenDetail,
+  isProcessingId,
 }: Grid26SemanasProps) {
   // Estado local para selector de ratio del Framing Engine por propuesta (por defecto 4:5)
   const [aspectRatios, setAspectRatios] = useState<Record<string, TargetAspectRatio>>({});
+  // Estado local para spinner inline si el padre no provee isProcessingId
+  const [localProcessingId, setLocalProcessingId] = useState<string | null>(null);
+
+  const isBusy = (id: string) => isProcessingId === id || localProcessingId === id;
 
   const getRatio = (propuestaId: string): TargetAspectRatio => {
     return aspectRatios[propuestaId] || "4:5";
@@ -49,6 +63,24 @@ export function Grid26Semanas({
 
   const handleRatioChange = (propuestaId: string, ratio: TargetAspectRatio) => {
     setAspectRatios((prev) => ({ ...prev, [propuestaId]: ratio }));
+  };
+
+  const handleApproveWithFeedback = async (id: string) => {
+    setLocalProcessingId(id);
+    try {
+      await onApprove(id);
+    } finally {
+      setLocalProcessingId(null);
+    }
+  };
+
+  const handlePublishWithFeedback = async (id: string) => {
+    setLocalProcessingId(id);
+    try {
+      await onPublish(id);
+    } finally {
+      setLocalProcessingId(null);
+    }
   };
 
   if (proposals.length === 0) {
@@ -72,6 +104,7 @@ export function Grid26Semanas({
         const isApproved = propuesta.estado === "aprobado";
         const isPending = propuesta.estado === "pendiente_revision";
         const isPublished = propuesta.estado === "publicado";
+        const busy = isBusy(propuesta.propuesta_id);
 
         const currentRatio = getRatio(propuesta.propuesta_id);
         const imgRuta = propuesta.imagen_boveda_vinculada?.ruta_archivo_local || DEFAULT_PHOTO;
@@ -91,7 +124,7 @@ export function Grid26Semanas({
             className="overflow-hidden border border-slate-200 bg-white shadow-sm hover:shadow-md transition-all flex flex-col justify-between rounded-xl"
           >
             <CardContent className="p-4 space-y-3.5">
-              {/* TOP BAR: ID + CANAL + ESTRATEGIA */}
+              {/* TOP BAR: ID + CANAL + ESTRATEGIA (CON TOOLTIP DIVULGACIÓN PROGRESIVA) */}
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[11px] font-bold text-blue-900 tracking-tight">
                   {propuesta.propuesta_id}
@@ -103,14 +136,39 @@ export function Grid26Semanas({
                   >
                     {propuesta.canal_destino}
                   </Badge>
-                  <Badge
-                    variant={isJab ? "default" : "destructive"}
-                    className={`text-[10px] font-bold ${
-                      isJab ? "bg-[#1A3D84] text-white" : "bg-[#E1061E] text-white"
-                    }`}
-                  >
-                    {isJab ? "Jab (80%)" : "Right Hook (20%)"}
-                  </Badge>
+                  <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-block cursor-help focus:outline-none">
+                          <Badge
+                          variant={isJab ? "default" : "destructive"}
+                          className={`cursor-help text-[10px] font-bold transition-transform hover:scale-105 ${
+                            isJab ? "bg-[#1A3D84] text-white" : "bg-[#E1061E] text-white"
+                          }`}
+                        >
+                          {isJab ? "Jab (80%)" : "Right Hook (20%)"}
+                          </Badge>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs p-2.5 bg-slate-900 text-white shadow-lg rounded-lg border border-slate-800">
+                        {isJab ? (
+                          <div>
+                            <p className="font-bold text-sky-300">Estrategia Jab (80% del Mix)</p>
+                            <p className="text-[11px] mt-0.5 text-slate-200">
+                              Contenido educativo, autoridad y reencuadre de dolor hacia el sistema. No pide nada a cambio; nutre a la audiencia.
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="font-bold text-red-300">Estrategia Right Hook (20% del Mix)</p>
+                            <p className="text-[11px] mt-0.5 text-slate-200">
+                              Llamado a la acción de conversión directa comercial (diagnóstico de 4 dimensiones, consultoría o propuesta).
+                            </p>
+                          </div>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
 
@@ -133,7 +191,7 @@ export function Grid26Semanas({
                 {borrador.titulo_portada}
               </h3>
 
-              {/* SELECTOR DE BORRADORES A / B / C */}
+              {/* SELECTOR DE BORRADORES A / B / C (ERGONOMÍA TÁCTIL) */}
               <div className="flex items-center justify-between pt-1 pb-0.5 border-t border-slate-100">
                 <span className="text-[10px] text-slate-400 font-medium">Borradores IA:</span>
                 <div className="flex gap-1">
@@ -143,7 +201,7 @@ export function Grid26Semanas({
                       type="button"
                       aria-label={`Seleccionar borrador ${op} para ${propuesta.propuesta_id}`}
                       onClick={() => onSelectDraft(propuesta.propuesta_id, op)}
-                      className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold transition-colors ${
+                      className={`min-h-[36px] min-w-[36px] sm:min-h-[24px] sm:min-w-[24px] flex items-center justify-center text-xs sm:text-[10px] px-2.5 py-1 sm:px-2 sm:py-0.5 rounded font-mono font-bold transition-all ${
                         propuesta.borrador_seleccionado === op
                           ? "bg-[#1A3D84] text-white shadow-xs"
                           : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -186,7 +244,7 @@ export function Grid26Semanas({
                         type="button"
                         aria-label={`Cambiar formato a ${r}`}
                         onClick={() => handleRatioChange(propuesta.propuesta_id, r)}
-                        className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition-all ${
+                        className={`min-h-[34px] sm:min-h-[22px] px-2.5 py-1 sm:px-1.5 sm:py-0.5 rounded text-[10px] sm:text-[9px] font-mono font-bold transition-all ${
                           currentRatio === r
                             ? "bg-white text-[#1A3D84] shadow-xs"
                             : "text-slate-500 hover:text-slate-800"
@@ -235,8 +293,8 @@ export function Grid26Semanas({
               </div>
             </CardContent>
 
-            {/* FOOTER: ESTADO Y BOTONES DE ACCIÓN */}
-            <div className="p-3 bg-slate-50/90 border-t border-slate-100 flex items-center justify-between gap-2">
+            {/* FOOTER: ESTADO Y BOTONES DE ACCIÓN (ERGONOMÍA MOBILE MIN 44PX + SPINNERS) */}
+            <div className="p-3 bg-slate-50/90 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
               <Badge
                 variant={isApproved ? "default" : isPending ? "secondary" : "outline"}
                 className={`text-[10px] font-semibold ${
@@ -254,20 +312,25 @@ export function Grid26Semanas({
                   : "Publicada"}
               </Badge>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 ml-auto">
                 {/* BOTÓN APROBAR */}
                 {isPending && (
                   <Button
                     size="sm"
                     variant="ghost"
+                    disabled={busy}
                     aria-label={`Aprobar pieza ${propuesta.propuesta_id}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      onApprove(propuesta.propuesta_id);
+                      handleApproveWithFeedback(propuesta.propuesta_id);
                     }}
-                    className="h-7 text-xs text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 font-semibold px-2"
+                    className="min-h-[44px] sm:min-h-[30px] h-auto py-2 sm:py-1 px-3 sm:px-2 text-xs text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 font-semibold"
                   >
-                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                    {busy ? (
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                    )}
                     Aprobar
                   </Button>
                 )}
@@ -277,14 +340,19 @@ export function Grid26Semanas({
                   <Button
                     size="sm"
                     variant="ghost"
+                    disabled={busy}
                     aria-label={`Publicar pieza ${propuesta.propuesta_id}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      onPublish(propuesta.propuesta_id);
+                      handlePublishWithFeedback(propuesta.propuesta_id);
                     }}
-                    className="h-7 text-xs text-blue-700 hover:text-blue-800 hover:bg-blue-50 font-semibold px-2"
+                    className="min-h-[44px] sm:min-h-[30px] h-auto py-2 sm:py-1 px-3 sm:px-2 text-xs text-blue-700 hover:text-blue-800 hover:bg-blue-50 font-semibold"
                   >
-                    <Send className="mr-1 h-3 w-3" />
+                    {busy ? (
+                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Send className="mr-1 h-3.5 w-3.5" />
+                    )}
                     Publicar
                   </Button>
                 )}
@@ -294,7 +362,7 @@ export function Grid26Semanas({
                   size="sm"
                   variant="outline"
                   onClick={() => onOpenDetail(propuesta)}
-                  className="h-7 text-xs bg-white hover:bg-slate-100 text-blue-900 font-semibold border-slate-300"
+                  className="min-h-[44px] sm:min-h-[30px] h-auto py-2 sm:py-1 px-3 sm:px-2.5 text-xs bg-white hover:bg-slate-100 text-blue-900 font-semibold border-slate-300"
                 >
                   Revisar / Editar
                   <ArrowRight className="ml-1 h-3 w-3" />
