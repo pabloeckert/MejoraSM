@@ -69,9 +69,16 @@ export class SqliteOutboxRepository {
     return Number(res.changes || 0) > 0;
   }
 
-  /** Reclama atómicamente hasta `limite` posts listos y los marca DESPACHANDO. */
-  public reclamarLote(limite: number, now: Date = new Date()): OutboxPost[] {
+  /** Reclama atómicamente hasta `limite` posts listos y los marca DESPACHANDO con lease_owner y lease_expira_at. */
+  public reclamarLote(
+    limite: number,
+    now: Date = new Date(),
+    leaseOwner: string = randomUUID(),
+    leaseDurationMs: number = 60_000
+  ): OutboxPost[] {
     const ahoraIso = now.toISOString();
+    const leaseExpiraIso = new Date(now.getTime() + leaseDurationMs).toISOString();
+
     return withImmediateTransaction(this.db, () => {
       const filas = this.db
         .prepare(
@@ -81,45 +88,181 @@ export class SqliteOutboxRepository {
            ORDER BY creado_en ASC, rowid ASC LIMIT ?`
         )
         .all(ahoraIso, limite) as unknown as OutboxPost[];
-      const marcar = this.db.prepare(
-        "UPDATE outbox_posts SET estado_post = 'DESPACHANDO', actualizado_en = ? WHERE post_id = ?"
+
+      const pasarACola = this.db.prepare(
+        "UPDATE outbox_posts SET estado_post = 'EN_COLA', actualizado_en = ? WHERE post_id = ? AND estado_post = 'APROBADO'"
       );
-      for (const f of filas) marcar.run(ahoraIso, f.post_id);
-      return filas.map((f) => ({ ...f, estado_post: "DESPACHANDO" as const, actualizado_en: ahoraIso }));
+      const marcar = this.db.prepare(
+        "UPDATE outbox_posts SET estado_post = 'DESPACHANDO', lease_owner = ?, lease_expira_at = ?, actualizado_en = ? WHERE post_id = ?"
+      );
+      for (const f of filas) {
+        if (f.estado_post === "APROBADO") {
+          pasarACola.run(ahoraIso, f.post_id);
+        }
+        marcar.run(leaseOwner, leaseExpiraIso, ahoraIso, f.post_id);
+      }
+      return filas.map((f) => ({
+        ...f,
+        estado_post: "DESPACHANDO" as const,
+        lease_owner: leaseOwner,
+        lease_expira_at: leaseExpiraIso,
+        actualizado_en: ahoraIso,
+      }));
     });
   }
 
-  public marcarPublicado(postId: string, now: Date = new Date()): void {
-    this.db
-      .prepare(
-        "UPDATE outbox_posts SET estado_post = 'PUBLICADO', error_ultimo = NULL, proximo_reintento_at = NULL, actualizado_en = ? WHERE post_id = ? AND estado_post = 'DESPACHANDO'"
-      )
-      .run(now.toISOString(), postId);
+  /**
+   * Commit de resultado PUBLICADO con Compare-And-Set (CAS):
+   * UPDATE outbox_posts SET estado_post='PUBLICADO'... WHERE post_id=? AND lease_owner=? AND estado_post='DESPACHANDO'
+   */
+  public marcarPublicado(
+    postId: string,
+    now: Date = new Date(),
+    leaseOwner?: string | null
+  ): { success: boolean; changes: number } {
+    const ahoraIso = now.toISOString();
+    return withImmediateTransaction(this.db, () => {
+      let res: { changes: number | bigint };
+      if (leaseOwner) {
+        res = this.db
+          .prepare(
+            `UPDATE outbox_posts
+             SET estado_post = 'PUBLICADO',
+                 lease_owner = NULL,
+                 lease_expira_at = NULL,
+                 error_ultimo = NULL,
+                 proximo_reintento_at = NULL,
+                 actualizado_en = ?
+             WHERE post_id = ? AND lease_owner = ? AND estado_post = 'DESPACHANDO'`
+          )
+          .run(ahoraIso, postId, leaseOwner);
+      } else {
+        res = this.db
+          .prepare(
+            `UPDATE outbox_posts
+             SET estado_post = 'PUBLICADO',
+                 lease_owner = NULL,
+                 lease_expira_at = NULL,
+                 error_ultimo = NULL,
+                 proximo_reintento_at = NULL,
+                 actualizado_en = ?
+             WHERE post_id = ? AND estado_post = 'DESPACHANDO'`
+          )
+          .run(ahoraIso, postId);
+      }
+
+      const changes = Number(res.changes || 0);
+      if (changes === 0) {
+        this.db
+          .prepare(
+            `INSERT INTO outbox_eventos_log (
+              evento_id, post_id, estado_anterior, estado_nuevo, motivo_catalogo, metadata_json, creado_en
+            ) VALUES (?, ?, 'DESPACHANDO', 'DESPACHANDO', 'CAS_LEASE_MISMATCH_REAPED', ?, ?)`
+          )
+          .run(
+            randomUUID(),
+            postId,
+            JSON.stringify({ lease_owner: leaseOwner, accion: "marcarPublicado" }),
+            ahoraIso
+          );
+        return { success: false, changes: 0 };
+      }
+
+      this.db
+        .prepare(
+          `INSERT INTO outbox_eventos_log (
+            evento_id, post_id, estado_anterior, estado_nuevo, motivo_catalogo, metadata_json, creado_en
+          ) VALUES (?, ?, 'DESPACHANDO', 'PUBLICADO', 'PUBLICACION_EXITOSA', NULL, ?)`
+        )
+        .run(randomUUID(), postId, ahoraIso);
+
+      return { success: true, changes: 1 };
+    });
   }
 
-  /** Fallo de envío: REINTENTO con backoff exponencial + jitter, o FALLIDO_PERMANENTE al agotar reintentos. */
+  /** Fallo de envío con Compare-And-Set (CAS). */
   public registrarFallo(
     postId: string,
     error: string,
     now: Date = new Date(),
-    opts: { maxReintentos?: number; backoff?: BackoffOptions } = {}
-  ): EstadoPostOutbox {
+    opts: { maxReintentos?: number; backoff?: BackoffOptions; leaseOwner?: string | null } = {}
+  ): { success: boolean; estado: EstadoPostOutbox; changes: number } {
     const max = opts.maxReintentos ?? MAX_REINTENTOS_OUTBOX;
+    const ahoraIso = now.toISOString();
+
     return withImmediateTransaction(this.db, () => {
       const post = this.obtenerPorId(postId);
       if (!post) throw new Error(`Outbox post ${postId} no encontrado`);
       const intentos = post.reintentos_cont + 1;
       const permanente = intentos >= max;
-      const estado: EstadoPostOutbox = permanente ? "FALLIDO_PERMANENTE" : "REINTENTO";
+      const estado: EstadoPostOutbox = permanente ? "DEAD_LETTER" : "REINTENTO";
       const proximo = permanente
         ? null
         : new Date(now.getTime() + calcularBackoffConJitter(intentos, opts.backoff)).toISOString();
+
+      let res: { changes: number | bigint };
+      if (opts.leaseOwner) {
+        res = this.db
+          .prepare(
+            `UPDATE outbox_posts
+             SET estado_post = ?,
+                 reintentos_cont = ?,
+                 lease_owner = NULL,
+                 lease_expira_at = NULL,
+                 proximo_reintento_at = ?,
+                 error_ultimo = ?,
+                 actualizado_en = ?
+             WHERE post_id = ? AND lease_owner = ? AND estado_post = 'DESPACHANDO'`
+          )
+          .run(estado, intentos, proximo, error, ahoraIso, postId, opts.leaseOwner);
+      } else {
+        res = this.db
+          .prepare(
+            `UPDATE outbox_posts
+             SET estado_post = ?,
+                 reintentos_cont = ?,
+                 lease_owner = NULL,
+                 lease_expira_at = NULL,
+                 proximo_reintento_at = ?,
+                 error_ultimo = ?,
+                 actualizado_en = ?
+             WHERE post_id = ? AND estado_post = 'DESPACHANDO'`
+          )
+          .run(estado, intentos, proximo, error, ahoraIso, postId);
+      }
+
+      const changes = Number(res.changes || 0);
+      if (changes === 0) {
+        this.db
+          .prepare(
+            `INSERT INTO outbox_eventos_log (
+              evento_id, post_id, estado_anterior, estado_nuevo, motivo_catalogo, metadata_json, creado_en
+            ) VALUES (?, ?, 'DESPACHANDO', 'DESPACHANDO', 'CAS_LEASE_MISMATCH_REAPED', ?, ?)`
+          )
+          .run(
+            randomUUID(),
+            postId,
+            JSON.stringify({ lease_owner: opts.leaseOwner, accion: "registrarFallo", error }),
+            ahoraIso
+          );
+        return { success: false, estado, changes: 0 };
+      }
+
       this.db
         .prepare(
-          "UPDATE outbox_posts SET estado_post = ?, reintentos_cont = ?, proximo_reintento_at = ?, error_ultimo = ?, actualizado_en = ? WHERE post_id = ?"
+          `INSERT INTO outbox_eventos_log (
+            evento_id, post_id, estado_anterior, estado_nuevo, motivo_catalogo, metadata_json, creado_en
+          ) VALUES (?, ?, 'DESPACHANDO', ?, 'DESPACHO_FALLIDO', ?, ?)`
         )
-        .run(estado, intentos, proximo, error, now.toISOString(), postId);
-      return estado;
+        .run(
+          randomUUID(),
+          postId,
+          estado,
+          JSON.stringify({ error, reintentos_cont: intentos }),
+          ahoraIso
+        );
+
+      return { success: true, estado, changes: 1 };
     });
   }
 

@@ -1,6 +1,7 @@
 // src/interfaces/http/server.ts
 // SERVIDOR HTTP LOCAL SOBERANO PARA MejoraSM
-// Motor: node:http nativo
+// Motor: node:http nativo con desacoplamiento de lectura (readOnly: true)
+// y escrituras cortas bajo BEGIN IMMEDIATE y busy_timeout <= 250ms.
 
 import { createServer, Server } from "node:http";
 import { handleSMHttpRequest, type SMAppServices } from "./router";
@@ -8,13 +9,34 @@ import { SqliteBovedaRepository } from "../../infrastructure/sqlite/SqliteBoveda
 import { SqlitePropuestaRepository } from "../../infrastructure/sqlite/SqlitePropuestaRepository";
 import { SqliteSMRepository } from "../../infrastructure/sqlite/SqliteSMRepository";
 import { SqliteProspectoRepository } from "../../infrastructure/sqlite/SqliteProspectoRepository";
+import {
+  createDatabaseConnection,
+  createReadOnlyConnection,
+  createShortWriteConnection,
+} from "../../infrastructure/sqlite/connectionFactory";
 import { SlidingWindowRateLimiter } from "./rateLimiter";
 
 export function createDefaultServices(dbPath: string = "data/mejora_sm.db"): SMAppServices {
-  const smRepo = new SqliteSMRepository(dbPath);
-  const bovedaRepo = new SqliteBovedaRepository(dbPath);
-  const propuestaRepo = new SqlitePropuestaRepository(dbPath);
-  const prospectoRepo = new SqliteProspectoRepository(dbPath);
+  if (dbPath === ":memory:") {
+    const memDb = createDatabaseConnection(":memory:");
+    return {
+      bovedaRepo: new SqliteBovedaRepository(memDb),
+      propuestaRepo: new SqlitePropuestaRepository(memDb),
+      smRepo: new SqliteSMRepository(memDb),
+      prospectoRepo: new SqliteProspectoRepository(memDb),
+      leadRateLimiter: new SlidingWindowRateLimiter(5, 60_000),
+    };
+  }
+
+  // Desacoplamiento HTTP: Lecturas con readOnly: true para aislamiento total
+  const readConn = createReadOnlyConnection(dbPath);
+  // Escrituras con conexión dedicada de corta duración (busy_timeout <= 250ms)
+  const writeConn = createShortWriteConnection(dbPath, 250);
+
+  const bovedaRepo = new SqliteBovedaRepository(readConn);
+  const smRepo = new SqliteSMRepository(writeConn);
+  const propuestaRepo = new SqlitePropuestaRepository(writeConn);
+  const prospectoRepo = new SqliteProspectoRepository(writeConn);
   const leadRateLimiter = new SlidingWindowRateLimiter(5, 60_000);
 
   return { bovedaRepo, propuestaRepo, smRepo, prospectoRepo, leadRateLimiter };

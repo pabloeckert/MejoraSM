@@ -298,8 +298,8 @@ CREATE INDEX IF NOT EXISTS idx_outbox_estado_reintento ON outbox_posts(estado_po
 CREATE INDEX IF NOT EXISTS idx_outbox_lease ON outbox_posts(estado_post, lease_expira_at);
 CREATE INDEX IF NOT EXISTS idx_outbox_eventos_post ON outbox_eventos_log(post_id);
 CREATE INDEX IF NOT EXISTS idx_contactos_email ON contactos(email);
-CREATE INDEX IF NOT EXISTS idx_contactos_telefono ON contactos(telefono);
 CREATE INDEX IF NOT EXISTS idx_outbox_pendientes ON outbox_posts(proximo_reintento_at) WHERE estado_post IN ('EN_COLA','REINTENTO');
+CREATE INDEX IF NOT EXISTS idx_outbox_leases ON outbox_posts(lease_expira_at) WHERE estado_post='DESPACHANDO';
 `;
 
 /**
