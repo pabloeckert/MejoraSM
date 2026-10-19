@@ -14,12 +14,9 @@ const Boveda = lazy(() => import("./pages/Boveda"));
 const MesaDialogo = lazy(() => import("./pages/MesaDialogo"));
 const Configuracion = lazy(() => import("./pages/Configuracion"));
 const Calendario = lazy(() => import("./pages/Calendario"));
-const Propuestas = lazy(() => import("./pages/Propuestas"));
 const SubirMaterial = lazy(() => import("./pages/SubirMaterial"));
 const Monitor = lazy(() => import("./pages/Monitor"));
-const Conversaciones = lazy(() => import("./pages/Conversaciones"));
 const CitasStudio = lazy(() => import("./pages/CitasStudio"));
-const Auditoria = lazy(() => import("./pages/Auditoria"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({

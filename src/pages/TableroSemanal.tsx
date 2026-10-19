@@ -3,19 +3,12 @@
 // Modo Local Soberano · Sin dependencias de Supabase · Conexión directa a persistencia
 
 import { useState, useMemo } from "react";
-import {
-  PropuestaMejoraSMDTO,
-  OpcionBorrador,
-  CanalDestino,
-  DimensionMC,
-} from "@/domain/types";
+import { PropuestaMejoraSMDTO } from "@/domain/types";
 import {
   getLocalProposals,
   approveLocalProposal,
   publishLocalProposal,
   approveBatchLocalProposals,
-  updateLocalProposal,
-  rejectLocalProposal,
   triggerBatchPackageDownload,
 } from "@/services/localSMService";
 import { Grid26Semanas } from "@/components/Grid26Semanas";
@@ -23,22 +16,13 @@ import { ProposalDetailDialog } from "@/components/ProposalDetailDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 
 import {
   CheckSquare,
   Download,
-  Calendar,
-  Sparkles,
-  ArrowRight,
-  Filter,
-  CheckCircle2,
-  Clock,
-  Layers,
   ChevronLeft,
   ChevronRight,
-  RefreshCw,
 } from "lucide-react";
 
 export default function TableroSemanal() {

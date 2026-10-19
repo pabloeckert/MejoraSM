@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { proposalsApi, templatesApi } from "@/services/supabase";
+import { templatesApi } from "@/services/supabase";
 import type { ProposalDetail } from "@/components/ProposalDetailDialog";
 import {
   getLocalProposals,

@@ -5,7 +5,6 @@
 
 import {
   generarGrillaEvergreen26Semanas,
-  Grilla26SemanasDTO,
 } from "@/domain/gridGenerator";
 import {
   PropuestaMejoraSMDTO,
@@ -18,7 +17,6 @@ import {
 import type { ProposalDetail } from "@/components/ProposalDetailDialog";
 
 const STORAGE_KEY_PROPOSALS = "mejora_sm_local_proposals_v2";
-const STORAGE_KEY_METRICS = "mejora_sm_local_metrics_v1";
 
 /**
  * Mapea una propuesta canónica de la Fase 1 al formato ProposalDetail

@@ -1,14 +1,12 @@
 // src/test/micropaso3-e2e-ui.test.tsx
 // PRUEBA EMPÍRICA INTEGRAL E2E DE RENDERIZADO UI Y FRAMING ENGINE VISUAL
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import TableroSemanal from "@/pages/TableroSemanal";
-import { Grid26Semanas } from "@/components/Grid26Semanas";
-import Boveda from "@/pages/Boveda";
 import { getLocalProposals } from "@/services/localSMService";
-import { calculateContainmentGeometry, validateFramingCompliance } from "@/domain/framingEngine";
+import { calculateContainmentGeometry } from "@/domain/framingEngine";
 
 function renderWithProviders(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

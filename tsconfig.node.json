@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2023"],
+    "types": ["node"],
     "module": "ESNext",
     "skipLibCheck": true,
 
@@ -26,7 +27,6 @@
   },
   "include": [
     "vite.config.ts",
-    "scratch/stress-production-audit.ts",
-    "scratch/e2e-probes.ts"
+    "scripts/migrate-v2.ts"
   ]
 }

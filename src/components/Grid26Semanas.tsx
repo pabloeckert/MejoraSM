@@ -6,7 +6,6 @@ import { useState } from "react";
 import {
   PropuestaMejoraSMDTO,
   OpcionBorrador,
-  CanalDestino,
 } from "@/domain/types";
 import { TargetAspectRatio } from "@/domain/framingEngine";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,7 +18,6 @@ import {
   ArrowRight,
   Eye,
   Layers,
-  Sparkles,
 } from "lucide-react";
 import { getAssetUrl } from "@/components/ProposalDetailDialog";
 
@@ -36,7 +34,7 @@ const DEFAULT_PHOTO = "content/boveda/04_networking/img_clevel_rosario_2026.jpg"
 
 export function Grid26Semanas({
   proposals,
-  activeWeek,
+  activeWeek: _activeWeek,
   onApprove,
   onPublish,
   onSelectDraft,

@@ -2,7 +2,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   getLocalProposals,
-  saveLocalProposals,
   updateLocalProposal,
   approveLocalProposal,
   publishLocalProposal,

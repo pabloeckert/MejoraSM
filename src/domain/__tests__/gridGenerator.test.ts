@@ -1,7 +1,7 @@
 // src/domain/__tests__/gridGenerator.test.ts
 import { describe, it, expect } from "vitest";
 import { generarGrillaEvergreen26Semanas } from "../gridGenerator";
-import { generarPaqueteMulticanal, toCanonicalPropuesta } from "../types";
+import { generarPaqueteMulticanal } from "../types";
 
 describe("Motor de Grilla Evergreen 26 Semanas (80/20 Rule)", () => {
   it("genera exactamente 26 semanas planificadas con 78 piezas en total", () => {

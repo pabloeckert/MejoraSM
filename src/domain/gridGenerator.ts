@@ -9,7 +9,6 @@ import {
   type CanalDestino,
   type BorradorPropuestaDTO,
   type CopyCalibradoCuatroPasos,
-  toCanonicalPropuesta,
 } from "./types";
 
 export type BuyerPersonaMC =
