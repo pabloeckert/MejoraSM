@@ -99,6 +99,7 @@ CREATE INDEX IF NOT EXISTS idx_outbox_estado_reintento ON outbox_posts(estado_po
 CREATE INDEX IF NOT EXISTS idx_outbox_lease ON outbox_posts(estado_post, lease_expira_at);
 CREATE INDEX IF NOT EXISTS idx_outbox_pendientes ON outbox_posts(proximo_reintento_at) WHERE estado_post IN ('EN_COLA','REINTENTO');
 CREATE INDEX IF NOT EXISTS idx_outbox_leases ON outbox_posts(lease_expira_at) WHERE estado_post='DESPACHANDO';
+CREATE INDEX IF NOT EXISTS idx_outbox_propuesta ON outbox_posts(propuesta_id);
 
 CREATE TABLE IF NOT EXISTS circuit_breaker_canales (
   canal TEXT PRIMARY KEY,
