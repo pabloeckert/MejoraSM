@@ -85,6 +85,8 @@ export class PostingDaemonSupervisor {
 
     this.lastHeartbeat = Date.now();
 
+    this.child.on("error", (_err) => {});
+
     this.child.on("message", (msg: any) => {
       if (msg && typeof msg === "object" && msg.type === "heartbeat") {
         this.lastHeartbeat = msg.timestamp || Date.now();
@@ -138,7 +140,7 @@ export class PostingDaemonSupervisor {
 
       try {
         if (child.connected) {
-          child.send({ type: "STOP" });
+          child.send({ type: "STOP" }, (_err) => {});
         }
       } catch {}
 
