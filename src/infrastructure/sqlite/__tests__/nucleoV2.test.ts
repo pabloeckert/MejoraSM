@@ -163,9 +163,9 @@ describe("Outbox transaccional e idempotencia", () => {
   });
 
   it("clave de idempotencia determinista: propuesta+canal+borrador+día", () => {
-    const d1 = new Date("2026-10-18T01:00:00Z");
+    const d1 = new Date("2026-10-18T12:00:00Z");
     const d2 = new Date("2026-10-18T23:00:00Z");
-    const d3 = new Date("2026-10-19T01:00:00Z");
+    const d3 = new Date("2026-10-19T12:00:00Z");
     const k = generarClaveIdempotencia("P1", "linkedin", "B", d1);
     expect(k).toMatch(/^[0-9a-f]{64}$/);
     expect(generarClaveIdempotencia("P1", "linkedin", "B", d2)).toBe(k);

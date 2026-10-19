@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { CREATE_TABLES_SQL } from "./schema";
 import { withImmediateTransaction } from "./transaction";
 import { SqliteOutboxRepository } from "./SqliteOutboxRepository";
+import { createDatabaseConnection } from "./connectionFactory";
 import {
   type FichaBovedaDTO,
   type PropuestaMejoraSMDTO,
@@ -60,15 +61,12 @@ export interface RankingPiezaDTO {
 export class SqliteSMRepository {
   private db: DatabaseSync;
 
-  constructor(dbPath: string = ":memory:") {
-    this.db = new DatabaseSync(dbPath);
-    this.init();
-  }
-
-  private init(): void {
-    this.db.exec("PRAGMA journal_mode = WAL;");
-    this.db.exec("PRAGMA busy_timeout = 5000;");
-    this.db.exec(CREATE_TABLES_SQL);
+  constructor(dbOrPath: DatabaseSync | string = ":memory:") {
+    if (typeof dbOrPath === "string") {
+      this.db = createDatabaseConnection(dbOrPath);
+    } else {
+      this.db = dbOrPath;
+    }
   }
 
   public close(): void {
@@ -182,10 +180,11 @@ export class SqliteSMRepository {
     `);
 
     const now = new Date().toISOString();
+    const diaProgramadoIso = new Date(propuesta.dia_programado).toISOString();
     stmt.run(
       propuesta.propuesta_id,
       propuesta.canal_destino,
-      propuesta.dia_programado,
+      diaProgramadoIso,
       propuesta.origen_boveda_id,
       JSON.stringify(propuesta.borradores),
       propuesta.borrador_seleccionado,

@@ -43,6 +43,9 @@ data/**/*.db
 data/**/*.db-wal
 data/**/*.db-shm
 data/test_*.db
+data/*.pre*
+data/archived_wal/
+data/archived/
 data/backups/
 !data/.gitkeep
 

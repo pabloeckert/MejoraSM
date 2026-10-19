@@ -1,6 +1,7 @@
 // src/infrastructure/sqlite/SqliteBovedaRepository.ts
 import { DatabaseSync } from "node:sqlite";
 import { CREATE_TABLES_SQL } from "./schema";
+import { createDatabaseConnection } from "./connectionFactory";
 import { type FichaBovedaDTO, type DimensionMC } from "../../domain/types";
 
 export class SqliteBovedaRepository {
@@ -8,10 +9,7 @@ export class SqliteBovedaRepository {
 
   constructor(dbOrPath: DatabaseSync | string = "data/mejora_sm.db") {
     if (typeof dbOrPath === "string") {
-      this.db = new DatabaseSync(dbOrPath);
-      this.db.exec("PRAGMA journal_mode = WAL;");
-      this.db.exec("PRAGMA busy_timeout = 5000;");
-      this.db.exec(CREATE_TABLES_SQL);
+      this.db = createDatabaseConnection(dbOrPath);
     } else {
       this.db = dbOrPath;
     }

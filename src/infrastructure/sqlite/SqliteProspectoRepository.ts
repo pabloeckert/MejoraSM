@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import { CREATE_TABLES_SQL } from "./schema";
 import { withImmediateTransaction } from "./transaction";
+import { createDatabaseConnection } from "./connectionFactory";
 import {
   type EstadoProspectoV2,
   calcularSlaCalificacion,
@@ -66,10 +67,7 @@ export class SqliteProspectoRepository {
 
   constructor(dbOrPath: DatabaseSync | string = "data/mejora_sm.db") {
     if (typeof dbOrPath === "string") {
-      this.db = new DatabaseSync(dbOrPath);
-      this.db.exec("PRAGMA journal_mode = WAL;");
-      this.db.exec("PRAGMA busy_timeout = 5000;");
-      this.db.exec(CREATE_TABLES_SQL);
+      this.db = createDatabaseConnection(dbOrPath);
     } else {
       this.db = dbOrPath;
     }

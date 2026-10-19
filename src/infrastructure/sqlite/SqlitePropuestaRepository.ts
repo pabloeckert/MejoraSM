@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { CREATE_TABLES_SQL } from "./schema";
 import { withImmediateTransaction } from "./transaction";
 import { SqliteOutboxRepository } from "./SqliteOutboxRepository";
+import { createDatabaseConnection } from "./connectionFactory";
 import {
   type PropuestaMejoraSMDTO,
   type EstadoPropuesta,
@@ -16,10 +17,7 @@ export class SqlitePropuestaRepository {
 
   constructor(dbOrPath: DatabaseSync | string = "data/mejora_sm.db") {
     if (typeof dbOrPath === "string") {
-      this.db = new DatabaseSync(dbOrPath);
-      this.db.exec("PRAGMA journal_mode = WAL;");
-      this.db.exec("PRAGMA busy_timeout = 5000;");
-      this.db.exec(CREATE_TABLES_SQL);
+      this.db = createDatabaseConnection(dbOrPath);
     } else {
       this.db = dbOrPath;
     }
@@ -60,10 +58,11 @@ export class SqlitePropuestaRepository {
     `);
 
     const now = new Date().toISOString();
+    const diaProgramadoIso = new Date(propuesta.dia_programado).toISOString();
     stmt.run(
       propuesta.propuesta_id,
       propuesta.canal_destino,
-      propuesta.dia_programado,
+      diaProgramadoIso,
       propuesta.origen_boveda_id,
       JSON.stringify(propuesta.borradores),
       propuesta.borrador_seleccionado,

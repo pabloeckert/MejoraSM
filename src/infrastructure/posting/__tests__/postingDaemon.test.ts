@@ -127,9 +127,9 @@ describe("Subfase 1.6: Auto-Posting Local con Zernio y Canal WhatsApp", () => {
   });
 
   it("ejecuta el ciclo de posting procesando únicamente propuestas aprobadas y vencidas", async () => {
-    const ahora = new Date("2026-10-16T12:00:00Z");
-    const pasada = "2026-10-16T10:00:00Z";
-    const futura = "2026-10-16T18:00:00Z";
+    const ahora = new Date("2026-10-16T12:00:00.000Z");
+    const pasada = "2026-10-16T10:00:00.000Z";
+    const futura = "2026-10-16T18:00:00.000Z";
 
     // 1. Aprobada y pasada -> DEBE publicarse
     repo.guardarPropuesta(crearPropuesta("P-LISTA-LI", "linkedin", "aprobado", pasada));
@@ -166,8 +166,8 @@ describe("Subfase 1.6: Auto-Posting Local con Zernio y Canal WhatsApp", () => {
   });
 
   it("RES-01: ante caída de Zernio (fallback local), computa encoladasFallbackLocal y 0 publicadas (cero falsos positivos)", async () => {
-    const ahora = new Date("2026-10-16T12:00:00Z");
-    const pasada = "2026-10-16T10:00:00Z";
+    const ahora = new Date("2026-10-16T12:00:00.000Z");
+    const pasada = "2026-10-16T10:00:00.000Z";
 
     repo.guardarPropuesta(crearPropuesta("P-FALLA-ZERNIO", "linkedin", "aprobado", pasada));
 
