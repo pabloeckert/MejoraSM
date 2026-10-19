@@ -282,6 +282,25 @@ export class SqliteOutboxRepository {
       .run(proximoReintento.toISOString(), motivo, now.toISOString(), postId);
   }
 
+  /** Reaper de leases vencidos: devuelve posts DESPACHANDO expirados a EN_COLA incrementando (+1) reintentos_cont. */
+  public liberarLeasesVencidos(now: Date = new Date()): number {
+    const ahoraIso = now.toISOString();
+    return withImmediateTransaction(this.db, () => {
+      const res = this.db
+        .prepare(
+          `UPDATE outbox_posts
+           SET estado_post = 'EN_COLA',
+               reintentos_cont = reintentos_cont + 1,
+               lease_owner = NULL,
+               lease_expira_at = NULL,
+               actualizado_en = ?
+           WHERE estado_post = 'DESPACHANDO' AND lease_expira_at <= ?`
+        )
+        .run(ahoraIso, ahoraIso);
+      return Number(res.changes || 0);
+    });
+  }
+
   public cancelar(postId: string, now: Date = new Date()): boolean {
     const res = this.db
       .prepare(

@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "sync:drive": "node scripts/sync-drive-assets.mjs"
+    "sync:drive": "node scripts/sync-drive-assets.mjs",
+    "chaos": "vitest run src/test/chaos.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.14",

@@ -1,8 +1,10 @@
 // src/infrastructure/posting/zernioDispatcher.ts
-// PATRÓN INNEGOCIABLE DE DESPACHO A ZERNIO (MejoraSM 2026)
+// PATRÓN INNEGOCIABLE DE DESPACHO A ZERNIO CON RECONCILIACIÓN ACTIVA (MejoraSM 2026)
 // (1) Transacción 1 (Claim): BEGIN IMMEDIATE -> UPDATE outbox_posts SET estado_post = 'DESPACHANDO', lease_owner = ? -> COMMIT
-// (2) Petición HTTP fuera de transacción: fetch() a Zernio con timeout (15s < lease 60s) y circuit breaker (cero locks SQLite)
-// (3) Transacción 2 (Result): BEGIN IMMEDIATE -> UPDATE outbox_posts SET estado_post = 'PUBLICADO' o 'REINTENTO'/'DEAD_LETTER' WHERE lease_owner = ? -> COMMIT
+// (2) Reconciliación Activa (Effectively-Once): Si es un reintento (reintentos_cont > 0), consulta la API de Zernio por clave_idempotencia.
+//     Si ya existe en la plataforma remota, actualiza estado a PUBLICADO sin re-publicar.
+// (3) Petición HTTP fuera de transacción: fetch() a Zernio con timeout (15s < lease 60s), header Idempotency-Key y circuit breaker.
+// (4) Transacción 2 (Result): BEGIN IMMEDIATE -> UPDATE outbox_posts SET estado_post = 'PUBLICADO' o 'REINTENTO'/'DEAD_LETTER' WHERE lease_owner = ? -> COMMIT
 // Si changes = 0 (CAS mismatch por reaper vencido): NO sobrescribe, registra en outbox_eventos_log y deriva a reconciliación.
 
 import { SqliteOutboxRepository, OutboxPost } from "../sqlite/SqliteOutboxRepository";
@@ -12,6 +14,12 @@ import { defaultZernioCircuitBreaker, type ZernioPostPayload } from "./postingDa
 export const ZERNIO_HTTP_TIMEOUT_MS = 15_000; // Estrictamente menor que LEASE_DURATION_MS (60s)
 export const LEASE_DURATION_MS = 60_000;
 
+export interface ZernioReconciliationClient {
+  consultarPorClaveIdempotencia: (
+    claveIdempotencia: string
+  ) => Promise<{ existe: boolean; zernioId?: string } | null>;
+}
+
 export interface DespachoResult {
   postId: string;
   exito: boolean;
@@ -20,6 +28,7 @@ export interface DespachoResult {
   zernioId?: string;
   casSuccess: boolean;
   reconciliacionRequerida?: boolean;
+  reconciliadoPreviamente?: boolean;
 }
 
 export async function despacharPostAZernio(
@@ -32,6 +41,7 @@ export async function despacharPostAZernio(
     circuitBreaker?: ZernioCircuitBreaker;
     now?: Date;
     timeoutMs?: number;
+    reconciliationClient?: ZernioReconciliationClient;
   } = {}
 ): Promise<DespachoResult> {
   const {
@@ -40,7 +50,31 @@ export async function despacharPostAZernio(
     circuitBreaker = defaultZernioCircuitBreaker,
     now = new Date(),
     timeoutMs = ZERNIO_HTTP_TIMEOUT_MS,
+    reconciliationClient,
   } = options;
+
+  // DIRECTIVA FASE 4: RECONCILIACIÓN ACTIVA CON ZERNIO (EFFECTIVELY-ONCE)
+  // Antes de cada REINTENTO por timeout, consultar la API de Zernio mediante la clave_idempotencia o Idempotency-Key.
+  // Si el post ya existe en la plataforma remota, actualizar el estado local a PUBLICADO sin re-publicar.
+  if (post.reintentos_cont > 0 && reconciliationClient) {
+    try {
+      const remoto = await reconciliationClient.consultarPorClaveIdempotencia(post.clave_idempotencia);
+      if (remoto && remoto.existe && remoto.zernioId) {
+        const casResult = outboxRepo.marcarPublicado(post.post_id, now, post.lease_owner);
+        return {
+          postId: post.post_id,
+          exito: true,
+          estadoFinal: casResult.success ? "PUBLICADO" : (outboxRepo.obtenerPorId(post.post_id)?.estado_post || "EN_COLA"),
+          zernioId: remoto.zernioId,
+          casSuccess: casResult.success,
+          reconciliacionRequerida: !casResult.success,
+          reconciliadoPreviamente: true,
+        };
+      }
+    } catch {
+      // Si la consulta falla por red, continuamos con el intento normal
+    }
+  }
 
   // PASO 2: Petición HTTP FUERA de cualquier transacción de SQLite
   // Con timeout defensivo estrictamente menor que el lease (15s < 60s)
@@ -54,7 +88,7 @@ export async function despacharPostAZernio(
   } else {
     try {
       const execution = await circuitBreaker.execute(
-        async (signal) => {
+        async () => {
           const timeoutController = new AbortController();
           const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
 
@@ -65,6 +99,7 @@ export async function despacharPostAZernio(
               headers: {
                 Authorization: `Bearer ${apiKey}`,
                 "Content-Type": "application/json",
+                "Idempotency-Key": post.clave_idempotencia,
               },
               body: JSON.stringify(payload),
             });
