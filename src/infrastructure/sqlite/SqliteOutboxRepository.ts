@@ -27,6 +27,8 @@ export interface OutboxPost {
   estado_post: EstadoPostOutbox;
   reintentos_cont: number;
   clave_idempotencia: string;
+  lease_owner: string | null;
+  lease_expira_at: string | null;
   proximo_reintento_at: string | null;
   error_ultimo: string | null;
   creado_en: string;
@@ -185,7 +187,12 @@ export class SqliteOutboxRepository {
     postId: string,
     error: string,
     now: Date = new Date(),
-    opts: { maxReintentos?: number; backoff?: BackoffOptions; leaseOwner?: string | null } = {}
+    opts: {
+      maxReintentos?: number;
+      backoff?: BackoffOptions;
+      leaseOwner?: string | null;
+      estadoFinal?: EstadoPostOutbox;
+    } = {}
   ): { success: boolean; estado: EstadoPostOutbox; changes: number } {
     const max = opts.maxReintentos ?? MAX_REINTENTOS_OUTBOX;
     const ahoraIso = now.toISOString();
@@ -195,7 +202,7 @@ export class SqliteOutboxRepository {
       if (!post) throw new Error(`Outbox post ${postId} no encontrado`);
       const intentos = post.reintentos_cont + 1;
       const permanente = intentos >= max;
-      const estado: EstadoPostOutbox = permanente ? "DEAD_LETTER" : "REINTENTO";
+      const estado: EstadoPostOutbox = permanente ? (opts.estadoFinal ?? "FALLIDO_PERMANENTE") : "REINTENTO";
       const proximo = permanente
         ? null
         : new Date(now.getTime() + calcularBackoffConJitter(intentos, opts.backoff)).toISOString();

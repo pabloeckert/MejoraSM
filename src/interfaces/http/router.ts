@@ -78,6 +78,15 @@ export interface SMAppServices extends Partial<CrmServices> {
   smRepo: SqliteSMRepository;
 }
 
+import {
+  validateHostAndOrigin,
+  defaultTokenManager,
+  sanitizeForLogs,
+  TokenManager,
+} from "./security";
+
+export { defaultTokenManager, TokenManager };
+
 function sendJson(res: ServerResponse, statusCode: number, data: unknown): void {
   const json = JSON.stringify(data);
   res.writeHead(statusCode, {
@@ -122,8 +131,7 @@ function isAuthorized(req: IncomingMessage): boolean {
     return false;
   }
   const token = match[1].trim();
-  const expectedToken = process.env.MEJORA_SM_AUTH_TOKEN || "mejora_sm_local_bearer_2026";
-  return token === expectedToken;
+  return defaultTokenManager.verifyToken(token);
 }
 
 export function handleSMHttpRequest(
@@ -133,6 +141,14 @@ export function handleSMHttpRequest(
 ): void {
   const method = req.method || "GET";
   const rawUrl = req.url || "/";
+
+  // Validación de seguridad de cabeceras Host y Origin
+  const sec = validateHostAndOrigin(req);
+  if (!sec.valid) {
+    sendJson(res, sec.status ?? 400, { error: sec.error });
+    return;
+  }
+
   const parsedUrl = new URL(rawUrl, "http://localhost");
   const pathname = parsedUrl.pathname;
 

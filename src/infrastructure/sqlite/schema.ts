@@ -99,6 +99,15 @@ CREATE INDEX IF NOT EXISTS idx_outbox_estado_reintento ON outbox_posts(estado_po
 CREATE INDEX IF NOT EXISTS idx_outbox_lease ON outbox_posts(estado_post, lease_expira_at);
 CREATE INDEX IF NOT EXISTS idx_outbox_pendientes ON outbox_posts(proximo_reintento_at) WHERE estado_post IN ('EN_COLA','REINTENTO');
 CREATE INDEX IF NOT EXISTS idx_outbox_leases ON outbox_posts(lease_expira_at) WHERE estado_post='DESPACHANDO';
+
+CREATE TABLE IF NOT EXISTS circuit_breaker_canales (
+  canal TEXT PRIMARY KEY,
+  estado TEXT NOT NULL CHECK (estado IN ('CLOSED', 'OPEN', 'HALF_OPEN')),
+  conteo_fallas INTEGER NOT NULL DEFAULT 0,
+  ultimo_fallo_at TEXT CHECK (ultimo_fallo_at IS NULL OR (ultimo_fallo_at GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9].[0-9][0-9][0-9]Z' AND datetime(ultimo_fallo_at) IS NOT NULL)),
+  ultimo_exito_at TEXT CHECK (ultimo_exito_at IS NULL OR (ultimo_exito_at GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9].[0-9][0-9][0-9]Z' AND datetime(ultimo_exito_at) IS NOT NULL)),
+  actualizado_at TEXT NOT NULL CHECK (actualizado_at GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9].[0-9][0-9][0-9]Z' AND datetime(actualizado_at) IS NOT NULL)
+);
 `;
 
 export const CREATE_TABLES_SQL = `

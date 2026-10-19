@@ -68,10 +68,11 @@ export async function dispatchOutbox(opts: OutboxDispatchOptions): Promise<Outbo
       outbox.marcarPublicado(post.post_id, clock());
       result.publicados++;
     } else {
-      const estado = outbox.registrarFallo(post.post_id, exec.result.error, clock(), {
+      const falloRes = outbox.registrarFallo(post.post_id, exec.result.error, clock(), {
         maxReintentos: opts.maxReintentos,
       });
-      if (estado === "FALLIDO_PERMANENTE") result.fallidosPermanentes++;
+      const estadoPost = typeof falloRes === "string" ? falloRes : (falloRes as any)?.estado;
+      if (estadoPost === "FALLIDO_PERMANENTE") result.fallidosPermanentes++;
       else result.reintentos++;
     }
   }

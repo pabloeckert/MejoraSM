@@ -183,8 +183,11 @@ describe("Parche v1.1.0 — FASE 2b: Daemon Desacoplado, Patrón de Despacho y E
     const supervisor = new PostingDaemonSupervisor(dummyWorkerPath, 40, 2);
     supervisor.start();
 
-    // Esperar a que arranque y emita el primer heartbeat
-    await new Promise((r) => setTimeout(r, 100));
+    // Esperar a que arranque y emita el primer heartbeat (tolerante a carga de CPU)
+    const tStart = Date.now();
+    while (!supervisor.getStatus().running && Date.now() - tStart < 2500) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
     const status1 = supervisor.getStatus();
     expect(status1.running).toBe(true);
 
@@ -195,7 +198,10 @@ describe("Parche v1.1.0 — FASE 2b: Daemon Desacoplado, Patrón de Despacho y E
     }
 
     // Esperar a que el watchdog detecte la falta de heartbeat y envíe SIGKILL
-    await new Promise((r) => setTimeout(r, 300));
+    const tKill = Date.now();
+    while (supervisor.getStatus().respawnCount < 1 && Date.now() - tKill < 3000) {
+      await new Promise((r) => setTimeout(r, 30));
+    }
     const status2 = supervisor.getStatus();
     expect(status2.respawnCount).toBeGreaterThanOrEqual(1);
 

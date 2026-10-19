@@ -27,7 +27,7 @@ export interface FocalCropPlan {
   strategy: FocalStrategy;
   reason?: "sin_rostros" | "rostros_exceden_ventana";
   window: CropWindow | null; // null en fallback (la imagen no se recorta)
-  focalPoint: { x: number; y: number } | null;
+  focalPoint: { x: number; y: number }; // Mandatorio en metadatos_json (centro de imagen si no hay rostros)
   facesDetected: number;
   facesCut: number; // invariante verificada: siempre 0
 }
@@ -88,7 +88,15 @@ export function planFocalCrop(srcW: number, srcH: number, ratio: TargetAspectRat
   faces.forEach((f) => validarCaja(f, srcW, srcH));
 
   if (faces.length === 0) {
-    return { ratio, strategy: "contain_blur_fallback", reason: "sin_rostros", window: null, focalPoint: null, facesDetected: 0, facesCut: 0 };
+    return {
+      ratio,
+      strategy: "contain_blur_fallback",
+      reason: "sin_rostros",
+      window: null,
+      focalPoint: { x: Math.round(srcW / 2), y: Math.round(srcH / 2) },
+      facesDetected: 0,
+      facesCut: 0,
+    };
   }
 
   const union = unionWithPadding(faces, srcW, srcH);
