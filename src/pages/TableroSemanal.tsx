@@ -214,10 +214,9 @@ export default function TableroSemanal() {
             className="text-xs border border-slate-300 rounded-md px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-800"
           >
             <option value="all">Todos los Canales</option>
-            <option value="linkedin">LinkedIn</option>
-            <option value="whatsapp">WhatsApp</option>
             <option value="instagram">Instagram</option>
             <option value="facebook">Facebook</option>
+            <option value="whatsapp">WhatsApp</option>
           </select>
 
           {/* Filtro por Estado */}

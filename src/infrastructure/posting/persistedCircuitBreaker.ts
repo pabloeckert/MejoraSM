@@ -1,7 +1,7 @@
 // src/infrastructure/posting/persistedCircuitBreaker.ts
 // CIRCUIT BREAKER PERSISTIDO POR CANAL EN SQLITE (MejoraSM 2026)
 // Criterio Zero-Trust Principal SRE:
-// 1. Persistencia transaccional de estado por canal ('linkedin', 'instagram', etc.).
+// 1. Persistencia transaccional de estado por canal ('instagram', 'facebook' (Meta)).
 // 2. Errores HTTP 4xx omitidos formalmente como fallas del sistema (son fallas de cliente/formato).
 // 3. Fallas 5xx, timeouts y caídas de red incrementan fallas y conmutan a OPEN.
 // 4. Fallback garantizado en < 50ms cuando el circuito está abierto.
@@ -225,4 +225,18 @@ export class PersistedChannelCircuitBreaker {
       };
     }
   }
+}
+
+
+export const CANALES_META = ["instagram", "facebook"] as const;
+export type CanalMeta = (typeof CANALES_META)[number];
+
+export function inicializarCircuitBreakersMeta(
+  db: DatabaseSync,
+  options?: CircuitBreakerOptions
+): Record<CanalMeta, PersistedChannelCircuitBreaker> {
+  return {
+    instagram: new PersistedChannelCircuitBreaker(db, "instagram", options),
+    facebook: new PersistedChannelCircuitBreaker(db, "facebook", options),
+  };
 }

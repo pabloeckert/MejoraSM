@@ -34,7 +34,7 @@ describe("Subfase 1.5: Planificador Evergreen 26 Semanas y Cerebro de KPIs Local
     }
   });
 
-  function insertarPropuestaBase(id: string, canal: any = "linkedin") {
+  function insertarPropuestaBase(id: string, canal: any = "instagram") {
     const p: PropuestaMejoraSMDTO = {
       propuesta_id: id,
       canal_destino: canal,
@@ -115,9 +115,9 @@ describe("Subfase 1.5: Planificador Evergreen 26 Semanas y Cerebro de KPIs Local
   });
 
   it("registra clics a mejoraok.com y conversiones a MejoraDiagnostico por Buyer Persona", () => {
-    insertarPropuestaBase("PROP-W42-01", "linkedin");
-    insertarPropuestaBase("PROP-W42-02", "linkedin");
-    insertarPropuestaBase("PROP-W42-03", "whatsapp");
+    insertarPropuestaBase("PROP-W42-01", "instagram");
+    insertarPropuestaBase("PROP-W42-02", "facebook");
+    insertarPropuestaBase("PROP-W42-03", "instagram");
 
     const ahora = new Date().toISOString();
 
@@ -125,7 +125,7 @@ describe("Subfase 1.5: Planificador Evergreen 26 Semanas y Cerebro de KPIs Local
       {
         id: "MET-001",
         propuesta_id: "PROP-W42-01",
-        canal: "linkedin",
+        canal: "instagram",
         buyer_persona: "emprendedor_saturado",
         dimension: "organizacional",
         formato: "carrusel_pdf",
@@ -139,7 +139,7 @@ describe("Subfase 1.5: Planificador Evergreen 26 Semanas y Cerebro de KPIs Local
       {
         id: "MET-002",
         propuesta_id: "PROP-W42-02",
-        canal: "linkedin",
+        canal: "facebook",
         buyer_persona: "empresario_mal_asesorado",
         dimension: "empresarial",
         formato: "post_autoridad",
@@ -153,7 +153,7 @@ describe("Subfase 1.5: Planificador Evergreen 26 Semanas y Cerebro de KPIs Local
       {
         id: "MET-003",
         propuesta_id: "PROP-W42-03",
-        canal: "whatsapp",
+        canal: "instagram",
         buyer_persona: "orden_para_crecer",
         dimension: "comercial",
         formato: "post_directo",
@@ -187,13 +187,13 @@ describe("Subfase 1.5: Planificador Evergreen 26 Semanas y Cerebro de KPIs Local
   });
 
   it("calcula la recomendación de combinación comercial óptima", () => {
-    insertarPropuestaBase("PROP-01", "linkedin");
+    insertarPropuestaBase("PROP-01", "instagram");
     const ahora = new Date().toISOString();
 
     repo.registrarMetricaAtribucion({
       id: "MET-OPT-1",
       propuesta_id: "PROP-01",
-      canal: "linkedin",
+      canal: "instagram",
       buyer_persona: "empresario_mal_asesorado",
       dimension: "empresarial",
       formato: "post_autoridad",

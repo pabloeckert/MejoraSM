@@ -87,7 +87,7 @@ describe("dispatchOutbox", () => {
     db.exec(CREATE_TABLES_SQL);
     const outbox = new SqliteOutboxRepository(db);
     const t = new Date("2026-10-18T10:00:00Z");
-    for (const id of ["P1", "P2", "P3", "P4"]) outbox.encolarAprobado({ propuesta_id: id, canal: "linkedin", borrador_opcion: "A" }, t);
+    for (const id of ["P1", "P2", "P3", "P4"]) outbox.encolarAprobado({ propuesta_id: id, canal: "instagram", borrador_opcion: "A" }, t);
     return { outbox, ahora: new Date("2026-10-18T10:00:00Z") };
   }
 

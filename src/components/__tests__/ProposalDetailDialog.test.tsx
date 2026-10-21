@@ -25,7 +25,7 @@ vi.mock("@/components/ui/use-toast", () => ({
 
 const mockProposal: PropuestaMejoraSMDTO = {
   propuesta_id: "PROP-2026-TEST-001",
-  canal_destino: "linkedin",
+  canal_destino: "instagram",
   dia_programado: "2026-10-20T10:00:00Z",
   origen_boveda_id: "BOV-2026-001",
   estado: "pendiente_revision",

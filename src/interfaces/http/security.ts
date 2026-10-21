@@ -26,7 +26,7 @@ export class TokenManager {
   private secondaryToken: string | null = null;
   private lastRotatedAt: number = Date.now();
 
-  constructor(initialToken: string = process.env.MEJORA_SM_AUTH_TOKEN || "mejora_sm_local_bearer_2026") {
+  constructor(initialToken: string = process.env.BEARER_TOKEN || process.env.MEJORA_SM_AUTH_TOKEN || "mejora_sm_local_bearer_2026") {
     this.primaryToken = initialToken;
   }
 

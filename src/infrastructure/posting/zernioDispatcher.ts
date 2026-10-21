@@ -10,6 +10,8 @@
 import { SqliteOutboxRepository, OutboxPost } from "../sqlite/SqliteOutboxRepository";
 import { ZernioCircuitBreaker } from "./circuitBreaker";
 import { defaultZernioCircuitBreaker, type ZernioPostPayload } from "./postingDaemon";
+import { inicializarCircuitBreakersMeta, PersistedChannelCircuitBreaker, type CanalMeta } from "./persistedCircuitBreaker";
+export { inicializarCircuitBreakersMeta };
 
 export const ZERNIO_HTTP_TIMEOUT_MS = 15_000; // Estrictamente menor que LEASE_DURATION_MS (60s)
 export const LEASE_DURATION_MS = 60_000;
@@ -38,7 +40,8 @@ export async function despacharPostAZernio(
   options: {
     sandbox?: boolean;
     apiKey?: string;
-    circuitBreaker?: ZernioCircuitBreaker;
+    circuitBreaker?: ZernioCircuitBreaker | PersistedChannelCircuitBreaker;
+    circuitBreakers?: Record<CanalMeta, PersistedChannelCircuitBreaker>;
     now?: Date;
     timeoutMs?: number;
     reconciliationClient?: ZernioReconciliationClient;
@@ -87,7 +90,11 @@ export async function despacharPostAZernio(
     zernioId = `zernio_mock_${Date.now()}_${post.post_id}`;
   } else {
     try {
-      const execution = await circuitBreaker.execute(
+      if (post.canal === 'linkedin') {
+        throw new Error("Canal 'linkedin' no admitido en el despachador. Operación exclusiva Meta ('instagram' | 'facebook').");
+      }
+      const activeBreaker = (options.circuitBreakers && (options.circuitBreakers as any)[post.canal]) || circuitBreaker;
+      const execution = await activeBreaker.execute(
         async () => {
           const timeoutController = new AbortController();
           const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);

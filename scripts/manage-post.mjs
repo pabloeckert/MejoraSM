@@ -25,7 +25,6 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ACCOUNT_ID_BY_PLATFORM = {
   instagram: process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID,
   facebook: process.env.ZERNIO_FACEBOOK_ACCOUNT_ID,
-  linkedin: process.env.ZERNIO_LINKEDIN_ACCOUNT_ID, // Fase 5 — vacío hasta conectar LinkedIn en Zernio
 };
 
 // Plataformas que este script acepta gestionar. LinkedIn solo si su cuenta

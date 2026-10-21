@@ -119,7 +119,7 @@ function parseJsonBody<T>(req: IncomingMessage, maxBytes: number = 5 * 1024 * 10
 }
 
 export const LOCAL_AUTH_TOKEN =
-  process.env.MEJORA_SM_AUTH_TOKEN || "mejora_sm_local_bearer_2026";
+  process.env.BEARER_TOKEN || process.env.MEJORA_SM_AUTH_TOKEN || "mejora_sm_local_bearer_2026";
 
 function isAuthorized(req: IncomingMessage): boolean {
   const authHeader = req.headers["authorization"] || req.headers["Authorization"];

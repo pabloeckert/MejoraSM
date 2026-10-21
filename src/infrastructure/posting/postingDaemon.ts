@@ -29,7 +29,6 @@ export interface PostingCycleOptions {
   apiKey?: string;
   circuitBreaker?: ZernioCircuitBreaker;
   accountIds?: {
-    linkedin?: string;
     instagram?: string;
     facebook?: string;
     whatsapp?: string;
@@ -50,8 +49,7 @@ export interface PostingCycleResult {
   }>;
 }
 
-export const CANALES_PLATAFORMA_MAP: Record<CanalDestino, string> = {
-  linkedin: "linkedin",
+export const CANALES_PLATAFORMA_MAP: Record<string, string> = {
   instagram: "instagram",
   facebook: "facebook",
   whatsapp: "whatsapp",
@@ -68,13 +66,14 @@ export function buildZernioPayload(
     propuesta.borradores.find((b) => b.opcion === propuesta.borrador_seleccionado) ||
     propuesta.borradores[0];
 
-  const plataformaZernio = CANALES_PLATAFORMA_MAP[propuesta.canal_destino];
-  const accountId = accountIds[propuesta.canal_destino] || `acc_${plataformaZernio}_default`;
+  const canalKey = propuesta.canal_destino as string;
+  const plataformaZernio = CANALES_PLATAFORMA_MAP[canalKey] || "instagram";
+  const accountId = accountIds[canalKey] || `acc_${plataformaZernio}_default`;
 
   // Para WhatsApp se formatea con negritas de WhatsApp (*texto*)
-  // Para redes se estructura con saltos limpios y hashtags
+  // Para redes Meta se estructura con saltos limpios y hashtags
   let content = "";
-  if (propuesta.canal_destino === "whatsapp") {
+  if (canalKey === "whatsapp") {
     content = `*${borrador.titulo_portada}*\n\n${borrador.copy_tres_pasos.paso1_dolor}\n\n${borrador.copy_tres_pasos.paso2_reencuadre}\n\n👉 *${borrador.copy_tres_pasos.paso3_direccion_web}*`;
   } else {
     content = `${borrador.titulo_portada}\n\n${borrador.copy_tres_pasos.paso1_dolor}\n\n${borrador.copy_tres_pasos.paso2_reencuadre}\n\n${borrador.copy_tres_pasos.paso3_direccion_web}\n\n#MejoraContinua #OrdenOperativo #LiderazgoDirectivo`;
@@ -107,9 +106,8 @@ export async function runPostingCycle(
     apiKey = process.env.ZERNIO_API_KEY || "sandbox_key",
     circuitBreaker = defaultZernioCircuitBreaker,
     accountIds = {
-      linkedin: process.env.ZERNIO_LINKEDIN_ACCOUNT_ID || "acc_li_01",
-      instagram: process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID || "acc_ig_01",
-      facebook: process.env.ZERNIO_FACEBOOK_ACCOUNT_ID || "acc_fb_01",
+      instagram: process.env.ZERNIO_ACCOUNT_INSTAGRAM || process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID || "acc_ig_01",
+      facebook: process.env.ZERNIO_ACCOUNT_FACEBOOK || process.env.ZERNIO_FACEBOOK_ACCOUNT_ID || "acc_fb_01",
       whatsapp: process.env.ZERNIO_WHATSAPP_ACCOUNT_ID || "acc_wa_01",
     },
   } = options;

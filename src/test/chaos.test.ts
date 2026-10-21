@@ -62,7 +62,7 @@ describe("FASE 4: Batería de Pruebas de Caos (1.000 Ciclos Deterministas)", () 
         propuesta_id, canal_destino, dia_programado, origen_boveda_id,
         borradores_json, tratamiento_visual_json, imagen_boveda_json,
         creado_el, actualizado_el
-      ) VALUES ('PROP-CHAOS-BASE', 'linkedin', ?, 'BOV-CHAOS', '[]', '{}', '{}', ?, ?)
+      ) VALUES ('PROP-CHAOS-BASE', 'instagram', ?, 'BOV-CHAOS', '[]', '{}', '{}', ?, ?)
     `).run(baseDate, baseDate, baseDate);
 
     for (let cycle = 1; cycle <= TOTAL_CYCLES; cycle++) {
@@ -76,7 +76,7 @@ describe("FASE 4: Batería de Pruebas de Caos (1.000 Ciclos Deterministas)", () 
           post_id, propuesta_id, canal, borrador_opcion, estado_post,
           clave_idempotencia, proximo_reintento_at, lease_owner, lease_expira_at,
           reintentos_cont, creado_en, actualizado_en
-        ) VALUES (?, 'PROP-CHAOS-BASE', 'linkedin', 'A', 'EN_COLA', ?, ?, NULL, NULL, 0, ?, ?)
+        ) VALUES (?, 'PROP-CHAOS-BASE', 'instagram', 'A', 'EN_COLA', ?, ?, NULL, NULL, 0, ?, ?)
       `).run(postId, claveIdempotencia, postDate.toISOString(), postDate.toISOString(), postDate.toISOString());
 
       // Determinar modo de falla probabilístico
@@ -106,7 +106,7 @@ describe("FASE 4: Batería de Pruebas de Caos (1.000 Ciclos Deterministas)", () 
         const desp = await despacharPostAZernio(
           outboxRepo,
           reclaim2[0],
-          { content: "Post saneado post-SIGKILL", mediaItems: [], platforms: [{ platform: 'linkedin' as const, accountId: 'acc-123' }], publishNow: true },
+          { content: "Post saneado post-SIGKILL", mediaItems: [], platforms: [{ platform: 'instagram' as const, accountId: 'acc-123' }], publishNow: true },
           { sandbox: true, now: reaperTime, reconciliationClient: mockReconciliationClient }
         );
         expect(desp.exito).toBe(true);
@@ -140,7 +140,7 @@ describe("FASE 4: Batería de Pruebas de Caos (1.000 Ciclos Deterministas)", () 
         const desp = await despacharPostAZernio(
           outboxRepo,
           reclaim2[0],
-          { content: "Post con reconciliación", mediaItems: [], platforms: [{ platform: 'linkedin' as const, accountId: 'acc-123' }], publishNow: true },
+          { content: "Post con reconciliación", mediaItems: [], platforms: [{ platform: 'instagram' as const, accountId: 'acc-123' }], publishNow: true },
           {
             sandbox: false,
             now: reaperTime,
@@ -174,7 +174,7 @@ describe("FASE 4: Batería de Pruebas de Caos (1.000 Ciclos Deterministas)", () 
         const desp = await despacharPostAZernio(
           outboxRepo,
           reclaim2[0],
-          { content: "Post C finalizado", mediaItems: [], platforms: [{ platform: 'linkedin' as const, accountId: 'acc-123' }], publishNow: true },
+          { content: "Post C finalizado", mediaItems: [], platforms: [{ platform: 'instagram' as const, accountId: 'acc-123' }], publishNow: true },
           { sandbox: true, now: reaperTime, reconciliationClient: mockReconciliationClient }
         );
         expect(desp.exito).toBe(true);
@@ -189,7 +189,7 @@ describe("FASE 4: Batería de Pruebas de Caos (1.000 Ciclos Deterministas)", () 
         const desp = await despacharPostAZernio(
           outboxRepo,
           reclamados[0],
-          { content: "Post normal", mediaItems: [], platforms: [{ platform: 'linkedin' as const, accountId: 'acc-123' }], publishNow: true },
+          { content: "Post normal", mediaItems: [], platforms: [{ platform: 'instagram' as const, accountId: 'acc-123' }], publishNow: true },
           { sandbox: true, now: postDate, reconciliationClient: mockReconciliationClient }
         );
         expect(desp.exito).toBe(true);

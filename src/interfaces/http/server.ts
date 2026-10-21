@@ -52,7 +52,7 @@ export function createSMServer(customServices?: SMAppServices): Server {
 
 // Punto de entrada si se ejecuta directamente con Node
 if (process.argv[1] && process.argv[1].endsWith("server.ts")) {
-  const PORT = Number(process.env.MEJORA_SM_PORT) || 4002;
+  const PORT = Number(process.env.PORT) || Number(process.env.MEJORA_SM_PORT) || 4002;
   const server = createSMServer();
   const HOST = "127.0.0.1";
   server.listen(PORT, HOST, () => {

@@ -85,7 +85,7 @@ describe("Subfase 1.1: Servidor HTTP Local y Persistencia Soberana en SQLite", (
   it("permite registrar propuestas, consultar listado y aprobar lote completo", async () => {
     const p1: PropuestaMejoraSMDTO = {
       propuesta_id: "PROP-E2E-01",
-      canal_destino: "linkedin",
+      canal_destino: "instagram",
       dia_programado: "2026-10-20T09:30:00.000Z",
       origen_boveda_id: "BOV-E2E-001",
       borradores: [

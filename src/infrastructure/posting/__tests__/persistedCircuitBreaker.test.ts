@@ -1,10 +1,10 @@
-// src/infrastructure/posting/__tests__/persistedCircuitBreaker.test.ts
 import { describe, it, expect, beforeEach } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import {
   PersistedChannelCircuitBreaker,
   Http4xxError,
   isHttp4xx,
+  inicializarCircuitBreakersMeta,
 } from "../persistedCircuitBreaker";
 import { CREATE_TABLES_V2_SQL } from "../../sqlite/schema";
 
@@ -17,28 +17,28 @@ describe("Fase 3: Circuit Breaker Persistido por Canal en SQLite", () => {
     db.exec(CREATE_TABLES_V2_SQL);
   });
 
-  it("aislamiento: estados independientes por canal ('linkedin' vs 'instagram')", async () => {
-    const cbLinkedin = new PersistedChannelCircuitBreaker(db, "linkedin", { failureThreshold: 2 });
+  it("aislamiento: estados independientes por canal ('facebook' vs 'instagram')", async () => {
+    const cbFacebook = new PersistedChannelCircuitBreaker(db, "facebook", { failureThreshold: 2 });
     const cbInstagram = new PersistedChannelCircuitBreaker(db, "instagram", { failureThreshold: 2 });
 
-    expect(cbLinkedin.getState()).toBe("CLOSED");
+    expect(cbFacebook.getState()).toBe("CLOSED");
     expect(cbInstagram.getState()).toBe("CLOSED");
 
-    // Linkedin falla 2 veces por error de sistema (500)
-    await cbLinkedin.execute(
+    // Facebook falla 2 veces por error de sistema (500)
+    await cbFacebook.execute(
       async () => { throw new Error("500 Internal Server Error"); },
-      async () => "fallback_li"
+      async () => "fallback_fb"
     );
-    await cbLinkedin.execute(
+    await cbFacebook.execute(
       async () => { throw new Error("503 Service Unavailable"); },
-      async () => "fallback_li"
+      async () => "fallback_fb"
     );
 
-    // Linkedin debe estar OPEN, pero Instagram debe continuar CLOSED
-    expect(cbLinkedin.getState()).toBe("OPEN");
+    // Facebook debe estar OPEN, pero Instagram debe continuar CLOSED
+    expect(cbFacebook.getState()).toBe("OPEN");
     expect(cbInstagram.getState()).toBe("CLOSED");
 
-    const rowLi = cbLinkedin.getRow();
+    const rowLi = cbFacebook.getRow();
     const rowIg = cbInstagram.getRow();
     expect(rowLi.estado).toBe("OPEN");
     expect(rowLi.conteo_fallas).toBe(2);
@@ -116,7 +116,7 @@ describe("Fase 3: Circuit Breaker Persistido por Canal en SQLite", () => {
     let virtualNow = 10000;
     const now = () => virtualNow;
 
-    const cb = new PersistedChannelCircuitBreaker(db, "linkedin", {
+    const cb = new PersistedChannelCircuitBreaker(db, "facebook", {
       failureThreshold: 1,
       cooldownMs: 5000,
       now,
@@ -147,5 +147,14 @@ describe("Fase 3: Circuit Breaker Persistido por Canal en SQLite", () => {
     expect(res.result).toBe("publicacion_exitosa");
     expect(cb.getState()).toBe("CLOSED");
     expect(cb.getRow().conteo_fallas).toBe(0);
+  });
+
+  it("inicializarCircuitBreakersMeta: inicializa únicamente breakers para Meta ('instagram' y 'facebook')", () => {
+    const breakers = inicializarCircuitBreakersMeta(db);
+    expect(breakers.instagram).toBeInstanceOf(PersistedChannelCircuitBreaker);
+    expect(breakers.facebook).toBeInstanceOf(PersistedChannelCircuitBreaker);
+    expect(breakers.instagram.canal).toBe("instagram");
+    expect(breakers.facebook.canal).toBe("facebook");
+    expect((breakers as any).linkedin).toBeUndefined();
   });
 });

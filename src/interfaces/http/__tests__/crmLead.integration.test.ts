@@ -29,7 +29,7 @@ async function levantar(limite: number): Promise<{ server: Server; base: string;
 const cerrar = (s: Server) => new Promise<void>((res, rej) => s.close((e) => (e ? rej(e) : res())));
 const lead = (over: Record<string, unknown> = {}) => ({
   email: "cliente@empresa.com", nombre: "Cliente", telefono: "+54 11 5555-1234", empresa: "ACME",
-  utm_content: "PZ-2026-014", utm_source: "linkedin", utm_medium: "social", utm_campaign: "q4", ...over,
+  utm_content: "PZ-2026-014", utm_source: "instagram", utm_medium: "social", utm_campaign: "q4", ...over,
 });
 const post = (base: string, body: unknown, headers: Record<string, string> = {}) =>
   fetch(`${base}/api/crm/lead`, { method: "POST", headers: { ...J, ...headers }, body: JSON.stringify(body) });
@@ -46,7 +46,7 @@ describe("POST /api/crm/lead", () => {
     expect(data).toMatchObject({ success: true, duplicado: false, estado: "CAPTURADO" });
     const p = ctx.repo.obtenerPorId(data.prospecto_id)!;
     expect(p.pieza_id_atribucion).toBe("PZ-2026-014");
-    expect(p.origen_utm).toBe("linkedin/social/q4");
+    expect(p.origen_utm).toBe("instagram/social/q4");
     const horas = (Date.parse(p.sla_limite_calificacion) - Date.parse(p.fecha_captura)) / 3_600_000;
     expect(horas).toBe(48);
   });

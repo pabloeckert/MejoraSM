@@ -112,7 +112,7 @@ describe("SRE Circuit Breaker Zernio & Fallback a SQLite", () => {
       (err) => {
         // Fallback a SQLite: registrar estado encolado
         const start = performance.now();
-        repo.guardarPropuesta(mockPropuesta("PROP-FALLBACK-TIMEOUT", "linkedin", `Fallback de red: ${err.message}`));
+        repo.guardarPropuesta(mockPropuesta("PROP-FALLBACK-TIMEOUT", "instagram", `Fallback de red: ${err.message}`));
         const duration = performance.now() - start;
         expect(duration).toBeLessThan(50);
         return "fallback_sqlite_id";

@@ -46,7 +46,7 @@ export function toLegacyProposal(p: PropuestaMejoraSMDTO): ProposalDetail {
     body: bodyText,
     cta: copy4?.paso4_conversion_lead || copy4?.paso3_engagement_nativo || selDraft?.cta_texto || copy3?.paso3_direccion_web || null,
     hashtags: ["#MejoraContinua", "#EstrategiaEmpresarial", "#Liderazgo"],
-    format: p.canal_destino === "whatsapp" ? "whatsapp" : "post",
+    format: "post",
     status: statusMap[p.estado] || "pending",
     rejection_reason: p.motivo_rechazo || null,
     scheduled_at: p.dia_programado,
@@ -142,7 +142,7 @@ export const LOCAL_HTTP_BASE =
 
 export const LOCAL_AUTH_BEARER =
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_LOCAL_AUTH_TOKEN) ||
-  (typeof process !== "undefined" && process.env?.MEJORA_SM_AUTH_TOKEN) ||
+  (typeof process !== "undefined" && (process.env?.BEARER_TOKEN || process.env?.MEJORA_SM_AUTH_TOKEN)) ||
   "mejora_sm_local_bearer_2026";
 
 function syncMutationToBackend(endpoint: string, payload: unknown) {
@@ -324,7 +324,7 @@ export function rejectLocalProposal(id: string, reason: string): PropuestaMejora
  */
 export function triggerPackageDownload(propuesta: PropuestaMejoraSMDTO): void {
   const paquete = generarPaqueteMulticanal(propuesta);
-  const blob = new Blob([paquete.textoWhatsApp + "\n\n---\n\n" + paquete.textoLinkedIn], {
+  const blob = new Blob([paquete.textoWhatsApp + "\n\n---\n\n" + (paquete.textoMeta)], {
     type: "text/plain;charset=utf-8",
   });
   const url = URL.createObjectURL(blob);
@@ -355,8 +355,8 @@ export function triggerBatchPackageDownload(proposals: PropuestaMejoraSMDTO[], w
     lines.push(`Activo Bóveda: ${p.imagen_boveda_vinculada.ruta_archivo_local}`);
     lines.push(`\n>>> TEXTO PARA WHATSAPP:`);
     lines.push(pkg.textoWhatsApp);
-    lines.push(`\n>>> TEXTO PARA LINKEDIN / REDES:`);
-    lines.push(pkg.textoLinkedIn);
+    lines.push(`\n>>> TEXTO PARA META (INSTAGRAM / FACEBOOK):`);
+    lines.push(pkg.textoMeta);
     lines.push(`\n`);
   });
 

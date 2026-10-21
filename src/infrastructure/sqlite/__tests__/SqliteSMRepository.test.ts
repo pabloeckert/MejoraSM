@@ -49,7 +49,7 @@ describe("SqliteSMRepository (Persistencia Local Soberana con node:sqlite)", () 
   it("gestiona propuestas completas con los 3 borradores paralelos y copy calibrado en 3 pasos", () => {
     const propuesta: PropuestaMejoraSMDTO = {
       propuesta_id: "PROP-2026-W42-01",
-      canal_destino: "linkedin",
+      canal_destino: "instagram",
       dia_programado: "2026-10-19T09:30:00.000Z",
       origen_boveda_id: "BOV-2026-NET-001",
       borradores: [
@@ -129,7 +129,7 @@ describe("SqliteSMRepository (Persistencia Local Soberana con node:sqlite)", () 
     for (let i = 1; i <= 3; i++) {
       repo.guardarPropuesta({
         propuesta_id: `PROP-TEST-0${i}`,
-        canal_destino: "linkedin",
+        canal_destino: "instagram",
         dia_programado: `2026-10-2${i}T09:30:00.000Z`,
         origen_boveda_id: "BOV-TEST",
         borradores: [
@@ -189,7 +189,7 @@ describe("SqliteSMRepository (Persistencia Local Soberana con node:sqlite)", () 
     // Insertamos propuesta base
     repo.guardarPropuesta({
       propuesta_id: "PROP-BASE-01",
-      canal_destino: "linkedin",
+      canal_destino: "instagram",
       dia_programado: "2026-10-19T09:30:00.000Z",
       origen_boveda_id: "BOV-TEST",
       borradores: [
@@ -236,7 +236,7 @@ describe("SqliteSMRepository (Persistencia Local Soberana con node:sqlite)", () 
     repo.registrarMetricaAtribucion({
       id: "MET-01",
       propuesta_id: "PROP-BASE-01",
-      canal: "linkedin",
+      canal: "instagram",
       buyer_persona: "emprendedor_saturado",
       dimension: "empresarial",
       formato: "carrusel_pdf",

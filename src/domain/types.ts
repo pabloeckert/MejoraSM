@@ -15,11 +15,8 @@ export type FaseComercial =
   | "mofu_educacion"
   | "bofu_conversion";
 
-export type CanalDestino =
-  | "linkedin"
-  | "instagram"
-  | "facebook"
-  | "whatsapp";
+export type CanalPublicacion = "instagram" | "facebook";
+export type CanalDestino = CanalPublicacion;
 
 export type OpcionBorrador = "A" | "B" | "C";
 
@@ -170,7 +167,8 @@ export const CONFIGURACION_BORRADORES: Record<
  */
 export function toCanonicalPropuesta(legacy: any): PropuestaMejoraSMDTO {
   const id = legacy?.id || legacy?.propuesta_id || `PROP-${Date.now()}`;
-  const canal: CanalDestino = legacy?.canal_destino || "linkedin";
+  const canal: CanalDestino =
+    legacy?.canal_destino === "facebook" ? "facebook" : "instagram";
   const dia = legacy?.dia_programado || legacy?.scheduled_at || new Date().toISOString();
   const bovedaId = legacy?.origen_boveda_id || legacy?.boveda_id || "BOV-2026-DEFAULT";
 
@@ -274,7 +272,7 @@ export function toCanonicalPropuesta(legacy: any): PropuestaMejoraSMDTO {
  */
 export function generarPaqueteMulticanal(propuesta: PropuestaMejoraSMDTO): {
   textoWhatsApp: string;
-  textoLinkedIn: string;
+  textoMeta: string;
   metadataJson: string;
   rutaImagen: string;
 } {
@@ -283,7 +281,7 @@ export function generarPaqueteMulticanal(propuesta: PropuestaMejoraSMDTO): {
   const esRightHook = borrador.estrategia === "right_hook_conversion";
 
   let textoWhatsApp: string;
-  let textoLinkedIn: string;
+  let textoMeta: string;
 
   if (c4) {
     if (esRightHook) {
@@ -302,7 +300,7 @@ export function generarPaqueteMulticanal(propuesta: PropuestaMejoraSMDTO): {
         `🔗 *Diagnóstico online:* https://mejoraok.com`,
       ].join("\n");
 
-      textoLinkedIn = [
+      textoMeta = [
         borrador.titulo_portada,
         ``,
         c4.paso1_dolor,
@@ -330,7 +328,7 @@ export function generarPaqueteMulticanal(propuesta: PropuestaMejoraSMDTO): {
         c4.paso3_engagement_nativo,
       ].join("\n");
 
-      textoLinkedIn = [
+      textoMeta = [
         borrador.titulo_portada,
         ``,
         c4.paso1_dolor,
@@ -357,7 +355,7 @@ export function generarPaqueteMulticanal(propuesta: PropuestaMejoraSMDTO): {
       esRightHook ? `🟡 *Paso 3: Dirección concreta*\n${c3.paso3_direccion_web}\n\n🔗 https://mejoraok.com` : `💬 *Paso 3: Debate*\n${c3.paso3_direccion_web}`,
     ].join("\n");
 
-    textoLinkedIn = [
+    textoMeta = [
       borrador.titulo_portada,
       ``,
       c3.paso1_dolor,
@@ -372,7 +370,7 @@ export function generarPaqueteMulticanal(propuesta: PropuestaMejoraSMDTO): {
 
   return {
     textoWhatsApp,
-    textoLinkedIn,
+    textoMeta,
     metadataJson: JSON.stringify(propuesta, null, 2),
     rutaImagen: propuesta.imagen_boveda_vinculada.ruta_archivo_local,
   };

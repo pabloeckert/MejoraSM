@@ -21,7 +21,7 @@ function nuevaDb(): DatabaseSync {
   return db;
 }
 
-const LEAD = { email: "Ana@Empresa.com", nombre: "Ana", pieza_id_atribucion: "PZ-2026-001", origen_utm: "linkedin/social/q4" };
+const LEAD = { email: "Ana@Empresa.com", nombre: "Ana", pieza_id_atribucion: "PZ-2026-001", origen_utm: "instagram/social/q4" };
 
 function propuesta(id: string): PropuestaMejoraSMDTO {
   const borrador = (opcion: "A" | "B" | "C") => ({
@@ -35,7 +35,7 @@ function propuesta(id: string): PropuestaMejoraSMDTO {
   });
   return {
     propuesta_id: id,
-    canal_destino: "linkedin",
+    canal_destino: "instagram",
     dia_programado: "2026-10-18T10:00:00.000Z",
     origen_boveda_id: "BOV-1",
     borradores: [borrador("A"), borrador("B"), borrador("C")],
@@ -166,12 +166,12 @@ describe("Outbox transaccional e idempotencia", () => {
     const d1 = new Date("2026-10-18T12:00:00Z");
     const d2 = new Date("2026-10-18T23:00:00Z");
     const d3 = new Date("2026-10-19T12:00:00Z");
-    const k = generarClaveIdempotencia("P1", "linkedin", "B", d1);
+    const k = generarClaveIdempotencia("P1", "instagram", "B", d1);
     expect(k).toMatch(/^[0-9a-f]{64}$/);
-    expect(generarClaveIdempotencia("P1", "linkedin", "B", d2)).toBe(k);
-    expect(generarClaveIdempotencia("P1", "linkedin", "B", d3)).not.toBe(k);
-    expect(generarClaveIdempotencia("P1", "linkedin", "A", d1)).not.toBe(k);
-    expect(generarClaveIdempotencia("P1", "instagram", "B", d1)).not.toBe(k);
+    expect(generarClaveIdempotencia("P1", "instagram", "B", d2)).toBe(k);
+    expect(generarClaveIdempotencia("P1", "instagram", "B", d3)).not.toBe(k);
+    expect(generarClaveIdempotencia("P1", "instagram", "A", d1)).not.toBe(k);
+    expect(generarClaveIdempotencia("P1", "facebook", "B", d1)).not.toBe(k);
   });
 
   it("aprobarLote encola un post APROBADO por propuesta en la misma transacción", () => {
@@ -179,13 +179,13 @@ describe("Outbox transaccional e idempotencia", () => {
     expect(propuestas.aprobarLote(["P1", "P2"])).toBe(2);
     const p1 = outbox.listarPorPropuesta("P1");
     expect(p1).toHaveLength(1);
-    expect(p1[0]).toMatchObject({ estado_post: "APROBADO", canal: "linkedin", borrador_opcion: "B", reintentos_cont: 0 });
+    expect(p1[0]).toMatchObject({ estado_post: "APROBADO", canal: "instagram", borrador_opcion: "B", reintentos_cont: 0 });
   });
 
   it("encolar dos veces el mismo día no duplica (INSERT OR IGNORE sobre clave UNIQUE)", () => {
     const t = new Date("2026-10-18T10:00:00Z");
-    expect(outbox.encolarAprobado({ propuesta_id: "P9", canal: "linkedin", borrador_opcion: "A" }, t)).toBe(true);
-    expect(outbox.encolarAprobado({ propuesta_id: "P9", canal: "linkedin", borrador_opcion: "A" }, t)).toBe(false);
+    expect(outbox.encolarAprobado({ propuesta_id: "P9", canal: "instagram", borrador_opcion: "A" }, t)).toBe(true);
+    expect(outbox.encolarAprobado({ propuesta_id: "P9", canal: "instagram", borrador_opcion: "A" }, t)).toBe(false);
     expect(outbox.listarPorPropuesta("P9")).toHaveLength(1);
   });
 

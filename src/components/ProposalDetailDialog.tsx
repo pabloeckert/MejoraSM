@@ -256,19 +256,21 @@ function ProposalDetailModal({
     },
   });
 
-  function handleCopyMulticanal(tipo: "whatsapp" | "linkedin") {
-    const texto = tipo === "whatsapp" ? paqueteMulticanal.textoWhatsApp : paqueteMulticanal.textoLinkedIn;
+  function handleCopyMulticanal(tipo: "whatsapp" | "meta") {
+    const texto = tipo === "whatsapp" ? paqueteMulticanal.textoWhatsApp : (paqueteMulticanal.textoMeta);
     navigator.clipboard.writeText(texto).then(
       () => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-        toast({ title: `Copiado para ${tipo === "whatsapp" ? "WhatsApp" : "LinkedIn"}` });
+        toast({ title: `Copiado para ${tipo === "whatsapp" ? "WhatsApp" : "Meta (Redes)"}` });
       },
       () => toast({ title: "Error", description: "El navegador bloqueó el portapapeles.", variant: "destructive" })
     );
   }
 
-  const [canalPreview, setCanalPreview] = useState<"linkedin" | "instagram" | "facebook">("linkedin");
+  const [canalPreview, setCanalPreview] = useState<"instagram" | "facebook">("instagram");
+  const [ratioInstagram, setRatioInstagram] = useState<"4:5" | "9:16">("4:5");
+  const [ratioFacebook, setRatioFacebook] = useState<"1:1" | "4:5">("1:1");
   const [downloadingZip, setDownloadingZip] = useState(false);
 
   async function handleDownloadPaquete() {
@@ -279,8 +281,8 @@ function ProposalDetailModal({
       // 1. Copy formateado para WhatsApp (con asteriscos, emojis oficiales y regla 80/20)
       zip.file(`${canonical.propuesta_id}_whatsapp.txt`, paqueteMulticanal.textoWhatsApp);
 
-      // 2. Copy formateado para LinkedIn y Redes
-      zip.file(`${canonical.propuesta_id}_redes.txt`, paqueteMulticanal.textoLinkedIn);
+      // 2. Copy formateado para Redes Meta (Instagram y Facebook)
+      zip.file(`${canonical.propuesta_id}_meta.txt`, paqueteMulticanal.textoMeta);
 
       // 3. Metadata canónica JSON
       zip.file(`${canonical.propuesta_id}_metadata.json`, paqueteMulticanal.metadataJson);
@@ -595,18 +597,6 @@ function ProposalDetailModal({
               <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm">
                 <button
                   type="button"
-                  onClick={() => setCanalPreview("linkedin")}
-                  className={cn(
-                    "px-2.5 py-1 text-xs font-semibold rounded-md transition-all",
-                    canalPreview === "linkedin"
-                      ? "bg-blue-800 text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  )}
-                >
-                  LinkedIn
-                </button>
-                <button
-                  type="button"
                   onClick={() => setCanalPreview("instagram")}
                   className={cn(
                     "px-2.5 py-1 text-xs font-semibold rounded-md transition-all",
@@ -634,69 +624,6 @@ function ProposalDetailModal({
 
             {/* MOCKUP DINÁMICO DE RED SOCIAL SEGÚN PESTAÑA */}
             <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-              {/* VISTA LINKEDIN */}
-              {canalPreview === "linkedin" && (
-                <div className="p-3.5 space-y-2.5 text-xs">
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-blue-900 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                      MC
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-slate-900 leading-tight">Pablo Eckert</p>
-                      <p className="text-[10px] text-slate-500 truncate">Director en Mejora Continua | Transformación de PyMEs</p>
-                      <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                        <span>{fmtDate(canonical.dia_programado) || "Programado"}</span>
-                        <span>•</span>
-                        <Globe className="h-2.5 w-2.5" />
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-slate-800 space-y-1.5 leading-relaxed">
-                    <p className="font-bold text-slate-900 text-sm">{currentBorrador.titulo_portada}</p>
-                    <p>{currentBorrador.copy_tres_pasos.paso1_dolor}</p>
-                    <p>{currentBorrador.copy_tres_pasos.paso2_reencuadre}</p>
-                    <p className="font-medium text-blue-900">{currentBorrador.copy_tres_pasos.paso3_direccion_web}</p>
-                    <p className="text-blue-700 text-[11px]">#MejoraContinua #Empresas #Liderazgo #Procesos</p>
-                  </div>
-
-                  {/* Canvas Gráfico Marco Desenfocado */}
-                  {imagenVinculada && (
-                    <div className="relative aspect-[4/5] max-h-64 w-full overflow-hidden rounded-md border border-slate-200 bg-white flex items-center justify-center">
-                      <div className="absolute top-0 left-0 right-0 h-1.5 z-30 flex">
-                        <div className="w-[60%] bg-[#1A3D84]" />
-                        <div className="w-[20%] bg-[#E1061E]" />
-                        <div className="w-[20%] bg-[#F7CC13]" />
-                      </div>
-                      <div
-                        className="absolute inset-[-20px] bg-cover bg-center filter opacity-75 scale-110"
-                        style={{
-                          backgroundImage: `url(${getAssetUrl(imagenVinculada)})`,
-                          filter: "blur(28px) brightness(0.85)",
-                        }}
-                      />
-                      <div className="relative z-10 w-full h-full p-2.5 flex items-center justify-center">
-                        <img
-                          src={getAssetUrl(imagenVinculada)}
-                          alt="Activo de Bóveda"
-                          className="max-h-full max-w-full object-contain border-2 border-white shadow-md rounded-sm"
-                        />
-                      </div>
-                      <div className="absolute bottom-2 right-2 z-20 bg-white/90 backdrop-blur px-1.5 py-0.5 rounded text-[9px] font-mono text-slate-700 border border-slate-200">
-                        Marco 4:5 · 0% Recorte
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-slate-600 text-[11px] font-semibold">
-                    <span className="flex items-center gap-1 hover:text-blue-800 cursor-pointer"><ThumbsUp className="h-3.5 w-3.5" /> Recomendar</span>
-                    <span className="flex items-center gap-1 hover:text-blue-800 cursor-pointer"><MessageCircle className="h-3.5 w-3.5" /> Comentar</span>
-                    <span className="flex items-center gap-1 hover:text-blue-800 cursor-pointer"><Share2 className="h-3.5 w-3.5" /> Compartir</span>
-                    <span className="flex items-center gap-1 hover:text-blue-800 cursor-pointer"><Send className="h-3.5 w-3.5" /> Enviar</span>
-                  </div>
-                </div>
-              )}
-
               {/* VISTA INSTAGRAM */}
               {canalPreview === "instagram" && (
                 <div className="p-3.5 space-y-2.5 text-xs bg-slate-900 text-white rounded-lg">
@@ -717,7 +644,10 @@ function ProposalDetailModal({
 
                   {/* Imagen Prioritaria IG */}
                   {imagenVinculada && (
-                    <div className="relative aspect-[4/5] max-h-72 w-full overflow-hidden rounded border border-slate-800 bg-black flex items-center justify-center">
+                    <div className={cn(
+                      "relative w-full overflow-hidden rounded border border-slate-800 bg-black flex items-center justify-center",
+                      ratioInstagram === "9:16" ? "aspect-[9/16] max-h-80" : "aspect-[4/5] max-h-72"
+                    )}>
                       <div className="absolute top-0 left-0 right-0 h-1.5 z-30 flex">
                         <div className="w-[60%] bg-[#1A3D84]" />
                         <div className="w-[20%] bg-[#E1061E]" />
@@ -782,7 +712,10 @@ function ProposalDetailModal({
                   </div>
 
                   {imagenVinculada && (
-                    <div className="relative aspect-[4/5] max-h-64 w-full overflow-hidden rounded-md border border-slate-200 bg-white flex items-center justify-center">
+                    <div className={cn(
+                      "relative w-full overflow-hidden rounded-md border border-slate-200 bg-white flex items-center justify-center",
+                      ratioFacebook === "1:1" ? "aspect-square max-h-64" : "aspect-[4/5] max-h-64"
+                    )}>
                       <div className="absolute top-0 left-0 right-0 h-1.5 z-30 flex">
                         <div className="w-[60%] bg-[#1A3D84]" />
                         <div className="w-[20%] bg-[#E1061E]" />

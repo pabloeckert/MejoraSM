@@ -73,7 +73,7 @@ describe("Motor de Grilla Evergreen 26 Semanas (80/20 Rule)", () => {
     }
   });
 
-  it("exporta correctamente el paquete multicanal para WhatsApp y LinkedIn según regla 80/20", () => {
+  it("exporta correctamente el paquete multicanal para WhatsApp y Meta según regla 80/20", () => {
     const grilla = generarGrillaEvergreen26Semanas();
     // Pieza 0: Lunes (Jab - 100% valor, 0% links)
     const piezaJab = grilla.semanas[0].propuestas[0];
@@ -85,7 +85,7 @@ describe("Motor de Grilla Evergreen 26 Semanas (80/20 Rule)", () => {
     expect(paqueteJab.textoWhatsApp).toContain("Paso 3: Pregunta de debate");
     // Regla de Oro: Prohibido incluir links externos en Jabs
     expect(paqueteJab.textoWhatsApp).not.toContain("mejoraok.com");
-    expect(paqueteJab.textoLinkedIn).toContain("#MejoraContinua");
+    expect(paqueteJab.textoMeta).toContain("#MejoraContinua");
 
     // Buscar una pieza Right Hook de conversión (Viernes)
     const piezaRightHook = grilla.semanas
@@ -97,7 +97,7 @@ describe("Motor de Grilla Evergreen 26 Semanas (80/20 Rule)", () => {
       piezaRightHook.borrador_seleccionado = "C";
       const paqueteHook = generarPaqueteMulticanal(piezaRightHook);
       expect(paqueteHook.textoWhatsApp).toContain("mejoraok.com");
-      expect(paqueteHook.textoLinkedIn).toContain("mejoraok.com");
+      expect(paqueteHook.textoMeta).toContain("mejoraok.com");
     }
   });
 });

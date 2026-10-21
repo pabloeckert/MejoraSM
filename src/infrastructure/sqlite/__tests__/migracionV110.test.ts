@@ -79,12 +79,12 @@ describe("Parche v1.1.0 — Fase 1b: SRE Hardening y Persistencia Soberana STRIC
 
     db.prepare(`
       INSERT INTO propuestas_sm (propuesta_id, canal_destino, dia_programado, origen_boveda_id, borradores_json, tratamiento_visual_json, imagen_boveda_json, creado_el, actualizado_el)
-      VALUES ('PROP-T1', 'linkedin', ?, 'BOV-T1', '[]', '{}', '{}', ?, ?)
+      VALUES ('PROP-T1', 'instagram', ?, 'BOV-T1', '[]', '{}', '{}', ?, ?)
     `).run(now, now, now);
 
     db.prepare(`
       INSERT INTO outbox_posts (post_id, propuesta_id, canal, borrador_opcion, estado_post, clave_idempotencia, creado_en, actualizado_en)
-      VALUES ('POST-T1', 'PROP-T1', 'linkedin', 'A', 'BORRADOR', 'CLAVE-T1', ?, ?)
+      VALUES ('POST-T1', 'PROP-T1', 'instagram', 'A', 'BORRADOR', 'CLAVE-T1', ?, ?)
     `).run(now, now);
 
     // Transición ilegal directa BORRADOR -> DESPACHANDO aborta
@@ -109,11 +109,11 @@ describe("Parche v1.1.0 — Fase 1b: SRE Hardening y Persistencia Soberana STRIC
     `).run(now);
     db.prepare(`
       INSERT INTO propuestas_sm (propuesta_id, canal_destino, dia_programado, origen_boveda_id, borradores_json, tratamiento_visual_json, imagen_boveda_json, creado_el, actualizado_el)
-      VALUES ('PROP-B1', 'linkedin', ?, 'BOV-B1', '[]', '{}', '{}', ?, ?)
+      VALUES ('PROP-B1', 'instagram', ?, 'BOV-B1', '[]', '{}', '{}', ?, ?)
     `).run(now, now, now);
     db.prepare(`
       INSERT INTO outbox_posts (post_id, propuesta_id, canal, borrador_opcion, estado_post, clave_idempotencia, creado_en, actualizado_en)
-      VALUES ('POST-B1', 'PROP-B1', 'linkedin', 'A', 'BORRADOR', 'CLAVE-B1', ?, ?)
+      VALUES ('POST-B1', 'PROP-B1', 'instagram', 'A', 'BORRADOR', 'CLAVE-B1', ?, ?)
     `).run(now, now);
 
     db.prepare(`
@@ -140,11 +140,11 @@ describe("Parche v1.1.0 — Fase 1b: SRE Hardening y Persistencia Soberana STRIC
     `).run(now);
     db.prepare(`
       INSERT INTO propuestas_sm (propuesta_id, canal_destino, dia_programado, origen_boveda_id, borradores_json, tratamiento_visual_json, imagen_boveda_json, creado_el, actualizado_el)
-      VALUES ('PROP-C1', 'linkedin', ?, 'BOV-C1', '[]', '{}', '{}', ?, ?)
+      VALUES ('PROP-C1', 'instagram', ?, 'BOV-C1', '[]', '{}', '{}', ?, ?)
     `).run(now, now, now);
     db.prepare(`
       INSERT INTO outbox_posts (post_id, propuesta_id, canal, borrador_opcion, estado_post, clave_idempotencia, creado_en, actualizado_en)
-      VALUES ('POST-C1', 'PROP-C1', 'linkedin', 'A', 'BORRADOR', 'CLAVE-C1', ?, ?)
+      VALUES ('POST-C1', 'PROP-C1', 'instagram', 'A', 'BORRADOR', 'CLAVE-C1', ?, ?)
     `).run(now, now);
 
     // Requeue en BORRADOR debe fallar (no está en DEAD_LETTER)
@@ -171,12 +171,12 @@ describe("Parche v1.1.0 — Fase 1b: SRE Hardening y Persistencia Soberana STRIC
     // 2026-10-18T22:00:00.000Z es 2026-10-18 19:00 en ART
     // 2026-10-19T02:30:00.000Z es 2026-10-18 23:30 en ART
     // Ambas corresponden al MISMO día en Argentina (2026-10-18)
-    const claveA = generarClaveIdempotencia("PROP-D1", "linkedin", "A", "2026-10-18T22:00:00.000Z");
-    const claveB = generarClaveIdempotencia("PROP-D1", "linkedin", "A", "2026-10-19T02:30:00.000Z");
+    const claveA = generarClaveIdempotencia("PROP-D1", "instagram", "A", "2026-10-18T22:00:00.000Z");
+    const claveB = generarClaveIdempotencia("PROP-D1", "instagram", "A", "2026-10-19T02:30:00.000Z");
     expect(claveA).toBe(claveB);
 
     // 2026-10-19T03:00:00.000Z ya es 2026-10-19 00:00 en ART -> día siguiente en Argentina
-    const claveC = generarClaveIdempotencia("PROP-D1", "linkedin", "A", "2026-10-19T03:00:00.000Z");
+    const claveC = generarClaveIdempotencia("PROP-D1", "instagram", "A", "2026-10-19T03:00:00.000Z");
     expect(claveC).not.toBe(claveA);
   });
 
@@ -188,19 +188,19 @@ describe("Parche v1.1.0 — Fase 1b: SRE Hardening y Persistencia Soberana STRIC
     `).run(now);
     db.prepare(`
       INSERT INTO propuestas_sm (propuesta_id, canal_destino, dia_programado, origen_boveda_id, borradores_json, tratamiento_visual_json, imagen_boveda_json, creado_el, actualizado_el)
-      VALUES ('PROP-E1', 'linkedin', ?, 'BOV-E1', '[]', '{}', '{}', ?, ?)
+      VALUES ('PROP-E1', 'instagram', ?, 'BOV-E1', '[]', '{}', '{}', ?, ?)
     `).run(now, now, now);
 
     db.prepare(`
       INSERT INTO outbox_posts (post_id, propuesta_id, canal, borrador_opcion, estado_post, clave_idempotencia, creado_en, actualizado_en)
-      VALUES ('POST-E1', 'PROP-E1', 'linkedin', 'A', 'BORRADOR', 'CLAVE-DUPLICADA', ?, ?)
+      VALUES ('POST-E1', 'PROP-E1', 'instagram', 'A', 'BORRADOR', 'CLAVE-DUPLICADA', ?, ?)
     `).run(now, now);
 
     // Segundo post con MISMA clave_idempotencia debe abortar por UNIQUE
     expect(() => {
       db.prepare(`
         INSERT INTO outbox_posts (post_id, propuesta_id, canal, borrador_opcion, estado_post, clave_idempotencia, creado_en, actualizado_en)
-        VALUES ('POST-E2', 'PROP-E1', 'linkedin', 'B', 'BORRADOR', 'CLAVE-DUPLICADA', ?, ?)
+        VALUES ('POST-E2', 'PROP-E1', 'instagram', 'B', 'BORRADOR', 'CLAVE-DUPLICADA', ?, ?)
       `).run(now, now);
     }).toThrow(/UNIQUE constraint failed/);
   });
@@ -213,13 +213,13 @@ describe("Parche v1.1.0 — Fase 1b: SRE Hardening y Persistencia Soberana STRIC
     `).run(now);
     db.prepare(`
       INSERT INTO propuestas_sm (propuesta_id, canal_destino, dia_programado, origen_boveda_id, borradores_json, tratamiento_visual_json, imagen_boveda_json, creado_el, actualizado_el)
-      VALUES ('PROP-F1', 'linkedin', ?, 'BOV-F1', '[]', '{}', '{}', ?, ?)
+      VALUES ('PROP-F1', 'instagram', ?, 'BOV-F1', '[]', '{}', '{}', ?, ?)
     `).run(now, now, now);
 
     const leaseExpirado = "2026-10-19T11:58:00.000Z";
     db.prepare(`
       INSERT INTO outbox_posts (post_id, propuesta_id, canal, borrador_opcion, estado_post, reintentos_cont, lease_owner, lease_expira_at, clave_idempotencia, creado_en, actualizado_en)
-      VALUES ('POST-F1', 'PROP-F1', 'linkedin', 'A', 'DESPACHANDO', 2, 'worker-muerto', ?, 'CLAVE-F1', ?, ?)
+      VALUES ('POST-F1', 'PROP-F1', 'instagram', 'A', 'DESPACHANDO', 2, 'worker-muerto', ?, 'CLAVE-F1', ?, ?)
     `).run(leaseExpirado, now, now);
 
     const reaped = runLeaseReaper(db, new Date("2026-10-19T12:00:00.000Z"));
@@ -246,19 +246,19 @@ describe("Parche v1.1.0 — Fase 1b: SRE Hardening y Persistencia Soberana STRIC
     `).run(now);
     fixtureDb.prepare(`
       INSERT INTO propuestas_sm (propuesta_id, canal_destino, dia_programado, origen_boveda_id, borradores_json, tratamiento_visual_json, imagen_boveda_json, creado_el, actualizado_el)
-      VALUES ('PROP-G1', 'linkedin', ?, 'BOV-G1', '[]', '{}', '{}', ?, ?)
+      VALUES ('PROP-G1', 'instagram', ?, 'BOV-G1', '[]', '{}', '{}', ?, ?)
     `).run(now, now, now);
 
     // Insertar un post CANCELADO
     fixtureDb.prepare(`
       INSERT INTO outbox_posts (post_id, propuesta_id, canal, borrador_opcion, estado_post, clave_idempotencia, creado_en, actualizado_en)
-      VALUES ('POST-CANCELADO', 'PROP-G1', 'linkedin', 'A', 'CANCELADO', 'CLAVE-CANC', ?, ?)
+      VALUES ('POST-CANCELADO', 'PROP-G1', 'instagram', 'A', 'CANCELADO', 'CLAVE-CANC', ?, ?)
     `).run(now, now);
 
     // Insertar un post en DEAD_LETTER (equivalente canónico de fallido permanente)
     fixtureDb.prepare(`
       INSERT INTO outbox_posts (post_id, propuesta_id, canal, borrador_opcion, estado_post, clave_idempotencia, creado_en, actualizado_en)
-      VALUES ('POST-DEAD', 'PROP-G1', 'linkedin', 'B', 'DEAD_LETTER', 'CLAVE-DEAD', ?, ?)
+      VALUES ('POST-DEAD', 'PROP-G1', 'instagram', 'B', 'DEAD_LETTER', 'CLAVE-DEAD', ?, ?)
     `).run(now, now);
 
     const countCanc = fixtureDb.prepare("SELECT count(*) as c FROM outbox_posts WHERE estado_post = 'CANCELADO'").get() as any;
@@ -276,21 +276,21 @@ describe("Parche v1.1.0 — Fase 1b: SRE Hardening y Persistencia Soberana STRIC
     // 1. Normalización NFC
     const palabraNFD = "PROP-Caf\u0065\u0301"; // e + acento combinado (NFD)
     const palabraNFC = "PROP-Café"; // é canónico (NFC)
-    const h1 = generarClaveIdempotencia(palabraNFD, "linkedin", "A", fecha);
-    const h2 = generarClaveIdempotencia(palabraNFC, "linkedin", "A", fecha);
+    const h1 = generarClaveIdempotencia(palabraNFD, "instagram", "A", fecha);
+    const h2 = generarClaveIdempotencia(palabraNFC, "instagram", "A", fecha);
     expect(h1).toBe(h2);
 
     // 2. Canal en minúsculas
-    const hLower = generarClaveIdempotencia("PROP-1", "linkedin", "A", fecha);
-    const hUpper = generarClaveIdempotencia("PROP-1", "LINKEDIN", "A", fecha);
-    const hMixed = generarClaveIdempotencia("PROP-1", "LinKedIn", "A", fecha);
+    const hLower = generarClaveIdempotencia("PROP-1", "instagram", "A", fecha);
+    const hUpper = generarClaveIdempotencia("PROP-1", "INSTAGRAM", "A", fecha);
+    const hMixed = generarClaveIdempotencia("PROP-1", "InsTaGram", "A", fecha);
     expect(hLower).toBe(hUpper);
     expect(hLower).toBe(hMixed);
 
     // 3. Escape de caracter '|' previene colisiones determinísticas
-    // Si no escapáramos '|': "P|1" + "linkedin" vs "P" + "1|linkedin" tendrían el mismo payload "P|1|linkedin..."
-    const hAmbiguo1 = generarClaveIdempotencia("P|1", "linkedin", "A", fecha);
-    const hAmbiguo2 = generarClaveIdempotencia("P", "1|linkedin", "A", fecha);
+    // Si no escapáramos '|': "P|1" + "instagram" vs "P" + "1|instagram" tendrían el mismo payload "P|1|instagram..."
+    const hAmbiguo1 = generarClaveIdempotencia("P|1", "instagram", "A", fecha);
+    const hAmbiguo2 = generarClaveIdempotencia("P", "1|instagram", "A", fecha);
     expect(hAmbiguo1).not.toBe(hAmbiguo2);
 
     expect(escapeDelimiter("hola|mundo")).toBe("hola\\|mundo");

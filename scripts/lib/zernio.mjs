@@ -410,7 +410,7 @@ export async function publishPost(imageUrl, caption = "") {
   if (platforms.length === 0) {
     return {
       success: false,
-      error: "Falta configurar cuentas de destino en Zernio (Instagram, Facebook, LinkedIn o WhatsApp).",
+      error: "Falta configurar cuentas de destino en Zernio (Instagram o Facebook Meta).",
     };
   }
 

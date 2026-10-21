@@ -312,7 +312,7 @@ const MATRIZ_TEMAS = {
 };
 
 const DIMENSIONES = ["personal", "organizacional", "comercial", "empresarial", "profesionalizacion", "networking_y_autoridad"];
-const CANALES = ["linkedin", "instagram", "facebook", "whatsapp"];
+const CANALES = ["instagram", "facebook"];
 const SEMANAS_RIGHT_HOOK = new Set([1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 25, 26]);
 
 const stmtPropuesta = db.prepare(`

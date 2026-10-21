@@ -251,7 +251,7 @@ Fotos seleccionadas: ${photos.map((p) => p.name).join(", ")}`;
                   <div>
                     <p className="text-xs font-bold text-foreground">Post de Feed</p>
                     <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">
-                      LinkedIn, Instagram y Facebook.
+                      Instagram y Facebook (Meta).
                     </p>
                   </div>
                 </button>

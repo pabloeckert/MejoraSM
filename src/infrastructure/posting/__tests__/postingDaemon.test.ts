@@ -117,11 +117,11 @@ describe("Subfase 1.6: Auto-Posting Local con Zernio y Canal WhatsApp", () => {
     expect(payload.mediaItems[0].url).toBe("https://example.com/foto_operativa.jpg");
   });
 
-  it("construye un payload canónico para LinkedIn con hashtags y formato editorial", () => {
-    const propLi = crearPropuesta("PROP-LI-01", "linkedin", "aprobado", "2026-10-16T10:00:00Z", "A");
-    const payload = buildZernioPayload(propLi, { linkedin: "li_acc_456" });
+  it("construye un payload canónico para Instagram con hashtags y formato editorial", () => {
+    const propIg = crearPropuesta("PROP-IG-01", "instagram", "aprobado", "2026-10-16T10:00:00Z", "A");
+    const payload = buildZernioPayload(propIg, { instagram: "ig_acc_456" });
 
-    expect(payload.platforms).toEqual([{ platform: "linkedin", accountId: "li_acc_456" }]);
+    expect(payload.platforms).toEqual([{ platform: "instagram", accountId: "ig_acc_456" }]);
     expect(payload.content).toContain("#MejoraContinua");
     expect(payload.content).toContain("Tu equipo no sabe qué prioridad atender primero.");
   });
@@ -132,13 +132,13 @@ describe("Subfase 1.6: Auto-Posting Local con Zernio y Canal WhatsApp", () => {
     const futura = "2026-10-16T18:00:00.000Z";
 
     // 1. Aprobada y pasada -> DEBE publicarse
-    repo.guardarPropuesta(crearPropuesta("P-LISTA-LI", "linkedin", "aprobado", pasada));
+    repo.guardarPropuesta(crearPropuesta("P-LISTA-IG", "instagram", "aprobado", pasada));
     // 2. Aprobada pero para WhatsApp y pasada -> DEBE publicarse
     repo.guardarPropuesta(crearPropuesta("P-LISTA-WA", "whatsapp", "aprobado", pasada));
     // 3. Aprobada pero FUTURA -> NO debe publicarse
-    repo.guardarPropuesta(crearPropuesta("P-FUTURA", "linkedin", "aprobado", futura));
+    repo.guardarPropuesta(crearPropuesta("P-FUTURA", "facebook", "aprobado", futura));
     // 4. Pendiente de revisión pasada -> NO debe publicarse
-    repo.guardarPropuesta(crearPropuesta("P-PENDIENTE", "linkedin", "pendiente_revision", pasada));
+    repo.guardarPropuesta(crearPropuesta("P-PENDIENTE", "instagram", "pendiente_revision", pasada));
 
     const res = await runPostingCycle({
       repository: repo,
@@ -151,7 +151,7 @@ describe("Subfase 1.6: Auto-Posting Local con Zernio y Canal WhatsApp", () => {
     expect(res.fallidas).toBe(0);
 
     // Verificar en la base SQLite que su estado cambió a "publicado"
-    const pLi = repo.obtenerPropuesta("P-LISTA-LI");
+    const pLi = repo.obtenerPropuesta("P-LISTA-IG");
     expect(pLi?.estado).toBe("publicado");
 
     const pWa = repo.obtenerPropuesta("P-LISTA-WA");
@@ -169,7 +169,7 @@ describe("Subfase 1.6: Auto-Posting Local con Zernio y Canal WhatsApp", () => {
     const ahora = new Date("2026-10-16T12:00:00.000Z");
     const pasada = "2026-10-16T10:00:00.000Z";
 
-    repo.guardarPropuesta(crearPropuesta("P-FALLA-ZERNIO", "linkedin", "aprobado", pasada));
+    repo.guardarPropuesta(crearPropuesta("P-FALLA-ZERNIO", "instagram", "aprobado", pasada));
 
     // Mock global de fetch que falla con error de red simulando caída de Zernio
     const mockFetch = vi.fn().mockRejectedValue(new Error("Network connection refused to zernio.com"));

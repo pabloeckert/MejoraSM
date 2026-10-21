@@ -26,14 +26,14 @@ describe("Parche v1.1.0 — FASE 2b: Daemon Desacoplado, Patrón de Despacho y E
     `).run(now);
     db.prepare(`
       INSERT INTO propuestas_sm (propuesta_id, canal_destino, dia_programado, origen_boveda_id, borradores_json, tratamiento_visual_json, imagen_boveda_json, creado_el, actualizado_el)
-      VALUES ('PROP-F2', 'linkedin', ?, 'BOV-F2', '[]', '{}', '{}', ?, ?)
+      VALUES ('PROP-F2', 'instagram', ?, 'BOV-F2', '[]', '{}', '{}', ?, ?)
     `).run(now, now, now);
   });
 
   // ── 1. PATRÓN INNEGOCIABLE DE DESPACHO A ZERNIO (3 PASOS) ────────────────
   it("ejecuta el patrón de despacho: (1) Claim -> COMMIT, (2) HTTP fuera de tx, (3) Result -> COMMIT", async () => {
     const now = new Date("2026-10-19T12:00:00.000Z");
-    outboxRepo.encolarAprobado({ propuesta_id: "PROP-F2", canal: "linkedin", borrador_opcion: "A" }, now);
+    outboxRepo.encolarAprobado({ propuesta_id: "PROP-F2", canal: "instagram", borrador_opcion: "A" }, now);
 
     // PASO 1: Transacción 1 (Claim) -> COMMIT con lease_owner
     const lote = outboxRepo.reclamarLote(1, now, "worker-prod-1");
@@ -51,7 +51,7 @@ describe("Parche v1.1.0 — FASE 2b: Daemon Desacoplado, Patrón de Despacho y E
     const mockPayload = {
       content: "Post content",
       mediaItems: [],
-      platforms: [{ platform: "linkedin", accountId: "acc_1" }],
+      platforms: [{ platform: "instagram", accountId: "acc_1" }],
       publishNow: true,
     };
 
@@ -71,7 +71,7 @@ describe("Parche v1.1.0 — FASE 2b: Daemon Desacoplado, Patrón de Despacho y E
 
   it("registra fallo a REINTENTO cuando la petición HTTP de Zernio falla fuera de transacción", async () => {
     const now = new Date("2026-10-19T12:00:00.000Z");
-    outboxRepo.encolarAprobado({ propuesta_id: "PROP-F2", canal: "linkedin", borrador_opcion: "B" }, now);
+    outboxRepo.encolarAprobado({ propuesta_id: "PROP-F2", canal: "instagram", borrador_opcion: "B" }, now);
 
     const lote = outboxRepo.reclamarLote(1, now, "worker-prod-2");
     const postReclamado = lote[0];
@@ -97,7 +97,7 @@ describe("Parche v1.1.0 — FASE 2b: Daemon Desacoplado, Patrón de Despacho y E
   // ── 2. COMPARE-AND-SET Y RESILIENCIA ANTE RESPUESTA TARDÍA (REAPER) ────────
   it("simula reaper devolviendo post a EN_COLA durante llamada lenta para comprobar que la respuesta tardía no pisa el estado (CAS changes = 0)", async () => {
     const claimTime = new Date("2026-10-19T12:00:00.000Z");
-    outboxRepo.encolarAprobado({ propuesta_id: "PROP-F2", canal: "linkedin", borrador_opcion: "C" }, claimTime);
+    outboxRepo.encolarAprobado({ propuesta_id: "PROP-F2", canal: "instagram", borrador_opcion: "C" }, claimTime);
 
     // 1. Worker reclama el post (lease por 60s vence a las 12:01:00)
     const lote = outboxRepo.reclamarLote(1, claimTime, "worker-lento", 60_000);

@@ -193,7 +193,7 @@ const DIMENSIONES_ORDEN: DimensionMC[] = [
   "networking_y_autoridad",
 ];
 
-const CANALES: CanalDestino[] = ["linkedin", "instagram", "facebook", "whatsapp"];
+const CANALES: CanalDestino[] = ["instagram", "facebook"];
 
 // Semanas específicas (15 semanas de las 26) donde el Viernes se ejecuta un Right Hook de conversión
 const SEMANAS_RIGHT_HOOK = new Set([
@@ -236,14 +236,10 @@ export const FOTOS_REALES_BOVEDA = [
 
 function obtenerEngagementNativo(canal: CanalDestino, _persona: BuyerPersonaMC): string {
   switch (canal) {
-    case "linkedin":
-      return "¿Tu equipo vive esta fricción en la diaria? Dejanos tu punto de vista en los comentarios o reposteá si tu equipo necesita este debate.";
     case "instagram":
       return "Comentá 'PROCESO' y te enviamos la plantilla práctica por mensaje privado. Guardá este posteo para tu próxima reunión directiva.";
     case "facebook":
       return "¿Cómo resuelven este desafío en tu empresa? Contanos tu experiencia en los comentarios.";
-    case "whatsapp":
-      return "¿Te pasa esto en tu empresa? Respondé a este mensaje para analizar cómo ordenarlo.";
     default:
       return "Dejanos tu punto de vista en los comentarios.";
   }

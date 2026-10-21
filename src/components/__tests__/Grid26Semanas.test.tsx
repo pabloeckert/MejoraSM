@@ -7,7 +7,7 @@ const mockPropuestas: PropuestaMejoraSMDTO[] = [
   {
     propuesta_id: "PROP-2026-W01-01",
     dia_programado: "2026-10-19T09:30:00.000Z",
-    canal_destino: "linkedin",
+    canal_destino: "instagram",
     origen_boveda_id: "BOV-2026-NET-001",
     estado: "pendiente_revision",
     borrador_seleccionado: "A",
@@ -67,7 +67,7 @@ const mockPropuestas: PropuestaMejoraSMDTO[] = [
   {
     propuesta_id: "PROP-2026-W01-02",
     dia_programado: "2026-10-21T09:30:00.000Z",
-    canal_destino: "whatsapp",
+    canal_destino: "facebook",
     origen_boveda_id: "BOV-2026-NET-001",
     estado: "aprobado",
     borrador_seleccionado: "A",
