@@ -71,7 +71,7 @@ export async function dispatchOutbox(opts: OutboxDispatchOptions): Promise<Outbo
       const falloRes = outbox.registrarFallo(post.post_id, exec.result.error, clock(), {
         maxReintentos: opts.maxReintentos,
       });
-      const estadoPost = typeof falloRes === "string" ? falloRes : (falloRes as any)?.estado;
+      const estadoPost = falloRes.estado;
       if (estadoPost === "FALLIDO_PERMANENTE") result.fallidosPermanentes++;
       else result.reintentos++;
     }

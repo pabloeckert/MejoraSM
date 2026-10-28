@@ -21,13 +21,19 @@ const DEFAULT_ALLOWED_ORIGINS = [
   /^http:\/\/\[::1\](:\d+)?$/,
 ];
 
+import { randomUUID } from "node:crypto";
+
 export class TokenManager {
   private primaryToken: string;
   private secondaryToken: string | null = null;
   private lastRotatedAt: number = Date.now();
 
-  constructor(initialToken: string = process.env.BEARER_TOKEN || process.env.MEJORA_SM_AUTH_TOKEN || "mejora_sm_local_bearer_2026") {
-    this.primaryToken = initialToken;
+  constructor(initialToken?: string) {
+    this.primaryToken =
+      initialToken ||
+      process.env.BEARER_TOKEN ||
+      process.env.MEJORA_SM_AUTH_TOKEN ||
+      randomUUID();
   }
 
   public rotateToken(newToken: string): void {
@@ -118,20 +124,23 @@ export function validateHostAndOrigin(
 export function sanitizeForLogs(data: unknown): unknown {
   if (typeof data === "string") {
     return data
-      .replace(/Bearer\s+[A-Za-z0-9_\-\.]+/gi, "Bearer [REDACTED]")
-      .replace(/token=([A-Za-z0-9_\-\.]+)/gi, "token=[REDACTED]")
+      .replace(/Bearer\s+[A-Za-z0-9_.-]+/gi, "Bearer [REDACTED]")
+      .replace(/token=([A-Za-z0-9_.-]+)/gi, "token=[REDACTED]")
       .replace(/("?(?:token|password|secret|apiKey|api_key)"?\s*[:=]\s*)"[^"]+"/gi, '$1"[REDACTED]"');
   }
   if (data && typeof data === "object") {
-    const clone = Array.isArray(data) ? [...data] : { ...data as Record<string, unknown> };
-    for (const key of Object.keys(clone)) {
+    if (Array.isArray(data)) {
+      return data.map((item) => sanitizeForLogs(item));
+    }
+    const record = { ...(data as Record<string, unknown>) };
+    for (const key of Object.keys(record)) {
       if (/^(authorization|token|secret|password|apikey|api_key)$/i.test(key)) {
-        (clone as any)[key] = "[REDACTED]";
-      } else if (typeof (clone as any)[key] === "object") {
-        (clone as any)[key] = sanitizeForLogs((clone as any)[key]);
+        record[key] = "[REDACTED]";
+      } else if (typeof record[key] === "object" && record[key] !== null) {
+        record[key] = sanitizeForLogs(record[key]);
       }
     }
-    return clone;
+    return record;
   }
   return data;
 }

@@ -78,7 +78,7 @@ describe("Fase 3: Circuit Breaker Persistido por Canal en SQLite", () => {
   });
 
   it("conmuta a OPEN ante timeouts o caídas de red y ejecuta fallback en < 50ms", async () => {
-    let virtualNow = 10000;
+    const virtualNow = 10000;
     const now = () => virtualNow;
 
     const cb = new PersistedChannelCircuitBreaker(db, "facebook", {
@@ -155,6 +155,6 @@ describe("Fase 3: Circuit Breaker Persistido por Canal en SQLite", () => {
     expect(breakers.facebook).toBeInstanceOf(PersistedChannelCircuitBreaker);
     expect(breakers.instagram.canal).toBe("instagram");
     expect(breakers.facebook.canal).toBe("facebook");
-    expect((breakers as any).linkedin).toBeUndefined();
+    expect((breakers as Record<string, unknown>).linkedin).toBeUndefined();
   });
 });

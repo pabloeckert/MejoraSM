@@ -2,20 +2,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import {
-  DDL_STRICT_SCHEMA,
   generarClaveIdempotencia,
   escapeDelimiter,
   requeueDeadLetter,
   runLeaseReaper,
-  getFechaProgramadaART,
 } from "../../../../scripts/migracion_v1_1_0.mjs";
 import {
   DDL_002_STRICT_SCHEMA,
-  ejecutarMigracion002,
 } from "../../../../scripts/migracion_002_fechas_estrictas.mjs";
 import {
   createDatabaseConnection,
-  createReadOnlyConnection,
 } from "../connectionFactory";
 
 describe("Parche v1.1.0 — Fase 1b: SRE Hardening y Persistencia Soberana STRICT", () => {
@@ -30,7 +26,7 @@ describe("Parche v1.1.0 — Fase 1b: SRE Hardening y Persistencia Soberana STRIC
   // ── 1. VERIFICACIÓN Y FIJACIÓN DE JOURNAL MODE Y FÁBRICA ÚNICA ───────────
   it("(Punto 2 & 4) fábrica única centraliza conexiones con foreign_keys = ON y journal_mode = WAL", () => {
     const conn = createDatabaseConnection(":memory:");
-    const fk = conn.prepare("PRAGMA foreign_keys;").get() as any;
+    const fk = conn.prepare("PRAGMA foreign_keys;").get() as { foreign_keys: number };
     expect(fk.foreign_keys).toBe(1);
 
     // Verificación de enforcement de FK activo por defecto
@@ -158,11 +154,11 @@ describe("Parche v1.1.0 — Fase 1b: SRE Hardening y Persistencia Soberana STRIC
 
     // Requeue sin motivo o con motivo vacío falla
     expect(() => requeueDeadLetter(db, "POST-C1", "")).toThrow(/motivo de catálogo/);
-    expect(() => requeueDeadLetter(db, "POST-C1", null as any)).toThrow();
+    expect(() => requeueDeadLetter(db, "POST-C1", null as unknown as string)).toThrow();
 
     // Requeue con motivo válido triunfa
     requeueDeadLetter(db, "POST-C1", "REINTENTO_SUPERVISOR_APROBADO");
-    const post = db.prepare("SELECT * FROM outbox_posts WHERE post_id = 'POST-C1'").get() as any;
+    const post = db.prepare("SELECT * FROM outbox_posts WHERE post_id = 'POST-C1'").get() as { estado_post: string; reintentos_cont: number };
     expect(post.estado_post).toBe("EN_COLA");
     expect(post.reintentos_cont).toBe(0);
   });
@@ -225,7 +221,7 @@ describe("Parche v1.1.0 — Fase 1b: SRE Hardening y Persistencia Soberana STRIC
     const reaped = runLeaseReaper(db, new Date("2026-10-19T12:00:00.000Z"));
     expect(reaped).toBe(1);
 
-    const post = db.prepare("SELECT * FROM outbox_posts WHERE post_id = 'POST-F1'").get() as any;
+    const post = db.prepare("SELECT * FROM outbox_posts WHERE post_id = 'POST-F1'").get() as { estado_post: string; lease_owner: string | null; lease_expira_at: string | null; reintentos_cont: number };
     expect(post.estado_post).toBe("EN_COLA");
     expect(post.lease_owner).toBeNull();
     expect(post.lease_expira_at).toBeNull();
@@ -261,8 +257,8 @@ describe("Parche v1.1.0 — Fase 1b: SRE Hardening y Persistencia Soberana STRIC
       VALUES ('POST-DEAD', 'PROP-G1', 'instagram', 'B', 'DEAD_LETTER', 'CLAVE-DEAD', ?, ?)
     `).run(now, now);
 
-    const countCanc = fixtureDb.prepare("SELECT count(*) as c FROM outbox_posts WHERE estado_post = 'CANCELADO'").get() as any;
-    const countDead = fixtureDb.prepare("SELECT count(*) as c FROM outbox_posts WHERE estado_post = 'DEAD_LETTER'").get() as any;
+    const countCanc = fixtureDb.prepare("SELECT count(*) as c FROM outbox_posts WHERE estado_post = 'CANCELADO'").get() as { c: number };
+    const countDead = fixtureDb.prepare("SELECT count(*) as c FROM outbox_posts WHERE estado_post = 'DEAD_LETTER'").get() as { c: number };
     expect(countCanc.c).toBe(1);
     expect(countDead.c).toBe(1);
 

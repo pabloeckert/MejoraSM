@@ -34,7 +34,7 @@ describe("Subfase 1.5: Planificador Evergreen 26 Semanas y Cerebro de KPIs Local
     }
   });
 
-  function insertarPropuestaBase(id: string, canal: any = "instagram") {
+  function insertarPropuestaBase(id: string, canal: "instagram" | "facebook" = "instagram") {
     const p: PropuestaMejoraSMDTO = {
       propuesta_id: id,
       canal_destino: canal,

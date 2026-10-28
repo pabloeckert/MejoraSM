@@ -3,7 +3,6 @@
 // Motor: node:sqlite (DatabaseSync nativo en Node.js 24) sin dependencias externas.
 
 import { DatabaseSync } from "node:sqlite";
-import { CREATE_TABLES_SQL } from "./schema";
 import { withImmediateTransaction } from "./transaction";
 import { SqliteOutboxRepository } from "./SqliteOutboxRepository";
 import { createDatabaseConnection } from "./connectionFactory";
@@ -14,7 +13,62 @@ import {
   type DimensionMC,
   type CanalDestino,
   type OpcionBorrador,
+  type BorradorPropuestaDTO,
 } from "../../domain/types";
+import { type CamposEdicionPropuesta } from "./SqlitePropuestaRepository";
+
+interface FichaBovedaRow {
+  id: string;
+  origen_carpeta: string;
+  dimension: string;
+  tipo_activo: string;
+  titulo: string;
+  contenido_raw: string;
+  metadatos_multimedia: string | null;
+  fase_comercial_sugerida: string;
+  creado_el: string;
+}
+
+interface PropuestaRow {
+  propuesta_id: string;
+  canal_destino: string;
+  dia_programado: string;
+  origen_boveda_id: string;
+  borradores_json: string;
+  borrador_seleccionado: string;
+  tratamiento_visual_json: string;
+  imagen_boveda_json: string;
+  estado: string;
+  motivo_rechazo: string | null;
+  metricas_json: string | null;
+  creado_el: string;
+  actualizado_el: string;
+}
+
+interface MetricaImpactoRow {
+  dia_semana?: string;
+  horario_publicacion?: string;
+  formato?: string;
+  dimension?: string;
+  promedio: number | null;
+}
+
+interface RankingBuyerPersonaRow {
+  buyer_persona: string;
+  total_clics: number | null;
+  total_diagnosticos: number | null;
+  score_promedio: number | null;
+}
+
+interface RankingPiezaRow {
+  propuesta_id: string;
+  canal: string;
+  buyer_persona: string;
+  formato: string;
+  clics_mejoraok: number | null;
+  diagnosticos_completados: number | null;
+  score_impacto: number | null;
+}
 
 export interface MetricaRegistroDTO {
   id: string;
@@ -108,18 +162,18 @@ export class SqliteSMRepository {
 
   public obtenerFichaBoveda(id: string): FichaBovedaDTO | null {
     const stmt = this.db.prepare("SELECT * FROM boveda_fichas WHERE id = ?");
-    const row = stmt.get(id) as any;
+    const row = stmt.get(id) as FichaBovedaRow | undefined;
     if (!row) return null;
 
     return {
       id: row.id,
-      origen_carpeta: row.origen_carpeta,
-      dimension: row.dimension,
-      tipo_activo: row.tipo_activo,
+      origen_carpeta: row.origen_carpeta as FichaBovedaDTO["origen_carpeta"],
+      dimension: row.dimension as DimensionMC,
+      tipo_activo: row.tipo_activo as FichaBovedaDTO["tipo_activo"],
       titulo: row.titulo,
       contenido_raw: row.contenido_raw,
       metadatos_multimedia: row.metadatos_multimedia ? JSON.parse(row.metadatos_multimedia) : undefined,
-      fase_comercial_sugerida: row.fase_comercial_sugerida,
+      fase_comercial_sugerida: row.fase_comercial_sugerida as FichaBovedaDTO["fase_comercial_sugerida"],
       creado_el: row.creado_el,
     };
   }
@@ -139,17 +193,17 @@ export class SqliteSMRepository {
     query += " ORDER BY creado_el DESC";
 
     const stmt = this.db.prepare(query);
-    const rows = stmt.all(...params) as any[];
+    const rows = stmt.all(...params) as unknown as FichaBovedaRow[];
 
     return rows.map((row) => ({
       id: row.id,
-      origen_carpeta: row.origen_carpeta,
-      dimension: row.dimension,
-      tipo_activo: row.tipo_activo,
+      origen_carpeta: row.origen_carpeta as FichaBovedaDTO["origen_carpeta"],
+      dimension: row.dimension as DimensionMC,
+      tipo_activo: row.tipo_activo as FichaBovedaDTO["tipo_activo"],
       titulo: row.titulo,
       contenido_raw: row.contenido_raw,
       metadatos_multimedia: row.metadatos_multimedia ? JSON.parse(row.metadatos_multimedia) : undefined,
-      fase_comercial_sugerida: row.fase_comercial_sugerida,
+      fase_comercial_sugerida: row.fase_comercial_sugerida as FichaBovedaDTO["fase_comercial_sugerida"],
       creado_el: row.creado_el,
     }));
   }
@@ -200,7 +254,7 @@ export class SqliteSMRepository {
 
   public obtenerPropuesta(id: string): PropuestaMejoraSMDTO | null {
     const stmt = this.db.prepare("SELECT * FROM propuestas_sm WHERE propuesta_id = ?");
-    const row = stmt.get(id) as any;
+    const row = stmt.get(id) as PropuestaRow | undefined;
     if (!row) return null;
 
     return {
@@ -218,9 +272,9 @@ export class SqliteSMRepository {
     };
   }
 
-  public listarPropuestas(filtro?: { estado?: EstadoPropuesta; canal?: CanalDestino }): PropuestaMejoraSMDTO[] {
+  public listarPropuestas(filtro?: { estado?: EstadoPropuesta; canal?: CanalDestino; limit?: number; offset?: number }): PropuestaMejoraSMDTO[] {
     let query = "SELECT * FROM propuestas_sm WHERE 1=1";
-    const params: string[] = [];
+    const params: (string | number)[] = [];
 
     if (filtro?.estado) {
       query += " AND estado = ?";
@@ -232,8 +286,17 @@ export class SqliteSMRepository {
     }
     query += " ORDER BY dia_programado ASC";
 
+    if (filtro?.limit !== undefined && filtro.limit > 0) {
+      query += " LIMIT ?";
+      params.push(filtro.limit);
+      if (filtro?.offset !== undefined && filtro.offset > 0) {
+        query += " OFFSET ?";
+        params.push(filtro.offset);
+      }
+    }
+
     const stmt = this.db.prepare(query);
-    const rows = stmt.all(...params) as any[];
+    const rows = stmt.all(...params) as unknown as PropuestaRow[];
 
     return rows.map((row) => ({
       propuesta_id: row.propuesta_id,
@@ -254,6 +317,68 @@ export class SqliteSMRepository {
     this.actualizarEstadoPropuesta(id, "aprobado");
   }
 
+  public rechazarPropuesta(id: string, motivo: string): boolean {
+    const stmt = this.db.prepare(`
+      UPDATE propuestas_sm
+      SET estado = 'rechazado', motivo_rechazo = ?, actualizado_el = ?
+      WHERE propuesta_id = ?;
+    `);
+    const res = stmt.run(motivo, new Date().toISOString(), id);
+    return Number(res.changes || 0) > 0;
+  }
+
+  public editarPropuesta(id: string, fields: CamposEdicionPropuesta): PropuestaMejoraSMDTO | null {
+    const p = this.obtenerPropuesta(id);
+    if (!p) return null;
+
+    const borradorActivo = fields.borrador_seleccionado || p.borrador_seleccionado || "A";
+    const nuevosBorradores = p.borradores.map((b) => {
+      if (b.opcion === borradorActivo) {
+        const nuevoCopyTresPasos = fields.copy_tres_pasos
+          ? { ...fields.copy_tres_pasos }
+          : {
+              paso1_dolor: fields.hook !== undefined ? fields.hook : b.copy_tres_pasos.paso1_dolor,
+              paso2_reencuadre: fields.body !== undefined ? fields.body : b.copy_tres_pasos.paso2_reencuadre,
+              paso3_direccion_web: fields.cta !== undefined ? fields.cta : b.copy_tres_pasos.paso3_direccion_web,
+            };
+
+        const nuevoCuerpo = fields.copy_tres_pasos
+          ? `${fields.copy_tres_pasos.paso1_dolor}\n\n${fields.copy_tres_pasos.paso2_reencuadre}`
+          : fields.body !== undefined
+          ? fields.body
+          : b.cuerpo_texto;
+
+        const nuevoCta =
+          fields.copy_tres_pasos?.paso3_direccion_web ??
+          (fields.cta !== undefined ? fields.cta : b.cta_texto);
+
+        return {
+          ...b,
+          titulo_portada: fields.title ?? b.titulo_portada,
+          copy_tres_pasos: nuevoCopyTresPasos,
+          cuerpo_texto: nuevoCuerpo,
+          cta_texto: nuevoCta,
+        };
+      }
+      return b;
+    }) as [BorradorPropuestaDTO, BorradorPropuestaDTO, BorradorPropuestaDTO];
+
+    const propuestaActualizada: PropuestaMejoraSMDTO = {
+      ...p,
+      borradores: nuevosBorradores,
+      borrador_seleccionado: fields.borrador_seleccionado ?? p.borrador_seleccionado,
+      imagen_boveda_vinculada: fields.imagen_boveda_vinculada
+        ? {
+            ...p.imagen_boveda_vinculada,
+            ...fields.imagen_boveda_vinculada,
+          }
+        : p.imagen_boveda_vinculada,
+    };
+
+    this.guardarPropuesta(propuestaActualizada);
+    return propuestaActualizada;
+  }
+
   public actualizarEstadoPropuesta(id: string, nuevoEstado: EstadoPropuesta, motivoRechazo?: string): void {
     const stmt = this.db.prepare(`
       UPDATE propuestas_sm
@@ -262,7 +387,6 @@ export class SqliteSMRepository {
     `);
     stmt.run(nuevoEstado, motivoRechazo || null, new Date().toISOString(), id);
   }
-
 
   /**
    * Aprueba en una sola transacción atómica el lote completo de propuestas pendientes.
@@ -341,7 +465,7 @@ export class SqliteSMRepository {
       ORDER BY promedio DESC
       LIMIT 1;
     `);
-    const mejorDiaRow = stmtDia.get() as any;
+    const mejorDiaRow = stmtDia.get() as MetricaImpactoRow | undefined;
 
     const stmtHorario = this.db.prepare(`
       SELECT horario_publicacion, AVG(score_impacto) as promedio
@@ -350,7 +474,7 @@ export class SqliteSMRepository {
       ORDER BY promedio DESC
       LIMIT 1;
     `);
-    const mejorHorarioRow = stmtHorario.get() as any;
+    const mejorHorarioRow = stmtHorario.get() as MetricaImpactoRow | undefined;
 
     const stmtFormato = this.db.prepare(`
       SELECT formato, AVG(score_impacto) as promedio
@@ -359,7 +483,7 @@ export class SqliteSMRepository {
       ORDER BY promedio DESC
       LIMIT 1;
     `);
-    const mejorFormatoRow = stmtFormato.get() as any;
+    const mejorFormatoRow = stmtFormato.get() as MetricaImpactoRow | undefined;
 
     const stmtDimension = this.db.prepare(`
       SELECT dimension, AVG(score_impacto) as promedio
@@ -368,7 +492,7 @@ export class SqliteSMRepository {
       ORDER BY promedio DESC
       LIMIT 1;
     `);
-    const mejorDimRow = stmtDimension.get() as any;
+    const mejorDimRow = stmtDimension.get() as MetricaImpactoRow | undefined;
 
     return {
       mejorDia: mejorDiaRow?.dia_semana || "Miércoles",
@@ -391,7 +515,7 @@ export class SqliteSMRepository {
       ORDER BY total_diagnosticos DESC, total_clics DESC;
     `);
 
-    const rows = stmt.all() as any[];
+    const rows = stmt.all() as unknown as RankingBuyerPersonaRow[];
     return rows.map((r) => {
       const clics = Number(r.total_clics || 0);
       const diag = Number(r.total_diagnosticos || 0);
@@ -420,10 +544,10 @@ export class SqliteSMRepository {
       LIMIT ?;
     `);
 
-    const rows = stmt.all(limite) as any[];
+    const rows = stmt.all(limite) as unknown as RankingPiezaRow[];
     return rows.map((r) => ({
       propuesta_id: r.propuesta_id,
-      canal: r.canal,
+      canal: r.canal as CanalDestino,
       buyer_persona: r.buyer_persona,
       formato: r.formato,
       clics_mejoraok: Number(r.clics_mejoraok || 0),

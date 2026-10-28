@@ -3,7 +3,6 @@
 
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
-import { CREATE_TABLES_SQL } from "./schema";
 import { withImmediateTransaction } from "./transaction";
 import { createDatabaseConnection } from "./connectionFactory";
 import { generarClaveIdempotencia, MAX_REINTENTOS_OUTBOX } from "../../domain/outbox";
@@ -69,6 +68,45 @@ export class SqliteOutboxRepository {
       )
       .run(randomUUID(), input.propuesta_id, input.canal, input.borrador_opcion, clave, ahoraIso, ahoraIso);
     return Number(res.changes || 0) > 0;
+  }
+
+  /**
+   * Encola un post para publicación con estado 'EN_COLA' y clave de idempotencia única SHA-256.
+   * Si ya existe un registro con la misma clave de idempotencia en estado APROBADO, lo transiciona a EN_COLA.
+   */
+  public encolarPost(
+    input: EncolarInput,
+    now: Date = new Date()
+  ): { success: boolean; postId: string; claveIdempotencia: string } {
+    const ahoraIso = now.toISOString();
+    const clave = generarClaveIdempotencia(input.propuesta_id, input.canal, input.borrador_opcion, now);
+    const postId = randomUUID();
+
+    return withImmediateTransaction(this.db, () => {
+      const existente = this.db
+        .prepare("SELECT post_id, estado_post FROM outbox_posts WHERE clave_idempotencia = ?")
+        .get(clave) as { post_id: string; estado_post: string } | undefined;
+
+      if (existente) {
+        if (existente.estado_post === "APROBADO") {
+          this.db
+            .prepare("UPDATE outbox_posts SET estado_post = 'EN_COLA', actualizado_en = ? WHERE post_id = ?")
+            .run(ahoraIso, existente.post_id);
+        }
+        return { success: true, postId: existente.post_id, claveIdempotencia: clave };
+      }
+
+      this.db
+        .prepare(
+          `INSERT INTO outbox_posts
+           (post_id, propuesta_id, canal, borrador_opcion, estado_post, reintentos_cont,
+            clave_idempotencia, proximo_reintento_at, error_ultimo, creado_en, actualizado_en)
+           VALUES (?, ?, ?, ?, 'EN_COLA', 0, ?, NULL, NULL, ?, ?)`
+        )
+        .run(postId, input.propuesta_id, input.canal, input.borrador_opcion, clave, ahoraIso, ahoraIso);
+
+      return { success: true, postId, claveIdempotencia: clave };
+    });
   }
 
   /** Reclama atómicamente hasta `limite` posts listos y los marca DESPACHANDO con lease_owner y lease_expira_at. */

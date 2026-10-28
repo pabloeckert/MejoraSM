@@ -27,7 +27,7 @@ import {
   Layers,
   Loader2,
 } from "lucide-react";
-import { getAssetUrl } from "@/components/ProposalDetailDialog";
+import { getAssetUrl } from "@/lib/utils";
 
 export interface Grid26SemanasProps {
   proposals: PropuestaMejoraSMDTO[];

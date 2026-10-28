@@ -9,8 +9,9 @@ import { SqliteBovedaRepository } from "../../../infrastructure/sqlite/SqliteBov
 import { SqlitePropuestaRepository } from "../../../infrastructure/sqlite/SqlitePropuestaRepository";
 import { SqliteProspectoRepository } from "../../../infrastructure/sqlite/SqliteProspectoRepository";
 import { SlidingWindowRateLimiter } from "../rateLimiter";
+import { defaultTokenManager } from "../security";
 
-const BEARER = { Authorization: `Bearer ${process.env.MEJORA_SM_AUTH_TOKEN || "mejora_sm_local_bearer_2026"}` };
+const BEARER = { Authorization: `Bearer ${defaultTokenManager.getPrimaryToken()}` };
 const J = { "Content-Type": "application/json" };
 
 async function levantar(limite: number): Promise<{ server: Server; base: string; repo: SqliteProspectoRepository }> {

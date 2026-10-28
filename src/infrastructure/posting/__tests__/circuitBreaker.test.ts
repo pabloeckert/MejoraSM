@@ -4,12 +4,12 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import { ZernioCircuitBreaker } from "../circuitBreaker";
 import { SqliteSMRepository } from "../../sqlite/SqliteSMRepository";
-import { PropuestaMejoraSMDTO } from "../../../domain/types";
+import { PropuestaMejoraSMDTO, CanalDestino } from "../../../domain/types";
 
-function mockPropuesta(id: string, canal: any, motivo: string): PropuestaMejoraSMDTO {
+function mockPropuesta(id: string, canal: CanalDestino | string, motivo: string): PropuestaMejoraSMDTO {
   return {
     propuesta_id: id,
-    canal_destino: canal,
+    canal_destino: canal as CanalDestino,
     dia_programado: new Date().toISOString(),
     origen_boveda_id: "BOV-001",
     borradores: [

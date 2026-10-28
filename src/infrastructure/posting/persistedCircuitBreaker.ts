@@ -132,7 +132,6 @@ export class PersistedChannelCircuitBreaker {
   }
 
   public reset(): void {
-    const nowIso = new Date(this.clock()).toISOString();
     this.updateState("CLOSED", 0, null, null);
   }
 
@@ -183,9 +182,9 @@ export class PersistedChannelCircuitBreaker {
         fromFallback: false,
         durationMs: performance.now() - callStart,
       };
-    } catch (rawError: any) {
+    } catch (rawError: unknown) {
       if (timer) clearTimeout(timer);
-      const errorMsg = rawError?.message || String(rawError);
+      const errorMsg = (rawError as Error)?.message || String(rawError);
       const err = new Error(errorMsg);
 
       // Criterio Mandatorio: ¿Es error 4xx?

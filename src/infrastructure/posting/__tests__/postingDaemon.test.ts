@@ -7,7 +7,7 @@ import {
   runPostingCycle,
 } from "../postingDaemon";
 import { SqliteSMRepository } from "../../sqlite/SqliteSMRepository";
-import { PropuestaMejoraSMDTO } from "../../../domain/types";
+import { PropuestaMejoraSMDTO, CanalDestino, EstadoPropuesta, OpcionBorrador } from "../../../domain/types";
 
 describe("Subfase 1.6: Auto-Posting Local con Zernio y Canal WhatsApp", () => {
   const testDbPath = path.join(process.cwd(), "data", "test_posting_subfase_1_6.db");
@@ -39,14 +39,14 @@ describe("Subfase 1.6: Auto-Posting Local con Zernio y Canal WhatsApp", () => {
 
   function crearPropuesta(
     id: string,
-    canal: any,
-    estado: any,
+    canal: CanalDestino | string,
+    estado: EstadoPropuesta,
     dia: string,
-    opcionBorrador: any = "A"
+    opcionBorrador: OpcionBorrador = "A"
   ): PropuestaMejoraSMDTO {
     return {
       propuesta_id: id,
-      canal_destino: canal,
+      canal_destino: canal as CanalDestino,
       dia_programado: dia,
       origen_boveda_id: "BOV-001",
       borradores: [
@@ -144,6 +144,7 @@ describe("Subfase 1.6: Auto-Posting Local con Zernio y Canal WhatsApp", () => {
       repository: repo,
       now: ahora,
       sandbox: true,
+      accountIds: { instagram: "acc_test_ig", whatsapp: "acc_test_wa" },
     });
 
     expect(res.propuestasProcesadas).toBe(2);
@@ -180,6 +181,7 @@ describe("Subfase 1.6: Auto-Posting Local con Zernio y Canal WhatsApp", () => {
       now: ahora,
       sandbox: false,
       apiKey: "test_key",
+      accountIds: { instagram: "acc_test_ig" },
     });
 
     expect(res.propuestasProcesadas).toBe(1);
@@ -193,5 +195,29 @@ describe("Subfase 1.6: Auto-Posting Local con Zernio y Canal WhatsApp", () => {
     expect(propEnDb?.motivo_rechazo).toContain("Fallback local");
 
     vi.restoreAllMocks();
+  });
+
+  it("falla con error explícito (throw) si falta ZERNIO_API_KEY o account IDs reales sin sandbox", async () => {
+    const ahora = new Date("2026-10-16T12:00:00.000Z");
+    repo.guardarPropuesta(crearPropuesta("P-SIN-KEY", "instagram", "aprobado", ahora.toISOString()));
+
+    await expect(
+      runPostingCycle({
+        repository: repo,
+        now: ahora,
+        sandbox: false,
+        apiKey: undefined,
+      })
+    ).rejects.toThrow(/Falta ZERNIO_API_KEY/);
+
+    await expect(
+      runPostingCycle({
+        repository: repo,
+        now: ahora,
+        sandbox: false,
+        apiKey: "valid_key",
+        accountIds: {},
+      })
+    ).rejects.toThrow(/Falta ID de cuenta real/);
   });
 });

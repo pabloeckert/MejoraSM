@@ -165,25 +165,48 @@ export const CONFIGURACION_BORRADORES: Record<
  * Si la propuesta antigua no tiene los 3 borradores, sintetiza las opciones A, B y C
  * respetando las reglas de negocio de Mejora Continua.
  */
-export function toCanonicalPropuesta(legacy: any): PropuestaMejoraSMDTO {
-  const id = legacy?.id || legacy?.propuesta_id || `PROP-${Date.now()}`;
+export function toCanonicalPropuesta(legacy: unknown): PropuestaMejoraSMDTO {
+  const l = (legacy && typeof legacy === "object" ? legacy : {}) as {
+    id?: string;
+    propuesta_id?: string;
+    canal_destino?: string;
+    dia_programado?: string;
+    scheduled_at?: string;
+    origen_boveda_id?: string;
+    boveda_id?: string;
+    hook?: string;
+    title?: string;
+    body?: string;
+    cta?: string;
+    copy_tres_pasos?: CopyCalibradoTresPasos;
+    borradores?: [BorradorPropuestaDTO, BorradorPropuestaDTO, BorradorPropuestaDTO];
+    borrador_seleccionado?: OpcionBorrador;
+    status?: string;
+    estado?: string;
+    motivo_rechazo?: string;
+    rendered_image_path?: string;
+    imagen_boveda_vinculada?: { id?: string; ruta_archivo_local?: string; titulo?: string };
+    tratamiento_visual?: TratamientoVisualDTO;
+    metricas_atribucion?: PropuestaMejoraSMDTO["metricas_atribucion"];
+  };
+  const id = l.id || l.propuesta_id || `PROP-${Date.now()}`;
   const canal: CanalDestino =
-    legacy?.canal_destino === "facebook" ? "facebook" : "instagram";
-  const dia = legacy?.dia_programado || legacy?.scheduled_at || new Date().toISOString();
-  const bovedaId = legacy?.origen_boveda_id || legacy?.boveda_id || "BOV-2026-DEFAULT";
+    l.canal_destino === "facebook" ? "facebook" : "instagram";
+  const dia = l.dia_programado || l.scheduled_at || new Date().toISOString();
+  const bovedaId = l.origen_boveda_id || l.boveda_id || "BOV-2026-DEFAULT";
 
-  const rawHook = legacy?.hook || legacy?.title || "Sin título";
-  const rawBody = legacy?.body || "";
-  const rawCta = legacy?.cta || "Conocé cómo ordenar tu empresa en mejoraok.com";
+  const rawHook = l.hook || l.title || "Sin título";
+  const rawBody = l.body || "";
+  const rawCta = l.cta || "Conocé cómo ordenar tu empresa en mejoraok.com";
 
   // Desglose del copy en 3 pasos (Dolor -> Reencuadre -> Dirección web)
-  const copy3Pasos: CopyCalibradoTresPasos = legacy?.copy_tres_pasos || {
+  const copy3Pasos: CopyCalibradoTresPasos = l.copy_tres_pasos || {
     paso1_dolor: rawHook,
     paso2_reencuadre: rawBody || "El desorden no es falta de capacidad, es falta de método y estructura.",
     paso3_direccion_web: rawCta,
   };
 
-  const borradorA: BorradorPropuestaDTO = legacy?.borradores?.[0] || {
+  const borradorA: BorradorPropuestaDTO = l.borradores?.[0] || {
     opcion: "A",
     tipo_formato: "carrusel_pdf",
     estrategia: "jab_educativo",
@@ -200,7 +223,7 @@ export function toCanonicalPropuesta(legacy: any): PropuestaMejoraSMDTO {
     cta_texto: copy3Pasos.paso3_direccion_web,
   };
 
-  const borradorB: BorradorPropuestaDTO = legacy?.borradores?.[1] || {
+  const borradorB: BorradorPropuestaDTO = l.borradores?.[1] || {
     opcion: "B",
     tipo_formato: "post_autoridad",
     estrategia: "networking_prueba_social",
@@ -214,7 +237,7 @@ export function toCanonicalPropuesta(legacy: any): PropuestaMejoraSMDTO {
     cta_texto: "Sumate a la mesa de trabajo en mejoraok.com",
   };
 
-  const borradorC: BorradorPropuestaDTO = legacy?.borradores?.[2] || {
+  const borradorC: BorradorPropuestaDTO = l.borradores?.[2] || {
     opcion: "C",
     tipo_formato: "post_directo",
     estrategia: "right_hook_conversion",
@@ -229,15 +252,15 @@ export function toCanonicalPropuesta(legacy: any): PropuestaMejoraSMDTO {
   };
 
   const estadoMapeado: EstadoPropuesta =
-    legacy?.status === "published" || legacy?.estado === "publicado"
+    l.status === "published" || l.estado === "publicado"
       ? "publicado"
-      : legacy?.status === "scheduled" || legacy?.status === "approved" || legacy?.estado === "aprobado"
+      : l.status === "scheduled" || l.status === "approved" || l.estado === "aprobado"
       ? "aprobado"
-      : legacy?.status === "rejected" || legacy?.estado === "rechazado"
+      : l.status === "rejected" || l.estado === "rechazado"
       ? "rechazado"
       : "pendiente_revision";
 
-  const imgPath = legacy?.rendered_image_path || legacy?.imagen_boveda_vinculada?.ruta_archivo_local || "";
+  const imgPath = l.rendered_image_path || l.imagen_boveda_vinculada?.ruta_archivo_local || "";
 
   return {
     propuesta_id: id,
@@ -245,24 +268,21 @@ export function toCanonicalPropuesta(legacy: any): PropuestaMejoraSMDTO {
     dia_programado: dia,
     origen_boveda_id: bovedaId,
     borradores: [borradorA, borradorB, borradorC],
-    borrador_seleccionado: legacy?.borrador_seleccionado || "A",
-    tratamiento_visual: legacy?.tratamiento_visual || {
+    borrador_seleccionado: l.borrador_seleccionado || "A",
+    tratamiento_visual: l.tratamiento_visual || {
       marco_expandido_requerido: true,
       color_fondo_marco: "#FFFFFF",
       regla_color_aplicada: "mucho_blanco_puntuacion_azul_rojo",
       relacion_aspecto_destino: "4:5",
     },
     imagen_boveda_vinculada: {
-      id: legacy?.imagen_boveda_vinculada?.id || bovedaId,
+      id: l.imagen_boveda_vinculada?.id || bovedaId,
       ruta_archivo_local: imgPath,
-      titulo: legacy?.imagen_boveda_vinculada?.titulo || legacy?.title || "Activo de Bóveda",
+      titulo: l.imagen_boveda_vinculada?.titulo || l.title || "Activo de Bóveda",
     },
     estado: estadoMapeado,
-    motivo_rechazo: legacy?.rejection_reason || legacy?.motivo_rechazo,
-    metricas_atribucion: legacy?.metricas_atribucion || {
-      clics_mejoraok: 0,
-      diagnosticos_completados: 0,
-    },
+    motivo_rechazo: l.motivo_rechazo,
+    metricas_atribucion: l.metricas_atribucion,
   };
 }
 

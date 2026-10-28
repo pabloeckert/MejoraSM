@@ -53,6 +53,6 @@ describe("Fase 3: Mantenimiento WAL (PASSIVE continua vs TRUNCATE ociosa)", () =
   });
 
   it("rechaza modos de checkpoint no reconocidos", () => {
-    expect(() => ejecutarWalCheckpoint(db, "INVENTADO" as any)).toThrow(/inválido/);
+    expect(() => ejecutarWalCheckpoint(db, "INVENTADO" as unknown as "PASSIVE")).toThrow(/inválido/);
   });
 });

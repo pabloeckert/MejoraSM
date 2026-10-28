@@ -1,8 +1,19 @@
 // src/infrastructure/sqlite/SqliteBovedaRepository.ts
 import { DatabaseSync } from "node:sqlite";
-import { CREATE_TABLES_SQL } from "./schema";
 import { createDatabaseConnection } from "./connectionFactory";
-import { type FichaBovedaDTO, type DimensionMC } from "../../domain/types";
+import { type FichaBovedaDTO, type DimensionMC, type FaseComercial } from "../../domain/types";
+
+interface FichaBovedaRow {
+  id: string;
+  origen_carpeta: string;
+  dimension: string;
+  tipo_activo: string;
+  titulo: string;
+  contenido_raw: string;
+  metadatos_multimedia: string | null;
+  fase_comercial_sugerida: string;
+  creado_el: string;
+}
 
 export class SqliteBovedaRepository {
   private db: DatabaseSync;
@@ -46,18 +57,18 @@ export class SqliteBovedaRepository {
 
   public obtenerPorId(id: string): FichaBovedaDTO | null {
     const stmt = this.db.prepare("SELECT * FROM boveda_fichas WHERE id = ?");
-    const row = stmt.get(id) as any;
+    const row = stmt.get(id) as FichaBovedaRow | undefined;
     if (!row) return null;
 
     return {
       id: row.id,
-      origen_carpeta: row.origen_carpeta,
-      dimension: row.dimension,
-      tipo_activo: row.tipo_activo,
+      origen_carpeta: row.origen_carpeta as FichaBovedaDTO["origen_carpeta"],
+      dimension: row.dimension as DimensionMC,
+      tipo_activo: row.tipo_activo as FichaBovedaDTO["tipo_activo"],
       titulo: row.titulo,
       contenido_raw: row.contenido_raw,
       metadatos_multimedia: row.metadatos_multimedia ? JSON.parse(row.metadatos_multimedia) : undefined,
-      fase_comercial_sugerida: row.fase_comercial_sugerida,
+      fase_comercial_sugerida: row.fase_comercial_sugerida as FaseComercial,
       creado_el: row.creado_el,
     };
   }
@@ -77,17 +88,17 @@ export class SqliteBovedaRepository {
     query += " ORDER BY creado_el DESC";
 
     const stmt = this.db.prepare(query);
-    const rows = stmt.all(...params) as any[];
+    const rows = stmt.all(...params) as unknown as FichaBovedaRow[];
 
     return rows.map((row) => ({
       id: row.id,
-      origen_carpeta: row.origen_carpeta,
-      dimension: row.dimension,
-      tipo_activo: row.tipo_activo,
+      origen_carpeta: row.origen_carpeta as FichaBovedaDTO["origen_carpeta"],
+      dimension: row.dimension as DimensionMC,
+      tipo_activo: row.tipo_activo as FichaBovedaDTO["tipo_activo"],
       titulo: row.titulo,
       contenido_raw: row.contenido_raw,
       metadatos_multimedia: row.metadatos_multimedia ? JSON.parse(row.metadatos_multimedia) : undefined,
-      fase_comercial_sugerida: row.fase_comercial_sugerida,
+      fase_comercial_sugerida: row.fase_comercial_sugerida as FaseComercial,
       creado_el: row.creado_el,
     }));
   }
@@ -104,7 +115,7 @@ export class SqliteBovedaRepository {
       FROM boveda_fichas
       GROUP BY origen_carpeta
     `);
-    const rows = stmt.all() as any[];
+    const rows = stmt.all() as unknown as Array<{ origen_carpeta: string; cantidad: number }>;
     const result: Record<string, number> = {
       constitucion: 0,
       autoridad: 0,

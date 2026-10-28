@@ -68,7 +68,10 @@ export function buildZernioPayload(
 
   const canalKey = propuesta.canal_destino as string;
   const plataformaZernio = CANALES_PLATAFORMA_MAP[canalKey] || "instagram";
-  const accountId = accountIds[canalKey] || `acc_${plataformaZernio}_default`;
+  const accountId = accountIds[canalKey] || accountIds[plataformaZernio];
+  if (!accountId) {
+    throw new Error(`Falta ID de cuenta real de Zernio para el canal '${canalKey}'.`);
+  }
 
   // Para WhatsApp se formatea con negritas de WhatsApp (*texto*)
   // Para redes Meta se estructura con saltos limpios y hashtags
@@ -102,15 +105,19 @@ export async function runPostingCycle(
   const {
     repository,
     now = new Date(),
-    sandbox = process.env.ZERNIO_SANDBOX === "true" || !process.env.ZERNIO_API_KEY,
-    apiKey = process.env.ZERNIO_API_KEY || "sandbox_key",
+    sandbox = process.env.ZERNIO_SANDBOX === "true",
+    apiKey = process.env.ZERNIO_API_KEY,
     circuitBreaker = defaultZernioCircuitBreaker,
     accountIds = {
-      instagram: process.env.ZERNIO_ACCOUNT_INSTAGRAM || process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID || "acc_ig_01",
-      facebook: process.env.ZERNIO_ACCOUNT_FACEBOOK || process.env.ZERNIO_FACEBOOK_ACCOUNT_ID || "acc_fb_01",
-      whatsapp: process.env.ZERNIO_WHATSAPP_ACCOUNT_ID || "acc_wa_01",
+      instagram: process.env.ZERNIO_ACCOUNT_INSTAGRAM || process.env.ZERNIO_INSTAGRAM_ACCOUNT_ID,
+      facebook: process.env.ZERNIO_ACCOUNT_FACEBOOK || process.env.ZERNIO_FACEBOOK_ACCOUNT_ID,
+      whatsapp: process.env.ZERNIO_WHATSAPP_ACCOUNT_ID,
     },
   } = options;
+
+  if (!sandbox && !apiKey) {
+    throw new Error("Falta ZERNIO_API_KEY requerida para la publicación real.");
+  }
 
   const todasAprobadas = repository.listarPropuestas({ estado: "aprobado" });
   // Filtrar las que tienen fecha programada alcanzada o vencida
@@ -157,7 +164,7 @@ export async function runPostingCycle(
               throw new Error(`Zernio API error ${response.status}: ${errBody}`);
             }
 
-            const data = (await response.json()) as any;
+            const data = (await response.json()) as { post?: { id?: string }; id?: string };
             return data.post?.id || data.id || `zernio_${Date.now()}`;
           },
           (fallbackErr) => {
@@ -186,12 +193,12 @@ export async function runPostingCycle(
         postId,
         payload,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       result.fallidas++;
       result.detalles.push({
         propuestaId: propuesta.propuesta_id,
         canal: propuesta.canal_destino,
-        error: err?.message || String(err),
+        error: err instanceof Error ? err.message : String(err),
         payload,
       });
     }

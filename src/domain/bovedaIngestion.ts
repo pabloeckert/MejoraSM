@@ -41,6 +41,7 @@ const TIPOS_ACTIVO_VALIDOS: Set<FichaBovedaDTO["tipo_activo"]> = new Set([
   "imagen_con_texto",
 ]);
 
+
 /**
  * Validador formal en memoria de contratos FichaBovedaDTO.
  * Rechaza atajos, valores incompletos o tipos incompatibles.
@@ -50,32 +51,35 @@ export function validateFichaBoveda(raw: unknown): FichaBovedaDTO {
     throw new Error("Payload inválido: FichaBovedaDTO debe ser un objeto.");
   }
 
-  const candidate = raw as Record<string, any>;
+  const candidate = raw as Record<string, unknown>;
 
-  if (!candidate.id || typeof candidate.id !== "string" || candidate.id.trim() === "") {
+  if (typeof candidate.id !== "string" || candidate.id.trim() === "") {
     throw new Error("Validación fallida: 'id' es obligatorio y no puede estar vacío.");
   }
 
+  const origen = candidate.origen_carpeta as FichaBovedaDTO["origen_carpeta"];
   const origenValido = Object.values(CAPAS_BOVEDA_MAP);
-  if (!origenValido.includes(candidate.origen_carpeta)) {
+  if (!origenValido.includes(origen)) {
     throw new Error(
       `Validación fallida: 'origen_carpeta' inválido. Debe ser uno de: ${origenValido.join(", ")}.`
     );
   }
 
-  if (!DIMENSIONES_VALIDAS.has(candidate.dimension)) {
+  const dimension = candidate.dimension as DimensionMC;
+  if (!DIMENSIONES_VALIDAS.has(dimension)) {
     throw new Error(
       `Validación fallida: 'dimension' inválida. Debe ser una de: ${Array.from(DIMENSIONES_VALIDAS).join(", ")}.`
     );
   }
 
-  if (!TIPOS_ACTIVO_VALIDOS.has(candidate.tipo_activo)) {
+  const tipoActivo = candidate.tipo_activo as FichaBovedaDTO["tipo_activo"];
+  if (!TIPOS_ACTIVO_VALIDOS.has(tipoActivo)) {
     throw new Error(
       `Validación fallida: 'tipo_activo' inválido. Debe ser uno de: ${Array.from(TIPOS_ACTIVO_VALIDOS).join(", ")}.`
     );
   }
 
-  if (!candidate.titulo || typeof candidate.titulo !== "string" || candidate.titulo.trim() === "") {
+  if (typeof candidate.titulo !== "string" || candidate.titulo.trim() === "") {
     throw new Error("Validación fallida: 'titulo' es obligatorio.");
   }
 
@@ -83,44 +87,53 @@ export function validateFichaBoveda(raw: unknown): FichaBovedaDTO {
     throw new Error("Validación fallida: 'contenido_raw' debe ser un string.");
   }
 
-  if (!FASES_COMERCIALES_VALIDAS.has(candidate.fase_comercial_sugerida)) {
+  const fase = candidate.fase_comercial_sugerida as FaseComercial;
+  if (!FASES_COMERCIALES_VALIDAS.has(fase)) {
     throw new Error(
       `Validación fallida: 'fase_comercial_sugerida' inválida. Debe ser una de: ${Array.from(FASES_COMERCIALES_VALIDAS).join(", ")}.`
     );
   }
 
-  if (candidate.metadatos_multimedia) {
-    const meta = candidate.metadatos_multimedia;
-    if (!meta.ruta_archivo_local || typeof meta.ruta_archivo_local !== "string") {
+  let multimedia: FichaBovedaDTO["metadatos_multimedia"] | undefined;
+  if (candidate.metadatos_multimedia && typeof candidate.metadatos_multimedia === "object") {
+    const meta = candidate.metadatos_multimedia as Record<string, unknown>;
+    if (typeof meta.ruta_archivo_local !== "string" || !meta.ruta_archivo_local) {
       throw new Error("Validación fallida: 'metadatos_multimedia.ruta_archivo_local' es obligatoria.");
     }
     if (!Array.isArray(meta.personas_presentes)) {
       throw new Error("Validación fallida: 'metadatos_multimedia.personas_presentes' debe ser un array.");
     }
-    if (!["horizontal", "vertical", "cuadrada"].includes(meta.orientacion_original)) {
+    if (
+      meta.orientacion_original !== "horizontal" &&
+      meta.orientacion_original !== "vertical" &&
+      meta.orientacion_original !== "cuadrada"
+    ) {
       throw new Error("Validación fallida: 'orientacion_original' debe ser horizontal, vertical o cuadrada.");
     }
+
+    const res = meta.resolucion as Record<string, unknown> | undefined;
+    multimedia = {
+      ruta_archivo_local: meta.ruta_archivo_local,
+      personas_presentes: meta.personas_presentes.map(String),
+      orientacion_original: meta.orientacion_original,
+      resolucion: res ? {
+        ancho: Number(res.ancho) || 0,
+        alto: Number(res.alto) || 0,
+      } : undefined,
+      locacion: typeof meta.locacion === "string" ? meta.locacion : undefined,
+    };
   }
 
   return {
     id: candidate.id.trim(),
-    origen_carpeta: candidate.origen_carpeta,
-    dimension: candidate.dimension,
-    tipo_activo: candidate.tipo_activo,
+    origen_carpeta: origen,
+    dimension,
+    tipo_activo: tipoActivo,
     titulo: candidate.titulo.trim(),
     contenido_raw: candidate.contenido_raw.trim(),
-    metadatos_multimedia: candidate.metadatos_multimedia ? {
-      ruta_archivo_local: candidate.metadatos_multimedia.ruta_archivo_local,
-      personas_presentes: [...candidate.metadatos_multimedia.personas_presentes],
-      orientacion_original: candidate.metadatos_multimedia.orientacion_original,
-      resolucion: candidate.metadatos_multimedia.resolucion ? {
-        ancho: Number(candidate.metadatos_multimedia.resolucion.ancho) || 0,
-        alto: Number(candidate.metadatos_multimedia.resolucion.alto) || 0,
-      } : undefined,
-      locacion: candidate.metadatos_multimedia.locacion || undefined,
-    } : undefined,
-    fase_comercial_sugerida: candidate.fase_comercial_sugerida,
-    creado_el: candidate.creado_el || new Date().toISOString(),
+    metadatos_multimedia: multimedia,
+    fase_comercial_sugerida: fase,
+    creado_el: typeof candidate.creado_el === "string" ? candidate.creado_el : new Date().toISOString(),
   };
 }
 
@@ -192,8 +205,8 @@ export async function ingestBovedaDirectory(bovedaBasePath: string): Promise<Fic
           }
           const valid = validateFichaBoveda(rawJson);
           results.push(valid);
-        } catch (err: any) {
-          console.warn(`[bovedaIngestion] Advertencia al procesar JSON en ${entry.name}: ${err?.message}`);
+        } catch (err: unknown) {
+          console.warn(`[bovedaIngestion] Advertencia al procesar JSON en ${entry.name}: ${(err as Error)?.message}`);
         }
       } else if (ext === ".md") {
         let dimension: DimensionMC = "organizacional";

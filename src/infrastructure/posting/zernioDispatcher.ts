@@ -93,7 +93,7 @@ export async function despacharPostAZernio(
       if (post.canal === 'linkedin') {
         throw new Error("Canal 'linkedin' no admitido en el despachador. Operación exclusiva Meta ('instagram' | 'facebook').");
       }
-      const activeBreaker = (options.circuitBreakers && (options.circuitBreakers as any)[post.canal]) || circuitBreaker;
+      const activeBreaker = (options.circuitBreakers && post.canal in options.circuitBreakers ? options.circuitBreakers[post.canal as keyof typeof options.circuitBreakers] : undefined) || circuitBreaker;
       const execution = await activeBreaker.execute(
         async () => {
           const timeoutController = new AbortController();
@@ -116,7 +116,7 @@ export async function despacharPostAZernio(
               throw new Error(`Zernio API error ${response.status}: ${errBody}`);
             }
 
-            const data = (await response.json()) as any;
+            const data = (await response.json()) as { post?: { id?: string }; id?: string };
             return data.post?.id || data.id || `zernio_${Date.now()}`;
           } finally {
             clearTimeout(timeoutId);
@@ -132,9 +132,9 @@ export async function despacharPostAZernio(
         httpExito = true;
         zernioId = execution.result;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       httpExito = false;
-      errorMsg = err.message;
+      errorMsg = err instanceof Error ? err.message : String(err);
     }
   }
 

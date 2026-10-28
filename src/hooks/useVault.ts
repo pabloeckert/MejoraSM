@@ -16,7 +16,7 @@ export function useDocuments() {
           if (res.ok) {
             const fichas = await res.json();
             if (Array.isArray(fichas) && fichas.length > 0) {
-              return fichas.map((f: any) => ({
+              return fichas.map((f: { id: string; titulo: string; creado_el?: string; contenido_raw?: string; capa?: string; dimension?: string; tags?: string[] }) => ({
                 id: f.id,
                 title: f.titulo,
                 file_type: "text/markdown",

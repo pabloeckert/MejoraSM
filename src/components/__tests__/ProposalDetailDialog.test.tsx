@@ -86,7 +86,7 @@ const mockProposal: PropuestaMejoraSMDTO = {
 };
 
 function renderDialog(props: {
-  proposal?: any;
+  proposal?: PropuestaMejoraSMDTO | null;
   open?: boolean;
   onApproveBatch?: () => void;
   totalLote?: number;

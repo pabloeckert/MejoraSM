@@ -177,6 +177,7 @@ CREATE INDEX IF NOT EXISTS idx_boveda_dimension ON boveda_fichas(dimension);
 CREATE INDEX IF NOT EXISTS idx_boveda_capa ON boveda_fichas(origen_carpeta);
 CREATE INDEX IF NOT EXISTS idx_propuestas_estado ON propuestas_sm(estado);
 CREATE INDEX IF NOT EXISTS idx_propuestas_dia ON propuestas_sm(dia_programado);
+CREATE INDEX IF NOT EXISTS idx_propuestas_estado_dia ON propuestas_sm(estado, dia_programado ASC);
 CREATE INDEX IF NOT EXISTS idx_propuestas_imagen ON propuestas_sm(imagen_boveda_id);
 CREATE INDEX IF NOT EXISTS idx_borradores_propuesta ON borradores(propuesta_id, opcion);
 CREATE INDEX IF NOT EXISTS idx_metricas_persona ON metricas_atribucion(buyer_persona);

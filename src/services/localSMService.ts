@@ -8,6 +8,7 @@ import {
 } from "@/domain/gridGenerator";
 import {
   PropuestaMejoraSMDTO,
+  BorradorPropuestaDTO,
   OpcionBorrador,
   CopyCalibradoTresPasos,
   CopyCalibradoCuatroPasos,
@@ -30,7 +31,7 @@ export function toLegacyProposal(p: PropuestaMejoraSMDTO): ProposalDetail {
     publicado: "published",
     rechazado: "rejected",
   };
-  const copy4 = (selDraft as any)?.copy_cuatro_pasos as CopyCalibradoCuatroPasos | undefined;
+  const copy4 = (selDraft as { copy_cuatro_pasos?: CopyCalibradoCuatroPasos } | undefined)?.copy_cuatro_pasos;
   const copy3 = selDraft?.copy_tres_pasos;
   const bodyText = copy4
     ? `${copy4.paso1_dolor}\n\n${copy4.paso2_reencuadre}\n\n${copy4.paso3_engagement_nativo}${copy4.paso4_conversion_lead ? `\n\n${copy4.paso4_conversion_lead}` : ""}`
@@ -140,25 +141,91 @@ export const LOCAL_HTTP_BASE =
   (typeof process !== "undefined" && process.env?.VITE_LOCAL_API_URL) ||
   "http://127.0.0.1:4002";
 
-export const LOCAL_AUTH_BEARER =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_LOCAL_AUTH_TOKEN) ||
-  (typeof process !== "undefined" && (process.env?.BEARER_TOKEN || process.env?.MEJORA_SM_AUTH_TOKEN)) ||
-  "mejora_sm_local_bearer_2026";
-
-function syncMutationToBackend(endpoint: string, payload: unknown) {
-  if (typeof fetch !== "undefined") {
-    fetch(`${LOCAL_HTTP_BASE}${endpoint}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${LOCAL_AUTH_BEARER}`,
-      },
-      body: JSON.stringify(payload),
-    }).catch((err) => {
-      // Diagnóstico explícito SRE sin silenciar errores
-      console.warn("[localSMService] Aviso: backend local no respondió a la sincronización:", err?.message || err);
-    });
+export const getLocalAuthBearer = (): string => {
+  if (typeof window !== "undefined" && window.localStorage) {
+    return window.localStorage.getItem("mejora_sm_auth_token") || "";
   }
+  if (typeof process !== "undefined") {
+    return process.env?.BEARER_TOKEN || process.env?.MEJORA_SM_AUTH_TOKEN || "";
+  }
+  return "";
+};
+
+export const LOCAL_AUTH_BEARER = getLocalAuthBearer();
+
+export async function syncMutationToBackend(
+  endpoint: string,
+  payload: unknown,
+  method: "POST" | "PATCH" = "POST",
+  retries: number = 2
+): Promise<boolean> {
+  if (typeof fetch === "undefined") {
+    return false;
+  }
+
+  const token = getLocalAuthBearer() || LOCAL_AUTH_BEARER;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+
+  for (let intento = 0; intento <= retries; intento++) {
+    try {
+      const res = await fetch(`${LOCAL_HTTP_BASE}${endpoint}`, {
+        method,
+        headers,
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        return true;
+      }
+      if (res.status >= 400 && res.status < 500 && res.status !== 408) {
+        const errText = await res.text();
+        console.warn(`[localSMService] Rechazado por el backend (${res.status}): ${errText}`);
+        return false;
+      }
+    } catch (err: unknown) {
+      if (intento === retries) {
+        console.warn("[localSMService] Aviso: backend local no respondió a la sincronización:", (err as Error)?.message || err);
+        return false;
+      }
+      await new Promise((r) => setTimeout(r, 50 * Math.pow(2, intento)));
+    }
+  }
+  return false;
+}
+
+/**
+ * Consulta la fuente de verdad en el servidor y sincroniza con localStorage como caché.
+ */
+export async function fetchServerProposals(): Promise<PropuestaMejoraSMDTO[]> {
+  if (typeof fetch === "undefined") {
+    return getLocalProposals();
+  }
+  try {
+    const token = getLocalAuthBearer() || LOCAL_AUTH_BEARER;
+    const res = await fetch(`${LOCAL_HTTP_BASE}/api/propuestas`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (res.ok) {
+      const data = (await res.json()) as PropuestaMejoraSMDTO[];
+      if (Array.isArray(data) && data.length > 0) {
+        saveLocalProposals(data);
+        return data;
+      }
+    }
+  } catch (err: unknown) {
+    console.warn("[localSMService] Servidor offline, leyendo desde caché local:", (err as Error)?.message || err);
+  }
+  return getLocalProposals();
+}
+
+export async function fetchServerProposalsAsLegacy(): Promise<ProposalDetail[]> {
+  const proposals = await fetchServerProposals();
+  return proposals.map(toLegacyProposal);
 }
 
 /**
@@ -167,14 +234,14 @@ function syncMutationToBackend(endpoint: string, payload: unknown) {
  */
 export function approveLocalProposal(id: string): PropuestaMejoraSMDTO[] {
   const all = getLocalProposals();
-  const target = all.find((p) => p.propuesta_id === id || (p as any).id === id);
+  const target = all.find((p) => p.propuesta_id === id || (p as unknown as { id?: string }).id === id);
   if (target && target.estado === "publicado") {
     console.warn(`[localSMService] Transición rechazada: propuesta ${id} ya está en estado 'publicado'`);
     return all;
   }
 
   const updated = all.map((p) => {
-    if (p.propuesta_id === id || (p as any).id === id) {
+    if (p.propuesta_id === id || (p as unknown as { id?: string }).id === id) {
       return { ...p, estado: "aprobado" as const };
     }
     return p;
@@ -190,7 +257,7 @@ export function approveLocalProposal(id: string): PropuestaMejoraSMDTO[] {
  */
 export function publishLocalProposal(id: string): PropuestaMejoraSMDTO[] {
   const all = getLocalProposals();
-  const target = all.find((p) => p.propuesta_id === id || (p as any).id === id);
+  const target = all.find((p) => p.propuesta_id === id || (p as unknown as { id?: string }).id === id);
   if (target && target.estado !== "aprobado") {
     console.warn(
       `[localSMService] Transición rechazada: propuesta ${id} debe estar en estado 'aprobado' para publicarse (actual: '${target?.estado}')`
@@ -199,7 +266,7 @@ export function publishLocalProposal(id: string): PropuestaMejoraSMDTO[] {
   }
 
   const updated = all.map((p) => {
-    if (p.propuesta_id === id || (p as any).id === id) {
+    if (p.propuesta_id === id || (p as unknown as { id?: string }).id === id) {
       return { ...p, estado: "publicado" as const };
     }
     return p;
@@ -217,7 +284,6 @@ export function approveBatchLocalProposals(filterWeek?: number): { updated: Prop
   let count = 0;
   const approvedIds: string[] = [];
   const updated = all.map((p) => {
-    // Si se especifica semana, filtrar por coincidencia en el ID (ej: PROP-2026-W01-...)
     const matchesWeek = filterWeek
       ? p.propuesta_id.includes(`-W${String(filterWeek).padStart(2, "0")}-`)
       : true;
@@ -243,7 +309,7 @@ export const publishProposal = publishLocalProposal;
 
 
 /**
- * Guarda cambios en el texto en 3 pasos, título o imagen de la propuesta.
+ * Guarda cambios en el texto en 3 pasos, título o imagen de la propuesta y sincroniza con la API.
  */
 export function updateLocalProposal(
   id: string,
@@ -259,7 +325,7 @@ export function updateLocalProposal(
 ): PropuestaMejoraSMDTO[] {
   const all = getLocalProposals();
   const updated = all.map((p) => {
-    if (p.propuesta_id === id || (p as any).id === id) {
+    if (p.propuesta_id === id || (p as unknown as { id?: string }).id === id) {
       const borradorActivo = fields.borrador_seleccionado || p.borrador_seleccionado || "A";
       const nuevosBorradores = p.borradores.map((b) => {
         if (b.opcion === borradorActivo) {
@@ -288,7 +354,7 @@ export function updateLocalProposal(
           };
         }
         return b;
-      }) as [any, any, any];
+      }) as [BorradorPropuestaDTO, BorradorPropuestaDTO, BorradorPropuestaDTO];
 
       return {
         ...p,
@@ -301,21 +367,23 @@ export function updateLocalProposal(
   });
 
   saveLocalProposals(updated);
+  syncMutationToBackend(`/api/proposals/${encodeURIComponent(id)}/edit`, fields, "PATCH");
   return updated;
 }
 
 /**
- * Rechaza una propuesta con motivo.
+ * Rechaza una propuesta con motivo y sincroniza con la API.
  */
 export function rejectLocalProposal(id: string, reason: string): PropuestaMejoraSMDTO[] {
   const all = getLocalProposals();
   const updated = all.map((p) => {
-    if (p.propuesta_id === id || (p as any).id === id) {
+    if (p.propuesta_id === id || (p as unknown as { id?: string }).id === id) {
       return { ...p, estado: "rechazado" as const, motivo_rechazo: reason };
     }
     return p;
   });
   saveLocalProposals(updated);
+  syncMutationToBackend(`/api/proposals/${encodeURIComponent(id)}/reject`, { reason }, "PATCH");
   return updated;
 }
 

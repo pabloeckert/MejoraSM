@@ -15,7 +15,7 @@ describe("Fase 3: Seguridad HTTP, Host/Origin y Token en Tiempo Constante", () =
       expect(tm.verifyToken(" token_secreto_2026 ")).toBe(true);
       expect(tm.verifyToken("token_falso")).toBe(false);
       expect(tm.verifyToken("")).toBe(false);
-      expect(tm.verifyToken(undefined as any)).toBe(false);
+      expect(tm.verifyToken(undefined as unknown as string)).toBe(false);
     });
 
     it("rotación de token: permite token nuevo y mantiene ventana para token previo", () => {
@@ -94,7 +94,7 @@ describe("Fase 3: Seguridad HTTP, Host/Origin y Token en Tiempo Constante", () =
         apiKey: "api_9999",
         data: { token: "tok_abc" },
       };
-      const sanitized = sanitizeForLogs(payload) as any;
+      const sanitized = sanitizeForLogs(payload) as Record<string, unknown> & { data: Record<string, unknown> };
       expect(sanitized.authorization).toBe("[REDACTED]");
       expect(sanitized.apiKey).toBe("[REDACTED]");
       expect(sanitized.data.token).toBe("[REDACTED]");

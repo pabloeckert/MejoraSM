@@ -1,5 +1,5 @@
 // src/infrastructure/posting/__tests__/fase2DaemonDispatcher.test.ts
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import { DDL_002_STRICT_SCHEMA } from "../../../../scripts/migracion_002_fechas_estrictas.mjs";
 import { SqliteOutboxRepository } from "../../sqlite/SqliteOutboxRepository";
@@ -79,7 +79,7 @@ describe("Parche v1.1.0 — FASE 2b: Daemon Desacoplado, Patrón de Despacho y E
     const mockFetch = vi.fn().mockRejectedValue(new Error("Zernio 503 Service Unavailable"));
     vi.stubGlobal("fetch", mockFetch);
 
-    const res = await despacharPostAZernio(outboxRepo, postReclamado, {} as any, {
+    const res = await despacharPostAZernio(outboxRepo, postReclamado, { content: "Test", mediaItems: [], platforms: [], publishNow: true }, {
       sandbox: false,
       now,
     });
@@ -152,7 +152,7 @@ describe("Parche v1.1.0 — FASE 2b: Daemon Desacoplado, Patrón de Despacho y E
       ORDER BY proximo_reintento_at ASC;
     `;
 
-    const plan = db.prepare("EXPLAIN QUERY PLAN " + query).all() as any[];
+    const plan = db.prepare("EXPLAIN QUERY PLAN " + query).all() as Array<{ id: number; parent: number; notused: number; detail: string }>;
     expect(plan.length).toBeGreaterThan(0);
 
     const usesIndex = plan.some((p) => p.detail.includes("idx_outbox_pendientes"));

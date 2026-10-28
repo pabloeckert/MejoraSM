@@ -149,11 +149,11 @@ export class ZernioCircuitBreaker {
         fromFallback: false,
         durationMs: performance.now() - callStart,
       };
-    } catch (rawError: any) {
+    } catch (rawError: unknown) {
       clearTimeout(timer);
       const errorMsg = isTimeout
         ? `Timeout de red (${this.timeoutMs}ms) excedido`
-        : rawError?.message || String(rawError);
+        : rawError instanceof Error ? rawError.message : String(rawError);
       const err = new Error(errorMsg);
 
       this.onFailure();

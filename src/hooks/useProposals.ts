@@ -3,12 +3,13 @@ import { templatesApi } from "@/services/supabase";
 import type { ProposalDetail } from "@/components/ProposalDetailDialog";
 import {
   getLocalProposals,
-  getLocalProposalsAsLegacy,
+  fetchServerProposalsAsLegacy,
   approveLocalProposal,
   rejectLocalProposal,
   updateLocalProposal,
   saveLocalProposals,
 } from "@/services/localSMService";
+import { type CanalDestino } from "@/domain/types";
 
 async function run(p: PromiseLike<{ error: { message: string } | null }>): Promise<void> {
   const { error } = await p;
@@ -19,7 +20,7 @@ export function useProposals() {
   return useQuery<ProposalDetail[]>({
     queryKey: ["proposals"],
     queryFn: async (): Promise<ProposalDetail[]> => {
-      return getLocalProposalsAsLegacy();
+      return fetchServerProposalsAsLegacy();
     },
   });
 }
@@ -28,7 +29,8 @@ export function usePendingProposals() {
   return useQuery<ProposalDetail[]>({
     queryKey: ["proposals", "pending"],
     queryFn: async (): Promise<ProposalDetail[]> => {
-      return getLocalProposalsAsLegacy().filter((p) => p.status === "pending");
+      const all = await fetchServerProposalsAsLegacy();
+      return all.filter((p) => p.status === "pending");
     },
     refetchInterval: 10000,
   });
@@ -130,7 +132,7 @@ export function useDeleteProposal() {
   return useMutation({
     mutationFn: async (id: string) => {
       const all = getLocalProposals();
-      const updated = all.filter((p) => p.propuesta_id !== id && (p as any).id !== id);
+      const updated = all.filter((p) => p.propuesta_id !== id && (p as unknown as { id?: string }).id !== id);
       saveLocalProposals(updated);
       return id;
     },
@@ -157,7 +159,7 @@ export function useConvertProposalFormat() {
     mutationFn: async ({ id, format }: { id: string; format: string }) => {
       const all = getLocalProposals();
       const updated = all.map((p) =>
-        p.propuesta_id === id ? { ...p, canal_destino: (format as any) } : p
+        p.propuesta_id === id ? { ...p, canal_destino: format as CanalDestino } : p
       );
       saveLocalProposals(updated);
       return id;

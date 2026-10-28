@@ -1,6 +1,5 @@
 // src/infrastructure/sqlite/SqlitePropuestaRepository.ts
 import { DatabaseSync } from "node:sqlite";
-import { CREATE_TABLES_SQL } from "./schema";
 import { withImmediateTransaction } from "./transaction";
 import { SqliteOutboxRepository } from "./SqliteOutboxRepository";
 import { createDatabaseConnection } from "./connectionFactory";
@@ -9,7 +8,35 @@ import {
   type EstadoPropuesta,
   type CanalDestino,
   type OpcionBorrador,
+  type BorradorPropuestaDTO,
+  type CopyCalibradoTresPasos,
 } from "../../domain/types";
+
+export interface CamposEdicionPropuesta {
+  title?: string;
+  hook?: string;
+  body?: string;
+  cta?: string;
+  copy_tres_pasos?: CopyCalibradoTresPasos;
+  imagen_boveda_vinculada?: { id: string; ruta_archivo_local: string; titulo?: string };
+  borrador_seleccionado?: OpcionBorrador;
+}
+
+interface PropuestaRow {
+  propuesta_id: string;
+  canal_destino: string;
+  dia_programado: string;
+  origen_boveda_id: string;
+  borradores_json: string;
+  borrador_seleccionado: string;
+  tratamiento_visual_json: string;
+  imagen_boveda_json: string;
+  estado: string;
+  motivo_rechazo: string | null;
+  metricas_json: string | null;
+  creado_el: string;
+  actualizado_el: string;
+}
 
 export class SqlitePropuestaRepository {
   private db: DatabaseSync;
@@ -22,6 +49,10 @@ export class SqlitePropuestaRepository {
       this.db = dbOrPath;
     }
     this.outbox = new SqliteOutboxRepository(this.db);
+  }
+
+  public getOutboxRepo(): SqliteOutboxRepository {
+    return this.outbox;
   }
 
   /** Encola en outbox_posts la propuesta recién aprobada. Debe invocarse dentro de la transacción de aprobación. */
@@ -86,7 +117,7 @@ export class SqlitePropuestaRepository {
 
   public obtenerPorId(id: string): PropuestaMejoraSMDTO | null {
     const stmt = this.db.prepare("SELECT * FROM propuestas_sm WHERE propuesta_id = ?");
-    const row = stmt.get(id) as any;
+    const row = stmt.get(id) as PropuestaRow | undefined;
     if (!row) return null;
 
     return {
@@ -104,9 +135,61 @@ export class SqlitePropuestaRepository {
     };
   }
 
-  public listar(filtro?: { estado?: EstadoPropuesta; canal?: CanalDestino }): PropuestaMejoraSMDTO[] {
+  public editar(id: string, fields: CamposEdicionPropuesta): PropuestaMejoraSMDTO | null {
+    const p = this.obtenerPorId(id);
+    if (!p) return null;
+
+    const borradorActivo = fields.borrador_seleccionado || p.borrador_seleccionado || "A";
+    const nuevosBorradores = p.borradores.map((b) => {
+      if (b.opcion === borradorActivo) {
+        const nuevoCopyTresPasos: CopyCalibradoTresPasos = fields.copy_tres_pasos
+          ? { ...fields.copy_tres_pasos }
+          : {
+              paso1_dolor: fields.hook !== undefined ? fields.hook : b.copy_tres_pasos.paso1_dolor,
+              paso2_reencuadre: fields.body !== undefined ? fields.body : b.copy_tres_pasos.paso2_reencuadre,
+              paso3_direccion_web: fields.cta !== undefined ? fields.cta : b.copy_tres_pasos.paso3_direccion_web,
+            };
+
+        const nuevoCuerpo = fields.copy_tres_pasos
+          ? `${fields.copy_tres_pasos.paso1_dolor}\n\n${fields.copy_tres_pasos.paso2_reencuadre}`
+          : fields.body !== undefined
+          ? fields.body
+          : b.cuerpo_texto;
+
+        const nuevoCta =
+          fields.copy_tres_pasos?.paso3_direccion_web ??
+          (fields.cta !== undefined ? fields.cta : b.cta_texto);
+
+        return {
+          ...b,
+          titulo_portada: fields.title ?? b.titulo_portada,
+          copy_tres_pasos: nuevoCopyTresPasos,
+          cuerpo_texto: nuevoCuerpo,
+          cta_texto: nuevoCta,
+        };
+      }
+      return b;
+    }) as [BorradorPropuestaDTO, BorradorPropuestaDTO, BorradorPropuestaDTO];
+
+    const propuestaActualizada: PropuestaMejoraSMDTO = {
+      ...p,
+      borradores: nuevosBorradores,
+      borrador_seleccionado: fields.borrador_seleccionado ?? p.borrador_seleccionado,
+      imagen_boveda_vinculada: fields.imagen_boveda_vinculada
+        ? {
+            ...p.imagen_boveda_vinculada,
+            ...fields.imagen_boveda_vinculada,
+          }
+        : p.imagen_boveda_vinculada,
+    };
+
+    this.guardar(propuestaActualizada);
+    return propuestaActualizada;
+  }
+
+  public listar(filtro?: { estado?: EstadoPropuesta; canal?: CanalDestino; limit?: number; offset?: number }): PropuestaMejoraSMDTO[] {
     let query = "SELECT * FROM propuestas_sm WHERE 1=1";
-    const params: string[] = [];
+    const params: (string | number)[] = [];
 
     if (filtro?.estado) {
       query += " AND estado = ?";
@@ -118,8 +201,17 @@ export class SqlitePropuestaRepository {
     }
     query += " ORDER BY dia_programado ASC";
 
+    if (filtro?.limit !== undefined && filtro.limit > 0) {
+      query += " LIMIT ?";
+      params.push(filtro.limit);
+      if (filtro?.offset !== undefined && filtro.offset > 0) {
+        query += " OFFSET ?";
+        params.push(filtro.offset);
+      }
+    }
+
     const stmt = this.db.prepare(query);
-    const rows = stmt.all(...params) as any[];
+    const rows = stmt.all(...params) as unknown as PropuestaRow[];
 
     return rows.map((row) => ({
       propuesta_id: row.propuesta_id,

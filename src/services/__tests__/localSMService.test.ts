@@ -91,12 +91,12 @@ describe("localSMService (Remediación P0: Seguridad, Resiliencia y Fidelidad de
   });
 
   it("SEC-02 e INT-01: syncMutationToBackend utiliza la base 4002 y envía Bearer token", async () => {
-    let sentHeaders: any = {};
+    let sentHeaders: Record<string, string> = {};
     let sentUrl = "";
 
     const mockFetch = vi.fn().mockImplementation(async (url: string, init: RequestInit) => {
       sentUrl = url;
-      sentHeaders = init.headers;
+      sentHeaders = (init.headers || {}) as Record<string, string>;
       return { ok: true, json: async () => ({ success: true }) };
     });
 

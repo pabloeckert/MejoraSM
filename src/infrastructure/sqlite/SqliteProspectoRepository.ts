@@ -4,7 +4,6 @@
 
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
-import { CREATE_TABLES_SQL } from "./schema";
 import { withImmediateTransaction } from "./transaction";
 import { createDatabaseConnection } from "./connectionFactory";
 import {

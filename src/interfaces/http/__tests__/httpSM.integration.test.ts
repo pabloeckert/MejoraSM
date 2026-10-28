@@ -6,19 +6,22 @@ import { createSMServer } from "../server";
 import { SqliteSMRepository } from "../../../infrastructure/sqlite/SqliteSMRepository";
 import { SqliteBovedaRepository } from "../../../infrastructure/sqlite/SqliteBovedaRepository";
 import { SqlitePropuestaRepository } from "../../../infrastructure/sqlite/SqlitePropuestaRepository";
+import { defaultTokenManager } from "../security";
 import { type FichaBovedaDTO, type PropuestaMejoraSMDTO } from "../../../domain/types";
 
 describe("Subfase 1.1: Servidor HTTP Local y Persistencia Soberana en SQLite", () => {
   let server: Server;
   let baseUrl: string;
+  let propuestaRepo: SqlitePropuestaRepository;
+  const authHeader = `Bearer ${defaultTokenManager.getPrimaryToken()}`;
 
   beforeAll(async () => {
     // Entorno aislado en memoria
     const smRepo = new SqliteSMRepository(":memory:");
     const bovedaRepo = new SqliteBovedaRepository(":memory:");
-    const propuestaRepo = new SqlitePropuestaRepository(":memory:");
+    propuestaRepo = new SqlitePropuestaRepository(":memory:");
 
-    server = createSMServer({ smRepo, bovedaRepo, propuestaRepo });
+    server = createSMServer({ smRepo, bovedaRepo, propuestaRepo, outboxRepo: propuestaRepo.getOutboxRepo() });
     await new Promise<void>((resolve) => {
       server.listen(0, () => resolve());
     });
@@ -57,7 +60,7 @@ describe("Subfase 1.1: Servidor HTTP Local y Persistencia Soberana en SQLite", (
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer mejora_sm_local_bearer_2026",
+        "Authorization": authHeader,
       },
       body: JSON.stringify(ficha),
     });
@@ -132,7 +135,7 @@ describe("Subfase 1.1: Servidor HTTP Local y Persistencia Soberana en SQLite", (
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer mejora_sm_local_bearer_2026",
+        "Authorization": authHeader,
       },
       body: JSON.stringify(p1),
     });
@@ -143,7 +146,7 @@ describe("Subfase 1.1: Servidor HTTP Local y Persistencia Soberana en SQLite", (
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer mejora_sm_local_bearer_2026",
+        "Authorization": authHeader,
       },
       body: JSON.stringify({ id: "PROP-E2E-01" }),
     });
@@ -154,7 +157,7 @@ describe("Subfase 1.1: Servidor HTTP Local y Persistencia Soberana en SQLite", (
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer mejora_sm_local_bearer_2026",
+        "Authorization": authHeader,
       },
       body: JSON.stringify({ ids: ["PROP-E2E-01"] }),
     });
@@ -168,23 +171,29 @@ describe("Subfase 1.1: Servidor HTTP Local y Persistencia Soberana en SQLite", (
     const dataProp = await resGetProp.json();
     expect(dataProp.estado).toBe("aprobado");
 
-    // Publicar ahora sí debe ser exitoso (200 OK)
+    // Publicar ahora encola en outbox_posts y responde 202 Accepted
     const resPublishOk = await fetch(`${baseUrl}/api/publish`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer mejora_sm_local_bearer_2026",
+        "Authorization": authHeader,
       },
       body: JSON.stringify({ id: "PROP-E2E-01" }),
     });
-    expect(resPublishOk.status).toBe(200);
+    expect(resPublishOk.status).toBe(202);
+    const dataPublish = await resPublishOk.json();
+    expect(dataPublish.estado).toBe("EN_COLA");
+    expect(dataPublish.clave_idempotencia).toBeDefined();
+
+    // Simular que el worker ejecuta la publicación final
+    propuestaRepo.publicar("PROP-E2E-01");
 
     // Guardrail: revertir a aprobado una propuesta ya publicada debe arrojar 409 Conflict
     const resRevertir = await fetch(`${baseUrl}/api/propuestas/PROP-E2E-01/aprobar`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer mejora_sm_local_bearer_2026",
+        "Authorization": authHeader,
       },
     });
     expect(resRevertir.status).toBe(409);
@@ -195,7 +204,7 @@ describe("Subfase 1.1: Servidor HTTP Local y Persistencia Soberana en SQLite", (
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer mejora_sm_local_bearer_2026",
+        "Authorization": authHeader,
       },
       body: JSON.stringify({ fechaInicio: "2026-10-19T00:00:00.000Z", guardarEnDb: true }),
     });
@@ -212,4 +221,46 @@ describe("Subfase 1.1: Servidor HTTP Local y Persistencia Soberana en SQLite", (
     const lista = await resLista.json();
     expect(lista.length).toBeGreaterThanOrEqual(78);
   });
+  it("Fase 2: /api/posts soporta limit y offset para paginación y cabecera ETag fuerte", async () => {
+    // 1. Paginación: limit=5
+    const resPaginada = await fetch(`${baseUrl}/api/posts?limit=5&offset=0`);
+    expect(resPaginada.status).toBe(200);
+    const dataPaginada = await resPaginada.json();
+    expect(dataPaginada.length).toBe(5);
+
+    // 2. Presencia de ETag
+    const etag = resPaginada.headers.get("etag");
+    expect(etag).toBeDefined();
+    expect(etag).toMatch(/^"[a-f0-9]+"/);
+
+    // 3. Validación de If-None-Match y 304 Not Modified
+    const resCache = await fetch(`${baseUrl}/api/posts?limit=5&offset=0`, {
+      headers: { "If-None-Match": etag! },
+    });
+    expect(resCache.status).toBe(304);
+
+    // 4. Offset: limit=5&offset=5 entrega piezas diferentes
+    const resOffset = await fetch(`${baseUrl}/api/posts?limit=5&offset=5`);
+    expect(resOffset.status).toBe(200);
+    const dataOffset = await resOffset.json();
+    expect(dataOffset.length).toBe(5);
+    expect(dataOffset[0].propuesta_id).not.toBe(dataPaginada[0].propuesta_id);
+  });
+
+  it("Fase 2: CORS restringe a whitelist local y nunca devuelve '*'", async () => {
+    // Petición con Origin en whitelist
+    const resCors = await fetch(`${baseUrl}/health`, {
+      headers: { Origin: "http://localhost:4015" },
+    });
+    expect(resCors.headers.get("access-control-allow-origin")).toBe("http://localhost:4015");
+
+    // Preflight OPTIONS nunca debe devolver '*'
+    const resOptions = await fetch(`${baseUrl}/api/posts`, {
+      method: "OPTIONS",
+      headers: { Origin: "http://127.0.0.1:4002" },
+    });
+    expect(resOptions.status).toBe(204);
+    expect(resOptions.headers.get("access-control-allow-origin")).toBe("http://127.0.0.1:4002");
+  });
+
 });

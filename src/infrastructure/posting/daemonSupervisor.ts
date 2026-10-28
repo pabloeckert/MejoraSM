@@ -69,7 +69,9 @@ export class PostingDaemonSupervisor {
           if (!this.child.killed) {
             this.child.kill("SIGKILL");
           }
-        } catch {}
+        } catch (_err) {
+          // ignore kill failure if process already died
+        }
       }
     }, this.heartbeatIntervalMs);
   }
@@ -87,13 +89,16 @@ export class PostingDaemonSupervisor {
 
     this.child.on("error", (_err) => {});
 
-    this.child.on("message", (msg: any) => {
-      if (msg && typeof msg === "object" && msg.type === "heartbeat") {
-        this.lastHeartbeat = msg.timestamp || Date.now();
+    this.child.on("message", (msg: unknown) => {
+      if (msg && typeof msg === "object") {
+        const m = msg as Record<string, unknown>;
+        if (m.type === "heartbeat") {
+          this.lastHeartbeat = typeof m.timestamp === "number" ? m.timestamp : Date.now();
+        }
       }
     });
 
-    this.child.on("exit", (code, signal) => {
+    this.child.on("exit", (_code, _signal) => {
       this.child = null;
       if (!this.isShuttingDown) {
         if (!this.isHungKilled) {
@@ -142,14 +147,18 @@ export class PostingDaemonSupervisor {
         if (child.connected) {
           child.send({ type: "STOP" }, (_err) => {});
         }
-      } catch {}
+      } catch (_err) {
+        // ignore send error on shutdown
+      }
 
       setTimeout(() => {
         try {
           if (!child.killed) {
             child.kill("SIGKILL");
           }
-        } catch {}
+        } catch (_err) {
+          // ignore kill error
+        }
         finish();
       }, graceMs);
     });
