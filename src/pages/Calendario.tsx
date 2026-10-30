@@ -330,7 +330,7 @@ function CalendarioContent() {
                       <div className="flex items-center gap-1.5">
                         <p className="truncate text-sm font-medium">{p.hook || p.title || "Sin título"}</p>
                         {p.isTest && (
-                          <Badge variant="outline" className="shrink-0 border-[#F7CC13] text-[10px] text-[#c9a30d]">
+                          <Badge variant="outline" className="shrink-0 bg-[#F7CC13] text-[10px] font-bold text-[#2B2B2B] border-transparent">
                             PRUEBA
                           </Badge>
                         )}

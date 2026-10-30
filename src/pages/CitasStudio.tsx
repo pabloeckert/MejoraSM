@@ -548,13 +548,13 @@ export default function CitasStudio() {
 
                 {/* Caja de Reflexión Operativa con borde amarillo institucional */}
                 <div
-                  className={`rounded-r-xl border-l-[4px] border-[#F7CC13] p-3.5 text-left backdrop-blur-sm ${
+                  className={`rounded-r-xl border-l-[4px] border-[#1A3D84] p-3.5 text-left backdrop-blur-sm ${
                     isLightMode
                       ? "bg-[#1A3D84]/5 border-t border-r border-b border-[#1A3D84]/10 text-slate-800"
                       : "bg-white/10 border-t border-r border-b border-white/15 text-white/95"
                   }`}
                 >
-                  <span className="block text-[9px] font-bold uppercase tracking-wider text-[#F7CC13] mb-1">
+                  <span className="inline-block text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#F7CC13] text-[#2B2B2B] mb-1">
                     Reflexión Operativa
                   </span>
                   <p className="text-[12px] leading-relaxed font-normal">

@@ -19,7 +19,7 @@ export function PipelineBadge({ format, className }: { format?: string | null; c
           variant="outline"
           className={cn(
             "gap-1",
-            autonomous ? "border-primary/40 text-primary" : "border-[#F7CC13] text-[#c9a30d]",
+            autonomous ? "border-primary/40 text-primary" : "bg-[#F7CC13] text-[#2B2B2B] font-medium border-transparent",
             className
           )}
         >

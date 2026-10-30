@@ -501,7 +501,7 @@ function DashboardContent() {
                     <TableCell className="max-w-[280px] truncate">
                       {r.proposals?.hook || r.proposals?.title || "Post sin título"}
                       {r.isTest && (
-                        <Badge variant="outline" className="ml-1.5 border-[#F7CC13] text-[#c9a30d]">
+                        <Badge variant="outline" className="ml-1.5 bg-[#F7CC13] text-[#2B2B2B] font-bold border-transparent">
                           PRUEBA
                         </Badge>
                       )}
@@ -1121,7 +1121,7 @@ function DashboardContent() {
                         {m.proposals?.hook || m.proposals?.title || "Post sin título"}
                       </p>
                       {m.isTest && (
-                        <Badge variant="outline" className="flex-shrink-0 border-[#F7CC13] text-[#c9a30d]">
+                        <Badge variant="outline" className="flex-shrink-0 bg-[#F7CC13] text-[#2B2B2B] font-bold border-transparent">
                           PRUEBA
                         </Badge>
                       )}
