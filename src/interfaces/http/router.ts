@@ -517,6 +517,84 @@ export function handleSMHttpRequest(
     return;
   }
 
+  // GET /api/kpis/buyer-personas
+  if (method === "GET" && pathname === "/api/kpis/buyer-personas") {
+    const ranking = services.smRepo.obtenerRankingPorBuyerPersona();
+    sendJson(res, 200, ranking);
+    return;
+  }
+
+  // GET /api/kpis/piezas
+  if (method === "GET" && pathname === "/api/kpis/piezas") {
+    const limit = Number(parsedUrl.searchParams.get("limit") || 10);
+    const piezas = services.smRepo.obtenerRankingPiezas(limit);
+    sendJson(res, 200, piezas);
+    return;
+  }
+
+  // POST /api/kpis/sincronizar-nucleo (Lee cierres y prospectos desde MejoraNucleo)
+  if (method === "POST" && pathname === "/api/kpis/sincronizar-nucleo") {
+    parseJsonBody<{ nucleoUrl?: string }>(req)
+      .then(async (body) => {
+        const nucleoUrl = body?.nucleoUrl || "http://127.0.0.1:4002/api/prospectos";
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4000);
+          const nucleoRes = await fetch(nucleoUrl, { signal: controller.signal });
+          clearTimeout(timeoutId);
+
+          if (!nucleoRes.ok) {
+            sendJson(res, 502, { error: `MejoraNucleo respondió con HTTP ${nucleoRes.status}` });
+            return;
+          }
+
+          const prospectos = (await nucleoRes.json()) as Array<{
+            id: string;
+            piezaIdAtribucion?: string;
+            buyerPersonaId?: string;
+            estado: string;
+            canalOrigen: string;
+            createdAt: string;
+          }>;
+
+          let sincronizados = 0;
+          const ahora = new Date().toISOString();
+
+          for (const p of prospectos) {
+            if (p.piezaIdAtribucion) {
+              const esGanado = p.estado === "CERRADO_GANADO";
+              services.smRepo.registrarMetricaAtribucion({
+                id: `NUC-SYNC-${p.id}`,
+                propuesta_id: p.piezaIdAtribucion,
+                canal: (p.canalOrigen === "facebook" ? "facebook" : "instagram") as CanalDestino,
+                buyer_persona: p.buyerPersonaId || "emprendedor_saturado",
+                dimension: "organizacional",
+                formato: "carrusel_pdf",
+                dia_semana: "Lunes",
+                horario_publicacion: "09:30",
+                clics_mejoraok: 1,
+                diagnosticos_completados: 1,
+                score_impacto: esGanado ? 10.0 : 7.5,
+                registrado_el: ahora,
+              });
+              sincronizados++;
+            }
+          }
+
+          sendJson(res, 200, {
+            success: true,
+            total_prospectos_nucleo: prospectos.length,
+            metricas_atribuidas: sincronizados,
+          });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          sendJson(res, 503, { error: `Fallo conectando a MejoraNucleo: ${msg}` });
+        }
+      })
+      .catch((err: Error) => sendJson(res, 400, { error: err.message }));
+    return;
+  }
+
   // Servidor de estáticos de producción si existe dist/
   if (method === "GET" && !pathname.startsWith("/api") && pathname !== "/health") {
     const served = serveStaticDistFile(res, pathname, undefined, req);

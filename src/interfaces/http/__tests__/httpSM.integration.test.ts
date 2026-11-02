@@ -263,4 +263,32 @@ describe("Subfase 1.1: Servidor HTTP Local y Persistencia Soberana en SQLite", (
     expect(resOptions.headers.get("access-control-allow-origin")).toBe("http://127.0.0.1:4002");
   });
 
+  it("MVP 3: expone endpoints de ranking por Buyer Persona y sincronización con MejoraNucleo", async () => {
+    // 1. GET /api/kpis/buyer-personas
+    const resBp = await fetch(`${baseUrl}/api/kpis/buyer-personas`);
+    expect(resBp.status).toBe(200);
+    const dataBp = await resBp.json();
+    expect(Array.isArray(dataBp)).toBe(true);
+
+    // 2. GET /api/kpis/piezas
+    const resPiezas = await fetch(`${baseUrl}/api/kpis/piezas?limit=5`);
+    expect(resPiezas.status).toBe(200);
+    const dataPiezas = await resPiezas.json();
+    expect(Array.isArray(dataPiezas)).toBe(true);
+
+    // 3. POST /api/kpis/sincronizar-nucleo con Bearer token y simulación de offline
+    const resSync = await fetch(`${baseUrl}/api/kpis/sincronizar-nucleo`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authHeader,
+      },
+      body: JSON.stringify({ nucleoUrl: "http://127.0.0.1:9999/api/prospectos_inexistente" }),
+    });
+    // Debe responder 503 controlado ante offline sin caerse
+    expect(resSync.status).toBe(503);
+    const dataSync = await resSync.json();
+    expect(dataSync.error).toBeDefined();
+  });
+
 });

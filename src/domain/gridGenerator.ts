@@ -322,7 +322,9 @@ export function generarGrillaEvergreen26Semanas(fechaInicio: Date = new Date()):
 
       const opcionDefault = esRightHook ? "C" : p % 2 === 0 ? "A" : "B";
       const engagementNativo = obtenerEngagementNativo(canal, tema.persona);
-      const conversionLeadText = "Hacé el test de diagnóstico de 4 dimensiones sin complacencia en mejoraok.com y detectá tus cuellos de botella.";
+      const utmParams = `utm_source=${canal}&utm_medium=organic_social&utm_campaign=evergreen_26s&utm_content=${propId}&pieza_id=${propId}&buyer_persona=${tema.persona}`;
+      const urlConversionTrazable = `mejoraok.com?${utmParams}`;
+      const conversionLeadText = `Hacé el test de diagnóstico de 4 dimensiones sin complacencia en ${urlConversionTrazable} y detectá tus cuellos de botella.`;
 
       const c4A: CopyCalibradoCuatroPasos = {
         paso1_dolor: tema.dolor,
@@ -341,7 +343,7 @@ export function generarGrillaEvergreen26Semanas(fechaInicio: Date = new Date()):
       const c4C: CopyCalibradoCuatroPasos = {
         paso1_dolor: tema.dolor,
         paso2_reencuadre: "La claridad directiva comienza por medir con números duros las 4 dimensiones de tu empresa.",
-        paso3_engagement_nativo: esRightHook ? "Completá el test diagnóstico para recibir el informe." : engagementNativo,
+        paso3_engagement_nativo: esRightHook ? `Completá el test diagnóstico en ${urlConversionTrazable} para recibir el informe.` : engagementNativo,
         paso4_conversion_lead: esRightHook ? conversionLeadText : undefined,
       };
 
@@ -355,16 +357,16 @@ export function generarGrillaEvergreen26Semanas(fechaInicio: Date = new Date()):
         copy_tres_pasos: {
           paso1_dolor: tema.dolor,
           paso2_reencuadre: tema.reencuadre,
-          paso3_direccion_web: esRightHook ? "Hacé el test de diagnóstico en mejoraok.com" : engagementNativo,
+          paso3_direccion_web: esRightHook ? `Hacé el test de diagnóstico en ${urlConversionTrazable}` : engagementNativo,
         },
         slides: [
           tema.titulo,
           tema.dolor,
           "La causa raíz operativa que no se suele mirar.",
           tema.reencuadre,
-          esRightHook ? "Diagnóstico en mejoraok.com" : engagementNativo,
+          esRightHook ? `Diagnóstico en ${urlConversionTrazable}` : engagementNativo,
         ],
-        cta_texto: esRightHook ? "Completar diagnóstico en mejoraok.com" : "Deslizá para ordenar tu proceso directivo",
+        cta_texto: esRightHook ? `Completar diagnóstico en ${urlConversionTrazable}` : "Deslizá para ordenar tu proceso directivo",
       };
 
       const borradorB: BorradorPropuestaDTO = {
@@ -377,9 +379,9 @@ export function generarGrillaEvergreen26Semanas(fechaInicio: Date = new Date()):
         copy_tres_pasos: {
           paso1_dolor: c4B.paso1_dolor,
           paso2_reencuadre: c4B.paso2_reencuadre,
-          paso3_direccion_web: esRightHook ? "Hacé el test de diagnóstico en mejoraok.com" : "¿Coincidís con esta perspectiva directiva? Compartí tu opinión abajo.",
+          paso3_direccion_web: esRightHook ? `Hacé el test de diagnóstico en ${urlConversionTrazable}` : "¿Coincidís con esta perspectiva directiva? Compartí tu opinión abajo.",
         },
-        cta_texto: esRightHook ? "Diagnóstico directivo en mejoraok.com" : "Dejanos tu punto de vista en los comentarios",
+        cta_texto: esRightHook ? `Diagnóstico directivo en ${urlConversionTrazable}` : "Dejanos tu punto de vista en los comentarios",
       };
 
       const borradorC: BorradorPropuestaDTO = {
@@ -388,15 +390,15 @@ export function generarGrillaEvergreen26Semanas(fechaInicio: Date = new Date()):
         estrategia: esRightHook ? "right_hook_conversion" : "jab_educativo",
         titulo_portada: esRightHook ? "¿Cómo está tu empresa hoy? (Diagnóstico 2026)" : tema.titulo,
         cuerpo_texto: esRightHook
-          ? `${tema.dolor}\n\nNo estás perdido. Estás desordenado.\n\nCompletá el diagnóstico sin complacencia en mejoraok.com.`
+          ? `${tema.dolor}\n\nNo estás perdido. Estás desordenado.\n\nCompletá el diagnóstico sin complacencia en ${urlConversionTrazable}.`
           : `${tema.dolor}\n\n${tema.reencuadre}`,
         copy_cuatro_pasos: c4C,
         copy_tres_pasos: {
           paso1_dolor: c4C.paso1_dolor,
           paso2_reencuadre: c4C.paso2_reencuadre,
-          paso3_direccion_web: esRightHook ? "Completá el diagnóstico en mejoraok.com" : engagementNativo,
+          paso3_direccion_web: esRightHook ? `Completá el diagnóstico en ${urlConversionTrazable}` : engagementNativo,
         },
-        cta_texto: esRightHook ? "Completar diagnóstico ahora en mejoraok.com" : "Comentá tu experiencia abajo",
+        cta_texto: esRightHook ? `Completar diagnóstico ahora en ${urlConversionTrazable}` : "Comentá tu experiencia abajo",
       };
 
       const propuesta: PropuestaMejoraSMDTO = {
