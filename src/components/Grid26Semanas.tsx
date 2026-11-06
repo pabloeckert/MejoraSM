@@ -26,6 +26,8 @@ import {
   Eye,
   Layers,
   Loader2,
+  Link2,
+  Zap,
 } from "lucide-react";
 import { getAssetUrl } from "@/lib/utils";
 
@@ -37,6 +39,8 @@ export interface Grid26SemanasProps {
   onSelectDraft: (id: string, opcion: OpcionBorrador) => void;
   onOpenDetail: (propuesta: PropuestaMejoraSMDTO) => void;
   isProcessingId?: string;
+  leadsByPieza?: Record<string, number>;
+  onSimulateLead?: (propuesta: PropuestaMejoraSMDTO) => void | Promise<unknown>;
 }
 
 const DEFAULT_PHOTO = "content/boveda/04_networking/img_clevel_rosario_2026.jpg";
@@ -49,11 +53,14 @@ export function Grid26Semanas({
   onSelectDraft,
   onOpenDetail,
   isProcessingId,
+  leadsByPieza = {},
+  onSimulateLead,
 }: Grid26SemanasProps) {
   // Estado local para selector de ratio del Framing Engine por propuesta (por defecto 4:5)
   const [aspectRatios, setAspectRatios] = useState<Record<string, TargetAspectRatio>>({});
   // Estado local para spinner inline si el padre no provee isProcessingId
   const [localProcessingId, setLocalProcessingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const isBusy = (id: string) => isProcessingId === id || localProcessingId === id;
 
@@ -109,6 +116,15 @@ export function Grid26Semanas({
         const currentRatio = getRatio(propuesta.propuesta_id);
         const imgRuta = propuesta.imagen_boveda_vinculada?.ruta_archivo_local || DEFAULT_PHOTO;
 
+        const buyerPersona =
+          propuesta.metricas_atribucion?.buyer_persona_predominante || "SATURADO";
+        const utmUrl = `https://mejoraok.com?utm_source=${encodeURIComponent(
+          propuesta.canal_destino
+        )}&utm_medium=organic_social&utm_campaign=evergreen_26s&pieza_id=${encodeURIComponent(
+          propuesta.propuesta_id
+        )}&buyer_persona=${encodeURIComponent(String(buyerPersona))}`;
+        const leadsConvertidos = leadsByPieza[propuesta.propuesta_id] || 0;
+
         // Clases de ratio para el contenedor visual
         const aspectClass =
           currentRatio === "1:1"
@@ -130,6 +146,11 @@ export function Grid26Semanas({
                   {propuesta.propuesta_id}
                 </span>
                 <div className="flex items-center gap-1.5">
+                  {leadsConvertidos > 0 && (
+                    <Badge className="bg-emerald-600 text-white text-[10px] font-bold">
+                      {leadsConvertidos} Lead{leadsConvertidos > 1 ? "s" : ""} en SQLite
+                    </Badge>
+                  )}
                   <Badge
                     variant="outline"
                     className="text-[10px] uppercase font-semibold text-slate-700 bg-slate-50 border-slate-300"
@@ -141,12 +162,12 @@ export function Grid26Semanas({
                       <TooltipTrigger asChild>
                         <span className="inline-block cursor-help focus:outline-none">
                           <Badge
-                          variant={isJab ? "default" : "destructive"}
-                          className={`cursor-help text-[10px] font-bold transition-transform hover:scale-105 ${
-                            isJab ? "bg-[#1A3D84] text-white" : "bg-[#E1061E] text-white"
-                          }`}
-                        >
-                          {isJab ? "Jab (80%)" : "Right Hook (20%)"}
+                            variant={isJab ? "default" : "destructive"}
+                            className={`cursor-help text-[10px] font-bold transition-transform hover:scale-105 ${
+                              isJab ? "bg-[#1A3D84] text-white" : "bg-[#E1061E] text-white"
+                            }`}
+                          >
+                            {isJab ? "Jab (80%)" : "Right Hook (20%)"}
                           </Badge>
                         </span>
                       </TooltipTrigger>
@@ -227,6 +248,42 @@ export function Grid26Semanas({
                   <span className="text-[10px] font-bold text-amber-700 block uppercase">3. Dirección</span>
                   <p className="text-slate-700 truncate">{borrador.copy_tres_pasos.paso3_direccion_web}</p>
                 </div>
+              </div>
+
+              {/* ATRIBUCIÓN UTM CANÓNICA Y PRUEBA DE CONVERSIÓN EN 1 CLIC */}
+              <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-2 space-y-1.5">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] font-bold text-[#1A3D84] flex items-center gap-1">
+                    <Link2 className="h-3 w-3" />
+                    <span>Link UTM Trazable ({String(buyerPersona)})</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof navigator !== "undefined" && navigator.clipboard) {
+                        navigator.clipboard.writeText(utmUrl);
+                        setCopiedId(propuesta.propuesta_id);
+                        setTimeout(() => setCopiedId(null), 2000);
+                      }
+                    }}
+                    className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white border border-blue-300 text-blue-900 hover:bg-blue-100 cursor-pointer"
+                  >
+                    {copiedId === propuesta.propuesta_id ? "✓ Copiado" : "Copiar UTM"}
+                  </button>
+                </div>
+                <div className="font-mono text-[10px] text-slate-600 truncate bg-white px-2 py-1 rounded border border-blue-100">
+                  {utmUrl}
+                </div>
+                {onSimulateLead && (
+                  <button
+                    type="button"
+                    onClick={() => onSimulateLead(propuesta)}
+                    className="w-full py-1 px-2 rounded bg-[#F7CC13]/90 hover:bg-[#F7CC13] text-slate-950 font-extrabold text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Zap className="h-3 w-3 text-[#E1061E]" />
+                    <span>Probar Conversión de esta Pieza → MejoraNucleo</span>
+                  </button>
+                )}
               </div>
 
               {/* MOTOR DE ENCUADRE VISUAL (FRAMING ENGINE CSS) */}

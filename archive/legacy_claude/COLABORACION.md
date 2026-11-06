@@ -472,7 +472,7 @@ Detalle: `CLAUDE.md` → "Auditoría en vivo del EDA con Claude in Chrome" + `Me
 `mejorasm-01` no está corriendo. Sigo sola, mismo mandato ("arreglá todo, no pares").
 
 - **`232f6ca`** — URGENTE: el fix `be10308` de ayer rompió `/hub` en prod (`IMG_RE is not defined` — la constante vivía en `PublishNowCard.tsx`, no en `Hub.tsx`). Definida + deploy inmediato.
-- **`9c98726`** — el typecheck de CI (`tsc --noEmit`) era un **no-op**: el `tsconfig.json` raíz es solution-style, hay que correr `tsc -b`. Por eso el `IMG_RE` pasó CI. Arreglado: `ci.yml` usa `tsc -b`; `types.ts` regenerado desde la base real (era el stub de Lovable, todo `never`); los 42 errores reales que quedaron (de ~110) arreglados uno por uno (null guards en Dashboard, narrowing en ProposalDetailDialog, `fetchAllPages` acepta `unknown[]`, test con `schedule` de 3 args). `*.tsbuildinfo` gitignoreado.
+- **`9c98726`** — el typecheck de CI (`tsc --noEmit`) era un **no-op**: el `tsconfig.json` raíz es solution-style, hay que correr `tsc -b`. Por eso el `IMG_RE` pasó CI. Arreglado: `ci.yml` usa `tsc -b`; `types.ts` regenerado desde la base real (era el stub de herramienta legacy, todo `never`); los 42 errores reales que quedaron (de ~110) arreglados uno por uno (null guards en Dashboard, narrowing en ProposalDetailDialog, `fetchAllPages` acepta `unknown[]`, test con `schedule` de 3 args). `*.tsbuildinfo` gitignoreado.
 - **`1566b6e`** — el preview de la pieza (`PiecePreview`) metía scroll horizontal en el diálogo de detalle (iframe mide 1080px en el layout aunque `scale()` lo achique). Ancho explícito en el wrap.
 - **`f3fde4a`** — `zernio.mjs` detecta `ACCOUNT_DISCONNECTED` y da un mensaje accionable.
 

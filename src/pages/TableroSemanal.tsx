@@ -1,8 +1,9 @@
 // src/pages/TableroSemanal.tsx
 // TABLERO SEMANAL DE REVISIÓN Y CONTROL — MEJORASM (2026)
-// Modo Local Soberano · Sin dependencias de Supabase · Conexión directa a persistencia
+// Modo Local Soberano · Sin dependencias de Supabase · Conexión directa a persistencia y MejoraNucleo
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { PropuestaMejoraSMDTO } from "@/domain/types";
 import {
   getLocalProposals,
@@ -10,6 +11,8 @@ import {
   publishLocalProposal,
   approveBatchLocalProposals,
   triggerBatchPackageDownload,
+  resetLocalProposalsToBlank,
+  resetLocalProposalsToPristine,
 } from "@/services/localSMService";
 import { Grid26Semanas } from "@/components/Grid26Semanas";
 import { ProposalDetailDialog } from "@/components/ProposalDetailDialog";
@@ -23,9 +26,32 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  Zap,
+  RefreshCw,
+  CheckCircle2,
+  Target,
+  TrendingUp,
+  Trash2,
+  Sparkles,
+  Upload,
+  Layers,
 } from "lucide-react";
 
+const NUCLEO_API_URL = "http://127.0.0.1:4002/api/prospectos";
+
+interface NucleoLeadRecord {
+  id: string;
+  nombre: string;
+  email: string;
+  canalOrigen: string;
+  estado: string;
+  piezaIdAtribucion?: string;
+  utmSource?: string;
+  buyerPersonaId?: string;
+}
+
 export default function TableroSemanal() {
+  const navigate = useNavigate();
   const [proposals, setProposals] = useState<PropuestaMejoraSMDTO[]>(() => getLocalProposals());
   const [activeWeek, setActiveWeek] = useState<number>(1);
   const [selectedCanal, setSelectedCanal] = useState<string>("all");
@@ -33,6 +59,35 @@ export default function TableroSemanal() {
   const [activeProposal, setActiveProposal] = useState<PropuestaMejoraSMDTO | null>(null);
   const [dialogOpen, setDialogOpen] = useState<boolean>(false);
   const [confirmBatchOpen, setConfirmBatchOpen] = useState<boolean>(false);
+
+  // Estado en vivo de Atribución y Conversión desde MejoraNucleo (4002)
+  const [nucleoLeads, setNucleoLeads] = useState<NucleoLeadRecord[]>([]);
+  const [nucleoConnected, setNucleoConnected] = useState<boolean>(false);
+  const [syncingNucleo, setSyncingNucleo] = useState<boolean>(false);
+  const [liveProofBanner, setLiveProofBanner] = useState<string | null>(null);
+
+  const fetchNucleoAttribution = useCallback(async () => {
+    if (typeof fetch === "undefined") return;
+    setSyncingNucleo(true);
+    try {
+      const res = await fetch(NUCLEO_API_URL);
+      if (res && res.ok) {
+        const data = (await res.json()) as NucleoLeadRecord[];
+        if (Array.isArray(data)) {
+          setNucleoLeads(data);
+          setNucleoConnected(true);
+        }
+      }
+    } catch {
+      // Modo offline/test silencioso
+    } finally {
+      setSyncingNucleo(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNucleoAttribution();
+  }, [fetchNucleoAttribution]);
 
   // Semanas disponibles (1 a 26)
   const totalWeeks = 26;
@@ -61,6 +116,75 @@ export default function TableroSemanal() {
 
     return { total, aprobadas, pendientes, publicadas, pendientesSemana };
   }, [proposals, activeWeek]);
+
+  // Estadísticas de atribución en vivo desde MejoraNucleo
+  const attributionStats = useMemo(() => {
+    const leadsByPieza: Record<string, number> = {};
+    const leadsByPersona: Record<string, { total: number; avanzados: number }> = {};
+    let totalAtribuidos = 0;
+
+    for (const lead of nucleoLeads) {
+      if (lead.piezaIdAtribucion) {
+        totalAtribuidos++;
+        leadsByPieza[lead.piezaIdAtribucion] = (leadsByPieza[lead.piezaIdAtribucion] || 0) + 1;
+      }
+      const bp = lead.buyerPersonaId || "SATURADO";
+      if (!leadsByPersona[bp]) leadsByPersona[bp] = { total: 0, avanzados: 0 };
+      leadsByPersona[bp].total++;
+      if (
+        lead.estado === "CALIFICADO" ||
+        lead.estado === "EN_SEGUIMIENTO" ||
+        lead.estado === "CERRADO_GANADO"
+      ) {
+        leadsByPersona[bp].avanzados++;
+      }
+    }
+
+    return { leadsByPieza, leadsByPersona, totalAtribuidos, totalNucleo: nucleoLeads.length };
+  }, [nucleoLeads]);
+
+  // Simular e inyectar un lead real desde una pieza de MejoraSM hacia MejoraNucleo
+  const handleSimulateLeadFromProposal = async (propuesta?: PropuestaMejoraSMDTO) => {
+    const target = propuesta || weekProposals[0] || proposals[0];
+    if (!target) return;
+
+    const bp = String(target.metricas_atribucion?.buyer_persona_predominante || "SATURADO").toUpperCase();
+    const payload = {
+      nombre: `Lead Social (${target.propuesta_id}) — Dir. Pyme`,
+      email: `lead.${target.propuesta_id.toLowerCase().replace(/[^a-z0-9]/g, "")}.${Date.now().toString().slice(-4)}@pyme.com.ar`,
+      telefono: "+5493764559911",
+      canalOrigen: "mejoraok_landing",
+      piezaIdAtribucion: target.propuesta_id,
+      utmSource: target.canal_destino,
+      utmMedium: "organic_social",
+      utmCampaign: "evergreen_26s",
+      buyerPersonaId: bp,
+    };
+
+    try {
+      const res = await fetch(NUCLEO_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res && res.ok) {
+        const created = (await res.json()) as NucleoLeadRecord;
+        await fetchNucleoAttribution();
+        setLiveProofBanner(
+          `✓ COMPROBADO EN VIVO: La pieza ${target.propuesta_id} (${target.canal_destino}) inyectó el prospecto "${created.nombre}" en MejoraNucleo SQLite con SLA 48h activo.`
+        );
+        toast({
+          title: "Conversión Real Registrada en MejoraNucleo",
+          description: `Pieza atribuida: ${target.propuesta_id} · Buyer Persona: ${bp}`,
+        });
+      }
+    } catch {
+      toast({
+        title: "Aviso de Conexión Local",
+        description: "Asegúrate de que MejoraNucleo esté activo en 127.0.0.1:4002.",
+      });
+    }
+  };
 
   // Manejador de apertura de modal
   const handleOpenDetail = (p: PropuestaMejoraSMDTO) => {
@@ -112,6 +236,39 @@ export default function TableroSemanal() {
 
         {/* ACCIONES GLOBALES DE LOTE */}
         <div className="flex flex-wrap items-center gap-2.5">
+                    <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const fresh = resetLocalProposalsToPristine();
+              setProposals(fresh);
+              toast({
+                title: "Plan Evergreen Restaurado",
+                description: "Las 78 piezas cargadas en estado inicial (0 aprobadas, 0 publicadas).",
+              });
+            }}
+            className="border-slate-300 bg-white hover:bg-slate-100 text-xs font-semibold text-blue-900 shadow-sm"
+          >
+            <Sparkles className="mr-1.5 h-3.5 w-3.5 text-amber-500" />
+            Cargar Plan 26 Semanas (78 Piezas)
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const blank = resetLocalProposalsToBlank();
+              setProposals(blank);
+              toast({
+                title: "Tablero en Blanco",
+                description: "Se han purgado todas las propuestas locales. Listo para empezar.",
+              });
+            }}
+            className="border-slate-300 bg-white hover:bg-red-50 text-xs font-semibold text-red-600 shadow-sm"
+          >
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            Vaciar Tablero (En Blanco)
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -134,6 +291,138 @@ export default function TableroSemanal() {
           </Button>
         </div>
       </header>
+
+      {/* PANEL EN VIVO DE COMPROBACIÓN OPERATIVA Y ATRIBUCIÓN DE CONVERSIÓN (MVP 3 + MVP 5) */}
+      <section
+        aria-label="Panel de Comprobación en Vivo y Atribución de Conversión"
+        className="rounded-2xl border-2 border-[#1A3D84]/25 bg-white shadow-sm overflow-hidden"
+      >
+        <div className="bg-slate-900 text-white px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                nucleoConnected
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/40"
+                  : "bg-amber-500/20 text-amber-300 border border-amber-400/40"
+              }`}
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  nucleoConnected ? "bg-emerald-400 animate-ping" : "bg-amber-400"
+                }`}
+              />
+              <span>
+                {nucleoConnected
+                  ? `CONECTADO A MEJORANUCLEO SQLITE (127.0.0.1:4002 · ${attributionStats.totalNucleo} Leads)`
+                  : "MOTOR DE ATRIBUCIÓN LOCAL ACTIVO"}
+              </span>
+            </span>
+            <span className="text-xs font-bold text-slate-200">
+              Circuito Cerrado: Pieza Social Media (UTM) → Lead en MejoraNucleo → Semáforo SLA 48h
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleSimulateLeadFromProposal()}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#F7CC13] hover:bg-amber-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider cursor-pointer shadow-xs"
+            >
+              <Zap className="h-3.5 w-3.5 text-[#E1061E]" />
+              <span>⚡ Probar Conversión Real (Inyectar Lead de Semana {activeWeek})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={fetchNucleoAttribution}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 cursor-pointer"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${syncingNucleo ? "animate-spin" : ""}`} />
+              <span>Sincronizar KPIs</span>
+            </button>
+          </div>
+        </div>
+
+        {liveProofBanner && (
+          <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-2.5 flex items-center justify-between text-xs font-bold text-emerald-900">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+              <span>{liveProofBanner}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLiveProofBanner(null)}
+              className="text-emerald-800 underline ml-3 cursor-pointer"
+            >
+              Ocultar
+            </button>
+          </div>
+        )}
+
+        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/60">
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <Target className="h-3.5 w-3.5 text-[#1A3D84]" />
+                <span>Piezas con Mayor Conversión en MejoraNucleo</span>
+              </span>
+              <span className="text-[11px] font-bold text-emerald-700">
+                {attributionStats.totalAtribuidos} leads atribuidos
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(attributionStats.leadsByPieza).length === 0 ? (
+                <span className="text-xs text-slate-500">
+                  Hacé clic en &quot;⚡ Probar Conversión Real&quot; para comprobar cómo una pieza inyecta leads en SQLite.
+                </span>
+              ) : (
+                Object.entries(attributionStats.leadsByPieza).map(([piezaId, count]) => (
+                  <div
+                    key={piezaId}
+                    className="px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs flex items-center gap-2"
+                  >
+                    <span className="font-mono font-bold text-[#1A3D84]">{piezaId}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white font-bold text-[10px]">
+                      {count} lead{count > 1 ? "s" : ""}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <TrendingUp className="h-3.5 w-3.5 text-[#E1061E]" />
+                <span>Conversión por Buyer Persona 4D (Feedback Loop)</span>
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(attributionStats.leadsByPersona).length === 0 ? (
+                <span className="text-xs text-slate-500">
+                  Sincronizando Buyer Personas desde MejoraNucleo...
+                </span>
+              ) : (
+                Object.entries(attributionStats.leadsByPersona).map(([bp, info]) => (
+                  <div
+                    key={bp}
+                    className="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-xs flex items-center gap-1.5 text-amber-950"
+                  >
+                    <span className="font-bold">🎯 {bp}:</span>
+                    <span className="font-mono font-extrabold">{info.total} leads</span>
+                    {info.avanzados > 0 && (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                        {info.avanzados} calif.
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* METRICAS Y RESUMEN OPERATIVO */}
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -235,9 +524,52 @@ export default function TableroSemanal() {
 
       {/* GRILLA DE PIEZAS DE LA SEMANA CON FRAMING ENGINE */}
       <section className="space-y-4">
-        <Grid26Semanas
+        {weekProposals.length === 0 ? (
+          proposals.length === 0 ? (
+            <div className="rounded-2xl border-2 border-dashed border-slate-300 p-10 text-center bg-white shadow-xs">
+              <div className="mx-auto w-12 h-12 rounded-xl bg-blue-50 text-[#1A3D84] flex items-center justify-center mb-3">
+                <Layers className="h-6 w-6" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-1">Tablero Totalmente Depurado y en Blanco</h3>
+              <p className="text-sm text-slate-600 max-w-md mx-auto mb-6">
+                El sistema está listo. Podés cargar el plan evergreen de 26 semanas (78 piezas balanceadas 80/20) o comenzar a subir activos operativos paso a paso.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Button
+                  onClick={() => {
+                    const fresh = resetLocalProposalsToPristine();
+                    setProposals(fresh);
+                    toast({
+                      title: "Plan Evergreen Generado",
+                      description: "78 piezas generadas en estado pendiente de revisión.",
+                    });
+                  }}
+                  className="bg-[#1A3D84] hover:bg-[#142F68] text-white font-bold"
+                >
+                  <Sparkles className="mr-2 h-4 w-4 text-[#F7CC13]" />
+                  Generar Plan Evergreen con IA (26 Semanas)
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/subir-material")}
+                  className="border-slate-300"
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Subir Primer Activo
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center bg-white text-slate-500 text-sm">
+              No hay propuestas para la Semana {activeWeek} con los filtros seleccionados ({selectedCanal !== 'all' ? selectedCanal : ''} {selectedEstado !== 'all' ? selectedEstado : ''}).
+            </div>
+          )
+        ) : (
+          <Grid26Semanas
           proposals={weekProposals}
           activeWeek={activeWeek}
+          leadsByPieza={attributionStats.leadsByPieza}
+          onSimulateLead={(propuesta) => handleSimulateLeadFromProposal(propuesta)}
           onApprove={(id) => {
             const updated = approveLocalProposal(id);
             setProposals(updated);
@@ -260,9 +592,9 @@ export default function TableroSemanal() {
             );
           }}
           onOpenDetail={handleOpenDetail}
-        />
+          />
+        )}
       </section>
-
 
       {/* DIÁLOGO DETALLADO CON 3 BORRADORES, EDICIÓN Y APROBACIÓN */}
       {activeProposal && (

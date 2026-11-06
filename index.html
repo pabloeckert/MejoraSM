@@ -16,10 +16,10 @@
     </script>
     <meta name="description" content="Sistema EDA — Gestión estratégica de contenidos en Instagram con IA para MejoraOK. Agentes que debaten, crean y optimizan tu contenido." />
     <meta name="author" content="MejoraOK" />
-    <!-- D4 (auditoría 2026-08-31): era #0f0f23, un azul casi negro que no está
-         en la paleta de Mejora Continua. Ahora el azul de marca (--primary). -->
     <meta name="theme-color" content="#1A3D84" />
     <link rel="canonical" href="https://mejorasm.mejoraok.com/app/" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/favicon.ico" />
 
     <!-- League Spartan: fallback / --font-heading-alt. Bw Modelica (woff2 local)
          carga primero. -->
@@ -30,9 +30,7 @@
       href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&display=swap"
     />
 
-    <!-- Open Graph — B34 (auditoría 2026-08-31): og:image apuntaba a
-         mejorasm.vercel.app, dominio que devuelve 404. Se saca hasta que haya
-         una imagen real servible. -->
+    <!-- Open Graph -->
     <meta property="og:title" content="MejoraSM — Estratega Digital Autónoma" />
     <meta property="og:description" content="Gestión estratégica de contenidos en Instagram con IA para Mejora Continua" />
     <meta property="og:type" content="website" />
@@ -48,7 +46,6 @@
 
     <!-- Security Headers -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <meta http-equiv="X-Frame-Options" content="DENY" />
     <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
     <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()" />
 
@@ -59,7 +56,7 @@
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
       font-src 'self' https://fonts.gstatic.com;
       img-src 'self' data: https: blob:;
-      connect-src 'self' https://*.supabase.co;
+      connect-src 'self' http://127.0.0.1:4002 http://localhost:4002 http://127.0.0.1:4015 http://localhost:4015 ws://localhost:* ws://127.0.0.1:* https://*.supabase.co;
       frame-src 'self';
       object-src 'none';
       base-uri 'self';

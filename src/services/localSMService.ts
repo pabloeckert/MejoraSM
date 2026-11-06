@@ -83,7 +83,7 @@ export function getLocalProposals(): PropuestaMejoraSMDTO[] {
     raw = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY_PROPOSALS) : null;
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed.map((p) => toCanonicalPropuesta(p));
       }
       // Si parsed no es un array válido no vacío, se considera estructura corrupta
@@ -128,6 +128,33 @@ export function getLocalProposals(): PropuestaMejoraSMDTO[] {
 /**
  * Guarda el conjunto de propuestas en localStorage de forma atómica.
  */
+
+/**
+ * Deja el tablero completamente en blanco (0 propuestas).
+ */
+export function resetLocalProposalsToBlank(): PropuestaMejoraSMDTO[] {
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem(STORAGE_KEY_PROPOSALS, JSON.stringify([]));
+  }
+  return [];
+}
+
+/**
+ * Regenera la grilla virgen de 26 semanas (78 piezas en estado 'pendiente_revision').
+ */
+export function resetLocalProposalsToPristine(): PropuestaMejoraSMDTO[] {
+  const fechaInicio = new Date("2026-10-19T09:30:00.000Z");
+  const grilla = generarGrillaEvergreen26Semanas(fechaInicio);
+  const flatList: PropuestaMejoraSMDTO[] = [];
+  for (const sem of grilla.semanas) {
+    for (const prop of sem.propuestas) {
+      flatList.push(prop);
+    }
+  }
+  saveLocalProposals(flatList);
+  return flatList;
+}
+
 export function saveLocalProposals(proposals: PropuestaMejoraSMDTO[]): void {
   try {
     localStorage.setItem(STORAGE_KEY_PROPOSALS, JSON.stringify(proposals));
