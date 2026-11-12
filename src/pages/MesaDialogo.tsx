@@ -33,6 +33,7 @@ import {
   AlertTriangle,
   RotateCw,
   Share2,
+  Video,
 } from "lucide-react";
 import {
   useDialogueSessions,
@@ -52,6 +53,7 @@ import {
   type CopyVariant,
   type VariantType,
 } from "@/domain/copyExperimentSimulator";
+import { TeleprompterStudio } from "@/components/TeleprompterStudio";
 
 function formatScheduledAt(iso: string) {
   return new Date(iso).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
@@ -448,6 +450,7 @@ function SessionCard({
   const [feedback, setFeedback] = useState("");
   const [showTechnicalLogs, setShowTechnicalLogs] = useState(false);
   const [isApprovingCustom, setIsApprovingCustom] = useState(false);
+  const [showTeleprompter, setShowTeleprompter] = useState(false);
 
   const isStale = session.status === "active" && (Date.now() - new Date(session.created_at).getTime()) > 90_000;
 
@@ -766,6 +769,34 @@ function SessionCard({
             }}
           />
 
+          {/* 1.7. ESTUDIO DE TELEPROMPTER Y RODAJE B2B (SPRINT S+9) */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl border border-rose-200 bg-rose-50/60 shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center font-bold shadow-2xs">
+                <Video className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                  <span>Estudio de Rodaje B2B · Teleprompter de Reels 60s</span>
+                  <Badge variant="outline" className="text-[10px] border-rose-300 text-rose-700 bg-white font-semibold">
+                    135 WPM Óptimo
+                  </Badge>
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Guion estructurado en 3 bloques (0-5s Gancho, 5-45s Método, 45-60s CTA) con cronómetro y velocidad regulable.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setShowTeleprompter(true)}
+              className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold gap-1.5 shadow-2xs"
+            >
+              <Video className="h-3.5 w-3.5" />
+              Abrir Teleprompter ▶
+            </Button>
+          </div>
+
           {/* 2. INSPECTOR Y EDITOR INTERACTIVO DE DIAPOSITIVAS DEL CARRUSEL (SLIDES 1 A 5) */}
           <div className="rounded-xl border bg-card p-4 space-y-4 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
@@ -996,6 +1027,22 @@ function SessionCard({
           )}
         </CardContent>
       )}
+
+      {/* ESTUDIO DE TELEPROMPTER EN MESA DE DIÁLOGO */}
+      <TeleprompterStudio
+        open={showTeleprompter}
+        onOpenChange={setShowTeleprompter}
+        input={{
+          propuesta_id: session.id,
+          titulo_portada: session.metadata?.proposal?.hook || session.topic || "Estrategia B2B",
+          cuerpo_texto: session.metadata?.proposal?.body || undefined,
+          copy_tres_pasos: {
+            dolor: slides[1] || "Cuellos de botella en la operación diaria.",
+            reencuadre: slides[2] || "La solución radica en el diseño del sistema.",
+            direccion: slides[3] || "Completá el autodiagnóstico en mejoraok.com.",
+          },
+        }}
+      />
     </Card>
   );
 }

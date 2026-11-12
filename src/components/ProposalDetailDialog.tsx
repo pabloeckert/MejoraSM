@@ -37,6 +37,7 @@ import {
   Globe,
   Eye,
   FileText,
+  Video,
 } from "lucide-react";
 import JSZip from "jszip";
 import { generarLinkedInCarouselPDF } from "@/services/pdfCarouselGenerator";
@@ -63,6 +64,7 @@ import {
 import { approveLocalProposal } from "@/services/localSMService";
 import { FormatRecommenderCard } from "@/components/FormatRecommenderCard";
 import { LinkedInThreadPreview } from "@/components/LinkedInThreadPreview";
+import { TeleprompterStudio } from "@/components/TeleprompterStudio";
 
 const OFERTAS = DIMENSIONES.map((d) => ({ value: d.key, label: d.label }));
 
@@ -205,6 +207,7 @@ function ProposalDetailModal({
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleOferta, setScheduleOferta] = useState("");
   const [copied, setCopied] = useState(false);
+  const [showTeleprompter, setShowTeleprompter] = useState(false);
 
 
 
@@ -617,6 +620,16 @@ function ProposalDetailModal({
               >
                 <FileText className="mr-1.5 h-3.5 w-3.5 text-blue-700" />
                 Carrusel PDF
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowTeleprompter(true)}
+                className="bg-white hover:bg-slate-100 text-xs font-semibold text-rose-900 border-rose-200"
+                title="Abrir estudio de rodaje y teleprompter para Reel 60s"
+              >
+                <Video className="mr-1.5 h-3.5 w-3.5 text-rose-600" />
+                Teleprompter
               </Button>
               <Button
                 size="sm"
@@ -1346,6 +1359,20 @@ function ProposalDetailModal({
         description="Todas las propuestas pendientes de la semana quedarán aprobadas y listas para su despacho según la grilla programada."
         confirmText="Aprobar Lote Completo"
         onConfirm={handleApproveAllBatch}
+      />
+
+      {/* ESTUDIO DE RODAJE Y TELEPROMPTER B2B (SPRINT S+9) */}
+      <TeleprompterStudio
+        open={showTeleprompter}
+        onOpenChange={setShowTeleprompter}
+        input={{
+          propuesta_id: canonical.propuesta_id,
+          titulo_portada: currentBorrador.titulo_portada,
+          cuerpo_texto: currentBorrador.cuerpo_texto,
+          copy_tres_pasos: currentBorrador.copy_tres_pasos,
+          buyer_persona: canonical.metricas_atribucion?.buyer_persona_predominante,
+          dimension_servicio: scheduleOferta,
+        }}
       />
     </>
   );
