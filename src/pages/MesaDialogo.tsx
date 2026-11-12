@@ -32,6 +32,7 @@ import {
   Calendar,
   AlertTriangle,
   RotateCw,
+  Share2,
 } from "lucide-react";
 import {
   useDialogueSessions,
@@ -45,6 +46,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { CopyExperimentSimulator } from "@/components/CopyExperimentSimulator";
 import { FormatRecommenderCard } from "@/components/FormatRecommenderCard";
+import { LinkedInThreadPreview } from "@/components/LinkedInThreadPreview";
 import {
   recordCopyExperiment,
   type CopyVariant,
@@ -884,6 +886,34 @@ function SessionCard({
                 {session.status === "approved" ? "Carrusel Ya Aprobado" : "Aprobar y Agendar Publicación"}
               </Button>
             </div>
+          </div>
+
+          {/* 2.5. PREVISUALIZADOR DE HILO DE CONVERSACIÓN DIRECTIVA C-LEVEL PARA LINKEDIN (SPRINT S+8) */}
+          <div className="rounded-xl border bg-card p-4 space-y-3 shadow-sm">
+            <div className="flex items-center justify-between border-b pb-2.5">
+              <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Share2 className="h-4 w-4 text-[#0A66C2]" />
+                Hilo de Conversación Directiva C-Level para LinkedIn
+              </span>
+              <Badge variant="outline" className="text-[10px] text-[#0A66C2] border-[#0A66C2]/30 bg-[#0A66C2]/10 font-bold">
+                Algoritmo Protegido (0 Links en Post)
+              </Badge>
+            </div>
+            <LinkedInThreadPreview
+              input={{
+                propuesta_id: session.id,
+                tema: session.topic || "Estrategia B2B",
+                titulo_portada: session.metadata?.proposal?.hook || session.topic || "Liderazgo y Procesos B2B",
+                cuerpo_texto: session.metadata?.proposal?.body || undefined,
+                copy_tres_pasos: {
+                  paso1_dolor: slides[1] || "Tus mandos medios no deciden solos.",
+                  paso2_reencuadre: slides[2] || "La causa es la ausencia de una matriz de delegación.",
+                  paso3_direccion_web: slides[3] || "mejoraok.com",
+                },
+                cta_texto: session.metadata?.proposal?.cta || undefined,
+              }}
+              ratio="1200:627"
+            />
           </div>
 
           {/* 3. ACORDEÓN COLAPSABLE PARA OCULTAR LA COMPLEJIDAD TÉCNICA DE LOGS */}

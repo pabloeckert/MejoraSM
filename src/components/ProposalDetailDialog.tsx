@@ -62,6 +62,7 @@ import {
 } from "@/domain/types";
 import { approveLocalProposal } from "@/services/localSMService";
 import { FormatRecommenderCard } from "@/components/FormatRecommenderCard";
+import { LinkedInThreadPreview } from "@/components/LinkedInThreadPreview";
 
 const OFERTAS = DIMENSIONES.map((d) => ({ value: d.key, label: d.label }));
 
@@ -877,6 +878,18 @@ function ProposalDetailModal({
                   >
                     Facebook
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setCanalPreview("linkedin")}
+                    className={cn(
+                      "px-2.5 py-1 text-xs font-semibold rounded-md transition-all",
+                      canalPreview === "linkedin"
+                        ? "bg-[#0A66C2] text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
+                  >
+                    LinkedIn
+                  </button>
                 </div>
               </div>
             </div>
@@ -1002,6 +1015,28 @@ function ProposalDetailModal({
                     <span className="flex items-center gap-1 hover:text-blue-600 cursor-pointer"><MessageCircle className="h-3.5 w-3.5" /> Comentar</span>
                     <span className="flex items-center gap-1 hover:text-blue-600 cursor-pointer"><Share2 className="h-3.5 w-3.5" /> Compartir</span>
                   </div>
+                </div>
+              )}
+
+              {/* VISTA LINKEDIN: HILO DE CONVERSACIÓN DIRECTIVA C-LEVEL (SPRINT S+8) */}
+              {canalPreview === "linkedin" && (
+                <div className="p-3.5 space-y-3">
+                  <LinkedInThreadPreview
+                    input={{
+                      propuesta_id: canonical.propuesta_id,
+                      tema: canonical.imagen_boveda_vinculada.titulo || currentBorrador.titulo_portada,
+                      titulo_portada: currentBorrador.titulo_portada,
+                      cuerpo_texto: currentBorrador.cuerpo_texto,
+                      copy_tres_pasos: currentBorrador.copy_tres_pasos,
+                      cta_texto: currentBorrador.cta_texto,
+                      arquetipo_target: canonical.metricas_atribucion?.buyer_persona_predominante || "fundador_saturado",
+                      url_diagnostico_trazable: (canonical as any).url_diagnostico_trazable || (currentBorrador.copy_tres_pasos.paso3_direccion_web.includes("http") ? currentBorrador.copy_tres_pasos.paso3_direccion_web : undefined),
+                      es_right_hook: canonical.borradores[2] === currentBorrador || canonical.propuesta_id.endsWith("-03"),
+                    }}
+                    imagenUrl={imagenVinculada}
+                    ratio={ratioLinkedIn === "1:1" ? "1:1" : "1200:627"}
+                    onDownloadPdf={handleDownloadPdfDirect}
+                  />
                 </div>
               )}
             </div>
