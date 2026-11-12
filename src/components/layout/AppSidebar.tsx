@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Upload,
   MonitorPlay,
+  MessagesSquare,
   Menu,
   LogOut,
 } from "lucide-react";
@@ -24,6 +25,7 @@ const navGroups: {
     label: "Mesa de Control",
     items: [
       { label: "Tablero Semanal", sublabel: "Revisión y aprobación", icon: LayoutDashboard, path: "/" },
+      { label: "Conversaciones", sublabel: "Lead Scoring y Respuestas", icon: MessagesSquare, path: "/conversaciones" },
       { label: "Biblioteca y Bóveda", sublabel: "Activos y fotos RAG", icon: BookOpen, path: "/boveda" },
     ],
   },

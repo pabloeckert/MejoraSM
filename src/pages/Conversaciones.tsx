@@ -40,6 +40,8 @@ import {
   extraerDatosDeTexto,
   inferirArquetipoMensaje,
 } from "@/services/contactosService";
+import { calcularLeadScoring, type ResultadoLeadScoring } from "@/domain/leadScoringEngine";
+import { LeadScoringBadge } from "@/components/LeadScoringBadge";
 
 const PLATFORM_LABEL: Record<string, string> = { instagram: "Instagram", facebook: "Facebook" };
 
@@ -52,6 +54,7 @@ const SENTIMENT_STYLE: Record<string, { label: string; className: string }> = {
 
 type SentimentFilter = "todos" | "pregunta" | "negativo" | "positivo" | "neutral";
 type PlatformFilter = "todas" | "instagram" | "facebook";
+type LeadWarmthFilter = "todos" | "calificados" | "nutricion" | "comunidad";
 
 export default function Conversaciones() {
   const { data: items = [], isLoading } = useInbox();
@@ -63,6 +66,7 @@ export default function Conversaciones() {
   const [onlyUnanswered, setOnlyUnanswered] = useState(true);
   const [sentiment, setSentiment] = useState<SentimentFilter>("todos");
   const [platform, setPlatform] = useState<PlatformFilter>("todas");
+  const [leadWarmth, setLeadWarmth] = useState<LeadWarmthFilter>("todos");
   const [showArchived, setShowArchived] = useState(false);
 
   const threads = useMemo(() => {
@@ -71,8 +75,21 @@ export default function Conversaciones() {
     if (onlyUnanswered && !showArchived) t = t.filter(isUnanswered);
     if (platform !== "todas") t = t.filter((x) => x.incoming.platform === platform);
     if (sentiment !== "todos") t = t.filter((x) => x.incoming.sentiment === sentiment);
+    if (leadWarmth !== "todos") {
+      t = t.filter((x) => {
+        const sc = calcularLeadScoring({
+          textoMensaje: x.incoming.text || x.history.map((h) => h.text).join(" "),
+          nombreRemitente: x.incoming.author_name || x.incoming.author_username || "",
+          seguidor: Boolean(x.incoming.author_is_follower),
+        });
+        if (leadWarmth === "calificados") return sc.cuadrante === "CALIFICADO_ALTO";
+        if (leadWarmth === "nutricion") return sc.cuadrante === "EN_NUTRICION";
+        if (leadWarmth === "comunidad") return sc.cuadrante === "COMUNIDAD";
+        return true;
+      });
+    }
     return t;
-  }, [items, onlyUnanswered, sentiment, platform, showArchived]);
+  }, [items, onlyUnanswered, sentiment, platform, showArchived, leadWarmth]);
 
   const unansweredCount = useMemo(
     () => buildThreads(items).filter(isUnanswered).length,
@@ -145,6 +162,19 @@ export default function Conversaciones() {
           </FilterChip>
         ))}
         <div className="mx-1 h-5 w-px bg-border" />
+        <FilterChip active={leadWarmth === "todos"} onClick={() => setLeadWarmth("todos")}>
+          Todos los leads
+        </FilterChip>
+        <FilterChip active={leadWarmth === "calificados"} onClick={() => setLeadWarmth("calificados")}>
+          🔥 Calificados (&ge;70)
+        </FilterChip>
+        <FilterChip active={leadWarmth === "nutricion"} onClick={() => setLeadWarmth("nutricion")}>
+          🟡 En Nutrición
+        </FilterChip>
+        <FilterChip active={leadWarmth === "comunidad"} onClick={() => setLeadWarmth("comunidad")}>
+          ⚪ Comunidad
+        </FilterChip>
+        <div className="mx-1 h-5 w-px bg-border" />
         <FilterChip active={showArchived} onClick={() => setShowArchived((v) => !v)}>
           Archivadas
         </FilterChip>
@@ -206,6 +236,22 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
   const platformLabel = PLATFORM_LABEL[incoming.platform] ?? incoming.platform;
   const sent = incoming.sentiment ? SENTIMENT_STYLE[incoming.sentiment] : null;
 
+  const fullText = useMemo(
+    () => history.map((h) => h.text).join(" ") || incoming.text || "",
+    [history, incoming.text]
+  );
+
+  const scoring: ResultadoLeadScoring = useMemo(
+    () =>
+      calcularLeadScoring({
+        textoMensaje: fullText,
+        nombreRemitente: incoming.author_name || incoming.author_username || "",
+        seguidor: Boolean(incoming.author_is_follower),
+        canal: incoming.platform,
+      }),
+    [fullText, incoming]
+  );
+
   const [sendingToCRM, setSendingToCRM] = useState(false);
   const [crmSent, setCrmSent] = useState(false);
   const isDerived = Boolean(incoming.persona_id || crmSent);
@@ -226,11 +272,10 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
   async function handleEnviarCRM() {
     try {
       setSendingToCRM(true);
-      const fullText = history.map((h) => h.text).join(" ");
       const extraidos = extraerDatosDeTexto(fullText);
       const nombre = incoming.author_name || incoming.author_username || `Lead ${platformLabel}`;
       const handle = incoming.author_username || incoming.author_name || "";
-      const arquetipoInferido = inferirArquetipoMensaje(fullText || incoming.text || "");
+      const arquetipoInferido = scoring.enriquecimientoCrm.arquetipoSugerido || inferirArquetipoMensaje(fullText || incoming.text || "");
       const canal = incoming.platform;
       const piezaId = `CONV-${incoming.platform.toUpperCase()}`;
 
@@ -243,15 +288,20 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
         pieza_id_origen: piezaId,
         arquetipo_inferido: arquetipoInferido,
         estado_inicial: "CAPTURADO",
-        sla_limite_horas: 48,
+        sla_limite_horas: scoring.enriquecimientoCrm.slaLimiteHoras,
         metadata: {
           red: incoming.platform,
           handle,
           thread_id: incoming.thread_id,
           sentiment: incoming.sentiment ?? undefined,
           arquetipo_inferido: arquetipoInferido,
+          lead_score_total: scoring.scoreTotal,
+          lead_cuadrante: scoring.cuadrante,
+          lead_prioridad: scoring.prioridadCrm,
+          fit_rol: scoring.fitRolDetectado,
+          dolores: scoring.doloresDetectados,
         },
-        nota_referencia: `[MejoraSM] Derivado desde ${platformLabel}${handle ? ` (@${handle})` : ""} [Arquetipo: ${arquetipoInferido}] [SLA 48h]. Mensaje: "${(incoming.text || '').slice(0, 120)}"`,
+        nota_referencia: scoring.enriquecimientoCrm.notaScoring,
       });
 
       setCrmSent(true);
@@ -272,8 +322,8 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
       });
 
       toast({
-        title: "Lead derivado a CRM (SLA 48h Activo)",
-        description: `Contacto ${nombre} registrado con arquetipo [${arquetipoInferido}] y SLA de 48h activo (ID: ${res.persona_id.slice(0, 8)}…)`,
+        title: `Lead ${scoring.cuadrante === "CALIFICADO_ALTO" ? "Calificado 🔥" : "Registrado"} (SLA <${scoring.slaHorasRecomendado}h)`,
+        description: `Contacto ${nombre} (${scoring.scoreTotal}/100 pts) registrado con arquetipo [${arquetipoInferido}] en CRM.`,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "No se pudo conectar con contactos-api";
@@ -301,6 +351,7 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
             {incoming.author_is_follower && <span className="text-muted-foreground/70">· sigue la cuenta</span>}
           </span>
           {sent && <Badge className={cn("border-0", sent.className)}>{sent.label}</Badge>}
+          <LeadScoringBadge scoring={scoring} />
           {!incoming.persona_id && (
             <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary text-[10px] font-mono capitalize">
               {inferirArquetipoMensaje(incoming.text || "")}
@@ -420,6 +471,28 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
           </div>
         ) : (
           <div className="space-y-2">
+            {/* FAST CONSULTATIVE REPLIES BAR (CALIDEZ CON VERDAD - 1 CLIC) */}
+            <div className="space-y-1 bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                Respuestas Consultivas Sugeridas (1 Clic • Calidez con Verdad):
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {scoring.respuestasSugeridas.map((sug) => (
+                  <Button
+                    key={sug.id}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-[11px] px-2.5 font-medium bg-white hover:bg-slate-100 border-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"
+                    onClick={() => setDraft(sug.texto)}
+                    title={sug.titulo}
+                  >
+                    {sug.etiquetaCorta}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
             <Textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}

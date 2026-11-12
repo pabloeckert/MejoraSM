@@ -78,4 +78,52 @@ describe("Conversaciones Page", () => {
     renderPage(<Conversaciones />);
     expect(screen.getByRole("button", { name: /Archivar todas/i })).toBeInTheDocument();
   });
+
+  it("renders the predictive Lead Scoring badge on the thread card", async () => {
+    const { default: Conversaciones } = await import("@/pages/Conversaciones");
+    renderPage(<Conversaciones />);
+    // Badge shows points and quadrant label
+    expect(screen.getByText(/pts/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/En Nutrición/i).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/SLA <24h/i)).toBeInTheDocument();
+  });
+
+  it("renders suggested consultative replies and populates textarea on click", async () => {
+    const { default: Conversaciones } = await import("@/pages/Conversaciones");
+    renderPage(<Conversaciones />);
+    
+    // Open reply box
+    fireEvent.click(screen.getByRole("button", { name: /Redactar respuesta/i }));
+
+    // Check fast consultative reply bar
+    expect(screen.getByText(/Respuestas Consultivas Sugeridas/i)).toBeInTheDocument();
+    const btnAuto = screen.getByRole("button", { name: /Autodiagnóstico 4D/i });
+    expect(btnAuto).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Pregunta de Trinchera/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Continuar por Privado/i })).toBeInTheDocument();
+
+    // Click suggested reply and verify textarea updates
+    fireEvent.click(btnAuto);
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    expect(textarea.value.toLowerCase()).toContain("autodiagnóstico");
+    expect(textarea.value).toContain("4 dimensiones");
+  });
+
+  it("filters threads based on lead warmth filter chips", async () => {
+    const { default: Conversaciones } = await import("@/pages/Conversaciones");
+    renderPage(<Conversaciones />);
+
+    // Initial state: thread is visible
+    expect(screen.getByText("Quiero información sobre el acompañamiento")).toBeInTheDocument();
+
+    // Click "🔥 Calificados (≥70)" filter -> item is En Nutrición (43 pts), so it should not appear in list
+    const btnCalificados = screen.getByRole("button", { name: /Calificados/i });
+    fireEvent.click(btnCalificados);
+    expect(screen.queryByText("Quiero información sobre el acompañamiento")).not.toBeInTheDocument();
+
+    // Click "🟡 En Nutrición" filter -> thread reappears
+    const btnNutricion = screen.getByRole("button", { name: /En Nutrición/i });
+    fireEvent.click(btnNutricion);
+    expect(screen.getByText("Quiero información sobre el acompañamiento")).toBeInTheDocument();
+  });
 });

@@ -17,6 +17,7 @@ const Calendario = lazy(() => import("./pages/Calendario"));
 const SubirMaterial = lazy(() => import("./pages/SubirMaterial"));
 const Monitor = lazy(() => import("./pages/Monitor"));
 const CitasStudio = lazy(() => import("./pages/CitasStudio"));
+const Conversaciones = lazy(() => import("./pages/Conversaciones"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -62,8 +63,9 @@ const App = () => (
                 <Route path="/hub" element={<SubirMaterial />} />
                 <Route path="/subir-material" element={<SubirMaterial />} />
                 <Route path="/monitor" element={<Monitor />} />
-                <Route path="/conversaciones" element={<Navigate to="/" replace />} />
-                <Route path="/crm" element={<Navigate to="/" replace />} />
+                <Route path="/conversaciones" element={<Conversaciones />} />
+                <Route path="/inbox" element={<Navigate to="/conversaciones" replace />} />
+                <Route path="/crm" element={<Navigate to="/conversaciones" replace />} />
                 <Route path="/citas" element={<CitasStudio />} />
                 <Route path="/citas-studio" element={<Navigate to="/citas" replace />} />
                 <Route path="/biblioteca" element={<Navigate to="/boveda" replace />} />
