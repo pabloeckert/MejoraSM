@@ -50,6 +50,12 @@ function wrapText(text: string, maxCharsPerLine: number = 42): string[] {
   return lines;
 }
 
+const encoder = new TextEncoder();
+
+function getByteLength(str: string): number {
+  return encoder.encode(str).length;
+}
+
 /**
  * Genera el Buffer / Uint8Array de un PDF 1.4 multipágina optimizado para LinkedIn Document Posts.
  */
@@ -150,7 +156,7 @@ export function generarLinkedInCarouselPDF(options: LinkedInCarouselOptions): Ui
       stream += `BT\n/F2 18 Tf\n0.55 0.58 0.62 rg\n80 90 Td\n(Mejora Continua  -  Calidez con Verdad) Tj\nET\n`;
     }
 
-    const streamLength = Buffer.byteLength(stream, "utf-8");
+    const streamLength = getByteLength(stream);
     const contentObjId = newObj(`<< /Length ${streamLength} >>\nstream\n${stream}endstream`);
 
     // Objeto Página
@@ -174,11 +180,11 @@ export function generarLinkedInCarouselPDF(options: LinkedInCarouselOptions): Ui
   const offsets: number[] = [0];
 
   for (const obj of objects) {
-    offsets.push(Buffer.byteLength(pdf, "utf-8"));
+    offsets.push(getByteLength(pdf));
     pdf += obj + "\n";
   }
 
-  const xrefOffset = Buffer.byteLength(pdf, "utf-8");
+  const xrefOffset = getByteLength(pdf);
   pdf += `xref\n0 ${objects.length + 1}\n`;
   pdf += `0000000000 65535 f \n`;
   for (let i = 1; i <= objects.length; i++) {
@@ -189,5 +195,5 @@ export function generarLinkedInCarouselPDF(options: LinkedInCarouselOptions): Ui
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root ${catalogObjId} 0 R >>\n`;
   pdf += `startxref\n${xrefOffset}\n%%EOF\n`;
 
-  return Buffer.from(pdf, "utf-8");
+  return encoder.encode(pdf);
 }
