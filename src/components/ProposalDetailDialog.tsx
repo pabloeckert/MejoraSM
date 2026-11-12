@@ -61,6 +61,7 @@ import {
   type CopyCalibradoTresPasos,
 } from "@/domain/types";
 import { approveLocalProposal } from "@/services/localSMService";
+import { FormatRecommenderCard } from "@/components/FormatRecommenderCard";
 
 const OFERTAS = DIMENSIONES.map((d) => ({ value: d.key, label: d.label }));
 
@@ -724,6 +725,48 @@ function ProposalDetailModal({
                 </div>
               </div>
             )}
+
+            {/* SPRINT S+7: RECOMENDADOR INTELIGENTE DE FORMATO */}
+            <FormatRecommenderCard
+              input={{
+                topic: canonical.imagen_boveda_vinculada.titulo || currentBorrador.titulo_portada,
+                hook: currentBorrador.titulo_portada,
+                body: currentBorrador.cuerpo_texto,
+                copy_tres_pasos: currentBorrador.copy_tres_pasos,
+                cta: currentBorrador.cta_texto,
+                stepps: currentBorrador.stepps_evaluacion,
+                targetChannel: (canonical.canal_destino as any) || "linkedin",
+              }}
+              activeFormat={currentBorrador.tipo_formato}
+              compact={true}
+              onApplyFormat={(fmt) => {
+                if (fmt === "carrusel") {
+                  setSelectedOpcion("A");
+                  setCanalPreview("linkedin");
+                } else if (fmt === "cita_placa") {
+                  setSelectedOpcion("B");
+                  setCanalPreview("instagram");
+                  setRatioInstagram("4:5");
+                } else if (fmt === "reel") {
+                  setCanalPreview("instagram");
+                  setRatioInstagram("9:16");
+                } else {
+                  setSelectedOpcion("C");
+                }
+                toast({
+                  title: "Formato aplicado",
+                  description: `Se configuró la pieza para ${
+                    fmt === "carrusel"
+                      ? "Carrusel PDF B2B"
+                      : fmt === "cita_placa"
+                      ? "Placa de Cita / Autoridad"
+                      : fmt === "reel"
+                      ? "Reel / Video Vertical"
+                      : "Post Estándar"
+                  }.`,
+                });
+              }}
+            />
 
           </div>
 

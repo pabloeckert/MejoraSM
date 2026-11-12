@@ -44,6 +44,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { CopyExperimentSimulator } from "@/components/CopyExperimentSimulator";
+import { FormatRecommenderCard } from "@/components/FormatRecommenderCard";
 import {
   recordCopyExperiment,
   type CopyVariant,
@@ -735,6 +736,32 @@ function SessionCard({
             initialCta={session.metadata?.proposal?.cta || undefined}
             activeVariantId={activeVariantId}
             onApplyVariant={handleApplyVariant}
+          />
+
+          {/* 1.6. RECOMENDADOR INTELIGENTE DE FORMATO (SPRINT S+7) */}
+          <FormatRecommenderCard
+            input={{
+              topic: session.topic || undefined,
+              hook: session.metadata?.proposal?.hook || session.topic || undefined,
+              body: session.metadata?.proposal?.body || undefined,
+              cta: session.metadata?.proposal?.cta || undefined,
+              targetChannel: "linkedin",
+            }}
+            compact={true}
+            onApplyFormat={(fmt) => {
+              toast({
+                title: "Formato Recomendado Seleccionado",
+                description: `Estrategia de publicación configurada para ${
+                  fmt === "carrusel"
+                    ? "Carrusel PDF B2B (1080x1350)"
+                    : fmt === "cita_placa"
+                    ? "Placa de Cita / Autoridad (1080x1080)"
+                    : fmt === "reel"
+                    ? "Reel / Video Vertical (1080x1920)"
+                    : "Post Estándar"
+                }.`,
+              });
+            }}
           />
 
           {/* 2. INSPECTOR Y EDITOR INTERACTIVO DE DIAPOSITIVAS DEL CARRUSEL (SLIDES 1 A 5) */}
