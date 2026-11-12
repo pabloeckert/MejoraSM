@@ -555,5 +555,116 @@ export class SqliteSMRepository {
       score_impacto: Number(r.score_impacto || 0),
     }));
   }
-}
 
+  public obtenerConfigAgentes(): Array<{ id: string; provider: string; model: string; temperature: number; system_prompt: string }> {
+    try {
+      const rows = this.db.prepare("SELECT id, provider, model, temperature, system_prompt FROM agent_config").all() as Array<{
+        id: string;
+        provider: string;
+        model: string;
+        temperature: number;
+        system_prompt: string;
+      }>;
+      if (rows && rows.length > 0) return rows;
+    } catch {
+      // ignore
+    }
+    return [
+      {
+        id: "estratega",
+        provider: "anthropic",
+        model: "claude-3-5-sonnet-20241022",
+        temperature: 0.7,
+        system_prompt: "Sos el Agente Estratega de Mejora Continua (mejoraok.com). Tu función es proponer ángulos B2B, identificar fricciones operativas y calibrar temas hacia los 3 arquetipos empresariales.",
+      },
+      {
+        id: "creativo",
+        provider: "anthropic",
+        model: "claude-3-5-sonnet-20241022",
+        temperature: 0.8,
+        system_prompt: "Sos el Agente Creativo de Mejora Continua. Redactás copys con rigor en 3 pasos (Dolor, Reencuadre, Dirección) aplicando la regla de oro: el problema es el proceso, jamás la persona.",
+      },
+      {
+        id: "critico",
+        provider: "anthropic",
+        model: "claude-3-opus-20240229",
+        temperature: 0.2,
+        system_prompt: "Sos el Agente Crítico de Mejora Continua. Evaluás que cada pieza cumpla con el Manual de Identidad (80% blanco, calidez con verdad, cero venta por precio) y validás o rechazás con criterio implacable.",
+      },
+    ];
+  }
+
+  public guardarConfigAgentes(configs: Array<{ id: string; provider?: string; model?: string; temperature?: number; system_prompt?: string }>): boolean {
+    const ahora = new Date().toISOString();
+    return withImmediateTransaction(this.db, () => {
+      const upsertStmt = this.db.prepare(`
+        INSERT INTO agent_config (id, provider, model, temperature, system_prompt, actualizado_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          provider = excluded.provider,
+          model = excluded.model,
+          temperature = excluded.temperature,
+          system_prompt = excluded.system_prompt,
+          actualizado_at = excluded.actualizado_at;
+      `);
+      for (const cfg of configs) {
+        upsertStmt.run(
+          cfg.id,
+          cfg.provider || "anthropic",
+          cfg.model || "claude-3-5-sonnet-20241022",
+          Number(cfg.temperature ?? 0.7),
+          cfg.system_prompt || "",
+          ahora
+        );
+      }
+      return true;
+    });
+  }
+
+  public obtenerHistorialCache(): { synced_at: string | null; posts: unknown[]; acciones_manuales: unknown[] } {
+    try {
+      const row = this.db.prepare("SELECT synced_at, posts_json, acciones_manuales_json FROM historial_cache WHERE id = 1").get() as {
+        synced_at: string | null;
+        posts_json: string;
+        acciones_manuales_json: string;
+      } | undefined;
+      if (row) {
+        return {
+          synced_at: row.synced_at,
+          posts: JSON.parse(row.posts_json || "[]"),
+          acciones_manuales: JSON.parse(row.acciones_manuales_json || "[]"),
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return { synced_at: null, posts: [], acciones_manuales: [] };
+  }
+
+  public guardarHistorialCache(data: { synced_at?: string | null; posts?: unknown[]; acciones_manuales?: unknown[] }): boolean {
+    const ahora = new Date().toISOString();
+    return withImmediateTransaction(this.db, () => {
+      const existing = this.obtenerHistorialCache();
+      const syncedAt = data.synced_at !== undefined ? data.synced_at : existing.synced_at || ahora;
+      const postsJson = JSON.stringify(data.posts !== undefined ? data.posts : existing.posts);
+      const accionesJson = JSON.stringify(data.acciones_manuales !== undefined ? data.acciones_manuales : existing.acciones_manuales);
+
+      this.db.prepare(`
+        INSERT INTO historial_cache (id, synced_at, posts_json, acciones_manuales_json, actualizado_at)
+        VALUES (1, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          synced_at = excluded.synced_at,
+          posts_json = excluded.posts_json,
+          acciones_manuales_json = excluded.acciones_manuales_json,
+          actualizado_at = excluded.actualizado_at;
+      `).run(syncedAt, postsJson, accionesJson, ahora);
+      return true;
+    });
+  }
+
+  public eliminarPostHistorial(postId: string): boolean {
+    const current = this.obtenerHistorialCache();
+    const filteredPosts = (current.posts as Array<{ id: string }>).filter((p) => p.id !== postId);
+    return this.guardarHistorialCache({ posts: filteredPosts });
+  }
+}

@@ -357,4 +357,93 @@ export class SqliteOutboxRepository {
       .prepare("SELECT * FROM outbox_posts WHERE propuesta_id = ? ORDER BY creado_en ASC")
       .all(propuestaId) as unknown as OutboxPost[];
   }
+
+  public listar(filtros?: { estado?: string; limit?: number }): OutboxPost[] {
+    let sql = "SELECT * FROM outbox_posts";
+    const params: (string | number)[] = [];
+    if (filtros?.estado) {
+      sql += " WHERE estado_post = ?";
+      params.push(filtros.estado);
+    }
+    sql += " ORDER BY creado_en DESC";
+    if (filtros?.limit) {
+      sql += " LIMIT ?";
+      params.push(filtros.limit);
+    }
+    return this.db.prepare(sql).all(...params) as unknown as OutboxPost[];
+  }
+
+  public obtenerEstadoResumen(): {
+    conteos: {
+      en_cola: number;
+      despachando: number;
+      reintento: number;
+      publicado: number;
+      fallido: number;
+      total: number;
+    };
+    posts: OutboxPost[];
+    circuitBreakers: Array<{
+      canal: string;
+      estado: string;
+      conteo_fallas: number;
+      ultimo_fallo_at: string | null;
+      ultimo_exito_at: string | null;
+    }>;
+  } {
+    const rows = this.db.prepare("SELECT estado_post, COUNT(*) as c FROM outbox_posts GROUP BY estado_post").all() as Array<{ estado_post: string; c: number }>;
+    const conteos = {
+      en_cola: 0,
+      despachando: 0,
+      reintento: 0,
+      publicado: 0,
+      fallido: 0,
+      total: 0,
+    };
+    for (const r of rows) {
+      const c = Number(r.c || 0);
+      conteos.total += c;
+      if (r.estado_post === "EN_COLA" || r.estado_post === "APROBADO") conteos.en_cola += c;
+      else if (r.estado_post === "DESPACHANDO") conteos.despachando += c;
+      else if (r.estado_post === "REINTENTO") conteos.reintento += c;
+      else if (r.estado_post === "PUBLICADO") conteos.publicado += c;
+      else if (r.estado_post === "FALLIDO_PERMANENTE" || r.estado_post === "DEAD_LETTER") conteos.fallido += c;
+    }
+
+    const posts = this.db
+      .prepare("SELECT * FROM outbox_posts ORDER BY creado_en DESC LIMIT 50")
+      .all() as unknown as OutboxPost[];
+
+    let circuitBreakers: Array<{
+      canal: string;
+      estado: string;
+      conteo_fallas: number;
+      ultimo_fallo_at: string | null;
+      ultimo_exito_at: string | null;
+    }> = [];
+
+    try {
+      circuitBreakers = this.db
+        .prepare("SELECT canal, estado, conteo_fallas, ultimo_fallo_at, ultimo_exito_at FROM circuit_breaker_canales")
+        .all() as typeof circuitBreakers;
+    } catch {
+      // tabla no existe aún o vacía
+    }
+
+    // Asegurar los 3 canales canónicos si la tabla está vacía
+    const canales = ["instagram", "facebook", "linkedin"];
+    for (const ch of canales) {
+      if (!circuitBreakers.some((cb) => cb.canal === ch)) {
+        circuitBreakers.push({
+          canal: ch,
+          estado: "CLOSED",
+          conteo_fallas: 0,
+          ultimo_fallo_at: null,
+          ultimo_exito_at: null,
+        });
+      }
+    }
+
+    return { conteos, posts, circuitBreakers };
+  }
 }

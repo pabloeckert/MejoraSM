@@ -36,8 +36,10 @@ import {
   Heart,
   Globe,
   Eye,
+  FileText,
 } from "lucide-react";
 import JSZip from "jszip";
+import { generarLinkedInCarouselPDF } from "@/services/pdfCarouselGenerator";
 import {
   useApproveProposal,
   useRejectProposal,
@@ -202,6 +204,8 @@ function ProposalDetailModal({
   const [scheduleOferta, setScheduleOferta] = useState("");
   const [copied, setCopied] = useState(false);
 
+
+
   // Inicialización al abrir la propuesta
   useEffect(() => {
     setIsEditing(false);
@@ -261,7 +265,8 @@ function ProposalDetailModal({
     );
   }
 
-  const [canalPreview, setCanalPreview] = useState<"instagram" | "facebook">("instagram");
+  const [canalPreview, setCanalPreview] = useState<"instagram" | "facebook" | "linkedin">("instagram");
+  const [ratioLinkedIn, setRatioLinkedIn] = useState<"1200:627" | "1:1">("1200:627");
   const [ratioInstagram, setRatioInstagram] = useState<"4:5" | "9:16">("4:5");
   const [ratioFacebook, setRatioFacebook] = useState<"1:1" | "4:5">("1:1");
   const [downloadingZip, setDownloadingZip] = useState(false);
@@ -276,6 +281,7 @@ function ProposalDetailModal({
 
       // 2. Copy formateado para Redes Meta (Instagram y Facebook)
       zip.file(`${canonical.propuesta_id}_meta.txt`, paqueteMulticanal.textoMeta);
+      zip.file(`${canonical.propuesta_id}_linkedin.txt`, paqueteMulticanal.textoLinkedIn);
 
       // 3. Metadata canónica JSON
       zip.file(`${canonical.propuesta_id}_metadata.json`, paqueteMulticanal.metadataJson);
@@ -320,6 +326,50 @@ function ProposalDetailModal({
       toast({ title: "Paquete descargado en 1 clic" });
     } finally {
       setDownloadingZip(false);
+    }
+  }
+
+  function handleDownloadPdfDirect() {
+    try {
+      const slides = currentBorrador.slides && currentBorrador.slides.length > 0
+        ? currentBorrador.slides.map((s, idx) => ({
+            titulo: idx === 0 ? currentBorrador.titulo_portada : `Paso 0${idx}`,
+            contenido: s,
+            esPortada: idx === 0,
+            esCierre: idx === currentBorrador.slides!.length - 1,
+          }))
+        : [
+            { titulo: currentBorrador.titulo_portada, contenido: currentBorrador.copy_tres_pasos.paso1_dolor, esPortada: true },
+            { titulo: "01. El Dolor Real", contenido: currentBorrador.copy_tres_pasos.paso1_dolor },
+            { titulo: "02. El Reencuadre", contenido: currentBorrador.copy_tres_pasos.paso2_reencuadre },
+            { titulo: "03. Direccion Operativa", contenido: currentBorrador.copy_tres_pasos.paso3_direccion_web, esCierre: true },
+          ];
+
+      const pdfBytes = generarLinkedInCarouselPDF({
+        propuesta_id: canonical.propuesta_id,
+        titulo_general: currentBorrador.titulo_portada,
+        slides,
+      });
+
+      const blob = new Blob([pdfBytes as unknown as BlobPart], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${canonical.propuesta_id}_carrusel_linkedin.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "📄 Carrusel PDF Generado",
+        description: "Listo para publicar como documento multipágina en LinkedIn (1080x1350).",
+      });
+    } catch (err) {
+      console.error("Error generando PDF LinkedIn:", err);
+      toast({
+        title: "Error",
+        description: "No se pudo generar el carrusel PDF.",
+        variant: "destructive",
+      });
     }
   }
 
@@ -407,6 +457,58 @@ function ProposalDetailModal({
     });
   }
 
+  // Atajos de Teclado Fluidos (Steve Krug / Marty Cagan: Cero Fricción)
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          activeEl.tagName === "SELECT" ||
+          (activeEl as HTMLElement).isContentEditable);
+
+      // [Ctrl+Enter] o [Cmd+Enter]: Aprobar de inmediato
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        if (!isPublished && !isApproved) {
+          handleApprove();
+        }
+        return;
+      }
+
+      // Si el usuario está escribiendo en un input, ignorar teclas alfabéticas
+      if (isInput) return;
+
+      const key = e.key.toLowerCase();
+      if (key === "a") {
+        e.preventDefault();
+        handleSelectOpcion("A");
+      } else if (key === "b") {
+        e.preventDefault();
+        handleSelectOpcion("B");
+      } else if (key === "c") {
+        e.preventDefault();
+        handleSelectOpcion("C");
+      } else if (key === "e") {
+        e.preventDefault();
+        setIsEditing((prev) => !prev);
+      } else if (key === "p") {
+        e.preventDefault();
+        handleDownloadPdfDirect();
+      } else if (key === "d") {
+        e.preventDefault();
+        handleDownloadPaquete();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, isPublished, isApproved]);
+
+
   function handleApproveAllBatch() {
     if (onApproveBatch) {
       onApproveBatch();
@@ -472,6 +574,18 @@ function ProposalDetailModal({
             <DialogDescription className="text-xs text-slate-500">
               {canonical.dia_programado ? `Programado: ${fmtDate(canonical.dia_programado)}` : "Sin fecha programada"}
             </DialogDescription>
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 bg-slate-100/90 border border-slate-200/90 px-2.5 py-1 rounded-md mt-1.5">
+              <span className="font-semibold text-slate-700">Atajos rápidos:</span>
+              <span className="font-mono bg-white px-1 rounded border border-slate-200 text-slate-800 font-bold">[A/B/C]</span> Borradores
+              <span>•</span>
+              <span className="font-mono bg-white px-1 rounded border border-slate-200 text-slate-800 font-bold">[Ctrl+Enter]</span> Aprobar
+              <span>•</span>
+              <span className="font-mono bg-white px-1 rounded border border-slate-200 text-slate-800 font-bold">[P]</span> PDF
+              <span>•</span>
+              <span className="font-mono bg-white px-1 rounded border border-slate-200 text-slate-800 font-bold">[D]</span> ZIP
+              <span>•</span>
+              <span className="font-mono bg-white px-1 rounded border border-slate-200 text-slate-800 font-bold">[E]</span> Editar
+            </div>
           </DialogHeader>
 
           <Tabs defaultValue="preview" className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -491,6 +605,16 @@ function ProposalDetailModal({
                   <Download className="mr-1.5 h-3.5 w-3.5 text-blue-700" />
                 )}
                 Descarga Multicanal (1 Clic)
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleDownloadPdfDirect}
+                className="bg-white hover:bg-slate-100 text-xs font-semibold text-blue-900 border-blue-200"
+                title="Descargar carrusel PDF para LinkedIn (1080x1350)"
+              >
+                <FileText className="mr-1.5 h-3.5 w-3.5 text-blue-700" />
+                Carrusel PDF
               </Button>
               <Button
                 size="sm"
@@ -577,6 +701,30 @@ function ProposalDetailModal({
             <p className="text-[11px] text-slate-500 italic">
               {CONFIGURACION_BORRADORES[selectedOpcion].descripcion}
             </p>
+            {currentBorrador.stepps_evaluacion && (
+              <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-emerald-50/80 border border-emerald-200 text-slate-800">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-emerald-700 text-white font-mono text-xs px-2 shadow-xs">
+                    STEPPS {currentBorrador.stepps_evaluacion.score_global}/10
+                  </Badge>
+                  <span className="text-xs font-bold text-emerald-900">
+                    Resonancia Psicológica B2B (Jonah Berger)
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-emerald-800 font-medium">
+                  <span>Moneda Social: <strong>{currentBorrador.stepps_evaluacion.moneda_social}</strong></span>
+                  <span>•</span>
+                  <span>Disparador: <strong>{currentBorrador.stepps_evaluacion.disparadores}</strong></span>
+                  <span>•</span>
+                  <span>Emoción: <strong>{currentBorrador.stepps_evaluacion.emocion_desculpabilizadora}</strong></span>
+                  <span>•</span>
+                  <span>Práctico: <strong>{currentBorrador.stepps_evaluacion.valor_practico}</strong></span>
+                  <span>•</span>
+                  <span>Historias: <strong>{currentBorrador.stepps_evaluacion.historias_troya}</strong></span>
+                </div>
+              </div>
+            )}
+
           </div>
 
           <TabsContent value="preview" forceMount className="data-[state=inactive]:hidden space-y-3 mt-0">
@@ -609,6 +757,30 @@ function ProposalDetailModal({
                       )}
                     >
                       9:16 Story
+                    </button>
+                  </div>
+                )}
+                {canalPreview === "linkedin" && (
+                  <div className="flex items-center gap-1 bg-white p-0.5 rounded-md border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setRatioLinkedIn("1200:627")}
+                      className={cn(
+                        "px-2 py-0.5 text-[11px] font-semibold rounded transition-all",
+                        ratioLinkedIn === "1200:627" ? "bg-slate-800 text-white" : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      1200×627 Feed
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRatioLinkedIn("1:1")}
+                      className={cn(
+                        "px-2 py-0.5 text-[11px] font-semibold rounded transition-all",
+                        ratioLinkedIn === "1:1" ? "bg-slate-800 text-white" : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      Carrusel PDF
                     </button>
                   </div>
                 )}

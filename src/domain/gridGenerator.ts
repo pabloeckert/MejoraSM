@@ -3,6 +3,7 @@
 // Balance estricto: 80% Jabs (Educación, Reencuadre, Autoridad) / 20% Right Hooks (Conversión a mejoraok.com).
 // Dirigido a los 3 Buyer Personas: Emprendedor Saturado, Empresario Mal Asesorado, El que Necesita Orden para Crecer.
 
+import { enriquecerBorradorConStepps } from "./steppsValidator";
 import {
   type PropuestaMejoraSMDTO,
   type DimensionMC,
@@ -14,7 +15,8 @@ import {
 export type BuyerPersonaMC =
   | "emprendedor_saturado"
   | "empresario_mal_asesorado"
-  | "orden_para_crecer";
+  | "orden_para_crecer"
+  | "empresario_esceptico";
 
 export interface SemanaPlanificadaDTO {
   numero_semana: number; // 1 a 26
@@ -193,7 +195,7 @@ const DIMENSIONES_ORDEN: DimensionMC[] = [
   "networking_y_autoridad",
 ];
 
-const CANALES: CanalDestino[] = ["instagram", "facebook"];
+const CANALES: CanalDestino[] = ["instagram", "facebook", "linkedin"];
 
 // Semanas específicas (15 semanas de las 26) donde el Viernes se ejecuta un Right Hook de conversión
 const SEMANAS_RIGHT_HOOK = new Set([
@@ -240,6 +242,8 @@ function obtenerEngagementNativo(canal: CanalDestino, _persona: BuyerPersonaMC):
       return "Comentá 'PROCESO' y te enviamos la plantilla práctica por mensaje privado. Guardá este posteo para tu próxima reunión directiva.";
     case "facebook":
       return "¿Cómo resuelven este desafío en tu empresa? Contanos tu experiencia en los comentarios.";
+    case "linkedin":
+      return "Para directores y socios de PyMEs: ¿En qué punto sentís que la estructura operativa de tu empresa no escala con el volumen? Comentá 'CLARIDAD' o dejá tu perspectiva para debatir.";
     default:
       return "Dejanos tu punto de vista en los comentarios.";
   }
@@ -269,6 +273,7 @@ export function generarGrillaEvergreen26Semanas(fechaInicio: Date = new Date()):
     emprendedor_saturado: 0,
     empresario_mal_asesorado: 0,
     orden_para_crecer: 0,
+    empresario_esceptico: 0,
   };
 
   let globalPieceIndex = 0;
@@ -322,8 +327,8 @@ export function generarGrillaEvergreen26Semanas(fechaInicio: Date = new Date()):
 
       const opcionDefault = esRightHook ? "C" : p % 2 === 0 ? "A" : "B";
       const engagementNativo = obtenerEngagementNativo(canal, tema.persona);
-      const utmParams = `utm_source=${canal}&utm_medium=organic_social&utm_campaign=evergreen_26s&utm_content=${propId}&pieza_id=${propId}&buyer_persona=${tema.persona}`;
-      const urlConversionTrazable = `mejoraok.com?${utmParams}`;
+      const utmParams = `utm_source=mejora_sm&utm_medium=organic_social&utm_campaign=${tema.persona}&pieza_id=${propId}&canal=${canal}`;
+      const urlConversionTrazable = `https://mejoraok.com/diagnostico?${utmParams}`;
       const conversionLeadText = `Hacé el test de diagnóstico de 4 dimensiones sin complacencia en ${urlConversionTrazable} y detectá tus cuellos de botella.`;
 
       const c4A: CopyCalibradoCuatroPasos = {
@@ -406,13 +411,13 @@ export function generarGrillaEvergreen26Semanas(fechaInicio: Date = new Date()):
         canal_destino: canal,
         dia_programado: diaPieza.toISOString(),
         origen_boveda_id: bovedaId,
-        borradores: [borradorA, borradorB, borradorC],
+        borradores: [enriquecerBorradorConStepps(borradorA), enriquecerBorradorConStepps(borradorB), enriquecerBorradorConStepps(borradorC)],
         borrador_seleccionado: opcionDefault,
         tratamiento_visual: {
           marco_expandido_requerido: true,
           color_fondo_marco: "#FFFFFF",
           regla_color_aplicada: "mucho_blanco_puntuacion_azul_rojo",
-          relacion_aspecto_destino: "4:5",
+          relacion_aspecto_destino: canal === "linkedin" ? "1200:627" : "4:5",
         },
         imagen_boveda_vinculada: {
           id: fotoBoveda.id,

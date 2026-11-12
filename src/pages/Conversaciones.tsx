@@ -35,7 +35,11 @@ import { inboxApi, type InboxItem } from "@/services/supabase";
 import { useConfirm } from "@/hooks/useConfirm";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { enviarLeadACRM, extraerDatosDeTexto } from "@/services/contactosService";
+import {
+  enviarLeadACRM,
+  extraerDatosDeTexto,
+  inferirArquetipoMensaje,
+} from "@/services/contactosService";
 
 const PLATFORM_LABEL: Record<string, string> = { instagram: "Instagram", facebook: "Facebook" };
 
@@ -226,19 +230,28 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
       const extraidos = extraerDatosDeTexto(fullText);
       const nombre = incoming.author_name || incoming.author_username || `Lead ${platformLabel}`;
       const handle = incoming.author_username || incoming.author_name || "";
+      const arquetipoInferido = inferirArquetipoMensaje(fullText || incoming.text || "");
+      const canal = incoming.platform;
+      const piezaId = `CONV-${incoming.platform.toUpperCase()}`;
 
       const res = await enviarLeadACRM({
         source: "mejora_sm",
         nombre,
         email: extraidos.email,
         telefono: extraidos.telefono,
+        canal_origen: canal,
+        pieza_id_origen: piezaId,
+        arquetipo_inferido: arquetipoInferido,
+        estado_inicial: "CAPTURADO",
+        sla_limite_horas: 48,
         metadata: {
           red: incoming.platform,
           handle,
           thread_id: incoming.thread_id,
           sentiment: incoming.sentiment ?? undefined,
+          arquetipo_inferido: arquetipoInferido,
         },
-        nota_referencia: `[MejoraSM] Derivado desde ${platformLabel}${handle ? ` (@${handle})` : ""}. Mensaje: "${(incoming.text || '').slice(0, 120)}"`,
+        nota_referencia: `[MejoraSM] Derivado desde ${platformLabel}${handle ? ` (@${handle})` : ""} [Arquetipo: ${arquetipoInferido}] [SLA 48h]. Mensaje: "${(incoming.text || '').slice(0, 120)}"`,
       });
 
       setCrmSent(true);
@@ -259,8 +272,8 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
       });
 
       toast({
-        title: "Enviado a CRM",
-        description: `Contacto ${nombre} registrado exitosamente en la fuente central (ID: ${res.persona_id.slice(0, 8)}…)`,
+        title: "Lead derivado a CRM (SLA 48h Activo)",
+        description: `Contacto ${nombre} registrado con arquetipo [${arquetipoInferido}] y SLA de 48h activo (ID: ${res.persona_id.slice(0, 8)}…)`,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "No se pudo conectar con contactos-api";
@@ -288,14 +301,19 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
             {incoming.author_is_follower && <span className="text-muted-foreground/70">· sigue la cuenta</span>}
           </span>
           {sent && <Badge className={cn("border-0", sent.className)}>{sent.label}</Badge>}
+          {!incoming.persona_id && (
+            <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary text-[10px] font-mono capitalize">
+              {inferirArquetipoMensaje(incoming.text || "")}
+            </Badge>
+          )}
           {incoming.persona_id && (
             <a
               href={`#lead-${incoming.persona_id}`}
               onClick={(e) => {
                 e.preventDefault();
                 toast({
-                  title: "Ficha de Prospecto en CRM",
-                  description: `ID de lead: ${incoming.persona_id}. Trazabilidad confirmada con la base de datos soberana.`,
+                  title: "Ficha de Prospecto en CRM (SLA 48h)",
+                  description: `ID de lead: ${incoming.persona_id}. Trazabilidad confirmada con la base de datos soberana. SLA activo: 48 horas.`,
                 });
               }}
               title={`Ver ficha del prospecto en CRM (ID: ${incoming.persona_id})`}
@@ -304,7 +322,10 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
               <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
               <span>Derivado a CRM</span>
               <span className="font-mono text-[9px] opacity-75 bg-emerald-100/80 px-1 py-0.2 rounded">
-                #${incoming.persona_id.slice(0, 8)}
+                #{incoming.persona_id.slice(0, 8)}
+              </span>
+              <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-medium bg-emerald-200/70 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200">
+                SLA 48h
               </span>
               <ExternalLink className="h-2.5 w-2.5 opacity-60 ml-0.5 group-hover:opacity-100" />
             </a>

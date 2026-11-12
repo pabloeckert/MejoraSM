@@ -62,16 +62,74 @@ export default function Configuracion() {
 function ConfiguracionContent() {
   const queryClient = useQueryClient();
 
-  // Load from Supabase
+  // Load from Local SQLite with offline fallback and Supabase sync
   const { data: dbConfig, isLoading } = useQuery({
     queryKey: ["agent-config"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("agent_config")
-        .select("*")
-        .order("id");
-      if (error) throw error;
-      return data as AgentConfigRow[];
+      // 1. Intentar local SQLite
+      try {
+        const localRes = await fetch("http://127.0.0.1:4002/api/configuracion/agentes");
+        if (localRes.ok) {
+          const localData = await localRes.json();
+          if (Array.isArray(localData) && localData.length > 0) {
+            localStorage.setItem("mejora_sm_agent_config", JSON.stringify(localData));
+            return localData as AgentConfigRow[];
+          }
+        }
+      } catch {
+        // Fallback local offline
+      }
+
+      // 2. Intentar localStorage
+      const cached = localStorage.getItem("mejora_sm_agent_config");
+      if (cached) {
+        try {
+          return JSON.parse(cached) as AgentConfigRow[];
+        } catch {}
+      }
+
+      // 3. Fallback a Supabase solo si está configurado
+      if (import.meta.env.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.includes("placeholder")) {
+        try {
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout Supabase")), 2500)
+          );
+          const { data, error } = (await Promise.race([
+            supabase.from("agent_config").select("*").order("id"),
+            timeoutPromise,
+          ])) as { data: any; error: any };
+          if (!error && data && data.length > 0) {
+            return data as AgentConfigRow[];
+          }
+        } catch {
+          // offline
+        }
+      }
+
+      // 4. Default Sovereign DTO
+      return [
+        {
+          id: "estratega",
+          provider: "anthropic",
+          model: "claude-3-5-sonnet-20241022",
+          temperature: 0.7,
+          system_prompt: "Sos el Agente Estratega de Mejora Continua (mejoraok.com). Proponés ángulos B2B basados en las 4 dimensiones y los 3 arquetipos.",
+        },
+        {
+          id: "creativo",
+          provider: "anthropic",
+          model: "claude-3-5-sonnet-20241022",
+          temperature: 0.8,
+          system_prompt: "Sos el Agente Creativo de Mejora Continua. Redactás copys en 3 pasos con foco en el proceso, no en la persona.",
+        },
+        {
+          id: "critico",
+          provider: "anthropic",
+          model: "claude-3-opus-20240229",
+          temperature: 0.2,
+          system_prompt: "Sos el Agente Crítico de Mejora Continua. Verificás que el 80% sea blanco, calidez con verdad y sin venta por precio.",
+        },
+      ];
     },
   });
 
@@ -161,8 +219,28 @@ function ConfiguracionContent() {
         system_prompt: cfg.system_prompt,
         updated_at: new Date().toISOString(),
       }));
-      const { error } = await supabase.from("agent_config").upsert(rows);
-      if (error) throw error;
+
+      // Guardado local inmediato en localStorage
+      localStorage.setItem("mejora_sm_agent_config", JSON.stringify(rows));
+
+      // Guardado en SQLite local
+      try {
+        await fetch("http://127.0.0.1:4002/api/configuracion/agentes", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer mejora_sm_local_bearer_2026",
+          },
+          body: JSON.stringify(rows),
+        });
+      } catch {
+        // Modo offline
+      }
+
+      // Sincronización asíncrona a Supabase si aplica
+      if (import.meta.env.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.includes("placeholder")) {
+        void supabase.from("agent_config").upsert(rows);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agent-config"] });

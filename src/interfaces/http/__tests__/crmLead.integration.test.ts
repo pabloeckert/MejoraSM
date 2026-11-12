@@ -130,3 +130,52 @@ describe("PATCH /api/crm/prospectos/:id/estado", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("GET /api/crm/prospectos-sla y GET /api/crm/prospectos", () => {
+  let ctx: Awaited<ReturnType<typeof levantar>>;
+  beforeAll(async () => {
+    ctx = await levantar(100);
+    // Inyectar un lead con canal_origen y arquetipo_inferido
+    await post(ctx.base, {
+      email: "fundador_saturado@empresa.com",
+      nombre: "Carlos Fundador",
+      telefono: "+54 11 4444-5555",
+      empresa: "Metalúrgica Sur",
+      canal_origen: "linkedin",
+      pieza_id_origen: "PZ-LI-001",
+      arquetipo_inferido: "saturado",
+    });
+  });
+  afterAll(async () => { await cerrar(ctx.server); });
+
+  it("captura lead con canal_origen, pieza_id_origen y arquetipo_inferido", async () => {
+    const res = await fetch(`${ctx.base}/api/crm/prospectos`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    expect(data.count).toBe(1);
+    const lead = data.prospectos[0];
+    expect(lead.email).toBe("fundador_saturado@empresa.com");
+    expect(lead.perfil_detectado_id).toBe("saturado");
+    expect(lead.pieza_id_atribucion).toBe("PZ-LI-001");
+    expect(lead.origen_utm).toBe("linkedin/-/-");
+  });
+
+  it("retorna auditoría completa de SLA en GET /api/crm/prospectos-sla", async () => {
+    const res = await fetch(`${ctx.base}/api/crm/prospectos-sla`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    expect(data.auditoria).toBeDefined();
+    expect(data.auditoria.total_capturados).toBe(1);
+    expect(data.auditoria.pendientes_atencion).toBe(1);
+    expect(data.auditoria.en_tiempo).toBe(1);
+    expect(data.auditoria.cumplimiento_pct).toBe(100);
+
+    const prospecto = data.auditoria.prospectos[0];
+    expect(prospecto.estado_sla).toBe("en_tiempo");
+    expect(prospecto.perfil_detectado_id).toBe("saturado");
+    expect(prospecto.horas_transcurridas).toBeGreaterThanOrEqual(0);
+    expect(prospecto.horas_restantes).toBeLessThanOrEqual(48);
+  });
+});

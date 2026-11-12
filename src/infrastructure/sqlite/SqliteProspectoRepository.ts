@@ -12,6 +12,10 @@ import {
   validarTransicion,
   esEstadoProspecto,
 } from "../../domain/prospectoStateMachine";
+import {
+  calcularMetricasSla,
+  type MetricasSlaResumen,
+} from "../../domain/prospectoSla";
 
 export interface ProspectoV2 {
   prospecto_id: string;
@@ -46,6 +50,7 @@ export interface NuevoLeadInput {
   empresa?: string | null;
   origen_utm?: string | null;
   pieza_id_atribucion: string;
+  perfil_detectado_id?: string | null;
 }
 
 export interface TransicionOpciones {
@@ -116,7 +121,7 @@ export class SqliteProspectoRepository {
         estado: "CAPTURADO",
         origen_utm: input.origen_utm ?? null,
         pieza_id_atribucion: input.pieza_id_atribucion,
-        perfil_detectado_id: null,
+        perfil_detectado_id: input.perfil_detectado_id ?? null,
         motivo_descarte_id: null,
         fecha_captura: ahoraIso,
         fecha_actualizacion: ahoraIso,
@@ -147,6 +152,7 @@ export class SqliteProspectoRepository {
       this.insertarEvento(prospecto.prospecto_id, null, "CAPTURADO", null, {
         origen_utm: prospecto.origen_utm,
         pieza_id_atribucion: prospecto.pieza_id_atribucion,
+        perfil_detectado_id: prospecto.perfil_detectado_id,
       }, ahoraIso);
       return { prospecto, creado: true };
     });
@@ -206,5 +212,23 @@ export class SqliteProspectoRepository {
     return this.db
       .prepare("SELECT * FROM prospectos WHERE estado = 'CAPTURADO' AND sla_limite_calificacion < ? ORDER BY sla_limite_calificacion ASC")
       .all(now.toISOString()) as unknown as ProspectoV2[];
+  }
+
+  /** Lista todos los prospectos con orden cronológico descendente, opcionalmente filtrados por estado. */
+  public listarTodos(filtro?: { estado?: EstadoProspectoV2 }): ProspectoV2[] {
+    if (filtro?.estado) {
+      return this.db
+        .prepare("SELECT * FROM prospectos WHERE estado = ? ORDER BY fecha_captura DESC")
+        .all(filtro.estado) as unknown as ProspectoV2[];
+    }
+    return this.db
+      .prepare("SELECT * FROM prospectos ORDER BY fecha_captura DESC")
+      .all() as unknown as ProspectoV2[];
+  }
+
+  /** Obtiene la auditoría completa de SLAs de atención (48h) con métricas del Service Blueprint. */
+  public obtenerAuditoriaSLA(now: Date = new Date()): MetricasSlaResumen {
+    const prospectos = this.listarTodos();
+    return calcularMetricasSla(prospectos, now);
   }
 }

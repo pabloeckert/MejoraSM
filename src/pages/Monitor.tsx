@@ -10,6 +10,7 @@ import { github } from "@/services/github";
 import { useWorkflowAction } from "@/hooks/useGithubUpload";
 import { useConfirm } from "@/hooks/useConfirm";
 import { toast } from "@/hooks/use-toast";
+import { SlaAuditSection } from "@/components/SlaAuditSection";
 
 // Fase 5 del plan estratégico 2026-08-16 (Un solo panel) — port fiel de
 // dashboard/index.html: mismas acciones de reversión (manage-story.yml/
@@ -59,13 +60,80 @@ interface AccionManual {
 }
 
 async function fetchHistorial(): Promise<{ syncedAt: string | null; posts: HistorialPost[]; accionesManuales: Map<string, AccionManual> }> {
-  const { data, error } = await historialApi.get();
-  if (error) throw error;
-  const accionesRaw = (data?.acciones_manuales as AccionManual[] | null) || [];
+  // 1. Intentar local SQLite
+  try {
+    const res = await fetch("http://127.0.0.1:4002/api/monitor/historial");
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.posts) && data.posts.length > 0) {
+        const accionesRaw = (data?.acciones_manuales as AccionManual[] | null) || [];
+        return {
+          syncedAt: data?.synced_at ?? new Date().toISOString(),
+          posts: data.posts as HistorialPost[],
+          accionesManuales: new Map(accionesRaw.map((a: AccionManual) => [`${a.postId}:${a.platform}`, a])),
+        };
+      }
+    }
+  } catch {
+    // offline
+  }
+
+  // 2. Intentar Supabase si está disponible
+  if (import.meta.env.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.includes("placeholder")) {
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout Supabase")), 2500)
+      );
+      const { data, error } = (await Promise.race([
+        historialApi.get(),
+        timeoutPromise,
+      ])) as { data: any; error: any };
+      if (!error && data) {
+        const accionesRaw = (data?.acciones_manuales as AccionManual[] | null) || [];
+        return {
+          syncedAt: data?.synced_at ?? null,
+          posts: (data?.posts as HistorialPost[] | null) || [],
+          accionesManuales: new Map(accionesRaw.map((a: AccionManual) => [`${a.postId}:${a.platform}`, a])),
+        };
+      }
+    } catch {
+      // offline
+    }
+  }
+
+  // 3. Fallback a posts de Outbox local
+  try {
+    const outboxRes = await fetch("http://127.0.0.1:4002/api/outbox");
+    if (outboxRes.ok) {
+      const outboxPosts = await outboxRes.json();
+      if (Array.isArray(outboxPosts) && outboxPosts.length > 0) {
+        const mappedPosts: HistorialPost[] = outboxPosts.map((p: any) => ({
+          id: p.post_id,
+          date: p.creado_en,
+          status: p.estado_post === "PUBLICADO" ? "published" : p.estado_post === "FALLIDO_PERMANENTE" ? "failed" : "pending",
+          content: `Propuesta ${p.propuesta_id} - ${p.borrador_opcion}`,
+          kind: "post",
+          proposalId: p.propuesta_id,
+          headline: `Pieza ${p.propuesta_id}`,
+          kicker: p.canal.toUpperCase(),
+          oferta: null,
+          imageUrl: null,
+          platforms: [{ platform: p.canal, status: p.estado_post === "PUBLICADO" ? "published" : "pending", url: null }],
+        }));
+        return {
+          syncedAt: new Date().toISOString(),
+          posts: mappedPosts,
+          accionesManuales: new Map(),
+        };
+      }
+    }
+  } catch {}
+
+  // 4. Retorno vacío inmediato (nunca se cuelga en loading)
   return {
-    syncedAt: data?.synced_at ?? null,
-    posts: (data?.posts as HistorialPost[] | null) || [],
-    accionesManuales: new Map(accionesRaw.map((a) => [`${a.postId}:${a.platform}`, a])),
+    syncedAt: null,
+    posts: [],
+    accionesManuales: new Map(),
   };
 }
 
@@ -668,6 +736,9 @@ export default function Monitor() {
           )}
         </p>
       )}
+
+      {/* Auditoría de SLAs de Conversión B2B (Service Blueprint 48h) */}
+      <SlaAuditSection />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {posts.map((post) => (

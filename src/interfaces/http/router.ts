@@ -595,6 +595,76 @@ export function handleSMHttpRequest(
     return;
   }
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // CONFIGURACIÓN DE AGENTES (Offline Fallback Soberano en SQLite)
+  // ──────────────────────────────────────────────────────────────────────────
+  if (method === "GET" && (pathname === "/api/configuracion/agentes" || pathname === "/api/configuracion")) {
+    const configs = services.smRepo.obtenerConfigAgentes();
+    sendJson(res, 200, configs, req);
+    return;
+  }
+
+  if ((method === "PUT" || method === "POST") && (pathname === "/api/configuracion/agentes" || pathname === "/api/configuracion")) {
+    parseJsonBody<any>(req)
+      .then((body) => {
+        const configs = Array.isArray(body) ? body : body?.configs || [body];
+        services.smRepo.guardarConfigAgentes(configs);
+        sendJson(res, 200, { success: true, message: "Configuración guardada en SQLite local", count: configs.length });
+      })
+      .catch((err: Error) => sendJson(res, 400, { error: err.message }));
+    return;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // MONITOR E HISTORIAL (Offline Fallback Soberano en SQLite)
+  // ──────────────────────────────────────────────────────────────────────────
+  if (method === "GET" && (pathname === "/api/monitor/historial" || pathname === "/api/historial")) {
+    const cache = services.smRepo.obtenerHistorialCache();
+    sendJson(res, 200, cache, req);
+    return;
+  }
+
+  if (method === "POST" && (pathname === "/api/monitor/historial" || pathname === "/api/historial")) {
+    parseJsonBody<any>(req)
+      .then((body) => {
+        services.smRepo.guardarHistorialCache(body);
+        sendJson(res, 200, { success: true, message: "Historial sincronizado en SQLite local" });
+      })
+      .catch((err: Error) => sendJson(res, 400, { error: err.message }));
+    return;
+  }
+
+  const matchDeleteHistorial = pathname.match(/^\/api\/(?:monitor\/historial|historial)\/([^/]+)$/);
+  if (method === "DELETE" && matchDeleteHistorial) {
+    const postId = decodeURIComponent(matchDeleteHistorial[1]);
+    const ok = services.smRepo.eliminarPostHistorial(postId);
+    sendJson(res, 200, { success: ok, id: postId });
+    return;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // DRAWER DE OUTBOX EN TIEMPO REAL & CIRCUIT BREAKER
+  // ──────────────────────────────────────────────────────────────────────────
+  if (method === "GET" && pathname === "/api/outbox/status") {
+    const outbox =
+      services.outboxRepo ||
+      new SqliteOutboxRepository((services.propuestaRepo as unknown as { db?: DatabaseSync })?.db || "data/mejora_sm.db");
+    const status = outbox.obtenerEstadoResumen();
+    sendJson(res, 200, { success: true, ...status }, req);
+    return;
+  }
+
+  if (method === "GET" && pathname === "/api/outbox") {
+    const outbox =
+      services.outboxRepo ||
+      new SqliteOutboxRepository((services.propuestaRepo as unknown as { db?: DatabaseSync })?.db || "data/mejora_sm.db");
+    const estado = parsedUrl.searchParams.get("estado") || undefined;
+    const limit = Number(parsedUrl.searchParams.get("limit") || 50);
+    const posts = outbox.listar({ estado, limit });
+    sendJson(res, 200, posts, req);
+    return;
+  }
+
   // Servidor de estáticos de producción si existe dist/
   if (method === "GET" && !pathname.startsWith("/api") && pathname !== "/health") {
     const served = serveStaticDistFile(res, pathname, undefined, req);

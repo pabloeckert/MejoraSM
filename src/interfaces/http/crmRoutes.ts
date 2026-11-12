@@ -37,6 +37,10 @@ interface LeadBody {
   utm_source?: unknown;
   utm_medium?: unknown;
   utm_campaign?: unknown;
+  canal_origen?: unknown;
+  pieza_id_origen?: unknown;
+  arquetipo_inferido?: unknown;
+  perfil_detectado_id?: unknown;
   website?: unknown; // honeypot: los humanos no lo ven ni lo completan
   form_rendered_at?: unknown; // epoch ms de render del form (opcional)
 }
@@ -112,16 +116,17 @@ export function handleCrmRequest(
           return;
         }
 
-        // Atribución obligatoria: pieza_id_atribucion ← utm_content (body o querystring)
-        const piezaId = str(body.utm_content) ?? str(searchParams.get("utm_content"));
+        // Atribución obligatoria: pieza_id_atribucion ← utm_content | pieza_id_origen (body o querystring)
+        const piezaId = str(body.utm_content) ?? str(body.pieza_id_origen) ?? str(searchParams.get("utm_content"));
         if (!piezaId || !PIEZA_RE.test(piezaId)) {
           http.sendJson(res, 400, { error: "utm_content obligatorio y válido (identifica la pieza de atribución)" });
           return;
         }
-        const source = utmToken(body.utm_source) ?? utmToken(searchParams.get("utm_source"));
+        const source = utmToken(body.utm_source) ?? utmToken(body.canal_origen) ?? utmToken(searchParams.get("utm_source"));
         const medium = utmToken(body.utm_medium) ?? utmToken(searchParams.get("utm_medium"));
         const campaign = utmToken(body.utm_campaign) ?? utmToken(searchParams.get("utm_campaign"));
         const origenUtm = source || medium || campaign ? `${source ?? "-"}/${medium ?? "-"}/${campaign ?? "-"}` : null;
+        const perfilDetectado = str(body.perfil_detectado_id) ?? str(body.arquetipo_inferido);
 
         const { prospecto, creado } = crm.prospectoRepo.capturarLead({
           email,
@@ -130,12 +135,15 @@ export function handleCrmRequest(
           empresa,
           origen_utm: origenUtm,
           pieza_id_atribucion: piezaId,
+          perfil_detectado_id: perfilDetectado,
         });
         http.sendJson(res, creado ? 201 : 200, {
           success: true,
           duplicado: !creado,
           prospecto_id: prospecto.prospecto_id,
+          persona_id: prospecto.prospecto_id,
           estado: prospecto.estado,
+          perfil_detectado_id: prospecto.perfil_detectado_id,
           sla_limite_calificacion: prospecto.sla_limite_calificacion,
         });
       })
@@ -143,6 +151,29 @@ export function handleCrmRequest(
         const tooLarge = /too large/i.test(err.message);
         http.sendJson(res, tooLarge ? 413 : 400, { error: err.message });
       });
+    return true;
+  }
+
+  // GET /api/crm/prospectos-sla (auditoría en tiempo real para el Monitor de SLAs B2B)
+  if (method === "GET" && pathname === "/api/crm/prospectos-sla") {
+    const auditoria = crm.prospectoRepo.obtenerAuditoriaSLA(now ? new Date(now()) : new Date());
+    http.sendJson(res, 200, {
+      success: true,
+      auditoria,
+    });
+    return true;
+  }
+
+  // GET /api/crm/prospectos (listado de prospectos con filtro opcional de estado)
+  if (method === "GET" && pathname === "/api/crm/prospectos") {
+    const estadoParam = searchParams.get("estado");
+    const estadoFiltro = esEstadoProspecto(estadoParam) ? estadoParam : undefined;
+    const prospectos = crm.prospectoRepo.listarTodos({ estado: estadoFiltro });
+    http.sendJson(res, 200, {
+      success: true,
+      count: prospectos.length,
+      prospectos,
+    });
     return true;
   }
 

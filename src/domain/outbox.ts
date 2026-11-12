@@ -20,9 +20,10 @@ export function normalizarCanal(canal: string): CanalPublicacion {
 
   if (norm === "instagram" || norm === "ig") return "instagram";
   if (norm === "facebook" || norm === "fb") return "facebook";
+  if (norm === "linkedin" || norm === "li") return "linkedin";
 
   throw new Error(
-    `Canal '${canal}' no permitido u omitido. MejoraSM opera exclusivamente sobre Meta ('instagram' | 'facebook').`
+    `Canal '${canal}' no permitido u omitido. MejoraSM opera sobre 'instagram', 'facebook' o 'linkedin'.`
   );
 }
 

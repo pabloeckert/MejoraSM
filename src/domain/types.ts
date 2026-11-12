@@ -15,7 +15,7 @@ export type FaseComercial =
   | "mofu_educacion"
   | "bofu_conversion";
 
-export type CanalPublicacion = "instagram" | "facebook";
+export type CanalPublicacion = "instagram" | "facebook" | "linkedin";
 export type CanalDestino = CanalPublicacion;
 
 export type OpcionBorrador = "A" | "B" | "C";
@@ -77,6 +77,18 @@ export interface CopyCalibradoTresPasos {
 // ────────────────────────────────────────────────────────────────────────────
 // BORRADOR INDIVIDUAL DE PROPUESTA
 // ────────────────────────────────────────────────────────────────────────────
+export interface EvaluacionSteppsDTO {
+  moneda_social: number; // 1 a 10 (Jonah Berger: Social Currency)
+  disparadores: number; // 1 a 10 (Triggers de contexto y dolor cotidiano)
+  emocion_desculpabilizadora: number; // 1 a 10 (Emotion: calidez con verdad sin culpar)
+  publico_visual: number; // 1 a 10 (Public: visualización y arquetipos)
+  valor_practico: number; // 1 a 10 (Practical Value: desgloses en 3 pasos)
+  historias_troya: number; // 1 a 10 (Stories: narrativas reales de trinchera)
+  score_global: number; // 1.0 a 10.0
+  aprobado_stepps: boolean; // score_global >= 7.0
+  feedback_editorial: string;
+}
+
 export interface BorradorPropuestaDTO {
   opcion: OpcionBorrador;
   tipo_formato: TipoFormatoBorrador;
@@ -87,6 +99,7 @@ export interface BorradorPropuestaDTO {
   copy_cuatro_pasos?: CopyCalibradoCuatroPasos;
   slides?: string[]; // Slides individuales para carruseles PDF
   cta_texto: string;
+  stepps_evaluacion?: EvaluacionSteppsDTO;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -96,7 +109,7 @@ export interface TratamientoVisualDTO {
   marco_expandido_requerido: boolean;
   color_fondo_marco: "#FFFFFF";
   regla_color_aplicada: "mucho_blanco_puntuacion_azul_rojo";
-  relacion_aspecto_destino: "4:5" | "1:1" | "9:16";
+  relacion_aspecto_destino: "4:5" | "1:1" | "9:16" | "1200:627";
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -120,7 +133,11 @@ export interface PropuestaMejoraSMDTO {
   metricas_atribucion?: {
     clics_mejoraok: number;
     diagnosticos_completados: number;
-    buyer_persona_predominante?: "emprendedor_saturado" | "empresario_mal_asesorado" | "orden_para_crecer";
+    buyer_persona_predominante?:
+      | "emprendedor_saturado"
+      | "empresario_mal_asesorado"
+      | "orden_para_crecer"
+      | "empresario_esceptico";
   };
 }
 
@@ -293,6 +310,7 @@ export function toCanonicalPropuesta(legacy: unknown): PropuestaMejoraSMDTO {
 export function generarPaqueteMulticanal(propuesta: PropuestaMejoraSMDTO): {
   textoWhatsApp: string;
   textoMeta: string;
+  textoLinkedIn: string;
   metadataJson: string;
   rutaImagen: string;
 } {
@@ -303,60 +321,63 @@ export function generarPaqueteMulticanal(propuesta: PropuestaMejoraSMDTO): {
   let textoWhatsApp: string;
   let textoMeta: string;
 
+  const arquetipo = propuesta.metricas_atribucion?.buyer_persona_predominante || "empresario_esceptico";
+  const utmParamString = `utm_source=mejora_sm&utm_medium=organic_social&utm_campaign=${arquetipo}&pieza_id=${propuesta.propuesta_id}`;
+  const urlDiagnosticoTrazable = `https://mejoraok.com/diagnostico?${utmParamString}`;
+
   if (c4) {
     if (esRightHook) {
       textoWhatsApp = [
         `*MEJORA CONTINUA — ${borrador.titulo_portada.toUpperCase()}*`,
-        ``,
+        "",
         `📌 *Paso 1: La situación*`,
         c4.paso1_dolor,
-        ``,
+        "",
         `💡 *Paso 2: Reencuadre de proceso*`,
         c4.paso2_reencuadre,
-        ``,
+        "",
         `🚀 *Paso 3: Diagnóstico empresarial*`,
         c4.paso4_conversion_lead || "Hacé el test de diagnóstico de 4 dimensiones sin complacencia en mejoraok.com.",
-        ``,
-        `🔗 *Diagnóstico online:* https://mejoraok.com`,
+        "",
+        `🔗 *Diagnóstico online:* ${urlDiagnosticoTrazable}`,
       ].join("\n");
 
       textoMeta = [
         borrador.titulo_portada,
-        ``,
+        "",
         c4.paso1_dolor,
-        ``,
+        "",
         c4.paso2_reencuadre,
-        ``,
+        "",
         c4.paso4_conversion_lead || "Hacé el test de diagnóstico de 4 dimensiones en mejoraok.com.",
-        ``,
-        `🔗 https://mejoraok.com`,
-        ``,
+        "",
+        `🔗 ${urlDiagnosticoTrazable}`,
+        "",
         `#MejoraContinua #Empresas #Liderazgo #Procesos #mejoraok`,
       ].join("\n");
     } else {
-      // 80% Jab: 0% enlaces salientes, puro engagement nativo
       textoWhatsApp = [
         `*MEJORA CONTINUA — ${borrador.titulo_portada.toUpperCase()}*`,
-        ``,
+        "",
         `📌 *Paso 1: La situación*`,
         c4.paso1_dolor,
-        ``,
+        "",
         `💡 *Paso 2: Reencuadre de proceso*`,
         c4.paso2_reencuadre,
-        ``,
+        "",
         `💬 *Paso 3: Pregunta de debate*`,
         c4.paso3_engagement_nativo,
       ].join("\n");
 
       textoMeta = [
         borrador.titulo_portada,
-        ``,
+        "",
         c4.paso1_dolor,
-        ``,
+        "",
         c4.paso2_reencuadre,
-        ``,
+        "",
         c4.paso3_engagement_nativo,
-        ``,
+        "",
         `#MejoraContinua #Empresas #Liderazgo #Procesos`,
       ].join("\n");
     }
@@ -365,32 +386,47 @@ export function generarPaqueteMulticanal(propuesta: PropuestaMejoraSMDTO): {
     const c3 = borrador.copy_tres_pasos;
     textoWhatsApp = [
       `*MEJORA CONTINUA — ${borrador.titulo_portada.toUpperCase()}*`,
-      ``,
+      "",
       `🔴 *Paso 1: La situación*`,
       c3.paso1_dolor,
-      ``,
+      "",
       `🔵 *Paso 2: El reencuadre de proceso*`,
       c3.paso2_reencuadre,
-      ``,
-      esRightHook ? `🟡 *Paso 3: Dirección concreta*\n${c3.paso3_direccion_web}\n\n🔗 https://mejoraok.com` : `💬 *Paso 3: Debate*\n${c3.paso3_direccion_web}`,
+      "",
+      esRightHook ? `🟡 *Paso 3: Dirección concreta*\n${c3.paso3_direccion_web}\n\n🔗 ${urlDiagnosticoTrazable}` : `💬 *Paso 3: Debate*\n${c3.paso3_direccion_web}`,
     ].join("\n");
 
     textoMeta = [
       borrador.titulo_portada,
-      ``,
+      "",
       c3.paso1_dolor,
-      ``,
+      "",
       c3.paso2_reencuadre,
-      ``,
+      "",
       c3.paso3_direccion_web,
-      ``,
-      esRightHook ? `🔗 https://mejoraok.com\n\n#MejoraContinua #Empresas #Liderazgo` : `#MejoraContinua #Empresas #Liderazgo`,
+      "",
+      esRightHook ? `🔗 ${urlDiagnosticoTrazable}\n\n#MejoraContinua #Empresas #Liderazgo` : `#MejoraContinua #Empresas #Liderazgo`,
     ].join("\n");
   }
+
+  const textoLinkedIn = [
+    borrador.titulo_portada,
+    "",
+    c4 ? c4.paso1_dolor : borrador.copy_tres_pasos.paso1_dolor,
+    "",
+    c4 ? c4.paso2_reencuadre : borrador.copy_tres_pasos.paso2_reencuadre,
+    "",
+    esRightHook
+      ? `Para dueños y directores generales de PyMEs: ¿En qué dimensión de gestión sentís que la empresa no escala con el volumen?\n\nPodés medir la salud de tus 4 dimensiones y evaluar tu estructura directiva aquí:\n${urlDiagnosticoTrazable}`
+      : (c4?.paso3_engagement_nativo || "Para directores y socios: ¿Cómo gestionan este cuello de botella en su mesa ejecutiva? Dejen su perspectiva en los comentarios."),
+    "",
+    "#Liderazgo #DireccionGeneral #PyMEs #GestionEmpresarial #MejoraContinua",
+  ].join("\n");
 
   return {
     textoWhatsApp,
     textoMeta,
+    textoLinkedIn,
     metadataJson: JSON.stringify(propuesta, null, 2),
     rutaImagen: propuesta.imagen_boveda_vinculada.ruta_archivo_local,
   };

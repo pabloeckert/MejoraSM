@@ -61,9 +61,49 @@ describe("contactosService en MejoraSM", () => {
     expect(sentPayload.source).toBe("mejora_sm");
     expect(sentPayload.metadata.red).toBe("instagram");
     expect(sentPayload.metadata.handle).toBe("cliente_demo");
+    expect(sentPayload.arquetipo_inferido).toBeDefined();
+    expect(sentPayload.sla_limite_horas).toBe(48);
+    expect(sentPayload.sla_vencimiento_at).toBeDefined();
 
     expect(resultado).toBeDefined();
     expect(resultado.persona_id).toBe(fakePersonaId);
     expect(resultado.creado).toBe(true);
+    expect(resultado.origen).toBe("crm_remoto");
+  });
+
+  it("aplica fallback soberano al endpoint local /api/crm/lead si la API remota falla", async () => {
+    const mockFetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes("contactos-api")) {
+        throw new Error("Network timeout en contacto remoto");
+      }
+      if (url.includes("/api/crm/lead")) {
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({
+            success: true,
+            prospecto_id: "loc-12345",
+            estado: "CAPTURADO",
+            sla_limite_calificacion: "2026-11-13T10:00:00.000Z",
+            duplicado: false,
+          }),
+        };
+      }
+      return { ok: false, status: 404 };
+    });
+
+    vi.stubGlobal("fetch", mockFetch);
+
+    const resultado = await enviarLeadACRM({
+      email: "lead_local@empresa.com",
+      nombre: "Martín Dueño",
+      canal_origen: "linkedin",
+      pieza_id_origen: "PZ-LI-042",
+      arquetipo_inferido: "saturado",
+    });
+
+    expect(resultado.origen).toBe("crm_local");
+    expect(resultado.persona_id).toBe("loc-12345");
+    expect(resultado.estado).toBe("CAPTURADO");
   });
 });

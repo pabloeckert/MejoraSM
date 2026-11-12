@@ -5,6 +5,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { PropuestaMejoraSMDTO } from "@/domain/types";
+import { detectarFatigaAudiencia } from "@/domain/fatigaAudienceDetector";
 import {
   getLocalProposals,
   approveLocalProposal,
@@ -16,6 +17,8 @@ import {
 } from "@/services/localSMService";
 import { Grid26Semanas } from "@/components/Grid26Semanas";
 import { ProposalDetailDialog } from "@/components/ProposalDetailDialog";
+import { cn } from "@/lib/utils";
+import { OutboxDrawer } from "@/components/OutboxDrawer";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,6 +62,7 @@ export default function TableroSemanal() {
   const [activeProposal, setActiveProposal] = useState<PropuestaMejoraSMDTO | null>(null);
   const [dialogOpen, setDialogOpen] = useState<boolean>(false);
   const [confirmBatchOpen, setConfirmBatchOpen] = useState<boolean>(false);
+  const [outboxDrawerOpen, setOutboxDrawerOpen] = useState<boolean>(false);
 
   // Estado en vivo de Atribución y Conversión desde MejoraNucleo (4002)
   const [nucleoLeads, setNucleoLeads] = useState<NucleoLeadRecord[]>([]);
@@ -89,6 +93,13 @@ export default function TableroSemanal() {
     fetchNucleoAttribution();
   }, [fetchNucleoAttribution]);
 
+  // Diagnóstico de Fatiga de Audiencia en ventana de 4 semanas (Donella Meadows: Bucle B1)
+  const diagnosticoFatiga = useMemo(() => {
+    return detectarFatigaAudiencia(proposals, activeWeek, 4);
+  }, [proposals, activeWeek]);
+
+
+
   // Semanas disponibles (1 a 26)
   const totalWeeks = 26;
 
@@ -116,6 +127,50 @@ export default function TableroSemanal() {
 
     return { total, aprobadas, pendientes, publicadas, pendientesSemana };
   }, [proposals, activeWeek]);
+
+  // Atajos de Teclado Globales en Tablero Semanal (Steve Krug / Marty Cagan: Cero Fricción)
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (dialogOpen || confirmBatchOpen) return;
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          activeEl.tagName === "SELECT" ||
+          (activeEl as HTMLElement).isContentEditable)
+      ) {
+        return;
+      }
+
+      if (e.key === "ArrowLeft" || e.key.toLowerCase() === "h") {
+        e.preventDefault();
+        setActiveWeek((w) => Math.max(1, w - 1));
+      } else if (e.key === "ArrowRight" || e.key.toLowerCase() === "l") {
+        e.preventDefault();
+        setActiveWeek((w) => Math.min(totalWeeks, w + 1));
+      } else if (e.key === "1" && weekProposals[0]) {
+        e.preventDefault();
+        handleOpenDetail(weekProposals[0]);
+      } else if (e.key === "2" && weekProposals[1]) {
+        e.preventDefault();
+        handleOpenDetail(weekProposals[1]);
+      } else if (e.key === "3" && weekProposals[2]) {
+        e.preventDefault();
+        handleOpenDetail(weekProposals[2]);
+      } else if (e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        setOutboxDrawerOpen((prev) => !prev);
+      } else if (e.key.toLowerCase() === "b" && stats.pendientesSemana > 0) {
+        e.preventDefault();
+        setConfirmBatchOpen(true);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [dialogOpen, confirmBatchOpen, weekProposals, totalWeeks, stats.pendientesSemana]);
+
 
   // Estadísticas de atribución en vivo desde MejoraNucleo
   const attributionStats = useMemo(() => {
@@ -291,6 +346,59 @@ export default function TableroSemanal() {
           </Button>
         </div>
       </header>
+
+      {/* BARRA DE ATAJOS RÁPIDOS Y ESTADO DE SALUD EDITORIAL */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-slate-100/90 border border-slate-200 text-xs text-slate-700 shadow-2xs">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Zap className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+          <span className="font-semibold text-slate-800">Modo Rápido:</span>
+          <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold text-slate-900">[1/2/3]</span> Abrir pieza
+          <span>•</span>
+          <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold text-slate-900">[← / →]</span> Semanas
+          <span>•</span>
+          <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold text-slate-900">[B]</span> Aprobar lote
+          <span>•</span>
+          <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold text-slate-900">[O]</span> Outbox
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-slate-500 font-medium">Salud Editorial:</span>
+          <Badge
+            className={cn(
+              "text-[11px] font-mono px-2",
+              diagnosticoFatiga.salud_editorial_pct >= 85
+                ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                : diagnosticoFatiga.salud_editorial_pct >= 65
+                ? "bg-amber-100 text-amber-800 border-amber-300"
+                : "bg-red-100 text-red-800 border-red-300"
+            )}
+            variant="outline"
+          >
+            {diagnosticoFatiga.salud_editorial_pct}% {diagnosticoFatiga.estado.toUpperCase()}
+          </Badge>
+        </div>
+      </div>
+
+      {/* ALERTA VISUAL DE FATIGA DE AUDIENCIA (DONELLA MEADOWS: BUCLE B1) */}
+      {diagnosticoFatiga.alertas.length > 0 && (
+        <div className="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-amber-900 text-xs space-y-1.5 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-bold text-amber-950">
+              <Target className="h-4 w-4 text-amber-600 shrink-0" />
+              <span>Sensor de Fatiga de Audiencia (Donella Meadows: Bucle B1)</span>
+            </div>
+            <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-[10px]">
+              {diagnosticoFatiga.alertas.length} alerta{diagnosticoFatiga.alertas.length > 1 ? "s" : ""}
+            </Badge>
+          </div>
+          <p className="text-amber-800 leading-relaxed">
+            {diagnosticoFatiga.alertas[0].mensaje}
+          </p>
+          <div className="p-2 rounded bg-white/90 border border-amber-200/90 font-medium text-amber-900 flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+            <span>Sugerencia: {diagnosticoFatiga.alertas[0].recomendacion_reencuadre}</span>
+          </div>
+        </div>
+      )}
 
       {/* PANEL EN VIVO DE COMPROBACIÓN OPERATIVA Y ATRIBUCIÓN DE CONVERSIÓN (MVP 3 + MVP 5) */}
       <section
@@ -505,6 +613,7 @@ export default function TableroSemanal() {
             <option value="all">Todos los Canales</option>
             <option value="instagram">Instagram</option>
             <option value="facebook">Facebook</option>
+            <option value="linkedin">LinkedIn</option>
             <option value="whatsapp">WhatsApp</option>
           </select>
 

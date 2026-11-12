@@ -109,6 +109,24 @@ CREATE TABLE IF NOT EXISTS circuit_breaker_canales (
   ultimo_exito_at TEXT CHECK (ultimo_exito_at IS NULL OR (ultimo_exito_at GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9].[0-9][0-9][0-9]Z' AND datetime(ultimo_exito_at) IS NOT NULL)),
   actualizado_at TEXT NOT NULL CHECK (actualizado_at GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9].[0-9][0-9][0-9]Z' AND datetime(actualizado_at) IS NOT NULL)
 );
+
+CREATE TABLE IF NOT EXISTS agent_config (
+  id TEXT PRIMARY KEY,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  temperature REAL NOT NULL,
+  system_prompt TEXT NOT NULL,
+  actualizado_at TEXT NOT NULL CHECK (actualizado_at GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9].[0-9][0-9][0-9]Z' AND datetime(actualizado_at) IS NOT NULL)
+);
+
+CREATE TABLE IF NOT EXISTS historial_cache (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  synced_at TEXT,
+  posts_json TEXT NOT NULL DEFAULT '[]',
+  acciones_manuales_json TEXT NOT NULL DEFAULT '[]',
+  actualizado_at TEXT NOT NULL CHECK (actualizado_at GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9].[0-9][0-9][0-9]Z' AND datetime(actualizado_at) IS NOT NULL)
+);
+
 `;
 
 export const CREATE_TABLES_SQL = `

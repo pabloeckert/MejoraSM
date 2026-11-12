@@ -3,7 +3,7 @@
 // Garantiza la conservación de bordes y rostros (0% de recorte de fotos reales)
 // según el estándar de Marca y Principios Zero-Trust de Mejora Continua.
 
-export type TargetAspectRatio = "4:5" | "1:1" | "9:16";
+export type TargetAspectRatio = "4:5" | "1:1" | "9:16" | "1200:627";
 
 export interface CanvasDimensions {
   width: number;
@@ -15,6 +15,7 @@ export const CANVAS_DIMENSIONS: Record<TargetAspectRatio, CanvasDimensions> = {
   "4:5": { width: 1080, height: 1350, ratio: "4:5" },
   "1:1": { width: 1080, height: 1080, ratio: "1:1" },
   "9:16": { width: 1080, height: 1920, ratio: "9:16" },
+  "1200:627": { width: 1200, height: 627, ratio: "1200:627" },
 };
 
 export interface ContainmentGeometry {
