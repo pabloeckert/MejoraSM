@@ -43,6 +43,12 @@ import {
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { CopyExperimentSimulator } from "@/components/CopyExperimentSimulator";
+import {
+  recordCopyExperiment,
+  type CopyVariant,
+  type VariantType,
+} from "@/domain/copyExperimentSimulator";
 
 function formatScheduledAt(iso: string) {
   return new Date(iso).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
@@ -480,6 +486,22 @@ function SessionCard({
   }, [session.metadata?.proposal, session.topic]);
 
   const [slides, setSlides] = useState<string[]>(initialSlides);
+  const [activeVariantId, setActiveVariantId] = useState<"A" | "B">("B");
+  const [activeVariantType, setActiveVariantType] = useState<VariantType>("empatico_operativo");
+  const [activeHypothesis, setActiveHypothesis] = useState<string>(
+    "Validar el agotamiento cotidiano con desculpabilización maximiza la tasa de respuesta en WhatsApp e Instagram."
+  );
+
+  const handleApplyVariant = (variant: CopyVariant) => {
+    setActiveVariantId(variant.id);
+    setActiveVariantType(variant.type);
+    setActiveHypothesis(variant.keyHypothesis);
+    setSlides(variant.slides);
+    toast({
+      title: `Variante ${variant.id} aplicada (${variant.badge})`,
+      description: "Las 5 diapositivas del carrusel fueron actualizadas en el editor.",
+    });
+  };
 
   // Sincronizar si cambia la sesión
   useEffect(() => {
@@ -515,7 +537,8 @@ function SessionCard({
       scheduledDate.setHours(11, 0, 0, 0);
 
       // Si existe propuesta asociada, actualizarla en Supabase
-      if (session.metadata?.proposalId) {
+      let targetProposalId = session.metadata?.proposalId;
+      if (targetProposalId) {
         await supabase
           .from("proposals")
           .update({
@@ -525,18 +548,32 @@ function SessionCard({
             status: "scheduled",
             scheduled_at: scheduledDate.toISOString(),
           })
-          .eq("id", session.metadata.proposalId);
+          .eq("id", targetProposalId);
       } else {
         // Crear propuesta vinculada
-        await supabase.from("proposals").insert({
-          title: updatedHook.slice(0, 80) || "Carrusel Aprobado",
-          format: "carrusel",
-          hook: updatedHook,
-          body: updatedBody,
-          cta: updatedCta,
-          status: "scheduled",
-          scheduled_at: scheduledDate.toISOString(),
-          dimension: "empresarial",
+        const { data: newProp } = await supabase
+          .from("proposals")
+          .insert({
+            title: updatedHook.slice(0, 80) || "Carrusel Aprobado",
+            format: "carrusel",
+            hook: updatedHook,
+            body: updatedBody,
+            cta: updatedCta,
+            status: "scheduled",
+            scheduled_at: scheduledDate.toISOString(),
+            dimension: "empresarial",
+          })
+          .select("id")
+          .single();
+        targetProposalId = newProp?.id;
+      }
+
+      // Registrar experimento A/B de copy en content_experiments
+      if (targetProposalId) {
+        await recordCopyExperiment({
+          proposalId: targetProposalId,
+          variant: activeVariantType,
+          hypothesis: activeHypothesis,
         });
       }
 
@@ -551,9 +588,9 @@ function SessionCard({
 
       toast({
         title: "Carrusel Aprobado y Agendado",
-        description: `Las 5 diapositivas fueron guardadas y programadas para el ${formatScheduledAt(
+        description: `Variante ${activeVariantId} programada para el ${formatScheduledAt(
           scheduledDate.toISOString()
-        )}.`,
+        )} y registrada en experimentos de contenido.`,
       });
     } catch (err) {
       console.error("Error al aprobar carrusel:", err);
@@ -689,6 +726,16 @@ function SessionCard({
               </div>
             )
           )}
+
+          {/* 1.5. SIMULADOR A/B DE COPY Y HOOKS (JONAH BERGER STEPPS) */}
+          <CopyExperimentSimulator
+            topic={session.topic || undefined}
+            initialHook={session.metadata?.proposal?.hook || session.topic || undefined}
+            initialBody={session.metadata?.proposal?.body || undefined}
+            initialCta={session.metadata?.proposal?.cta || undefined}
+            activeVariantId={activeVariantId}
+            onApplyVariant={handleApplyVariant}
+          />
 
           {/* 2. INSPECTOR Y EDITOR INTERACTIVO DE DIAPOSITIVAS DEL CARRUSEL (SLIDES 1 A 5) */}
           <div className="rounded-xl border bg-card p-4 space-y-4 shadow-sm">
