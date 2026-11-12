@@ -28,6 +28,7 @@ export interface DriveSyncResult {
   scanned: number;
   synced: number;
   skipped: number;
+  skippedByHash?: number;
   errors: string[];
   files: Array<{
     id: string;
@@ -37,6 +38,7 @@ export interface DriveSyncResult {
     operationalTitle: string;
     trenchPain: string;
     path: string;
+    sha256?: string;
   }>;
 }
 
@@ -50,6 +52,7 @@ export interface DriveSyncOptions {
 interface SyncManifest {
   folderId: string;
   lastSync: string | null;
+  processedHashes?: Record<string, string>; // sha256 -> file_id
   processedFiles: Record<
     string,
     {
@@ -63,6 +66,7 @@ interface SyncManifest {
       trenchPain?: string;
       classifyReason: string;
       savedPath: string;
+      sha256?: string;
       processedAt: string;
     }
   >;
@@ -102,9 +106,40 @@ function sanitizeFilename(name: string): string {
   return `${stamp}-${rnd}-${base}${ext}`;
 }
 
-// Genera un mockup PNG de 1x1 píxel en DataURL si no hay credenciales
-function createTransparentMockDataUrl(): string {
-  return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+// Genera un mockup PNG de 1x1 píxel en DataURL con semilla para pruebas
+function createTransparentMockDataUrl(seed?: string): string {
+  const baseMock = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+  return seed ? `${baseMock}#mock-${encodeURIComponent(seed)}` : baseMock;
+}
+
+/**
+ * Calcula el hash SHA-256 de forma agnóstica para navegador y Node.js (Web Cryptography API estándar).
+ */
+export async function computeSha256Hex(data: string | ArrayBuffer): Promise<string> {
+  let buffer: ArrayBuffer;
+  if (typeof data === "string") {
+    const encoder = new TextEncoder();
+    buffer = encoder.encode(data).buffer;
+  } else {
+    buffer = data;
+  }
+
+  // 1. Web Cryptography API estándar (Navegadores y Node.js moderno)
+  if (typeof globalThis !== "undefined" && globalThis.crypto?.subtle) {
+    const hashBuffer = await globalThis.crypto.subtle.digest("SHA-256", buffer);
+    return Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  // 2. Fallback determinístico sin dependencias
+  let hash = 0;
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.length; i++) {
+    hash = (hash << 5) - hash + bytes[i];
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(16).padStart(64, "0");
 }
 
 // Lista archivos desde Google Drive v3 API
@@ -128,7 +163,7 @@ async function listDriveFiles(apiKey: string, folderId: string): Promise<DriveFi
 // Descarga archivo como Data URL
 async function downloadDriveFileDataUrl(file: DriveFileItem, apiKey: string): Promise<string> {
   if (file.isMock) {
-    return createTransparentMockDataUrl();
+    return createTransparentMockDataUrl(file.id);
   }
 
   const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${apiKey}`;
@@ -256,6 +291,25 @@ export async function syncGoogleDriveAssets(options: DriveSyncOptions = {}): Pro
 
     try {
       const dataUrl = await downloadDriveFileDataUrl(file, apiKey);
+      const sha256 = await computeSha256Hex(dataUrl);
+
+      if (!manifest.processedHashes) {
+        manifest.processedHashes = {};
+      }
+
+      // Deduplicación estricta por contenido (hashing SHA-256 defensivo - DDIA)
+      if (manifest.processedHashes[sha256]) {
+        const idPrevio = manifest.processedHashes[sha256];
+        result.skipped++;
+        result.skippedByHash = (result.skippedByHash || 0) + 1;
+        onProgress({
+          status: `Omitiendo duplicado idéntico por SHA-256 [${i + 1}/${toProcess.length}]: ${file.name} (ya existe como #${idPrevio.slice(0, 8)}…)`,
+          current: i + 1,
+          total: toProcess.length,
+        });
+        continue;
+      }
+
       const base64 = dataUrl.includes(",") ? dataUrl.slice(dataUrl.indexOf(",") + 1) : dataUrl;
 
       onProgress({
@@ -298,7 +352,7 @@ export async function syncGoogleDriveAssets(options: DriveSyncOptions = {}): Pro
       // Guardar imagen en el repo vía función repo
       await github.commitPhoto(targetDim, filename, dataUrl);
 
-      // Guardar metadatos enriquecidos
+      // Guardar metadatos enriquecidos con trazabilidad SHA-256
       const meta = {
         filename,
         originalName: file.name,
@@ -307,6 +361,7 @@ export async function syncGoogleDriveAssets(options: DriveSyncOptions = {}): Pro
         operationalTitle: classification.operationalTitle,
         trenchPain: classification.trenchPain,
         reason: classification.reason,
+        sha256,
         uploadedAt: new Date().toISOString(),
         source: "google_drive",
       };
@@ -317,7 +372,8 @@ export async function syncGoogleDriveAssets(options: DriveSyncOptions = {}): Pro
         `metadata drive asset: ${filename}`
       );
 
-      // Registrar en manifiesto
+      // Registrar en manifiesto con ID y Hash SHA-256
+      manifest.processedHashes[sha256] = file.id;
       manifest.processedFiles[file.id] = {
         id: file.id,
         name: file.name,
@@ -329,6 +385,7 @@ export async function syncGoogleDriveAssets(options: DriveSyncOptions = {}): Pro
         trenchPain: classification.trenchPain,
         classifyReason: classification.reason,
         savedPath: `content/inbox/${targetDim}/${filename}`,
+        sha256,
         processedAt: new Date().toISOString(),
       };
 
@@ -341,6 +398,7 @@ export async function syncGoogleDriveAssets(options: DriveSyncOptions = {}): Pro
         operationalTitle: classification.operationalTitle,
         trenchPain: classification.trenchPain,
         path: `content/inbox/${targetDim}/${filename}`,
+        sha256,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

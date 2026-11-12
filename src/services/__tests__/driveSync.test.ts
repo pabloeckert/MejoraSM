@@ -3,6 +3,7 @@ import {
   syncGoogleDriveAssets,
   getStoredDriveApiKey,
   setStoredDriveApiKey,
+  computeSha256Hex,
   GOOGLE_DRIVE_ASSETS_FOLDER_ID,
 } from "@/services/driveSync";
 import { github } from "@/services/github";
@@ -151,5 +152,71 @@ describe("driveSync service", () => {
         useMockIfNoKey: false,
       })
     ).rejects.toThrow(/Google Drive API Key/i);
+  });
+
+  it("calcula hash SHA-256 de 64 caracteres de forma determinista", async () => {
+    const hash1 = await computeSha256Hex("contenido-prueba-123");
+    const hash2 = await computeSha256Hex("contenido-prueba-123");
+    const hash3 = await computeSha256Hex("contenido-distinto-456");
+
+    expect(hash1).toHaveLength(64);
+    expect(hash1).toBe(hash2);
+    expect(hash1).not.toBe(hash3);
+  });
+
+  it("omite archivos con contenido idéntico por SHA-256 aunque tengan diferente fileId y filename", async () => {
+    const rawImageBytes = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    const expectedSha256 = await computeSha256Hex(rawImageBytes);
+
+    // Manifiesto con hash previamente registrado por otro archivo
+    vi.mocked(github.getJsonFile).mockResolvedValueOnce({
+      folderId: GOOGLE_DRIVE_ASSETS_FOLDER_ID,
+      lastSync: "2026-09-20T00:00:00Z",
+      processedHashes: {
+        [expectedSha256]: "archivo-original-previo-id",
+      },
+      processedFiles: {},
+    });
+
+    // Google Drive entrega un archivo con ID y Nombre completamente nuevos
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          files: [
+            { id: "id-totalmente-nuevo-999", name: "copia-renombrada-de-foto.jpg", mimeType: "image/jpeg" },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        blob: async () => new Blob(["fake"], { type: "image/jpeg" }),
+      });
+
+    // Mock FileReader para devolver el mismo DataURL con el hash registrado
+    const originalFileReader = global.FileReader;
+    class MockFileReader {
+      public result: string = rawImageBytes;
+      public onloadend: (() => void) | null = null;
+      public readAsDataURL() {
+        if (this.onloadend) this.onloadend();
+      }
+    }
+    // @ts-expect-error mock FileReader
+    global.FileReader = MockFileReader;
+
+    const result = await syncGoogleDriveAssets({
+      apiKey: "fake-key",
+    });
+
+    // Restaurar FileReader
+    global.FileReader = originalFileReader;
+
+    expect(result.scanned).toBe(1);
+    expect(result.synced).toBe(0);
+    expect(result.skipped).toBe(1);
+    expect(result.skippedByHash).toBe(1);
+    // Jamás debe haberse hecho commit a GitHub de la imagen duplicada
+    expect(github.commitPhoto).not.toHaveBeenCalled();
   });
 });

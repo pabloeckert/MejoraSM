@@ -197,9 +197,14 @@ export function DriveSyncDialog({ open, onOpenChange, onSyncSuccess }: DriveSync
           {/* RESULT SUMMARY */}
           {lastResult && (
             <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3.5 space-y-2.5">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                 <CheckCircle2 className="h-4 w-4" />
-                Resumen de ingesta: {lastResult.synced} nuevas, {lastResult.skipped} ya registradas
+                <span>Resumen de ingesta: {lastResult.synced} nuevas, {lastResult.skipped} ya registradas</span>
+                {lastResult.skippedByHash && lastResult.skippedByHash > 0 ? (
+                  <span className="text-[10px] font-normal opacity-85 bg-emerald-100/70 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded">
+                    ({lastResult.skippedByHash} omitidas por SHA-256 duplicado)
+                  </span>
+                ) : null}
               </div>
 
               {lastResult.files.length > 0 && (
@@ -211,7 +216,14 @@ export function DriveSyncDialog({ open, onOpenChange, onSyncSuccess }: DriveSync
                     >
                       <div className="truncate flex-1">
                         <p className="font-medium truncate text-foreground">{f.operationalTitle}</p>
-                        <p className="text-[11px] text-muted-foreground truncate">{f.name}</p>
+                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground truncate">
+                          <span className="truncate">{f.name}</span>
+                          {f.sha256 && (
+                            <span className="font-mono text-[9px] bg-muted px-1 py-0.2 rounded border border-border shrink-0">
+                              #{f.sha256.slice(0, 8)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <Badge variant="secondary" className="text-[10px]">
