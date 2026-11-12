@@ -71,9 +71,22 @@ describe("driveSync service", () => {
     expect(result.files[0].dimension).toBe("organizacional");
     expect(result.files[0].situation).toBe("Taller/Equipo");
     expect(result.files[0].operationalTitle).toBe("Desalineación entre Ventas y Operaciones");
+    expect(result.files[0].focalPoint).toBeDefined();
+    expect(typeof result.files[0].focalPoint?.x).toBe("number");
+    expect(typeof result.files[0].focalPoint?.y).toBe("number");
 
     expect(github.commitPhoto).toHaveBeenCalledTimes(3);
     expect(github.putJsonFile).toHaveBeenCalled();
+    expect(github.putJsonFile).toHaveBeenCalledWith(
+      expect.stringContaining(".json"),
+      expect.objectContaining({
+        focalPoint: expect.objectContaining({
+          x: expect.any(Number),
+          y: expect.any(Number),
+        }),
+      }),
+      expect.any(String)
+    );
   });
 
   it("skips files that are already recorded in manifest to prevent duplicates", async () => {

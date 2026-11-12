@@ -32,6 +32,7 @@ import { DIMENSIONES, dimensionLabel } from "@/shared/constants";
 import { PublishNowCard } from "@/components/PublishNowCard";
 import { DriveSyncDialog } from "@/components/DriveSyncDialog";
 import { ContentFormatModal, type SelectedPhotoItem } from "@/components/ContentFormatModal";
+import { detectFacesFromDataUrl } from "@/infrastructure/imaging/localFaceDetector";
 
 const OFERTAS = DIMENSIONES.map((d) => ({ key: d.key, kicker: d.label, title: d.title }));
 const KICKER = dimensionLabel;
@@ -364,15 +365,22 @@ export default function SubirMaterial() {
 
       const targetDim = instantSuggestedDim || instantDim;
 
+      // Detección soberana de punto focal y rostros para encuadre seguro (Sprint S+5)
+      const focalAnalysis = await detectFacesFromDataUrl(dataUrl);
+
       // 1. Guardar la imagen en content/inbox/${targetDim}/
       await github.commitPhoto(targetDim, filename, dataUrl);
 
-      // 2. Guardar metadatos contextuales
+      // 2. Guardar metadatos contextuales enriquecidos con punto focal
       const meta = {
         filename,
         originalName: instantFile.name,
         contextNote: instantNote.trim(),
         dimension: targetDim,
+        focalPoint: focalAnalysis.focalPoint,
+        faces: focalAnalysis.faces,
+        facesDetected: focalAnalysis.facesDetected,
+        imageDimensions: { width: focalAnalysis.width, height: focalAnalysis.height },
         uploadedAt: new Date().toISOString(),
         source: "instantanea_de_trinchera",
       };

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { github } from "@/services/github";
 import { toast } from "@/hooks/use-toast";
+import { detectFacesFromDataUrl } from "@/infrastructure/imaging/localFaceDetector";
 
 // Dispara manage-post.yml/manage-story.yml/mark-manual.yml directo desde la
 // app — hallazgo real de auditoría 2026-08-26 (Pablo: "por qué tengo que ir
@@ -98,6 +99,32 @@ export function usePhotoUpload(onDone?: () => void) {
       const dataUrl = await readAsDataUrl(item.file);
       const filename = safeFilename(item.file.name);
       await github.commitPhoto(item.dimension, filename, dataUrl);
+
+      // Guardar metadatos enriquecidos con punto focal si la API lo soporta
+      if (typeof github.putJsonFile === "function") {
+        try {
+          const focal = await detectFacesFromDataUrl(dataUrl);
+          const meta = {
+            filename,
+            originalName: item.file.name,
+            dimension: item.dimension,
+            focalPoint: focal.focalPoint,
+            faces: focal.faces,
+            facesDetected: focal.facesDetected,
+            imageDimensions: { width: focal.width, height: focal.height },
+            uploadedAt: new Date().toISOString(),
+            source: "carga_lote_biblioteca",
+          };
+          await github.putJsonFile(
+            `content/inbox/${item.dimension}/${filename}.json`,
+            meta,
+            `metadata lote: ${filename}`
+          );
+        } catch {
+          // Fallo no bloqueante en metadatos secundarios
+        }
+      }
+
       setUploads((prev) => prev.map((u) => (u.id === item.id ? { ...u, status: "done" } : u)));
       return item.dimension;
     } catch (e) {

@@ -3,6 +3,7 @@
 
 import { github } from "@/services/github";
 import { suggestPhotoDimension, type PhotoClassification } from "@/services/ai";
+import { detectFacesFromDataUrl } from "@/infrastructure/imaging/localFaceDetector";
 
 export const GOOGLE_DRIVE_ASSETS_FOLDER_ID = "1VAIMCt3nuGg57IUg7hVjgKUoDS7yYMPy";
 const STORAGE_KEY_API_KEY = "mejorasm_google_drive_api_key";
@@ -39,6 +40,7 @@ export interface DriveSyncResult {
     trenchPain: string;
     path: string;
     sha256?: string;
+    focalPoint?: { x: number; y: number };
   }>;
 }
 
@@ -67,6 +69,7 @@ interface SyncManifest {
       classifyReason: string;
       savedPath: string;
       sha256?: string;
+      focalPoint?: { x: number; y: number };
       processedAt: string;
     }
   >;
@@ -349,10 +352,13 @@ export async function syncGoogleDriveAssets(options: DriveSyncOptions = {}): Pro
         total: toProcess.length,
       });
 
+      // Detección soberana de punto focal y rostros para encuadre seguro (Sprint S+5)
+      const focalAnalysis = await detectFacesFromDataUrl(dataUrl);
+
       // Guardar imagen en el repo vía función repo
       await github.commitPhoto(targetDim, filename, dataUrl);
 
-      // Guardar metadatos enriquecidos con trazabilidad SHA-256
+      // Guardar metadatos enriquecidos con trazabilidad SHA-256 y punto focal
       const meta = {
         filename,
         originalName: file.name,
@@ -362,6 +368,10 @@ export async function syncGoogleDriveAssets(options: DriveSyncOptions = {}): Pro
         trenchPain: classification.trenchPain,
         reason: classification.reason,
         sha256,
+        focalPoint: focalAnalysis.focalPoint,
+        faces: focalAnalysis.faces,
+        facesDetected: focalAnalysis.facesDetected,
+        imageDimensions: { width: focalAnalysis.width, height: focalAnalysis.height },
         uploadedAt: new Date().toISOString(),
         source: "google_drive",
       };
@@ -386,6 +396,7 @@ export async function syncGoogleDriveAssets(options: DriveSyncOptions = {}): Pro
         classifyReason: classification.reason,
         savedPath: `content/inbox/${targetDim}/${filename}`,
         sha256,
+        focalPoint: focalAnalysis.focalPoint,
         processedAt: new Date().toISOString(),
       };
 
@@ -399,6 +410,7 @@ export async function syncGoogleDriveAssets(options: DriveSyncOptions = {}): Pro
         trenchPain: classification.trenchPain,
         path: `content/inbox/${targetDim}/${filename}`,
         sha256,
+        focalPoint: focalAnalysis.focalPoint,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
