@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   UserCheck,
   ExternalLink,
+  FileText,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -42,6 +43,7 @@ import {
 } from "@/services/contactosService";
 import { calcularLeadScoring, type ResultadoLeadScoring } from "@/domain/leadScoringEngine";
 import { LeadScoringBadge } from "@/components/LeadScoringBadge";
+import { ExecutiveDiagnosticModal } from "@/components/ExecutiveDiagnosticModal";
 
 const PLATFORM_LABEL: Record<string, string> = { instagram: "Instagram", facebook: "Facebook" };
 
@@ -254,6 +256,7 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
 
   const [sendingToCRM, setSendingToCRM] = useState(false);
   const [crmSent, setCrmSent] = useState(false);
+  const [diagnosticOpen, setDiagnosticOpen] = useState(false);
   const isDerived = Boolean(incoming.persona_id || crmSent);
 
   async function handleSend() {
@@ -460,6 +463,16 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
               {isDerived ? "Derivado a CRM" : "Enviar a CRM"}
             </Button>
             <Button
+              variant="outline"
+              size="sm"
+              className="h-9 border-primary/30 hover:bg-primary/5 text-primary font-medium"
+              onClick={() => setDiagnosticOpen(true)}
+              title="Generar Diagnóstico Ejecutivo One-Pager en PDF (A4)"
+            >
+              <FileText className="mr-1.5 h-3.5 w-3.5 text-primary" />
+              Diagnóstico A4
+            </Button>
+            <Button
               variant="ghost"
               size="sm"
               className="h-9"
@@ -522,6 +535,17 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
           </div>
         )}
       </CardContent>
+      <ExecutiveDiagnosticModal
+        open={diagnosticOpen}
+        onOpenChange={setDiagnosticOpen}
+        initialData={{
+          nombreDirectivo: incoming.author_name || incoming.author_username || "Directivo",
+          empresa: incoming.author_username ? `@${incoming.author_username}` : "Empresa PyME",
+          scoreLead: scoring.scoreTotal,
+          textoMensajeOriginal: fullText,
+          doloresDetectados: scoring.doloresDetectados,
+        }}
+      />
       {ConfirmUI}
     </Card>
   );

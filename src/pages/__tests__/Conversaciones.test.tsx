@@ -126,4 +126,19 @@ describe("Conversaciones Page", () => {
     fireEvent.click(btnNutricion);
     expect(screen.getByText("Quiero información sobre el acompañamiento")).toBeInTheDocument();
   });
+
+  it("renders 'Diagnóstico A4' button and opens ExecutiveDiagnosticModal", async () => {
+    const { default: Conversaciones } = await import("@/pages/Conversaciones");
+    renderPage(<Conversaciones />);
+
+    const btnDiag = screen.getByRole("button", { name: /Diagnóstico A4/i });
+    expect(btnDiag).toBeInTheDocument();
+
+    fireEvent.click(btnDiag);
+
+    // Modal opens and shows title and sections
+    expect(screen.getByRole("heading", { name: /Diagnóstico Ejecutivo One-Pager/i })).toBeInTheDocument();
+    expect(screen.getByText(/1. El Reencuadre Sistémico/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Descargar PDF A4/i })).toBeInTheDocument();
+  });
 });
