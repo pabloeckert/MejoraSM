@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, RefreshCw, Recycle, Sparkles, ArrowRight } from "lucide-react";
+import { Loader2, RefreshCw, Recycle, Sparkles, ArrowRight, Repeat } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -16,6 +16,7 @@ import {
 } from "@/services/ai";
 import { dimensionLabel } from "@/shared/constants";
 import { toast } from "@/hooks/use-toast";
+import { ContentTransmutationModal } from "@/components/ContentTransmutationModal";
 
 // Fase 3 del plan de publicación 2026 — Reciclado de contenido.
 // Lo que rindió bien hace >90 días se puede volver a publicar con el hook y
@@ -76,6 +77,7 @@ export function RecycleTab() {
 function CandidateRow({ candidate }: { candidate: RecycleCandidate }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [showTransmutation, setShowTransmutation] = useState(false);
   const [refreshed, setRefreshed] = useState<RecycleRefresh | null>(null);
   const [hook, setHook] = useState("");
   const [body, setBody] = useState("");
@@ -133,10 +135,22 @@ function CandidateRow({ candidate }: { candidate: RecycleCandidate }) {
         <p className="text-sm text-foreground">{candidate.hook || candidate.title || "(sin hook)"}</p>
 
         {!open ? (
-          <Button size="sm" className="h-9" onClick={() => refreshMut.mutate()} disabled={refreshMut.isPending}>
-            {refreshMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
-            Refrescar hook y CTA
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" className="h-9" onClick={() => refreshMut.mutate()} disabled={refreshMut.isPending}>
+              {refreshMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+              Refrescar hook y CTA
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 border-indigo-200 bg-indigo-50/70 text-indigo-900 hover:bg-indigo-100 text-xs font-semibold"
+              onClick={() => setShowTransmutation(true)}
+              title="Transmutar en 5 activos multicanal en 1 clic (The Content Pyramid)"
+            >
+              <Repeat className="mr-1.5 h-3.5 w-3.5 text-indigo-600" />
+              Transmutar (5 en 1)
+            </Button>
+          </div>
         ) : (
           <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
             {refreshed && (
@@ -163,6 +177,19 @@ function CandidateRow({ candidate }: { candidate: RecycleCandidate }) {
           </div>
         )}
       </CardContent>
+
+      <ContentTransmutationModal
+        open={showTransmutation}
+        onOpenChange={setShowTransmutation}
+        input={{
+          propuesta_id: candidate.id,
+          titulo_portada: candidate.title || candidate.hook || "Estrategia B2B",
+          hook_aprobado: candidate.hook || undefined,
+          oferta: candidate.oferta || undefined,
+          formatoOriginal: candidate.format || undefined,
+          dimension_servicio: candidate.oferta || undefined,
+        }}
+      />
     </Card>
   );
 }

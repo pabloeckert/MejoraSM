@@ -65,6 +65,7 @@ import { approveLocalProposal } from "@/services/localSMService";
 import { FormatRecommenderCard } from "@/components/FormatRecommenderCard";
 import { LinkedInThreadPreview } from "@/components/LinkedInThreadPreview";
 import { TeleprompterStudio } from "@/components/TeleprompterStudio";
+import { ContentTransmutationModal } from "@/components/ContentTransmutationModal";
 
 const OFERTAS = DIMENSIONES.map((d) => ({ value: d.key, label: d.label }));
 
@@ -208,6 +209,7 @@ function ProposalDetailModal({
   const [scheduleOferta, setScheduleOferta] = useState("");
   const [copied, setCopied] = useState(false);
   const [showTeleprompter, setShowTeleprompter] = useState(false);
+  const [showTransmutation, setShowTransmutation] = useState(false);
 
 
 
@@ -630,6 +632,16 @@ function ProposalDetailModal({
               >
                 <Video className="mr-1.5 h-3.5 w-3.5 text-rose-600" />
                 Teleprompter
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowTransmutation(true)}
+                className="bg-indigo-50/70 hover:bg-indigo-100 text-xs font-semibold text-indigo-900 border-indigo-200"
+                title="Transmutar en 5 activos multicanal en 1 clic (The Content Pyramid)"
+              >
+                <Repeat className="mr-1.5 h-3.5 w-3.5 text-indigo-600" />
+                Transmutar (5 en 1)
               </Button>
               <Button
                 size="sm"
@@ -1372,6 +1384,26 @@ function ProposalDetailModal({
           copy_tres_pasos: currentBorrador.copy_tres_pasos,
           buyer_persona: canonical.metricas_atribucion?.buyer_persona_predominante,
           dimension_servicio: scheduleOferta,
+        }}
+      />
+
+      {/* MOTOR DE TRANSMUTACIÓN Y REPURPOSING MULTICANAL (SPRINT S+10) */}
+      <ContentTransmutationModal
+        open={showTransmutation}
+        onOpenChange={setShowTransmutation}
+        input={{
+          propuesta_id: canonical.propuesta_id,
+          titulo_portada: currentBorrador.titulo_portada,
+          cuerpo_texto: currentBorrador.cuerpo_texto,
+          copy_tres_pasos: currentBorrador.copy_tres_pasos,
+          oferta: scheduleOferta,
+          hook_aprobado: (rawProp as ProposalDetail)?.hook || undefined,
+          buyer_persona: canonical.metricas_atribucion?.buyer_persona_predominante,
+          dimension_servicio: scheduleOferta,
+        }}
+        onLaunchTeleprompter={() => {
+          setShowTransmutation(false);
+          setShowTeleprompter(true);
         }}
       />
     </>
