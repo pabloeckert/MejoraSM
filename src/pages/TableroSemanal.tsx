@@ -38,7 +38,9 @@ import {
   Sparkles,
   Upload,
   Layers,
+  FileSpreadsheet,
 } from "lucide-react";
+import { ExecutiveMemoModal } from "@/components/ExecutiveMemoModal";
 
 const NUCLEO_API_URL = "http://127.0.0.1:4002/api/prospectos";
 
@@ -63,6 +65,7 @@ export default function TableroSemanal() {
   const [dialogOpen, setDialogOpen] = useState<boolean>(false);
   const [confirmBatchOpen, setConfirmBatchOpen] = useState<boolean>(false);
   const [outboxDrawerOpen, setOutboxDrawerOpen] = useState<boolean>(false);
+  const [memoModalOpen, setMemoModalOpen] = useState<boolean>(false);
 
   // Estado en vivo de Atribución y Conversión desde MejoraNucleo (4002)
   const [nucleoLeads, setNucleoLeads] = useState<NucleoLeadRecord[]>([]);
@@ -333,6 +336,17 @@ export default function TableroSemanal() {
           >
             <Download className="mr-1.5 h-3.5 w-3.5 text-[#1A3D84]" />
             Descarga Lote Semana {activeWeek}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setMemoModalOpen(true)}
+            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
+            title="Memorando Operativo Ejecutivo de Socios (Andy Grove & Peter Drucker)"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 text-[#1A3D84]" />
+            Memo de Socios
           </Button>
 
           <Button
@@ -734,6 +748,18 @@ export default function TableroSemanal() {
         description={`Todas las propuestas pendientes de la semana (${stats.pendientesSemana}) quedarán aprobadas y listas para su despacho según la grilla programada.`}
         confirmText="Confirmar Aprobación de Lote"
         onConfirm={handleApproveBatch}
+      />
+
+      {/* MEMORANDO OPERATIVO EJECUTIVO DE SOCIOS (ANDY GROVE) */}
+      <ExecutiveMemoModal
+        open={memoModalOpen}
+        onOpenChange={setMemoModalOpen}
+        initialData={{
+          semana: activeWeek,
+          proposalsCount: weekProposals.length,
+          approvedCount: weekProposals.filter((p) => p.estado === "aprobado").length,
+          publishedCount: weekProposals.filter((p) => p.estado === "publicado").length,
+        }}
       />
     </div>
   );
