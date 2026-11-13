@@ -17,6 +17,7 @@ import {
   UserCheck,
   ExternalLink,
   FileText,
+  ClipboardList,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -44,6 +45,8 @@ import {
 import { calcularLeadScoring, type ResultadoLeadScoring } from "@/domain/leadScoringEngine";
 import { LeadScoringBadge } from "@/components/LeadScoringBadge";
 import { ExecutiveDiagnosticModal } from "@/components/ExecutiveDiagnosticModal";
+import { MeetingDossierModal } from "@/components/MeetingDossierModal";
+import { inferirArquetipoDolor } from "@/domain/executiveDiagnosticEngine";
 
 const PLATFORM_LABEL: Record<string, string> = { instagram: "Instagram", facebook: "Facebook" };
 
@@ -257,6 +260,7 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
   const [sendingToCRM, setSendingToCRM] = useState(false);
   const [crmSent, setCrmSent] = useState(false);
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
+  const [dossierOpen, setDossierOpen] = useState(false);
   const isDerived = Boolean(incoming.persona_id || crmSent);
 
   async function handleSend() {
@@ -473,6 +477,16 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
               Diagnóstico A4
             </Button>
             <Button
+              variant="outline"
+              size="sm"
+              className="h-9 border-primary/30 hover:bg-primary/5 text-primary font-medium"
+              onClick={() => setDossierOpen(true)}
+              title="Dossier Confidencial de Preparación para Reunión 1 a 1 (Andy Grove)"
+            >
+              <ClipboardList className="mr-1.5 h-3.5 w-3.5 text-primary" />
+              Dossier 1 a 1
+            </Button>
+            <Button
               variant="ghost"
               size="sm"
               className="h-9"
@@ -544,6 +558,19 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
           scoreLead: scoring.scoreTotal,
           textoMensajeOriginal: fullText,
           doloresDetectados: scoring.doloresDetectados,
+        }}
+      />
+      <MeetingDossierModal
+        open={dossierOpen}
+        onOpenChange={setDossierOpen}
+        initialData={{
+          nombreDirectivo: incoming.author_name || incoming.author_username || "Directivo",
+          empresa: incoming.author_username ? `@${incoming.author_username}` : "Empresa PyME",
+          cargo: "Dueño / Socio Gerente",
+          canal: incoming.platform,
+          scoreLead: scoring.scoreTotal,
+          arquetipoDolor: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
+          historialMensajes: fullText,
         }}
       />
       {ConfirmUI}

@@ -141,4 +141,20 @@ describe("Conversaciones Page", () => {
     expect(screen.getByText(/1. El Reencuadre Sistémico/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Descargar PDF A4/i })).toBeInTheDocument();
   });
+
+  it("renders 'Dossier 1 a 1' button and opens MeetingDossierModal", async () => {
+    const { default: Conversaciones } = await import("@/pages/Conversaciones");
+    renderPage(<Conversaciones />);
+
+    const btnDossier = screen.getByRole("button", { name: /Dossier 1 a 1/i });
+    expect(btnDossier).toBeInTheDocument();
+
+    fireEvent.click(btnDossier);
+
+    // Modal opens and shows title, tabs and action buttons
+    expect(screen.getByRole("heading", { name: /Dossier de Preparación para Reunión 1 a 1/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Apertura 90s/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Preguntas 4D/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Descargar Dossier PDF A4/i })).toBeInTheDocument();
+  });
 });
