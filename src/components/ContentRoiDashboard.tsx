@@ -6,6 +6,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   TrendingUp,
   DollarSign,
@@ -19,6 +20,7 @@ import {
   AlertCircle,
   Briefcase,
   PieChart,
+  Table as TableIcon,
 } from "lucide-react";
 import {
   calcularContentRoi,
@@ -27,6 +29,7 @@ import {
   type ResultadoContentRoi,
 } from "@/domain/contentRoiEngine";
 import { type InboxItem } from "@/services/supabase";
+import { PipelineExporterModal } from "@/components/PipelineExporterModal";
 import { cn } from "@/lib/utils";
 
 export interface ContentRoiDashboardProps {
@@ -43,6 +46,7 @@ export function ContentRoiDashboard({
   totalClicks,
 }: ContentRoiDashboardProps) {
   const [periodo, setPeriodo] = useState<FiltroPeriodoRoi>("ultimos_30_dias");
+  const [exporterOpen, setExporterOpen] = useState(false);
 
   const roiData: ResultadoContentRoi = useMemo(() => {
     return calcularContentRoi({
@@ -85,45 +89,57 @@ export function ContentRoiDashboard({
             </p>
           </div>
 
-          {/* Filtros de Período */}
-          <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-lg border border-border">
-            <Filter className="h-3.5 w-3.5 text-muted-foreground ml-1 mr-0.5" />
-            <button
+          {/* Filtros de Período y Exportación CSV */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-muted/60 p-1 rounded-lg border border-border">
+              <Filter className="h-3.5 w-3.5 text-muted-foreground ml-1 mr-0.5" />
+              <button
+                type="button"
+                onClick={() => setPeriodo("ultimos_30_dias")}
+                className={cn(
+                  "px-2.5 py-1 text-xs rounded-md font-medium transition-all",
+                  periodo === "ultimos_30_dias"
+                    ? "bg-background text-foreground shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Últimos 30 Días
+              </button>
+              <button
+                type="button"
+                onClick={() => setPeriodo("trimestre_actual")}
+                className={cn(
+                  "px-2.5 py-1 text-xs rounded-md font-medium transition-all",
+                  periodo === "trimestre_actual"
+                    ? "bg-background text-foreground shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Trimestre (90D)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPeriodo("historico_completo")}
+                className={cn(
+                  "px-2.5 py-1 text-xs rounded-md font-medium transition-all",
+                  periodo === "historico_completo"
+                    ? "bg-background text-foreground shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Histórico
+              </button>
+            </div>
+            <Button
               type="button"
-              onClick={() => setPeriodo("ultimos_30_dias")}
-              className={cn(
-                "px-2.5 py-1 text-xs rounded-md font-medium transition-all",
-                periodo === "ultimos_30_dias"
-                  ? "bg-background text-foreground shadow-xs font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
+              variant="outline"
+              size="sm"
+              onClick={() => setExporterOpen(true)}
+              className="h-8 text-xs border-[#1A3D84]/30 text-[#1A3D84] hover:bg-blue-50/50 font-semibold"
             >
-              Últimos 30 Días
-            </button>
-            <button
-              type="button"
-              onClick={() => setPeriodo("trimestre_actual")}
-              className={cn(
-                "px-2.5 py-1 text-xs rounded-md font-medium transition-all",
-                periodo === "trimestre_actual"
-                  ? "bg-background text-foreground shadow-xs font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Trimestre (90D)
-            </button>
-            <button
-              type="button"
-              onClick={() => setPeriodo("historico_completo")}
-              className={cn(
-                "px-2.5 py-1 text-xs rounded-md font-medium transition-all",
-                periodo === "historico_completo"
-                  ? "bg-background text-foreground shadow-xs font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Histórico
-            </button>
+              <TableIcon className="mr-1.5 h-3.5 w-3.5 text-[#1A3D84]" />
+              Exportar CSV / Sheets
+            </Button>
           </div>
         </div>
       </CardHeader>
@@ -342,6 +358,19 @@ export function ContentRoiDashboard({
           </div>
         </div>
       </CardContent>
+
+      <PipelineExporterModal
+        open={exporterOpen}
+        onOpenChange={setExporterOpen}
+        initialDataset="embudo_roi"
+        exportInput={{
+          filtroPeriodo: periodo,
+          proposalsCount,
+          totalImpressions,
+          totalClicks,
+          inboxItems,
+        }}
+      />
     </Card>
   );
 }

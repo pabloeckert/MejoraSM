@@ -39,8 +39,10 @@ import {
   Upload,
   Layers,
   FileSpreadsheet,
+  Table as TableIcon,
 } from "lucide-react";
 import { ExecutiveMemoModal } from "@/components/ExecutiveMemoModal";
+import { PipelineExporterModal } from "@/components/PipelineExporterModal";
 
 const NUCLEO_API_URL = "http://127.0.0.1:4002/api/prospectos";
 
@@ -66,6 +68,39 @@ export default function TableroSemanal() {
   const [confirmBatchOpen, setConfirmBatchOpen] = useState<boolean>(false);
   const [outboxDrawerOpen, setOutboxDrawerOpen] = useState<boolean>(false);
   const [memoModalOpen, setMemoModalOpen] = useState<boolean>(false);
+  const [exporterOpen, setExporterOpen] = useState<boolean>(false);
+
+  const exportInput = useMemo(() => {
+    const piezasGrilla = proposals.slice(0, 24).map((p) => {
+      const borrador =
+        p.borradores.find((b) => b.opcion === p.borrador_seleccionado) ||
+        p.borradores[0];
+      const matchSem = /-W(\d{2})-/.exec(p.propuesta_id);
+      const semana = matchSem ? Number(matchSem[1]) : 1;
+      const persona =
+        p.metricas_atribucion?.buyer_persona_predominante ||
+        "emprendedor_saturado";
+      return {
+        id: p.propuesta_id,
+        semana,
+        canal: p.canal_destino,
+        formato: borrador.tipo_formato,
+        buyerPersona: persona,
+        dimension: "4 Dimensiones MC",
+        titular: borrador.titulo_portada || borrador.copy_tres_pasos.paso1_dolor,
+        estado: p.estado,
+        scoreStepps: Math.round(
+          (borrador.stepps_evaluacion?.score_global ?? 8.5) * 10
+        ),
+        utmUrl: `https://mejoraok.com/diagnostico?utm_source=mejora_sm&utm_medium=organic_social&utm_campaign=${persona}&pieza_id=${p.propuesta_id}&canal=${p.canal_destino}`,
+      };
+    });
+    return {
+      semanaMemo: activeWeek,
+      proposalsCount: proposals.length,
+      piezasGrilla,
+    };
+  }, [proposals, activeWeek]);
 
   // Estado en vivo de Atribución y Conversión desde MejoraNucleo (4002)
   const [nucleoLeads, setNucleoLeads] = useState<NucleoLeadRecord[]>([]);
@@ -347,6 +382,17 @@ export default function TableroSemanal() {
           >
             <FileSpreadsheet className="h-3.5 w-3.5 text-[#1A3D84]" />
             Memo de Socios
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setExporterOpen(true)}
+            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
+            title="Exportar grilla, métricas ROI y pipeline a CSV / Google Sheets"
+          >
+            <TableIcon className="h-3.5 w-3.5 text-[#1A3D84]" />
+            Exportar CSV / Sheets
           </Button>
 
           <Button
@@ -760,6 +806,14 @@ export default function TableroSemanal() {
           approvedCount: weekProposals.filter((p) => p.estado === "aprobado").length,
           publishedCount: weekProposals.filter((p) => p.estado === "publicado").length,
         }}
+      />
+
+      {/* CENTRO DE EXPORTACIÓN CSV / GOOGLE SHEETS */}
+      <PipelineExporterModal
+        open={exporterOpen}
+        onOpenChange={setExporterOpen}
+        initialDataset="grilla_editorial_26s"
+        exportInput={exportInput}
       />
     </div>
   );

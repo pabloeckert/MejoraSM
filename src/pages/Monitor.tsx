@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, X, Clock, ExternalLink, RefreshCw, Loader2, Trash2, FileSpreadsheet } from "lucide-react";
+import { Check, X, Clock, ExternalLink, RefreshCw, Loader2, Trash2, FileSpreadsheet, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { historialApi } from "@/services/supabase";
 import { github } from "@/services/github";
@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { SlaAuditSection } from "@/components/SlaAuditSection";
 import { ContentRoiDashboard } from "@/components/ContentRoiDashboard";
 import { ExecutiveMemoModal } from "@/components/ExecutiveMemoModal";
+import { PipelineExporterModal } from "@/components/PipelineExporterModal";
 import { useInbox } from "@/hooks/useInbox";
 
 // Fase 5 del plan estratégico 2026-08-16 (Un solo panel) — port fiel de
@@ -650,6 +651,7 @@ export default function Monitor() {
   const accionesManuales = data?.accionesManuales || new Map<string, AccionManual>();
   const [syncing, setSyncing] = useState(false);
   const [memoModalOpen, setMemoModalOpen] = useState(false);
+  const [exporterOpen, setExporterOpen] = useState(false);
 
   // Guard de desmontaje — hallazgo real (auditoría 2026-09-08): los dos
   // setTimeout de refreshAfterAction (~95s en total) no tenían cleanup ni
@@ -707,6 +709,15 @@ export default function Monitor() {
           >
             <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-[#1A3D84]" />
             Memo de Socios
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setExporterOpen(true)}
+            className="border-primary/30 text-primary hover:bg-primary/5"
+          >
+            <Download className="mr-1.5 h-3.5 w-3.5 text-[#1A3D84]" />
+            Exportar CSV / Sheets
           </Button>
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isRefetching}>
             <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", isRefetching && "animate-spin")} />
@@ -785,6 +796,17 @@ export default function Monitor() {
 
       {/* Modal Memo Operativo de Socios (Andy Grove / Peter Drucker) */}
       <ExecutiveMemoModal open={memoModalOpen} onOpenChange={setMemoModalOpen} />
+
+      {/* Centro de Exportación y Sincronización CSV / Google Sheets */}
+      <PipelineExporterModal
+        open={exporterOpen}
+        onOpenChange={setExporterOpen}
+        initialDataset="prospectos_sla"
+        exportInput={{
+          inboxItems,
+          proposalsCount: posts.length > 0 ? posts.length : undefined,
+        }}
+      />
     </div>
   );
 }
