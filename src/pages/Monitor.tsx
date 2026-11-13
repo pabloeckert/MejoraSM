@@ -11,6 +11,8 @@ import { useWorkflowAction } from "@/hooks/useGithubUpload";
 import { useConfirm } from "@/hooks/useConfirm";
 import { toast } from "@/hooks/use-toast";
 import { SlaAuditSection } from "@/components/SlaAuditSection";
+import { ContentRoiDashboard } from "@/components/ContentRoiDashboard";
+import { useInbox } from "@/hooks/useInbox";
 
 // Fase 5 del plan estratégico 2026-08-16 (Un solo panel) — port fiel de
 // dashboard/index.html: mismas acciones de reversión (manage-story.yml/
@@ -640,6 +642,9 @@ export default function Monitor() {
     queryFn: fetchHistorial,
   });
 
+  const { data: inboxData } = useInbox();
+  const inboxItems = inboxData || [];
+
   const posts = data?.posts || [];
   const accionesManuales = data?.accionesManuales || new Map<string, AccionManual>();
   const [syncing, setSyncing] = useState(false);
@@ -736,6 +741,12 @@ export default function Monitor() {
           )}
         </p>
       )}
+
+      {/* Content ROI Dashboard & Funnel B2B (Peter Drucker & Marty Cagan) */}
+      <ContentRoiDashboard
+        inboxItems={inboxItems}
+        proposalsCount={posts.length > 0 ? posts.length : undefined}
+      />
 
       {/* Auditoría de SLAs de Conversión B2B (Service Blueprint 48h) */}
       <SlaAuditSection />

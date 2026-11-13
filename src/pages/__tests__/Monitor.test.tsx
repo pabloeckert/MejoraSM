@@ -44,6 +44,8 @@ describe("Monitor Page (Un Solo Panel SRE & SLA)", () => {
     renderPage();
 
     expect(screen.getByText(/Monitor de stories y posts/i)).toBeInTheDocument();
+    expect(screen.getByText(/CONTENT ROI & FUNNEL B2B/i)).toBeInTheDocument();
+    expect(screen.getByText(/Retorno de Inversión Editorial y Embudo de Conversión/i)).toBeInTheDocument();
     expect(screen.getByText(/Auditoría de SLAs de Conversión B2B/i)).toBeInTheDocument();
     expect(screen.getByText(/SLA Máx: 48 Horas/i)).toBeInTheDocument();
 
