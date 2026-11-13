@@ -157,4 +157,22 @@ describe("Conversaciones Page", () => {
     expect(screen.getByRole("button", { name: /Preguntas 4D/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Descargar Dossier PDF A4/i })).toBeInTheDocument();
   });
+
+  it("renders 'Propuesta B2B' button and opens ScopeAgreementModal", async () => {
+    const { default: Conversaciones } = await import("@/pages/Conversaciones");
+    renderPage(<Conversaciones />);
+
+    const btnScope = screen.getByRole("button", { name: /Propuesta B2B/i });
+    expect(btnScope).toBeInTheDocument();
+
+    fireEvent.click(btnScope);
+
+    // Modal opens and shows title, tabs and download button
+    expect(
+      screen.getByRole("heading", { name: /Acuerdo de Alcance y Propuesta de Acompañamiento B2B/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /1\. Diagnóstico & Objetivo/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /2\. Fases \(90 Días\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Descargar Propuesta PDF A4/i })).toBeInTheDocument();
+  });
 });

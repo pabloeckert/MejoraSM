@@ -18,6 +18,7 @@ import {
   ExternalLink,
   FileText,
   ClipboardList,
+  FileCheck2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -46,6 +47,7 @@ import { calcularLeadScoring, type ResultadoLeadScoring } from "@/domain/leadSco
 import { LeadScoringBadge } from "@/components/LeadScoringBadge";
 import { ExecutiveDiagnosticModal } from "@/components/ExecutiveDiagnosticModal";
 import { MeetingDossierModal } from "@/components/MeetingDossierModal";
+import { ScopeAgreementModal } from "@/components/ScopeAgreementModal";
 import { inferirArquetipoDolor } from "@/domain/executiveDiagnosticEngine";
 
 const PLATFORM_LABEL: Record<string, string> = { instagram: "Instagram", facebook: "Facebook" };
@@ -261,6 +263,7 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
   const [crmSent, setCrmSent] = useState(false);
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
   const [dossierOpen, setDossierOpen] = useState(false);
+  const [scopeOpen, setScopeOpen] = useState(false);
   const isDerived = Boolean(incoming.persona_id || crmSent);
 
   async function handleSend() {
@@ -487,6 +490,16 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
               Dossier 1 a 1
             </Button>
             <Button
+              variant="outline"
+              size="sm"
+              className="h-9 border-primary/30 hover:bg-primary/5 text-primary font-medium"
+              onClick={() => setScopeOpen(true)}
+              title="Acuerdo de Alcance y Propuesta de Acompañamiento B2B en PDF A4 (David Maister)"
+            >
+              <FileCheck2 className="mr-1.5 h-3.5 w-3.5 text-primary" />
+              Propuesta B2B
+            </Button>
+            <Button
               variant="ghost"
               size="sm"
               className="h-9"
@@ -571,6 +584,18 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
           scoreLead: scoring.scoreTotal,
           arquetipoDolor: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
           historialMensajes: fullText,
+        }}
+      />
+      <ScopeAgreementModal
+        open={scopeOpen}
+        onOpenChange={setScopeOpen}
+        initialData={{
+          nombreDirectivo: incoming.author_name || incoming.author_username || "Directivo",
+          empresa: incoming.author_username ? `@${incoming.author_username}` : "Empresa PyME",
+          cargo: "Dueño / Socio Gerente",
+          canal: incoming.platform,
+          arquetipoDolor: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
+          mesesDuracion: 3,
         }}
       />
       {ConfirmUI}
