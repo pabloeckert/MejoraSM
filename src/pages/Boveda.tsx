@@ -35,6 +35,7 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { DOC_CATEGORIES } from "@/shared/constants";
 import { documentsApi } from "@/services/supabase";
+import { CustomerSuccessSection } from "@/components/CustomerSuccessSection";
 
 const MAX_FILE_SIZE_MB = 20;
 const SUPPORTED_EXT = [".pdf", ".docx", ".txt", ".md"];
@@ -663,6 +664,9 @@ function BovedaContent() {
           </Card>
         )}
       </div>
+
+      {/* 2. CASOS DE ÉXITO DE AUTORIDAD B2B (STORYBRAND & CIALDINI) */}
+      <CustomerSuccessSection />
 
       {/* 3. BÚSQUEDA Y LISTA DE DOCUMENTOS DE LA BÓVEDA */}
       {documents && documents.length > 0 && (

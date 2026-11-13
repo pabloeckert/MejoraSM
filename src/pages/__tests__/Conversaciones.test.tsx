@@ -175,4 +175,20 @@ describe("Conversaciones Page", () => {
     expect(screen.getByRole("button", { name: /2\. Fases \(90 Días\)/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Descargar Propuesta PDF A4/i })).toBeInTheDocument();
   });
+
+  it("renders 'Caso de Éxito' button and opens CustomerSuccessModal", async () => {
+    const { default: Conversaciones } = await import("@/pages/Conversaciones");
+    renderPage(<Conversaciones />);
+
+    const btnCase = screen.getByRole("button", { name: /Caso de Éxito/i });
+    expect(btnCase).toBeInTheDocument();
+
+    fireEvent.click(btnCase);
+
+    // Modal opens and shows title, badges, tabs and download button
+    expect(screen.getByText(/CASO DE ÉXITO & PRUEBA SOCIAL B2B/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /1\. Historia StoryBrand/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /2\. Métricas & Resultados/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Descargar Caso A4 \(PDF\)/i })).toBeInTheDocument();
+  });
 });

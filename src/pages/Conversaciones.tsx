@@ -19,6 +19,7 @@ import {
   FileText,
   ClipboardList,
   FileCheck2,
+  Award,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -48,6 +49,7 @@ import { LeadScoringBadge } from "@/components/LeadScoringBadge";
 import { ExecutiveDiagnosticModal } from "@/components/ExecutiveDiagnosticModal";
 import { MeetingDossierModal } from "@/components/MeetingDossierModal";
 import { ScopeAgreementModal } from "@/components/ScopeAgreementModal";
+import { CustomerSuccessModal } from "@/components/CustomerSuccessModal";
 import { inferirArquetipoDolor } from "@/domain/executiveDiagnosticEngine";
 
 const PLATFORM_LABEL: Record<string, string> = { instagram: "Instagram", facebook: "Facebook" };
@@ -264,6 +266,7 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
   const [dossierOpen, setDossierOpen] = useState(false);
   const [scopeOpen, setScopeOpen] = useState(false);
+  const [caseStudyOpen, setCaseStudyOpen] = useState(false);
   const isDerived = Boolean(incoming.persona_id || crmSent);
 
   async function handleSend() {
@@ -500,6 +503,16 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
               Propuesta B2B
             </Button>
             <Button
+              variant="outline"
+              size="sm"
+              className="h-9 border-amber-500/40 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 text-amber-700 dark:text-amber-400 font-medium"
+              onClick={() => setCaseStudyOpen(true)}
+              title="Casos de Éxito B2B y Prueba Social de Pares (Donald Miller & Robert Cialdini)"
+            >
+              <Award className="mr-1.5 h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              Caso de Éxito
+            </Button>
+            <Button
               variant="ghost"
               size="sm"
               className="h-9"
@@ -596,6 +609,15 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
           canal: incoming.platform,
           arquetipoDolor: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
           mesesDuracion: 3,
+        }}
+      />
+      <CustomerSuccessModal
+        open={caseStudyOpen}
+        onOpenChange={setCaseStudyOpen}
+        initialData={{
+          arquetipo: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
+          empresa: incoming.author_username ? `@${incoming.author_username}` : undefined,
+          rolProtagonista: incoming.author_name || undefined,
         }}
       />
       {ConfirmUI}
