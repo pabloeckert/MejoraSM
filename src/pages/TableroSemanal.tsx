@@ -40,9 +40,11 @@ import {
   Layers,
   FileSpreadsheet,
   Table as TableIcon,
+  Scale,
 } from "lucide-react";
 import { ExecutiveMemoModal } from "@/components/ExecutiveMemoModal";
 import { PipelineExporterModal } from "@/components/PipelineExporterModal";
+import { BrandVoiceLinterModal } from "@/components/BrandVoiceLinterModal";
 
 const NUCLEO_API_URL = "http://127.0.0.1:4002/api/prospectos";
 
@@ -69,6 +71,7 @@ export default function TableroSemanal() {
   const [outboxDrawerOpen, setOutboxDrawerOpen] = useState<boolean>(false);
   const [memoModalOpen, setMemoModalOpen] = useState<boolean>(false);
   const [exporterOpen, setExporterOpen] = useState<boolean>(false);
+  const [linterModalOpen, setLinterModalOpen] = useState<boolean>(false);
 
   const exportInput = useMemo(() => {
     const piezasGrilla = proposals.slice(0, 24).map((p) => {
@@ -393,6 +396,17 @@ export default function TableroSemanal() {
           >
             <TableIcon className="h-3.5 w-3.5 text-[#1A3D84]" />
             Exportar CSV / Sheets
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setLinterModalOpen(true)}
+            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
+            title="Auditor y Calibrador de Tono de Marca ('Calidez con Verdad')"
+          >
+            <Scale className="h-3.5 w-3.5 text-[#1A3D84]" />
+            Auditar Tono MC
           </Button>
 
           <Button
@@ -814,6 +828,13 @@ export default function TableroSemanal() {
         onOpenChange={setExporterOpen}
         initialDataset="grilla_editorial_26s"
         exportInput={exportInput}
+      />
+
+      {/* AUDITOR Y CALIBRADOR DE IDENTIDAD Y TONO DE MARCA (CALIDEZ CON VERDAD) */}
+      <BrandVoiceLinterModal
+        open={linterModalOpen}
+        onOpenChange={setLinterModalOpen}
+        contextLabel={`Tablero Semanal · Semana ${activeWeek}`}
       />
     </div>
   );

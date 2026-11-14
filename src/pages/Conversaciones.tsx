@@ -20,6 +20,7 @@ import {
   ClipboardList,
   FileCheck2,
   Award,
+  Scale,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -50,6 +51,7 @@ import { ExecutiveDiagnosticModal } from "@/components/ExecutiveDiagnosticModal"
 import { MeetingDossierModal } from "@/components/MeetingDossierModal";
 import { ScopeAgreementModal } from "@/components/ScopeAgreementModal";
 import { CustomerSuccessModal } from "@/components/CustomerSuccessModal";
+import { BrandVoiceLinterModal } from "@/components/BrandVoiceLinterModal";
 import { inferirArquetipoDolor } from "@/domain/executiveDiagnosticEngine";
 
 const PLATFORM_LABEL: Record<string, string> = { instagram: "Instagram", facebook: "Facebook" };
@@ -267,6 +269,7 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
   const [dossierOpen, setDossierOpen] = useState(false);
   const [scopeOpen, setScopeOpen] = useState(false);
   const [caseStudyOpen, setCaseStudyOpen] = useState(false);
+  const [linterOpen, setLinterOpen] = useState(false);
   const isDerived = Boolean(incoming.persona_id || crmSent);
 
   async function handleSend() {
@@ -513,6 +516,16 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
               Caso de Éxito
             </Button>
             <Button
+              variant="outline"
+              size="sm"
+              className="h-9 border-primary/30 hover:bg-primary/5 text-primary font-medium"
+              onClick={() => setLinterOpen(true)}
+              title="Auditar y calibrar respuesta con estándar Calidez con Verdad"
+            >
+              <Scale className="mr-1.5 h-3.5 w-3.5 text-primary" />
+              Calibrar Tono MC
+            </Button>
+            <Button
               variant="ghost"
               size="sm"
               className="h-9"
@@ -557,6 +570,16 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
               <Button size="sm" className="h-9" onClick={handleSend} disabled={sendMut.isPending || !draft.trim()}>
                 {sendMut.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Send className="mr-1.5 h-3.5 w-3.5" />}
                 Enviar a {platformLabel}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 border-primary/30 text-primary"
+                onClick={() => setLinterOpen(true)}
+                title="Auditar borrador con el Linter de Calidez con Verdad"
+              >
+                <Scale className="mr-1.5 h-3.5 w-3.5 text-primary" />
+                Auditar Tono MC
               </Button>
               <Button
                 size="sm"
@@ -618,6 +641,16 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
           arquetipo: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
           empresa: incoming.author_username ? `@${incoming.author_username}` : undefined,
           rolProtagonista: incoming.author_name || undefined,
+        }}
+      />
+      <BrandVoiceLinterModal
+        open={linterOpen}
+        onOpenChange={setLinterOpen}
+        initialText={draft || undefined}
+        contextLabel={`Respuesta a ${incoming.author_name || incoming.author_username || platformLabel}`}
+        onApplyText={(calibrated) => {
+          setDraft(calibrated);
+          setReplyOpen(true);
         }}
       />
       {ConfirmUI}
