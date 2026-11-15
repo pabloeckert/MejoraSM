@@ -42,11 +42,13 @@ import {
   Table as TableIcon,
   Scale,
   Compass,
+  Radio,
 } from "lucide-react";
 import { ExecutiveMemoModal } from "@/components/ExecutiveMemoModal";
 import { PipelineExporterModal } from "@/components/PipelineExporterModal";
 import { BrandVoiceLinterModal } from "@/components/BrandVoiceLinterModal";
 import { KickoffBlueprintModal } from "@/components/KickoffBlueprintModal";
+import { ReactiveHookModal } from "@/components/ReactiveHookModal";
 
 const NUCLEO_API_URL = "http://127.0.0.1:4002/api/prospectos";
 
@@ -75,6 +77,7 @@ export default function TableroSemanal() {
   const [exporterOpen, setExporterOpen] = useState<boolean>(false);
   const [linterModalOpen, setLinterModalOpen] = useState<boolean>(false);
   const [kickoffModalOpen, setKickoffModalOpen] = useState<boolean>(false);
+  const [coyunturaModalOpen, setCoyunturaModalOpen] = useState<boolean>(false);
 
   const exportInput = useMemo(() => {
     const piezasGrilla = proposals.slice(0, 24).map((p) => {
@@ -421,6 +424,17 @@ export default function TableroSemanal() {
           >
             <Compass className="h-3.5 w-3.5 text-[#1A3D84]" />
             Kickoff 30D
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCoyunturaModalOpen(true)}
+            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
+            title="Radar de Coyuntura Operativa PyME y Hooks Reactivos (Gary Vaynerchuk & Jonah Berger)"
+          >
+            <Radio className="h-3.5 w-3.5 text-[#1A3D84]" />
+            Radar Coyuntura
           </Button>
 
           <Button
@@ -855,6 +869,12 @@ export default function TableroSemanal() {
       <KickoffBlueprintModal
         open={kickoffModalOpen}
         onOpenChange={setKickoffModalOpen}
+      />
+
+      {/* RADAR DE COYUNTURA OPERATIVA PYME Y HOOKS REACTIVOS */}
+      <ReactiveHookModal
+        open={coyunturaModalOpen}
+        onOpenChange={setCoyunturaModalOpen}
       />
     </div>
   );

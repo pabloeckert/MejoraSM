@@ -34,6 +34,7 @@ import {
   RotateCw,
   Share2,
   Video,
+  Radio,
 } from "lucide-react";
 import {
   useDialogueSessions,
@@ -54,6 +55,7 @@ import {
   type VariantType,
 } from "@/domain/copyExperimentSimulator";
 import { TeleprompterStudio } from "@/components/TeleprompterStudio";
+import { ReactiveHookModal } from "@/components/ReactiveHookModal";
 
 function formatScheduledAt(iso: string) {
   return new Date(iso).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
@@ -156,6 +158,7 @@ function MesaDialogoContent() {
 
   const [newTopic, setNewTopic] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [reactiveHookOpen, setReactiveHookOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
 
   useEffect(() => {
@@ -257,13 +260,24 @@ function MesaDialogoContent() {
           </p>
         </div>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2 bg-[#1A3D84] hover:bg-[#142e63] text-white">
-              <Plus className="h-4 w-4" />
-              Nueva Sesión
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setReactiveHookOpen(true)}
+            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-[#1A3D84] dark:text-blue-300 font-semibold gap-2"
+            title="Radar de Coyuntura Operativa PyME y Hooks Reactivos (Gary Vaynerchuk & Jonah Berger)"
+          >
+            <Radio className="h-4 w-4 text-[#1A3D84]" />
+            Radar Coyuntura
+          </Button>
+
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2 bg-[#1A3D84] hover:bg-[#142e63] text-white">
+                <Plus className="h-4 w-4" />
+                Nueva Sesión
+              </Button>
+            </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Iniciar Sesión Ejecutiva</DialogTitle>
@@ -321,6 +335,7 @@ function MesaDialogoContent() {
           </DialogContent>
         </Dialog>
       </div>
+    </div>
 
       {/* 1. BARRA SUPERIOR DE LOS 4 PILARES DE AUTORIDAD B2B */}
       <div className="space-y-3">
@@ -421,6 +436,16 @@ function MesaDialogoContent() {
           })}
         </div>
       )}
+
+      {/* Modal Radar de Coyuntura Operativa PyME y Hooks Reactivos */}
+      <ReactiveHookModal
+        open={reactiveHookOpen}
+        onOpenChange={setReactiveHookOpen}
+        onApplyTopic={(promptTopic) => {
+          setNewTopic(promptTopic);
+          setDialogOpen(true);
+        }}
+      />
     </div>
   );
 }
