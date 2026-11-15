@@ -41,10 +41,12 @@ import {
   FileSpreadsheet,
   Table as TableIcon,
   Scale,
+  Compass,
 } from "lucide-react";
 import { ExecutiveMemoModal } from "@/components/ExecutiveMemoModal";
 import { PipelineExporterModal } from "@/components/PipelineExporterModal";
 import { BrandVoiceLinterModal } from "@/components/BrandVoiceLinterModal";
+import { KickoffBlueprintModal } from "@/components/KickoffBlueprintModal";
 
 const NUCLEO_API_URL = "http://127.0.0.1:4002/api/prospectos";
 
@@ -72,6 +74,7 @@ export default function TableroSemanal() {
   const [memoModalOpen, setMemoModalOpen] = useState<boolean>(false);
   const [exporterOpen, setExporterOpen] = useState<boolean>(false);
   const [linterModalOpen, setLinterModalOpen] = useState<boolean>(false);
+  const [kickoffModalOpen, setKickoffModalOpen] = useState<boolean>(false);
 
   const exportInput = useMemo(() => {
     const piezasGrilla = proposals.slice(0, 24).map((p) => {
@@ -407,6 +410,17 @@ export default function TableroSemanal() {
           >
             <Scale className="h-3.5 w-3.5 text-[#1A3D84]" />
             Auditar Tono MC
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setKickoffModalOpen(true)}
+            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
+            title="Protocolo de Onboarding y Plan de Primeros 30 Días + Gemba Walk 4D"
+          >
+            <Compass className="h-3.5 w-3.5 text-[#1A3D84]" />
+            Kickoff 30D
           </Button>
 
           <Button
@@ -835,6 +849,12 @@ export default function TableroSemanal() {
         open={linterModalOpen}
         onOpenChange={setLinterModalOpen}
         contextLabel={`Tablero Semanal · Semana ${activeWeek}`}
+      />
+
+      {/* MATRIZ DE ONBOARDING Y PLAN DE PRIMEROS 30 DÍAS + GEMBA WALK 4D */}
+      <KickoffBlueprintModal
+        open={kickoffModalOpen}
+        onOpenChange={setKickoffModalOpen}
       />
     </div>
   );
