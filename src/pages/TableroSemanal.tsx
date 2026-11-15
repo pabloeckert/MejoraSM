@@ -43,12 +43,14 @@ import {
   Scale,
   Compass,
   Radio,
+  Calculator,
 } from "lucide-react";
 import { ExecutiveMemoModal } from "@/components/ExecutiveMemoModal";
 import { PipelineExporterModal } from "@/components/PipelineExporterModal";
 import { BrandVoiceLinterModal } from "@/components/BrandVoiceLinterModal";
 import { KickoffBlueprintModal } from "@/components/KickoffBlueprintModal";
 import { ReactiveHookModal } from "@/components/ReactiveHookModal";
+import { InactionCostModal } from "@/components/InactionCostModal";
 
 const NUCLEO_API_URL = "http://127.0.0.1:4002/api/prospectos";
 
@@ -78,6 +80,7 @@ export default function TableroSemanal() {
   const [linterModalOpen, setLinterModalOpen] = useState<boolean>(false);
   const [kickoffModalOpen, setKickoffModalOpen] = useState<boolean>(false);
   const [coyunturaModalOpen, setCoyunturaModalOpen] = useState<boolean>(false);
+  const [inactionCostModalOpen, setInactionCostModalOpen] = useState<boolean>(false);
 
   const exportInput = useMemo(() => {
     const piezasGrilla = proposals.slice(0, 24).map((p) => {
@@ -435,6 +438,17 @@ export default function TableroSemanal() {
           >
             <Radio className="h-3.5 w-3.5 text-[#1A3D84]" />
             Radar Coyuntura
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setInactionCostModalOpen(true)}
+            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
+            title="Calculadora & Simulador de Costo de Inacción Operativa B2B & Retorno 4D"
+          >
+            <Calculator className="h-3.5 w-3.5 text-[#1A3D84]" />
+            Costo Inacción
           </Button>
 
           <Button
@@ -875,6 +889,12 @@ export default function TableroSemanal() {
       <ReactiveHookModal
         open={coyunturaModalOpen}
         onOpenChange={setCoyunturaModalOpen}
+      />
+
+      {/* CALCULADORA DE COSTO DE INACCIÓN OPERATIVA & RETORNO 4D */}
+      <InactionCostModal
+        open={inactionCostModalOpen}
+        onOpenChange={setInactionCostModalOpen}
       />
     </div>
   );

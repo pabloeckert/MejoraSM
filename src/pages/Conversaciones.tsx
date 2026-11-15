@@ -22,6 +22,7 @@ import {
   Award,
   Scale,
   Compass,
+  Calculator,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -54,6 +55,7 @@ import { ScopeAgreementModal } from "@/components/ScopeAgreementModal";
 import { CustomerSuccessModal } from "@/components/CustomerSuccessModal";
 import { BrandVoiceLinterModal } from "@/components/BrandVoiceLinterModal";
 import { KickoffBlueprintModal } from "@/components/KickoffBlueprintModal";
+import { InactionCostModal } from "@/components/InactionCostModal";
 import { inferirArquetipoDolor } from "@/domain/executiveDiagnosticEngine";
 
 const PLATFORM_LABEL: Record<string, string> = { instagram: "Instagram", facebook: "Facebook" };
@@ -273,6 +275,7 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
   const [caseStudyOpen, setCaseStudyOpen] = useState(false);
   const [linterOpen, setLinterOpen] = useState(false);
   const [kickoffOpen, setKickoffOpen] = useState(false);
+  const [inactionCostOpen, setInactionCostOpen] = useState(false);
   const isDerived = Boolean(incoming.persona_id || crmSent);
 
   async function handleSend() {
@@ -521,6 +524,16 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
             <Button
               variant="outline"
               size="sm"
+              className="h-9 border-[#1A3D84]/40 hover:bg-blue-50/50 text-[#1A3D84] dark:text-blue-300 font-medium"
+              onClick={() => setInactionCostOpen(true)}
+              title="Calculadora de Costo de Inacción Operativa & Retorno 4D (Challenger Sale & Peter Drucker)"
+            >
+              <Calculator className="mr-1.5 h-3.5 w-3.5 text-[#1A3D84]" />
+              Costo Inacción
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               className="h-9 border-amber-500/40 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 text-amber-700 dark:text-amber-400 font-medium"
               onClick={() => setCaseStudyOpen(true)}
               title="Casos de Éxito B2B y Prueba Social de Pares (Donald Miller & Robert Cialdini)"
@@ -673,6 +686,15 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
           nombreDirectivo: incoming.author_name || incoming.author_username || "Directivo",
           empresa: incoming.author_username ? `@${incoming.author_username}` : "Empresa PyME",
           cargo: "Dueño / Socio Gerente",
+          arquetipoDolor: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
+        }}
+      />
+      <InactionCostModal
+        open={inactionCostOpen}
+        onOpenChange={setInactionCostOpen}
+        initialData={{
+          nombreDirectivo: incoming.author_name || incoming.author_username || "Directivo",
+          empresaNombre: incoming.author_username ? `@${incoming.author_username}` : "Empresa PyME",
           arquetipoDolor: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
         }}
       />
