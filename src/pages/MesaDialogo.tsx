@@ -35,6 +35,7 @@ import {
   Share2,
   Video,
   Radio,
+  HeartHandshake,
 } from "lucide-react";
 import {
   useDialogueSessions,
@@ -56,6 +57,7 @@ import {
 } from "@/domain/copyExperimentSimulator";
 import { TeleprompterStudio } from "@/components/TeleprompterStudio";
 import { ReactiveHookModal } from "@/components/ReactiveHookModal";
+import { ObjectionMatrixModal } from "@/components/ObjectionMatrixModal";
 
 function formatScheduledAt(iso: string) {
   return new Date(iso).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
@@ -159,6 +161,7 @@ function MesaDialogoContent() {
   const [newTopic, setNewTopic] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reactiveHookOpen, setReactiveHookOpen] = useState(false);
+  const [objectionOpen, setObjectionOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
 
   useEffect(() => {
@@ -269,6 +272,16 @@ function MesaDialogoContent() {
           >
             <Radio className="h-4 w-4 text-[#1A3D84]" />
             Radar Coyuntura
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => setObjectionOpen(true)}
+            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-[#1A3D84] dark:text-blue-300 font-semibold gap-2"
+            title="Matriz de Objeciones Directivas y Argumentario de Confianza (David Maister & Chris Voss)"
+          >
+            <HeartHandshake className="h-4 w-4 text-[#1A3D84]" />
+            Objeciones
           </Button>
 
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -441,6 +454,16 @@ function MesaDialogoContent() {
       <ReactiveHookModal
         open={reactiveHookOpen}
         onOpenChange={setReactiveHookOpen}
+        onApplyTopic={(promptTopic) => {
+          setNewTopic(promptTopic);
+          setDialogOpen(true);
+        }}
+      />
+
+      {/* Modal Matriz de Objeciones Directivas & Argumentario de Confianza */}
+      <ObjectionMatrixModal
+        open={objectionOpen}
+        onOpenChange={setObjectionOpen}
         onApplyTopic={(promptTopic) => {
           setNewTopic(promptTopic);
           setDialogOpen(true);
