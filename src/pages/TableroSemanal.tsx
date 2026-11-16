@@ -44,6 +44,7 @@ import {
   Compass,
   Radio,
   Calculator,
+  GitFork,
 } from "lucide-react";
 import { ExecutiveMemoModal } from "@/components/ExecutiveMemoModal";
 import { PipelineExporterModal } from "@/components/PipelineExporterModal";
@@ -51,6 +52,7 @@ import { BrandVoiceLinterModal } from "@/components/BrandVoiceLinterModal";
 import { KickoffBlueprintModal } from "@/components/KickoffBlueprintModal";
 import { ReactiveHookModal } from "@/components/ReactiveHookModal";
 import { InactionCostModal } from "@/components/InactionCostModal";
+import { ManagementAutonomyModal } from "@/components/ManagementAutonomyModal";
 
 const NUCLEO_API_URL = "http://127.0.0.1:4002/api/prospectos";
 
@@ -81,6 +83,7 @@ export default function TableroSemanal() {
   const [kickoffModalOpen, setKickoffModalOpen] = useState<boolean>(false);
   const [coyunturaModalOpen, setCoyunturaModalOpen] = useState<boolean>(false);
   const [inactionCostModalOpen, setInactionCostModalOpen] = useState<boolean>(false);
+  const [autonomyModalOpen, setAutonomyModalOpen] = useState<boolean>(false);
 
   const exportInput = useMemo(() => {
     const piezasGrilla = proposals.slice(0, 24).map((p) => {
@@ -449,6 +452,17 @@ export default function TableroSemanal() {
           >
             <Calculator className="h-3.5 w-3.5 text-[#1A3D84]" />
             Costo Inacción
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAutonomyModalOpen(true)}
+            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
+            title="Matriz de Autonomía de Mandos Medios y Delegación Paramétrica (Andy Grove & Michael Gerber)"
+          >
+            <GitFork className="h-3.5 w-3.5 text-[#1A3D84]" />
+            Autonomía Mandos
           </Button>
 
           <Button
@@ -895,6 +909,12 @@ export default function TableroSemanal() {
       <InactionCostModal
         open={inactionCostModalOpen}
         onOpenChange={setInactionCostModalOpen}
+      />
+
+      {/* MATRIZ DE AUTONOMÍA Y DELEGACIÓN PARAMÉTRICA DE MANDOS MEDIOS (ANDY GROVE) */}
+      <ManagementAutonomyModal
+        open={autonomyModalOpen}
+        onOpenChange={setAutonomyModalOpen}
       />
     </div>
   );
