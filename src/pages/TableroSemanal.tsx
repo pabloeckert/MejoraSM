@@ -84,6 +84,7 @@ export default function TableroSemanal() {
   const [coyunturaModalOpen, setCoyunturaModalOpen] = useState<boolean>(false);
   const [inactionCostModalOpen, setInactionCostModalOpen] = useState<boolean>(false);
   const [autonomyModalOpen, setAutonomyModalOpen] = useState<boolean>(false);
+  const [centroEjecutivoOpen, setCentroEjecutivoOpen] = useState<boolean>(false);
 
   const exportInput = useMemo(() => {
     const piezasGrilla = proposals.slice(0, 24).map((p) => {
@@ -388,82 +389,79 @@ export default function TableroSemanal() {
             Descarga Lote Semana {activeWeek}
           </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setMemoModalOpen(true)}
-            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
-            title="Memorando Operativo Ejecutivo de Socios (Andy Grove & Peter Drucker)"
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5 text-[#1A3D84]" />
-            Memo de Socios
-          </Button>
+          {/* MENÚ DESPLEGABLE: CENTRO EJECUTIVO B2B (PROGRESSIVE DISCLOSURE) */}
+          <div className="relative inline-block">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCentroEjecutivoOpen(!centroEjecutivoOpen)}
+              className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
+              title="Centro de herramientas ejecutivas, memorandos, diagnósticos y matrices 4D"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-[#1A3D84]" />
+              <span>Centro Ejecutivo</span>
+              <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", centroEjecutivoOpen && "rotate-90")} />
+            </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setExporterOpen(true)}
-            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
-            title="Exportar grilla, métricas ROI y pipeline a CSV / Google Sheets"
-          >
-            <TableIcon className="h-3.5 w-3.5 text-[#1A3D84]" />
-            Exportar CSV / Sheets
-          </Button>
+            {centroEjecutivoOpen && (
+              <div className="absolute right-0 mt-1.5 w-72 z-50 rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xl dark:bg-slate-900 dark:border-slate-800 space-y-1.5 text-xs">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5">1. Dirección & Socios</p>
+                <button
+                  onClick={() => { setMemoModalOpen(true); setCentroEjecutivoOpen(false); }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center gap-2.5 text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5 text-[#1A3D84]" />
+                  <span>Memo de Socios (Grove)</span>
+                </button>
+                <button
+                  onClick={() => { setAutonomyModalOpen(true); setCentroEjecutivoOpen(false); }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center gap-2.5 text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
+                >
+                  <GitFork className="h-3.5 w-3.5 text-[#1A3D84]" />
+                  <span>Autonomía Mandos (TRM)</span>
+                </button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setLinterModalOpen(true)}
-            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
-            title="Auditor y Calibrador de Tono de Marca ('Calidez con Verdad')"
-          >
-            <Scale className="h-3.5 w-3.5 text-[#1A3D84]" />
-            Auditar Tono MC
-          </Button>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pt-1 py-0.5">2. Diagnóstico & Coyuntura</p>
+                <button
+                  onClick={() => { setInactionCostModalOpen(true); setCentroEjecutivoOpen(false); }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center gap-2.5 text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
+                >
+                  <Calculator className="h-3.5 w-3.5 text-[#1A3D84]" />
+                  <span>Costo de Inacción 4D</span>
+                </button>
+                <button
+                  onClick={() => { setCoyunturaModalOpen(true); setCentroEjecutivoOpen(false); }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center gap-2.5 text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
+                >
+                  <Radio className="h-3.5 w-3.5 text-[#1A3D84]" />
+                  <span>Radar de Coyuntura PyME</span>
+                </button>
+                <button
+                  onClick={() => { setKickoffModalOpen(true); setCentroEjecutivoOpen(false); }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center gap-2.5 text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
+                >
+                  <Compass className="h-3.5 w-3.5 text-[#1A3D84]" />
+                  <span>Kickoff 30D (Gemba Walk)</span>
+                </button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setKickoffModalOpen(true)}
-            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
-            title="Protocolo de Onboarding y Plan de Primeros 30 Días + Gemba Walk 4D"
-          >
-            <Compass className="h-3.5 w-3.5 text-[#1A3D84]" />
-            Kickoff 30D
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCoyunturaModalOpen(true)}
-            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
-            title="Radar de Coyuntura Operativa PyME y Hooks Reactivos (Gary Vaynerchuk & Jonah Berger)"
-          >
-            <Radio className="h-3.5 w-3.5 text-[#1A3D84]" />
-            Radar Coyuntura
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setInactionCostModalOpen(true)}
-            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
-            title="Calculadora & Simulador de Costo de Inacción Operativa B2B & Retorno 4D"
-          >
-            <Calculator className="h-3.5 w-3.5 text-[#1A3D84]" />
-            Costo Inacción
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setAutonomyModalOpen(true)}
-            className="border-[#1A3D84]/40 bg-white hover:bg-blue-50/50 text-xs font-semibold text-[#1A3D84] shadow-sm flex items-center gap-1.5"
-            title="Matriz de Autonomía de Mandos Medios y Delegación Paramétrica (Andy Grove & Michael Gerber)"
-          >
-            <GitFork className="h-3.5 w-3.5 text-[#1A3D84]" />
-            Autonomía Mandos
-          </Button>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pt-1 py-0.5">3. Auditoría & Datos</p>
+                <button
+                  onClick={() => { setExporterOpen(true); setCentroEjecutivoOpen(false); }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center gap-2.5 text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
+                >
+                  <TableIcon className="h-3.5 w-3.5 text-[#1A3D84]" />
+                  <span>Exportar CSV / Sheets</span>
+                </button>
+                <button
+                  onClick={() => { setLinterModalOpen(true); setCentroEjecutivoOpen(false); }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2.5 text-slate-800 dark:text-slate-200 font-medium cursor-pointer"
+                >
+                  <Scale className="h-3.5 w-3.5 text-slate-700" />
+                  <span>Auditar Tono MC (Linter)</span>
+                </button>
+              </div>
+            )}
+          </div>
 
           <Button
             size="sm"

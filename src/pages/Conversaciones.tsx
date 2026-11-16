@@ -25,6 +25,7 @@ import {
   Calculator,
   HeartHandshake,
   GitFork,
+  ChevronDown,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -51,6 +52,9 @@ import {
 } from "@/services/contactosService";
 import { calcularLeadScoring, type ResultadoLeadScoring } from "@/domain/leadScoringEngine";
 import { LeadScoringBadge } from "@/components/LeadScoringBadge";
+import { inferirArquetipoDolor } from "@/domain/executiveDiagnosticEngine";
+import { ProspectCaseProvider, useProspectCase } from "@/context/ProspectCaseContext";
+
 import { ExecutiveDiagnosticModal } from "@/components/ExecutiveDiagnosticModal";
 import { MeetingDossierModal } from "@/components/MeetingDossierModal";
 import { ScopeAgreementModal } from "@/components/ScopeAgreementModal";
@@ -60,7 +64,6 @@ import { KickoffBlueprintModal } from "@/components/KickoffBlueprintModal";
 import { InactionCostModal } from "@/components/InactionCostModal";
 import { ObjectionMatrixModal } from "@/components/ObjectionMatrixModal";
 import { ManagementAutonomyModal } from "@/components/ManagementAutonomyModal";
-import { inferirArquetipoDolor } from "@/domain/executiveDiagnosticEngine";
 
 const PLATFORM_LABEL: Record<string, string> = { instagram: "Instagram", facebook: "Facebook" };
 
@@ -76,6 +79,14 @@ type PlatformFilter = "todas" | "instagram" | "facebook";
 type LeadWarmthFilter = "todos" | "calificados" | "nutricion" | "comunidad";
 
 export default function Conversaciones() {
+  return (
+    <ProspectCaseProvider>
+      <ConversacionesContent />
+    </ProspectCaseProvider>
+  );
+}
+
+function ConversacionesContent() {
   const { data: items = [], isLoading } = useInbox();
   const { data: syncState } = useInboxSyncState();
   const sync = useSyncInbox();
@@ -282,7 +293,19 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
   const [inactionCostOpen, setInactionCostOpen] = useState(false);
   const [objectionOpen, setObjectionOpen] = useState(false);
   const [autonomyOpen, setAutonomyOpen] = useState(false);
+  const [toolkitOpen, setToolkitOpen] = useState(false);
   const isDerived = Boolean(incoming.persona_id || crmSent);
+
+  const { getCaseForLead } = useProspectCase();
+  const leadCase = useMemo(() => {
+    return getCaseForLead(incoming.id, {
+      directivo: incoming.author_name || incoming.author_username || "Directivo",
+      empresa: incoming.author_username ? `@${incoming.author_username}` : "Empresa PyME",
+      dolorDetectado: fullText,
+      arquetipo: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
+      canal: incoming.platform,
+    });
+  }, [getCaseForLead, incoming, fullText, scoring.doloresDetectados]);
 
   async function handleSend() {
     if (!draft.trim()) return;
@@ -520,46 +543,6 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
             <Button
               variant="outline"
               size="sm"
-              className="h-9 border-[#1A3D84]/40 hover:bg-blue-50/50 text-[#1A3D84] dark:text-blue-300 font-medium"
-              onClick={() => setKickoffOpen(true)}
-              title="Matriz de Onboarding 30 Días y Gemba Walk 4D en PDF A4 (Joey Coleman & Taiichi Ohno)"
-            >
-              <Compass className="mr-1.5 h-3.5 w-3.5 text-[#1A3D84]" />
-              Kickoff 30D
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 border-[#1A3D84]/40 hover:bg-blue-50/50 text-[#1A3D84] dark:text-blue-300 font-medium"
-              onClick={() => setInactionCostOpen(true)}
-              title="Calculadora de Costo de Inacción Operativa & Retorno 4D (Challenger Sale & Peter Drucker)"
-            >
-              <Calculator className="mr-1.5 h-3.5 w-3.5 text-[#1A3D84]" />
-              Costo Inacción
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 border-[#1A3D84]/40 hover:bg-blue-50/50 text-[#1A3D84] dark:text-blue-300 font-medium"
-              onClick={() => setObjectionOpen(true)}
-              title="Matriz de Objeciones Directivas & Argumentario de Confianza (David Maister & Chris Voss)"
-            >
-              <HeartHandshake className="mr-1.5 h-3.5 w-3.5 text-[#1A3D84]" />
-              Objeciones
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 border-[#1A3D84]/40 hover:bg-blue-50/50 text-[#1A3D84] dark:text-blue-300 font-medium"
-              onClick={() => setAutonomyOpen(true)}
-              title="Matriz de Autonomía de Mandos Medios y Delegación Paramétrica (Andy Grove & Michael Gerber)"
-            >
-              <GitFork className="mr-1.5 h-3.5 w-3.5 text-[#1A3D84]" />
-              Autonomía Mandos
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
               className="h-9 border-amber-500/40 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 text-amber-700 dark:text-amber-400 font-medium"
               onClick={() => setCaseStudyOpen(true)}
               title="Casos de Éxito B2B y Prueba Social de Pares (Donald Miller & Robert Cialdini)"
@@ -567,16 +550,66 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
               <Award className="mr-1.5 h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
               Caso de Éxito
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 border-primary/30 hover:bg-primary/5 text-primary font-medium"
-              onClick={() => setLinterOpen(true)}
-              title="Auditar y calibrar respuesta con estándar Calidez con Verdad"
-            >
-              <Scale className="mr-1.5 h-3.5 w-3.5 text-primary" />
-              Calibrar Tono MC
-            </Button>
+
+            {/* DROPDOWN PROGRESSIVE DISCLOSURE: TOOLKIT CONSULTIVO B2B */}
+            <div className="relative inline-block">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 border-[#1A3D84]/40 hover:bg-blue-50/50 text-[#1A3D84] dark:text-blue-300 font-medium flex items-center gap-1.5"
+                onClick={() => setToolkitOpen(!toolkitOpen)}
+                title="Herramientas operativas de negociación, objeciones y onboarding"
+              >
+                <span>Toolkit Consultivo</span>
+                <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", toolkitOpen && "rotate-180")} />
+              </Button>
+
+              {toolkitOpen && (
+                <div className="absolute left-0 mt-1 w-64 z-50 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:bg-slate-900 dark:border-slate-800 space-y-1 text-xs">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-0.5">1. Cuantificar Dolor</p>
+                  <button
+                    onClick={() => { setInactionCostOpen(true); setToolkitOpen(false); }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center gap-2 text-slate-800 dark:text-slate-200 font-medium"
+                  >
+                    <Calculator className="h-3.5 w-3.5 text-[#1A3D84]" />
+                    <span>Calculadora Costo Inacción</span>
+                  </button>
+
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pt-1 py-0.5">2. Destrabar Negociación</p>
+                  <button
+                    onClick={() => { setObjectionOpen(true); setToolkitOpen(false); }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-rose-50 dark:hover:bg-slate-800 flex items-center gap-2 text-slate-800 dark:text-slate-200 font-medium"
+                  >
+                    <HeartHandshake className="h-3.5 w-3.5 text-rose-600" />
+                    <span>Matriz de Objeciones Directivas</span>
+                  </button>
+
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pt-1 py-0.5">3. Implantar & Calibrar</p>
+                  <button
+                    onClick={() => { setKickoffOpen(true); setToolkitOpen(false); }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center gap-2 text-slate-800 dark:text-slate-200 font-medium"
+                  >
+                    <Compass className="h-3.5 w-3.5 text-[#1A3D84]" />
+                    <span>Plan Kickoff 30D (Gemba)</span>
+                  </button>
+                  <button
+                    onClick={() => { setAutonomyOpen(true); setToolkitOpen(false); }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center gap-2 text-slate-800 dark:text-slate-200 font-medium"
+                  >
+                    <GitFork className="h-3.5 w-3.5 text-[#1A3D84]" />
+                    <span>Autonomía Mandos Medios</span>
+                  </button>
+                  <button
+                    onClick={() => { setLinterOpen(true); setToolkitOpen(false); }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 text-slate-800 dark:text-slate-200 font-medium"
+                  >
+                    <Scale className="h-3.5 w-3.5 text-slate-700 dark:text-slate-300" />
+                    <span>Calibrar Tono MC (Linter)</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
             <Button
               variant="ghost"
               size="sm"
@@ -654,47 +687,51 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
         open={diagnosticOpen}
         onOpenChange={setDiagnosticOpen}
         initialData={{
-          nombreDirectivo: incoming.author_name || incoming.author_username || "Directivo",
-          empresa: incoming.author_username ? `@${incoming.author_username}` : "Empresa PyME",
+          nombreDirectivo: leadCase.directivo,
+          empresa: leadCase.empresa,
           scoreLead: scoring.scoreTotal,
           textoMensajeOriginal: fullText,
           doloresDetectados: scoring.doloresDetectados,
         }}
       />
+
       <MeetingDossierModal
         open={dossierOpen}
         onOpenChange={setDossierOpen}
         initialData={{
-          nombreDirectivo: incoming.author_name || incoming.author_username || "Directivo",
-          empresa: incoming.author_username ? `@${incoming.author_username}` : "Empresa PyME",
+          nombreDirectivo: leadCase.directivo,
+          empresa: leadCase.empresa,
           cargo: "Dueño / Socio Gerente",
           canal: incoming.platform,
           scoreLead: scoring.scoreTotal,
-          arquetipoDolor: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
+          arquetipoDolor: leadCase.arquetipo,
           historialMensajes: fullText,
         }}
       />
+
       <ScopeAgreementModal
         open={scopeOpen}
         onOpenChange={setScopeOpen}
         initialData={{
-          nombreDirectivo: incoming.author_name || incoming.author_username || "Directivo",
-          empresa: incoming.author_username ? `@${incoming.author_username}` : "Empresa PyME",
+          nombreDirectivo: leadCase.directivo,
+          empresa: leadCase.empresa,
           cargo: "Dueño / Socio Gerente",
           canal: incoming.platform,
-          arquetipoDolor: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
+          arquetipoDolor: leadCase.arquetipo,
           mesesDuracion: 3,
         }}
       />
+
       <CustomerSuccessModal
         open={caseStudyOpen}
         onOpenChange={setCaseStudyOpen}
         initialData={{
-          arquetipo: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
+          arquetipo: leadCase.arquetipo,
           empresa: incoming.author_username ? `@${incoming.author_username}` : undefined,
           rolProtagonista: incoming.author_name || undefined,
         }}
       />
+
       <BrandVoiceLinterModal
         open={linterOpen}
         onOpenChange={setLinterOpen}
@@ -705,40 +742,44 @@ function ThreadCard({ thread, archivedView }: { thread: InboxThread; archivedVie
           setReplyOpen(true);
         }}
       />
+
       <KickoffBlueprintModal
         open={kickoffOpen}
         onOpenChange={setKickoffOpen}
         initialData={{
-          nombreDirectivo: incoming.author_name || incoming.author_username || "Directivo",
-          empresa: incoming.author_username ? `@${incoming.author_username}` : "Empresa PyME",
+          nombreDirectivo: leadCase.directivo,
+          empresa: leadCase.empresa,
           cargo: "Dueño / Socio Gerente",
-          arquetipoDolor: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
+          arquetipoDolor: leadCase.arquetipo,
         }}
       />
+
       <InactionCostModal
         open={inactionCostOpen}
         onOpenChange={setInactionCostOpen}
         initialData={{
-          nombreDirectivo: incoming.author_name || incoming.author_username || "Directivo",
-          empresaNombre: incoming.author_username ? `@${incoming.author_username}` : "Empresa PyME",
-          arquetipoDolor: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
+          nombreDirectivo: leadCase.directivo,
+          empresaNombre: leadCase.empresa,
+          arquetipoDolor: leadCase.arquetipo,
         }}
       />
+
       <ObjectionMatrixModal
         open={objectionOpen}
         onOpenChange={setObjectionOpen}
         initialData={{
-          nombreDirectivo: incoming.author_name || incoming.author_username || "Directivo",
-          empresaNombre: incoming.author_username ? `@${incoming.author_username}` : "Empresa PyME",
-          arquetipoDolor: inferirArquetipoDolor(fullText, scoring.doloresDetectados),
+          nombreDirectivo: leadCase.directivo,
+          empresaNombre: leadCase.empresa,
+          arquetipoDolor: leadCase.arquetipo,
         }}
       />
+
       <ManagementAutonomyModal
         open={autonomyOpen}
         onOpenChange={setAutonomyOpen}
         initialData={{
-          nombreDirectivo: incoming.author_name || incoming.author_username || "Directivo",
-          empresaNombre: incoming.author_username ? `@${incoming.author_username}` : "Empresa PyME",
+          nombreDirectivo: leadCase.directivo,
+          empresaNombre: leadCase.empresa,
         }}
       />
       {ConfirmUI}
