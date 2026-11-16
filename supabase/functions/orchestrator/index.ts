@@ -1397,12 +1397,13 @@ Proponé un tema nuevo, específico y accionable para el próximo posteo.`;
       } catch (groqErr: any) {
         console.warn(`[orchestrator] pickAutoTopic Groq falló (${groqErr.message}), usando pilar editorial predeterminado`);
         const defaultTopics = [
-        "Por qué las pymes colapsan al crecer en ventas sin procesos operativos estandarizados",
-        "El peligro de operar con WhatsApp, CRM y facturación en silos desconectados",
-        "Por qué comprar software sin diagnosticar antes los procesos destruye la rentabilidad",
-        "La diferencia entre ser el bombero permanente de la empresa y formar mandos medios autónomos",
-      ];
-      topic = defaultTopics[Math.floor(Math.random() * defaultTopics.length)];
+          "Por qué las pymes colapsan al crecer en ventas sin procesos operativos estandarizados",
+          "El peligro de operar con WhatsApp, CRM y facturación en silos desconectados",
+          "Por qué comprar software sin diagnosticar antes los procesos destruye la rentabilidad",
+          "La diferencia entre ser el bombero permanente de la empresa y formar mandos medios autónomos",
+        ];
+        topic = defaultTopics[Math.floor(Math.random() * defaultTopics.length)];
+      }
     }
   }
 
