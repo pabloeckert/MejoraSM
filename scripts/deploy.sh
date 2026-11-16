@@ -46,7 +46,7 @@ FUNCTIONS=("orchestrator" "vault-process" "metrics-collector" "rule-engine" "cop
 
 for fn in "${FUNCTIONS[@]}"; do
   echo "  → $fn..."
-  if npx supabase functions deploy "$fn" --project-ref "$PROJECT_REF" 2>&1; then
+  if npx supabase functions deploy "$fn" --project-ref "$PROJECT_REF" --yes 2>&1; then
     echo "  ✅ $fn — deploy OK"
   else
     echo "  ❌ $fn — deploy FALLO"
