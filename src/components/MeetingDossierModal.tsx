@@ -19,7 +19,6 @@ import {
   Copy,
   Check,
   User,
-  Building2,
   ShieldAlert,
   HelpCircle,
   CheckSquare,

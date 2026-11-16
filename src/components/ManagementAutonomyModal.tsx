@@ -14,18 +14,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Layers,
   Download,
   Copy,
   Check,
   Sparkles,
   GitFork,
   CheckCircle2,
-  Clock,
   DollarSign,
-  ShieldCheck,
-  ChevronRight,
-  TrendingUp,
 } from "lucide-react";
 import {
   calcularAutonomiaMandosMedios,

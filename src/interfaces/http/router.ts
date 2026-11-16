@@ -532,11 +532,11 @@ export function handleSMHttpRequest(
     return;
   }
 
-  // POST /api/kpis/sincronizar-nucleo (Lee cierres y prospectos desde MejoraNucleo)
+  // POST /api/kpis/sincronizar-nucleo (Lee cierres y prospectos desde MejoraNucleo / MejoraCRM)
   if (method === "POST" && pathname === "/api/kpis/sincronizar-nucleo") {
     parseJsonBody<{ nucleoUrl?: string }>(req)
       .then(async (body) => {
-        const nucleoUrl = body?.nucleoUrl || "http://127.0.0.1:4002/api/prospectos";
+        const nucleoUrl = body?.nucleoUrl || process.env.VITE_CRM_API_URL || "http://127.0.0.1:4002/api/crm/prospectos";
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -605,9 +605,15 @@ export function handleSMHttpRequest(
   }
 
   if ((method === "PUT" || method === "POST") && (pathname === "/api/configuracion/agentes" || pathname === "/api/configuracion")) {
-    parseJsonBody<any>(req)
+    parseJsonBody<Array<{ id: string; provider?: string; model?: string; temperature?: number; system_prompt?: string }> | { configs?: Array<{ id: string; provider?: string; model?: string; temperature?: number; system_prompt?: string }>; id?: string; provider?: string; model?: string; temperature?: number; system_prompt?: string }>(req)
       .then((body) => {
-        const configs = Array.isArray(body) ? body : body?.configs || [body];
+        const configs = Array.isArray(body)
+          ? body
+          : body && "configs" in body && Array.isArray(body.configs)
+          ? body.configs
+          : body && body.id
+          ? [body as { id: string; provider?: string; model?: string; temperature?: number; system_prompt?: string }]
+          : [];
         services.smRepo.guardarConfigAgentes(configs);
         sendJson(res, 200, { success: true, message: "Configuración guardada en SQLite local", count: configs.length });
       })
@@ -625,9 +631,9 @@ export function handleSMHttpRequest(
   }
 
   if (method === "POST" && (pathname === "/api/monitor/historial" || pathname === "/api/historial")) {
-    parseJsonBody<any>(req)
+    parseJsonBody<{ synced_at?: string | null; posts?: unknown[]; acciones_manuales?: unknown[] }>(req)
       .then((body) => {
-        services.smRepo.guardarHistorialCache(body);
+        services.smRepo.guardarHistorialCache(body || {});
         sendJson(res, 200, { success: true, message: "Historial sincronizado en SQLite local" });
       })
       .catch((err: Error) => sendJson(res, 400, { error: err.message }));

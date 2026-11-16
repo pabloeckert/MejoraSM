@@ -6,12 +6,11 @@ import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Award, Download, Copy, Eye, Check, TrendingUp, Building2, ArrowRight } from "lucide-react";
+import { Award, Download, Copy, Eye, Check, Building2, ArrowRight } from "lucide-react";
 import {
   obtenerCasosExitoBiblioteca,
   formatearCasoWhatsApp,
   type CustomerCase,
-  type ArquetipoCaso,
 } from "@/domain/customerSuccessEngine";
 import { descargarCasoExitoPDF } from "@/services/customerSuccessPdfGenerator";
 import { CustomerSuccessModal } from "@/components/CustomerSuccessModal";

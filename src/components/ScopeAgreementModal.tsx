@@ -24,7 +24,6 @@ import {
   Sparkles,
   Handshake,
   DollarSign,
-  Briefcase,
 } from "lucide-react";
 import {
   generarAcuerdoAlcance,

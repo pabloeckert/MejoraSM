@@ -164,7 +164,7 @@ export function generarDiagnosticoEjecutivoPDF(diag: DiagnosticoEjecutivo): Uint
   curY -= 16;
   const col1W = 150;
   const col2W = 190;
-  const col3W = contentWidth - col1W - col2W; // 183.28
+  const _col3W = contentWidth - col1W - col2W; // 183.28
 
   // Header tabla
   stream += `0.92 0.94 0.96 rg ${marginX} ${curY} ${contentWidth} 16 re f\n`;

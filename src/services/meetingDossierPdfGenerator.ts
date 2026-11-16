@@ -112,7 +112,7 @@ export function generarMeetingDossierPDF(dossier: MeetingDossier): Uint8Array {
   stream += `0.95 0.97 1.0 rg ${marginX} ${scriptY} ${contentWidth} ${scriptH} re f\n`;
   stream += `0.102 0.239 0.518 RG 1 w ${marginX} ${scriptY} ${contentWidth} ${scriptH} re S\n`;
 
-  let lineY = curY - 14;
+  const lineY = curY - 14;
   stream += `BT\n/F2 7.5 Tf\n0.15 0.20 0.30 rg\n`;
   for (let l = 0; l < scriptLines.length; l++) {
     if (l === 0) {
@@ -161,7 +161,7 @@ export function generarMeetingDossierPDF(dossier: MeetingDossier): Uint8Array {
 
   let objRowY = objSectionY - 12;
   const colObj1W = 160;
-  const colObj2W = contentWidth - colObj1W; // ~363 pt
+  const _colObj2W = contentWidth - colObj1W; // ~363 pt
 
   // Header tabla objeciones
   stream += `0.92 0.94 0.96 rg ${marginX} ${objRowY} ${contentWidth} 14 re f\n`;

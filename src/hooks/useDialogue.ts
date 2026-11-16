@@ -115,7 +115,7 @@ export function useStartDialogue() {
   return useMutation({
     mutationFn: async (arg: string | { topic: string; mode: "dirigido" | "auto" }) => {
       const topic = typeof arg === "string" ? arg : arg.topic;
-      const mode = typeof arg === "string" ? "dirigido" : arg.mode;
+      const _mode = typeof arg === "string" ? "dirigido" : arg.mode;
       try {
         return await (typeof arg === "string" ? startDialogue(arg) : startDialogue(arg.topic, arg.mode));
       } catch (err) {

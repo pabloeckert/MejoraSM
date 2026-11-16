@@ -19,15 +19,12 @@ import {
   Mail,
   Phone,
   Tag,
-  Share2,
-  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   obtenerAuditoriaSlaCRM,
   calificarProspectoCRM,
   type MetricasSlaResumen,
-  type ProspectoSlaCalculado,
 } from "@/services/contactosService";
 import { toast } from "@/hooks/use-toast";
 

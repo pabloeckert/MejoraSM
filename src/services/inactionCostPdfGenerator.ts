@@ -28,26 +28,6 @@ function escapePdfText(str: string): string {
     .replace(/[^\x20-\x7E]/g, " ");
 }
 
-function wrapText(text: string, maxCharsPerLine: number): string[] {
-  if (!text) return [];
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let currentLine = "";
-
-  for (const word of words) {
-    if (!currentLine) {
-      currentLine = word;
-    } else if (currentLine.length + 1 + word.length <= maxCharsPerLine) {
-      currentLine += " " + word;
-    } else {
-      lines.push(currentLine);
-      currentLine = word;
-    }
-  }
-  if (currentLine) lines.push(currentLine);
-  return lines;
-}
-
 function truncateLine(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
   return text.slice(0, Math.max(0, maxChars - 3)).trimEnd() + "...";

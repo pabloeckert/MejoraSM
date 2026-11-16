@@ -91,7 +91,7 @@ async function fetchHistorial(): Promise<{ syncedAt: string | null; posts: Histo
       const { data, error } = (await Promise.race([
         historialApi.get(),
         timeoutPromise,
-      ])) as { data: any; error: any };
+      ])) as { data: { synced_at?: string | null; posts?: HistorialPost[]; acciones_manuales?: AccionManual[] } | null; error: { message: string } | null };
       if (!error && data) {
         const accionesRaw = (data?.acciones_manuales as AccionManual[] | null) || [];
         return {
@@ -111,7 +111,15 @@ async function fetchHistorial(): Promise<{ syncedAt: string | null; posts: Histo
     if (outboxRes.ok) {
       const outboxPosts = await outboxRes.json();
       if (Array.isArray(outboxPosts) && outboxPosts.length > 0) {
-        const mappedPosts: HistorialPost[] = outboxPosts.map((p: any) => ({
+        interface RawOutboxPost {
+          post_id: string;
+          creado_en: string;
+          estado_post: string;
+          propuesta_id: string;
+          borrador_opcion: string;
+          canal: string;
+        }
+        const mappedPosts: HistorialPost[] = (outboxPosts as RawOutboxPost[]).map((p) => ({
           id: p.post_id,
           date: p.creado_en,
           status: p.estado_post === "PUBLICADO" ? "published" : p.estado_post === "FALLIDO_PERMANENTE" ? "failed" : "pending",
@@ -131,7 +139,9 @@ async function fetchHistorial(): Promise<{ syncedAt: string | null; posts: Histo
         };
       }
     }
-  } catch {}
+  } catch {
+    // offline local daemon fallback
+  }
 
   // 4. Retorno vacío inmediato (nunca se cuelga en loading)
   return {

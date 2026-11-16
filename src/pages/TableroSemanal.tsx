@@ -54,7 +54,7 @@ import { ReactiveHookModal } from "@/components/ReactiveHookModal";
 import { InactionCostModal } from "@/components/InactionCostModal";
 import { ManagementAutonomyModal } from "@/components/ManagementAutonomyModal";
 
-const NUCLEO_API_URL = "http://127.0.0.1:4002/api/prospectos";
+const NUCLEO_API_URL = import.meta.env.VITE_CRM_API_URL || "http://127.0.0.1:4002/api/crm/prospectos";
 
 interface NucleoLeadRecord {
   id: string;
@@ -488,7 +488,14 @@ export default function TableroSemanal() {
           <span>•</span>
           <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold text-slate-900">[B]</span> Aprobar lote
           <span>•</span>
-          <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold text-slate-900">[O]</span> Outbox
+          <button
+            onClick={() => setOutboxDrawerOpen(true)}
+            className="inline-flex items-center gap-1 hover:text-blue-900 transition-colors cursor-pointer"
+            title="Supervisión en vivo de la cola Outbox y estado de despacho"
+          >
+            <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-300 font-bold text-slate-900">[O]</span>
+            <span className="font-medium underline underline-offset-2">Outbox</span>
+          </button>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-slate-500 font-medium">Salud Editorial:</span>
@@ -915,6 +922,12 @@ export default function TableroSemanal() {
       <ManagementAutonomyModal
         open={autonomyModalOpen}
         onOpenChange={setAutonomyModalOpen}
+      />
+
+      {/* DRAWER LATERAL DE OUTBOX Y ESTADO DE DISPATCH (SRE) */}
+      <OutboxDrawer
+        isOpen={outboxDrawerOpen}
+        onClose={() => setOutboxDrawerOpen(false)}
       />
     </div>
   );

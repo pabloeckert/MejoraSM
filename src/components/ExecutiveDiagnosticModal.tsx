@@ -23,7 +23,6 @@ import {
   Building2,
   User,
   Compass,
-  ArrowRight,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";

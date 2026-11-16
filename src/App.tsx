@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AuthGate } from "@/components/AuthGate";
 
 // Chunking diferido por ruta
 const TableroSemanal = lazy(() => import("./pages/TableroSemanal"));
@@ -18,6 +19,8 @@ const SubirMaterial = lazy(() => import("./pages/SubirMaterial"));
 const Monitor = lazy(() => import("./pages/Monitor"));
 const CitasStudio = lazy(() => import("./pages/CitasStudio"));
 const Conversaciones = lazy(() => import("./pages/Conversaciones"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Auditoria = lazy(() => import("./pages/Auditoria"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -48,32 +51,36 @@ const App = () => (
       <Sonner />
       <HashRouter>
         <ErrorBoundary>
-          <Suspense fallback={<RouteFallback />}>
-            <Routes>
-              <Route element={<AppLayout />}>
-                {/* Ruta Principal: Mesa de Revisión y Control de MejoraSM */}
-                <Route path="/" element={<TableroSemanal />} />
-                <Route path="/tablero" element={<TableroSemanal />} />
-                <Route path="/propuestas" element={<TableroSemanal />} />
-                <Route path="/boveda" element={<Boveda />} />
-                <Route path="/mesa" element={<MesaDialogo />} />
-                <Route path="/laboratorio" element={<Navigate to="/mesa" replace />} />
-                <Route path="/configuracion" element={<Configuracion />} />
-                <Route path="/calendario" element={<Calendario />} />
-                <Route path="/hub" element={<SubirMaterial />} />
-                <Route path="/subir-material" element={<SubirMaterial />} />
-                <Route path="/monitor" element={<Monitor />} />
-                <Route path="/conversaciones" element={<Conversaciones />} />
-                <Route path="/inbox" element={<Navigate to="/conversaciones" replace />} />
-                <Route path="/crm" element={<Navigate to="/conversaciones" replace />} />
-                <Route path="/citas" element={<CitasStudio />} />
-                <Route path="/citas-studio" element={<Navigate to="/citas" replace />} />
-                <Route path="/biblioteca" element={<Navigate to="/boveda" replace />} />
-                <Route path="/auditoria" element={<Navigate to="/" replace />} />
-                <Route path="*" element={<NotFound />} />
-              </Route>
-            </Routes>
-          </Suspense>
+          <AuthGate>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route element={<AppLayout />}>
+                  {/* Ruta Principal: Mesa de Revisión y Control de MejoraSM */}
+                  <Route path="/" element={<TableroSemanal />} />
+                  <Route path="/tablero" element={<TableroSemanal />} />
+                  <Route path="/propuestas" element={<TableroSemanal />} />
+                  <Route path="/boveda" element={<Boveda />} />
+                  <Route path="/mesa" element={<MesaDialogo />} />
+                  <Route path="/laboratorio" element={<Navigate to="/mesa" replace />} />
+                  <Route path="/configuracion" element={<Configuracion />} />
+                  <Route path="/calendario" element={<Calendario />} />
+                  <Route path="/hub" element={<SubirMaterial />} />
+                  <Route path="/subir-material" element={<SubirMaterial />} />
+                  <Route path="/monitor" element={<Monitor />} />
+                  <Route path="/conversaciones" element={<Conversaciones />} />
+                  <Route path="/inbox" element={<Navigate to="/conversaciones" replace />} />
+                  <Route path="/crm" element={<Navigate to="/conversaciones" replace />} />
+                  <Route path="/citas" element={<CitasStudio />} />
+                  <Route path="/citas-studio" element={<Navigate to="/citas" replace />} />
+                  <Route path="/biblioteca" element={<Navigate to="/boveda" replace />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/tablero-ejecutivo" element={<Dashboard />} />
+                  <Route path="/auditoria" element={<Auditoria />} />
+                  <Route path="*" element={<NotFound />} />
+                </Route>
+              </Routes>
+            </Suspense>
+          </AuthGate>
         </ErrorBoundary>
       </HashRouter>
     </TooltipProvider>

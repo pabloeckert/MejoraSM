@@ -85,7 +85,9 @@ function ConfiguracionContent() {
       if (cached) {
         try {
           return JSON.parse(cached) as AgentConfigRow[];
-        } catch {}
+        } catch {
+          // ignore corrupted json
+        }
       }
 
       // 3. Fallback a Supabase solo si está configurado
@@ -97,7 +99,7 @@ function ConfiguracionContent() {
           const { data, error } = (await Promise.race([
             supabase.from("agent_config").select("*").order("id"),
             timeoutPromise,
-          ])) as { data: any; error: any };
+          ])) as { data: AgentConfigRow[] | null; error: { message: string } | null };
           if (!error && data && data.length > 0) {
             return data as AgentConfigRow[];
           }

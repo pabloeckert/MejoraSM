@@ -12,12 +12,11 @@ import {
   calculateFocalPoint,
   parsePngDimensions,
   parseJpegDimensions,
-  detectFacesLocally,
   detectFacesFromDataUrl,
 } from "../localFaceDetector";
 import { renderFocalCropsToDisk } from "../focalRenderer";
 import { encodePng, decodePng, type PngImage } from "../pngCodec";
-import { CANVAS_DIMENSIONS, type TargetAspectRatio } from "../../../domain/framingEngine";
+import { CANVAS_DIMENSIONS } from "../../../domain/framingEngine";
 import type { FaceBox } from "../../../domain/focalPoint";
 
 describe("localFaceDetector: Clasificador Colorimétrico Soberano", () => {

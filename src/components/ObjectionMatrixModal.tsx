@@ -22,9 +22,7 @@ import {
   MessageSquareShare,
   HelpCircle,
   Sparkles,
-  PhoneCall,
   Layers,
-  ChevronRight,
 } from "lucide-react";
 import {
   listarObjecionesCatalogo,

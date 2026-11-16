@@ -169,7 +169,7 @@ export function calcularMetricasSla(
     }
   });
 
-  const totalAtendidos = calificadosEnSla + calificadosFueraSla;
+  const _totalAtendidos = calificadosEnSla + calificadosFueraSla;
   const tiempoPromedioAtencion =
     tiemposAtencionHoras.length > 0
       ? Math.round((tiemposAtencionHoras.reduce((acc, h) => acc + h, 0) / tiemposAtencionHoras.length) * 10) / 10

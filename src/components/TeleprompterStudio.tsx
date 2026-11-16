@@ -7,15 +7,11 @@ import {
   Copy,
   Check,
   Download,
-  Maximize2,
-  Minimize2,
   Clock,
   Sparkles,
-  Volume2,
   FileText,
   Sliders,
   FlipHorizontal,
-  ChevronRight,
   Eye,
   AlertCircle,
 } from "lucide-react";
@@ -46,7 +42,6 @@ export function TeleprompterStudio({ open, onOpenChange, input }: TeleprompterSt
   const [fontSize, setFontSize] = useState<"normal" | "large" | "xlarge">("large");
   const [isMirrored, setIsMirrored] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
-  const [themeMode, setThemeMode] = useState<"dark" | "light">("dark");
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);

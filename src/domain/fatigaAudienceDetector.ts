@@ -101,7 +101,7 @@ export function detectarFatigaAudiencia(
   tamanoVentana: number = 4
 ): DiagnosticoFatigaAudienceDTO {
   const minSemana = Math.max(1, semanaCentro - Math.floor(tamanoVentana / 2));
-  const maxSemana = minSemana + tamanoVentana - 1;
+  const _maxSemana = minSemana + tamanoVentana - 1;
   const semanasVentana = Array.from({ length: tamanoVentana }, (_, i) => minSemana + i);
 
   // Filtrar propuestas correspondientes a las semanas analizadas

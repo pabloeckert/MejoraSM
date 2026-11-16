@@ -18,11 +18,8 @@ import {
   Globe,
   Check,
   Copy,
-  Download,
   Sparkles,
   ShieldCheck,
-  ChevronDown,
-  ChevronUp,
   ExternalLink,
   MessageCircle,
   FileText,
@@ -31,7 +28,6 @@ import { toast } from "@/hooks/use-toast";
 import {
   generarHiloLinkedIn,
   LinkedInThreadInput,
-  LinkedInComment,
 } from "@/domain/linkedinThreadEngine";
 import { cn, getAssetUrl } from "@/lib/utils";
 
@@ -367,7 +363,7 @@ export function LinkedInThreadPreview({
 
           {/* Lista de Comentarios Anidados del Hilo */}
           <div className="space-y-3 pl-1 sm:pl-3">
-            {hiloDebateSimulado.map((comment, index) => {
+            {hiloDebateSimulado.map((comment) => {
               const isFirstAnchor = comment.esPrimerComentarioEstrategico;
 
               return (

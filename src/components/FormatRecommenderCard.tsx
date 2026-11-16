@@ -61,7 +61,7 @@ export function FormatRecommenderCard({
   const {
     primaryFormat,
     primaryChannel,
-    canonicalTipoFormato,
+    canonicalTipoFormato: _canonicalTipoFormato,
     confidenceScore,
     predictedCTR,
     predictedRetention,

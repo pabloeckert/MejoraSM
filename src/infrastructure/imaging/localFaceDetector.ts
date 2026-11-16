@@ -125,13 +125,11 @@ export function detectFacesInPixelArray(
       if (grid[gidx] !== 1 || visited[gidx] === 1) continue;
 
       let minGx = gx, maxGx = gx, minGy = gy, maxGy = gy;
-      let count = 0;
       const queue: [number, number][] = [[gx, gy]];
       visited[gidx] = 1;
 
       while (queue.length > 0) {
         const [cx, cy] = queue.shift()!;
-        count++;
         minGx = Math.min(minGx, cx);
         maxGx = Math.max(maxGx, cx);
         minGy = Math.min(minGy, cy);

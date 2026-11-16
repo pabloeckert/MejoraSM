@@ -10,6 +10,10 @@ import {
   MessagesSquare,
   Menu,
   LogOut,
+  Sparkles,
+  Quote,
+  BarChart3,
+  FileCheck2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,19 +26,23 @@ const navGroups: {
   items: { label: string; sublabel?: string; icon: typeof LayoutDashboard; path: string }[];
 }[] = [
   {
-    label: "Mesa de Control",
+    label: "Estrategia & Consultoría",
     items: [
       { label: "Tablero Semanal", sublabel: "Revisión y aprobación", icon: LayoutDashboard, path: "/" },
-      { label: "Conversaciones", sublabel: "Lead Scoring y Respuestas", icon: MessagesSquare, path: "/conversaciones" },
+      { label: "Conversaciones", sublabel: "Lead Scoring & CRM", icon: MessagesSquare, path: "/conversaciones" },
       { label: "Biblioteca y Bóveda", sublabel: "Activos y fotos RAG", icon: BookOpen, path: "/boveda" },
+      { label: "Mesa de Diálogo", sublabel: "Orquestador Multi-Agente", icon: Sparkles, path: "/mesa" },
+      { label: "Citas Studio", sublabel: "Placas y carruseles", icon: Quote, path: "/citas" },
     ],
   },
   {
-    label: "Operación MVP",
+    label: "Operación & Despacho",
     items: [
       { label: "Subir material", sublabel: "Ingesta de activos", icon: Upload, path: "/subir-material" },
       { label: "Calendario", sublabel: "Vista de despacho", icon: CalendarDays, path: "/calendario" },
-      { label: "Monitor", sublabel: "Publicación y cola", icon: MonitorPlay, path: "/monitor" },
+      { label: "Monitor & Outbox", sublabel: "Publicación y cola", icon: MonitorPlay, path: "/monitor" },
+      { label: "Centro Ejecutivo", sublabel: "Copiloto, Ads y KPIs", icon: BarChart3, path: "/dashboard" },
+      { label: "Auditoría", sublabel: "Logs y trazabilidad", icon: FileCheck2, path: "/auditoria" },
       { label: "Configuración", sublabel: "Ajustes y Zernio", icon: Settings, path: "/configuracion" },
     ],
   },

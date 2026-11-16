@@ -16,17 +16,12 @@ import { Badge } from "@/components/ui/badge";
 import {
   Radio,
   Flame,
-  Layers,
-  Video,
   Copy,
   Check,
   Sparkles,
-  ArrowRight,
   Send,
   MessageSquare,
-  HelpCircle,
   ShieldCheck,
-  TrendingUp,
 } from "lucide-react";
 import {
   generarPiezaCoyuntura,

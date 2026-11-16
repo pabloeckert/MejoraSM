@@ -4,14 +4,13 @@
 // Clasifica leads en 🔥 Calificados (SLA <2h), 🟡 En Nutrición (SLA <24h) y ⚪ Comunidad (SLA <48h).
 
 import React from "react";
-import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Flame, Clock, ShieldAlert, Sparkles } from "lucide-react";
+import { Flame, Clock, Sparkles } from "lucide-react";
 import { ResultadoLeadScoring } from "@/domain/leadScoringEngine";
 import { cn } from "@/lib/utils";
 

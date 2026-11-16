@@ -513,6 +513,7 @@ function ProposalDetailModal({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isPublished, isApproved]);
 
 
@@ -761,7 +762,7 @@ function ProposalDetailModal({
                 copy_tres_pasos: currentBorrador.copy_tres_pasos,
                 cta: currentBorrador.cta_texto,
                 stepps: currentBorrador.stepps_evaluacion,
-                targetChannel: (canonical.canal_destino as any) || "linkedin",
+                targetChannel: (canonical.canal_destino === "instagram" || canonical.canal_destino === "facebook" ? canonical.canal_destino : "linkedin"),
               }}
               activeFormat={currentBorrador.tipo_formato}
               compact={true}
@@ -1055,7 +1056,7 @@ function ProposalDetailModal({
                       copy_tres_pasos: currentBorrador.copy_tres_pasos,
                       cta_texto: currentBorrador.cta_texto,
                       arquetipo_target: canonical.metricas_atribucion?.buyer_persona_predominante || "fundador_saturado",
-                      url_diagnostico_trazable: (canonical as any).url_diagnostico_trazable || (currentBorrador.copy_tres_pasos.paso3_direccion_web.includes("http") ? currentBorrador.copy_tres_pasos.paso3_direccion_web : undefined),
+                      url_diagnostico_trazable: (canonical as { url_diagnostico_trazable?: string }).url_diagnostico_trazable || (currentBorrador.copy_tres_pasos.paso3_direccion_web.includes("http") ? currentBorrador.copy_tres_pasos.paso3_direccion_web : undefined),
                       es_right_hook: canonical.borradores[2] === currentBorrador || canonical.propuesta_id.endsWith("-03"),
                     }}
                     imagenUrl={imagenVinculada}

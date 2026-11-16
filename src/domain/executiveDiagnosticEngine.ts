@@ -462,7 +462,7 @@ _Paradoja:_ ${datos.paradojaDirectiva}
 *2. Causa Raíz Identificada en Trinchera:*
 ${datos.filasCausaRaiz
   .map(
-    (f, i) =>
+    (f) =>
       `• *${f.sintomaVisible}:* ${f.causaRaizSistemica}. _Impacto:_ ${f.impactoNegocio}`
   )
   .join("\n")}

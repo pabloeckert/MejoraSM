@@ -18,18 +18,13 @@ import {
   Download,
   Copy,
   Check,
-  Building2,
   TrendingUp,
-  Layers,
   Sparkles,
   AlertTriangle,
   Target,
-  ArrowRight,
   ShieldCheck,
   Share2,
   Clock,
-  Briefcase,
-  Users,
 } from "lucide-react";
 import {
   calcularExecutiveOperationsMemo,
