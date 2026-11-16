@@ -21,6 +21,7 @@ const fakeSession = { user: { email: "pabloeckert@gmail.com" } } as unknown as S
 
 describe("AuthGate", () => {
   beforeEach(() => {
+    localStorage.clear();
     getSessionMock.mockReset();
     onAuthStateChangeMock.mockReset();
     onAuthStateChangeMock.mockReturnValue({
@@ -56,6 +57,22 @@ describe("AuthGate", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Contenido protegido")).toBeInTheDocument();
+    });
+  });
+
+  it("renderiza los children inmediatamente cuando el PIN rápido 2301 está validado en localStorage", async () => {
+    localStorage.setItem("mejorasm_auth_session", "valid");
+    getSessionMock.mockResolvedValue({ data: { session: null } });
+
+    const { AuthGate } = await import("@/components/AuthGate");
+    render(
+      <AuthGate>
+        <div>Contenido protegido por PIN</div>
+      </AuthGate>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Contenido protegido por PIN")).toBeInTheDocument();
     });
   });
 });

@@ -92,7 +92,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_CONTACTOS_API_URL: ${{ secrets.VITE_CONTACTOS_API_URL }}
-          VITE_BASE_PATH: /app/
+          VITE_BASE_PATH: /
 
       - name: Setup Pages
         uses: actions/configure-pages@v6
@@ -100,13 +100,14 @@ jobs:
       - name: Armar sitio combinado
         run: |
           mkdir -p _site
-          cp -r hub/. _site/               # raíz + hub/CNAME (dominio propio)
+          cp -r dist/. _site/               # la app vive DIRECTAMENTE en la raíz (https://mejorasm.mejoraok.com/)
+          cp hub/CNAME _site/CNAME          # CNAME propio mejorasm.mejoraok.com
           if [ -d dashboard ]; then
             mkdir -p _site/dashboard
             cp -r dashboard/. _site/dashboard/
           fi
           mkdir -p _site/app
-          cp -r dist/. _site/app/
+          cp -r dist/. _site/app/           # compatibilidad si alguien abre /app/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5

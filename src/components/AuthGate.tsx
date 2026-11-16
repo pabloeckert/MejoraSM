@@ -10,14 +10,23 @@ import { ResetPassword } from "@/pages/ResetPassword";
 // Una sola cuenta compartida (la que está en app_admins).
 export function AuthGate({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const [pinAuthorized, setPinAuthorized] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("mejorasm_auth_session") === "valid";
+  });
   const [loading, setLoading] = useState(true);
   const [recovery, setRecovery] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        setSession(data.session);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+      });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event, newSession) => {
       // El link de "blanqueo" del email (si por algún motivo cae en el SPA
@@ -33,7 +42,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const isLocalSoberano =
     import.meta.env.DEV && import.meta.env.MODE !== "test";
 
-  if (isLocalSoberano) {
+  if (isLocalSoberano || pinAuthorized) {
     return <>{children}</>;
   }
 
@@ -50,7 +59,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   if (!session) {
-    return <Login />;
+    return <Login onPinSuccess={() => setPinAuthorized(true)} />;
   }
 
   return <>{children}</>;
