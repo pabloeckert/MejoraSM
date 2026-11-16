@@ -14,17 +14,35 @@ export function AuthGate({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("mejorasm_auth_session") === "valid";
   });
-  const [loading, setLoading] = useState(true);
+
+  // En un navegador nuevo o sin sesión de Supabase guardada, NO mostramos pantalla de carga:
+  // Mostramos el formulario de ingreso con PIN inmediatamente (0ms).
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    if (localStorage.getItem("mejorasm_auth_session") === "valid") return false;
+    // Solo esperamos verificación si existe explícitamente un token previo de Supabase en localStorage
+    return Object.keys(localStorage).some(
+      (k) => k.startsWith("sb-") && k.endsWith("-auth-token")
+    );
+  });
   const [recovery, setRecovery] = useState(false);
 
   useEffect(() => {
+    // Timeout de seguridad: si getSession() tarda más de 800ms (por Supabase pausado o lentitud de red),
+    // cancelamos el loading para mostrar el login con PIN de inmediato sin colgar la UI.
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 800);
+
     supabase.auth
       .getSession()
       .then(({ data }) => {
+        clearTimeout(safetyTimer);
         setSession(data.session);
         setLoading(false);
       })
       .catch(() => {
+        clearTimeout(safetyTimer);
         setLoading(false);
       });
 
@@ -36,7 +54,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
       setSession(newSession);
     });
 
-    return () => subscription.subscription.unsubscribe();
+    return () => {
+      clearTimeout(safetyTimer);
+      subscription.subscription.unsubscribe();
+    };
   }, []);
 
   const isLocalSoberano =
