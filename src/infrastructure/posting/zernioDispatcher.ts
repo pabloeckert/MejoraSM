@@ -90,9 +90,6 @@ export async function despacharPostAZernio(
     zernioId = `zernio_mock_${Date.now()}_${post.post_id}`;
   } else {
     try {
-      if (post.canal === 'linkedin') {
-        throw new Error("Canal 'linkedin' no admitido en el despachador. Operación exclusiva Meta ('instagram' | 'facebook').");
-      }
       const activeBreaker = (options.circuitBreakers && post.canal in options.circuitBreakers ? options.circuitBreakers[post.canal as keyof typeof options.circuitBreakers] : undefined) || circuitBreaker;
       const execution = await activeBreaker.execute(
         async () => {

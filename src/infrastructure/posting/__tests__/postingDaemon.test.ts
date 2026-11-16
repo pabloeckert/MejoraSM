@@ -126,6 +126,16 @@ describe("Subfase 1.6: Auto-Posting Local con Zernio y Canal WhatsApp", () => {
     expect(payload.content).toContain("Tu equipo no sabe qué prioridad atender primero.");
   });
 
+  it("construye un payload canónico para LinkedIn con soporte de documento PDF y hashtags ejecutivos", () => {
+    const propLi = crearPropuesta("PROP-LI-01", "linkedin", "aprobado", "2026-10-16T10:00:00Z", "A");
+    const payload = buildZernioPayload(propLi, { linkedin: "li_acc_789" });
+
+    expect(payload.platforms).toEqual([{ platform: "linkedin", accountId: "li_acc_789" }]);
+    expect(payload.content).toContain("#LiderazgoDirectivo");
+    expect(payload.content).toContain("#PyME");
+    expect(payload.mediaItems[0].type).toBe("document");
+  });
+
   it("ejecuta el ciclo de posting procesando únicamente propuestas aprobadas y vencidas", async () => {
     const ahora = new Date("2026-10-16T12:00:00.000Z");
     const pasada = "2026-10-16T10:00:00.000Z";

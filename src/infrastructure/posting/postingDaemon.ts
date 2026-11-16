@@ -17,7 +17,7 @@ export interface ZernioPlatformConfig {
 
 export interface ZernioPostPayload {
   content: string;
-  mediaItems: Array<{ type: "image"; url: string }>;
+  mediaItems: Array<{ type: "image" | "document" | "video"; url: string }>;
   platforms: ZernioPlatformConfig[];
   publishNow: boolean;
 }
@@ -32,6 +32,7 @@ export interface PostingCycleOptions {
     instagram?: string;
     facebook?: string;
     whatsapp?: string;
+    linkedin?: string;
   };
 }
 
@@ -53,6 +54,7 @@ export const CANALES_PLATAFORMA_MAP: Record<string, string> = {
   instagram: "instagram",
   facebook: "facebook",
   whatsapp: "whatsapp",
+  linkedin: "linkedin",
 };
 
 /**
@@ -74,10 +76,13 @@ export function buildZernioPayload(
   }
 
   // Para WhatsApp se formatea con negritas de WhatsApp (*texto*)
+  // Para LinkedIn se formatea con criterio de Autoridad B2B (Zero-click, max 3 hashtags)
   // Para redes Meta se estructura con saltos limpios y hashtags
   let content = "";
   if (canalKey === "whatsapp") {
     content = `*${borrador.titulo_portada}*\n\n${borrador.copy_tres_pasos.paso1_dolor}\n\n${borrador.copy_tres_pasos.paso2_reencuadre}\n\n👉 *${borrador.copy_tres_pasos.paso3_direccion_web}*`;
+  } else if (canalKey === "linkedin") {
+    content = `${borrador.titulo_portada}\n\n${borrador.copy_tres_pasos.paso1_dolor}\n\n${borrador.copy_tres_pasos.paso2_reencuadre}\n\n${borrador.copy_tres_pasos.paso3_direccion_web}\n\n#MejoraContinua #LiderazgoDirectivo #PyME`;
   } else {
     content = `${borrador.titulo_portada}\n\n${borrador.copy_tres_pasos.paso1_dolor}\n\n${borrador.copy_tres_pasos.paso2_reencuadre}\n\n${borrador.copy_tres_pasos.paso3_direccion_web}\n\n#MejoraContinua #OrdenOperativo #LiderazgoDirectivo`;
   }
@@ -86,9 +91,13 @@ export function buildZernioPayload(
     propuesta.imagen_boveda_vinculada?.ruta_archivo_local ||
     "https://raw.githubusercontent.com/pabloeckert/MejoraSM/main/templates/assets/foto_default.jpg";
 
+  const isDocument =
+    (borrador.tipo_formato === "carrusel_pdf" || (borrador.tipo_formato as string) === "carrusel") &&
+    (mediaUrl.endsWith(".pdf") || canalKey === "linkedin");
+
   return {
     content,
-    mediaItems: [{ type: "image", url: mediaUrl }],
+    mediaItems: [{ type: isDocument ? "document" : "image", url: mediaUrl }],
     platforms: [{ platform: plataformaZernio, accountId }],
     publishNow: true,
   };
