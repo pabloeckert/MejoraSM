@@ -50,6 +50,7 @@ export interface GuionReelCompleto {
   resumenDirector: string;
   ctaCanonica: string;
   exportarMarkdown: () => string;
+  exportarSRT: () => string;
 }
 
 /**
@@ -217,5 +218,43 @@ export function generarGuionReel(input: InputGuionReel): GuionReelCompleto {
     resumenDirector: `${totalPalabras} palabras (~${duracionTotalEstimadaSegundos}s de rodaje). Ritmo sereno de 135 WPM con pausas de énfasis directivo.`,
     ctaCanonica: textoCTA,
     exportarMarkdown,
+    exportarSRT: () => exportarSubtitulosSRT(bloques),
   };
+}
+
+export function segundosASrtTimestamp(segundos: number): string {
+  const horas = Math.floor(segundos / 3600);
+  const minutos = Math.floor((segundos % 3600) / 60);
+  const segs = Math.floor(segundos % 60);
+  const millis = Math.floor((segundos % 1) * 1000);
+
+  const pad = (n: number, z = 2) => String(n).padStart(z, "0");
+  return `${pad(horas)}:${pad(minutos)}:${pad(segs)},${pad(millis, 3)}`;
+}
+
+export function exportarSubtitulosSRT(bloques: BloqueGuion[]): string {
+  const entradas: string[] = [];
+  let contador = 1;
+
+  for (const b of bloques) {
+    const oraciones = b.texto
+      .replace(/\[PAUSA\]/g, "")
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    const duracionBloque = b.duracionSegundos;
+    const durPorOracion = duracionBloque / Math.max(1, oraciones.length);
+
+    oraciones.forEach((oracion, idx) => {
+      const inicio = b.segundoInicio + idx * durPorOracion;
+      const fin = Math.min(b.segundoFin, inicio + durPorOracion);
+      entradas.push(
+        `${contador}\n${segundosASrtTimestamp(inicio)} --> ${segundosASrtTimestamp(fin)}\n${oracion}\n`
+      );
+      contador++;
+    });
+  }
+
+  return entradas.join("\n");
 }

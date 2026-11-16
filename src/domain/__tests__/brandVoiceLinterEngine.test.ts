@@ -79,4 +79,29 @@ describe("brandVoiceLinterEngine ('Calidez con Verdad' & Manual de Marca MC — 
     expect(res.estructuraTresPasos.paso2CausaRaizSistema.length).toBeGreaterThan(10);
     expect(res.estructuraTresPasos.paso3DireccionConcreta.length).toBeGreaterThan(10);
   });
+
+  it("detecta clichés de IA (Anti-AI-Slop 2026-2027) y sugiere vocabulario directivo de trinchera", () => {
+    const res = auditarBrandVoice(
+      "En este vertiginoso mundo empresarial, sumérgete en este método que revoluciona tu negocio y descubre el secreto."
+    );
+    expect(res.hallazgos.some((h) => h.regla === "anti_slop_ia")).toBe(true);
+    expect(res.textoCalibradoSugerido).not.toContain("vertiginoso mundo");
+  });
+
+  it("bloquea engagement bait artificial ('comentá X y te paso', 'dejame fueguito') y penaliza exceso de hashtags", () => {
+    const res = auditarBrandVoice(
+      "Comentá PLAN y te paso el PDF por privado. Dejame un fueguito si te sirvió. #Pymes #Liderazgo #Empresas #Gestion #Negocios"
+    );
+    expect(res.estadoAprobacion).toBe("RECHAZADO_TONO_NO_ALINEADO");
+    expect(res.hallazgos.some((h) => h.regla === "engagement_bait_penalizacion")).toBe(true);
+    expect(res.metricasTexto.hashtagsCount).toBe(5);
+    expect(res.metricasTexto.hashtagsExcedidos).toBe(true);
+  });
+
+  it("calcula el score de profundidad (Save-Worthiness / Zero-Click Value) basado en matrices, métricas y mandos medios", () => {
+    const res = auditarBrandVoice(
+      "Presentamos la matriz de 4 Dimensiones con métricas de 15% de rentabilidad y causa raíz en la delegación a mandos medios."
+    );
+    expect(res.metricasTexto.profundidadContenidoScore).toBe(100);
+  });
 });

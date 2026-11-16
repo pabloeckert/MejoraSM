@@ -25,7 +25,9 @@ export type ReglaBrandVoice =
   | "sistema_no_persona"
   | "calidez_con_verdad"
   | "no_vender_por_precio"
-  | "estructura_direccion_4d";
+  | "estructura_direccion_4d"
+  | "anti_slop_ia"
+  | "engagement_bait_penalizacion";
 
 export type SeveridadHallazgo = "bloqueante" | "advertencia" | "sugerencia";
 
@@ -80,6 +82,10 @@ export interface ResultadoAuditoriaBrandVoice {
     tieneDireccionConcreta: boolean;
     bloqueantesCount: number;
     advertenciasCount: number;
+    hashtagsCount: number;
+    hashtagsExcedidos: boolean;
+    profundidadContenidoScore: number;
+    tieneLinkEnCuerpo: boolean;
   };
 }
 
@@ -228,6 +234,82 @@ const PATRONES_REGLAS: PatronRegla[] = [
     reemplazo: "autodiagnóstico ejecutivo inicial en mejoraok.com/diagnostico",
     penalizacion: 11,
   },
+
+  // 4. ANTI-AI-SLOP (Clichés genéricos de LLMs 2026-2027)
+  {
+    id: "SLOP-01",
+    regla: "anti_slop_ia",
+    reglaLabel: "4. Anti-AI-Slop (Especificidad Directiva)",
+    severidad: "advertencia",
+    regex: /\b(en este vertiginoso mundo|en el vertiginoso mundo|en el competitivo mundo actual|en el cambiante mundo actual)\b/gi,
+    terminoLabel: "cliché genérico de IA ('en el competitivo mundo actual')",
+    explicacion:
+      "Frase de relleno generada por modelos de lenguaje. Ir directamente a la fricción de la empresa.",
+    reemplazo: "en la operación diaria de una PyME",
+    penalizacion: 8,
+  },
+  {
+    id: "SLOP-02",
+    regla: "anti_slop_ia",
+    reglaLabel: "4. Anti-AI-Slop (Especificidad Directiva)",
+    severidad: "advertencia",
+    regex: /\b(sum[eé]rgete en|sumergite en|ad[eé]ntrate en|adentrate en)\b/gi,
+    terminoLabel: "cliché de IA ('sumérgete en')",
+    explicacion:
+      "Metáfora artificial de copywriter novato. Sustituir por verbo técnico concreto.",
+    reemplazo: "analicemos",
+    penalizacion: 8,
+  },
+  {
+    id: "SLOP-03",
+    regla: "anti_slop_ia",
+    reglaLabel: "4. Anti-AI-Slop (Especificidad Directiva)",
+    severidad: "advertencia",
+    regex: /\b(revoluciona tu negocio|cambiar[aá] las reglas del juego|game changer)\b/gi,
+    terminoLabel: "hipérbole vacía ('revoluciona tu negocio')",
+    explicacion:
+      "En consultoría directiva se habla de estandarización, orden y márgenes, no de revoluciones mágicas.",
+    reemplazo: "ordena la estructura operativa de tu empresa",
+    penalizacion: 10,
+  },
+  {
+    id: "SLOP-04",
+    regla: "anti_slop_ia",
+    reglaLabel: "4. Anti-AI-Slop (Especificidad Directiva)",
+    severidad: "advertencia",
+    regex: /\b(descubre el secreto|el secreto que no quieren que sepas)\b/gi,
+    terminoLabel: "cliché sensacionalista ('descubre el secreto')",
+    explicacion:
+      "No hay secretos místicos en la gestión empresarial: hay método, indicadores y disciplina.",
+    reemplazo: "conozcamos el método de diagnóstico",
+    penalizacion: 10,
+  },
+
+  // 5. CERO ENGAGEMENT BAIT (Penalización Algorítmica 2026-2027)
+  {
+    id: "BAIT-01",
+    regla: "engagement_bait_penalizacion",
+    reglaLabel: "5. Cero Engagement Bait (Penalización Algorítmica)",
+    severidad: "bloqueante",
+    regex: /\bcoment[aá]\s+(la\s+palabra\s+)?['"]?[A-Za-z0-9_-]+['"]?\s+y\s+te\s+(mando|paso|env[ií]o)\b/gi,
+    terminoLabel: "engagement bait ('comentá X y te paso')",
+    explicacion:
+      "Táctica de infoproductores penalizada severamente por LinkedIn y Meta en 2026-2027. La autoridad se comparte completa (Zero-Click) o se deriva al sitio institucional.",
+    reemplazo: "revisá el criterio completo o autodiagnosticate en",
+    penalizacion: 15,
+  },
+  {
+    id: "BAIT-02",
+    regla: "engagement_bait_penalizacion",
+    reglaLabel: "5. Cero Engagement Bait (Penalización Algorítmica)",
+    severidad: "bloqueante",
+    regex: /\b(dejame\s+(un\s+)?fueguito|deja\s+un\s+fuego|dejame\s+un\s+like|dale\s+like\s+si)\b/gi,
+    terminoLabel: "mendicidad de interacciones ('dejame fueguito / dale like')",
+    explicacion:
+      "Erosiona la autoridad directiva. La interacción genuina proviene de la utilidad del criterio expuesto.",
+    reemplazo: "evaluá cómo impacta este criterio en tu operación",
+    penalizacion: 15,
+  },
 ];
 
 const TERMINOS_SISTEMA = [
@@ -355,7 +437,11 @@ export function auditarBrandVoice(textoInput: string): ResultadoAuditoriaBrandVo
 
       if (patron.regla === "sistema_no_persona") {
         sistemaNoPersona = Math.max(0, sistemaNoPersona - patron.penalizacion);
-      } else if (patron.regla === "calidez_con_verdad") {
+      } else if (
+        patron.regla === "calidez_con_verdad" ||
+        patron.regla === "anti_slop_ia" ||
+        patron.regla === "engagement_bait_penalizacion"
+      ) {
         calidezConVerdad = Math.max(0, calidezConVerdad - patron.penalizacion);
       } else if (patron.regla === "no_vender_por_precio") {
         noVenderPorPrecio = Math.max(0, noVenderPorPrecio - patron.penalizacion);
@@ -410,6 +496,41 @@ export function auditarBrandVoice(textoInput: string): ResultadoAuditoriaBrandVo
   }
   if (!calibradoTieneDireccion) {
     textoCalibrado = `${textoCalibrado} Evaluá el estado actual de tu sistema operativo en https://mejoraok.com/diagnostico.`.trim();
+  }
+
+  // Auditoría Algorítmica 2026-2027: Hashtags y Zero-Click Links
+  const hashtags = textoOriginal.match(/#[A-Za-z0-9_]+/g) || [];
+  const hashtagsCount = hashtags.length;
+  const hashtagsExcedidos = hashtagsCount > 3;
+
+  if (hashtagsExcedidos) {
+    hallazgos.push({
+      id: "TAG-01",
+      regla: "engagement_bait_penalizacion",
+      reglaLabel: "5. Cero Engagement Bait (Penalización Algorítmica)",
+      severidad: "advertencia",
+      terminoDetectado: `Exceso de hashtags (${hashtagsCount} detectados)`,
+      explicacionCriterio:
+        "En 2026-2027 los algoritmos (especialmente LinkedIn y Meta) penalizan publicaciones con más de 3 hashtags. Se recomienda un máximo de 3 hashtags temáticos de alta relevancia.",
+      reemplazoSugerido: "Limitar a máximo 3 hashtags temáticos (#MejoraContinua #LiderazgoDirectivo #PyME).",
+    });
+  }
+
+  const tieneLinkEnCuerpo = /https?:\/\/[^\s]+/i.test(textoOriginal);
+
+  // Score de Profundidad / Save-Worthiness (Zero-Click Value 2026-2027)
+  let profundidadContenidoScore = 0;
+  if (/matriz|cuadrante|etapas?|fases?|procesos?|est[áa]ndar|dimensiones?/i.test(textoLower)) {
+    profundidadContenidoScore += 25;
+  }
+  if (/%|\$|ars|usd|\b\d+\s*(horas?|d[íi]as?|meses?|semanas?|a[ñn]os?|%)\b|facturaci[óo]n|m[áa]rgenes?/i.test(textoLower)) {
+    profundidadContenidoScore += 25;
+  }
+  if (/causa\s+ra[íi]z|cuello\s+de\s+botella|criterio|regla|indicador|responsabilidad|est[áa]ndares/i.test(textoLower)) {
+    profundidadContenidoScore += 25;
+  }
+  if (/mando\s+medio|mandos\s+medios|directiv[oa]s?|gerentes?|due[ñn][oa]s?|liderazgo|fundador/i.test(textoLower)) {
+    profundidadContenidoScore += 25;
   }
 
   const scoreGlobal = Math.max(
@@ -475,6 +596,10 @@ export function auditarBrandVoice(textoInput: string): ResultadoAuditoriaBrandVo
       tieneDireccionConcreta,
       bloqueantesCount,
       advertenciasCount,
+      hashtagsCount,
+      hashtagsExcedidos,
+      profundidadContenidoScore,
+      tieneLinkEnCuerpo,
     },
   };
 }

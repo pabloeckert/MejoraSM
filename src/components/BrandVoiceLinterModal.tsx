@@ -362,13 +362,29 @@ export function BrandVoiceLinterModal({
             <div className="space-y-4">
               {/* Editor de Texto */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor="brand-voice-editor"
-                    className="text-xs font-bold uppercase tracking-wider text-primary"
-                  >
-                    Texto bajo Auditoría ({auditoria.metricasTexto.palabrasCount} palabras):
-                  </label>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label
+                      htmlFor="brand-voice-editor"
+                      className="text-xs font-bold uppercase tracking-wider text-primary"
+                    >
+                      Texto bajo Auditoría ({auditoria.metricasTexto.palabrasCount} palabras)
+                    </label>
+                    <Badge variant="outline" className="text-[10px] font-medium border-blue-200 text-[#1A3D84] dark:text-blue-300">
+                      Save-Worthiness: {auditoria.metricasTexto.profundidadContenidoScore}%
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-[10px] font-medium",
+                        auditoria.metricasTexto.hashtagsExcedidos
+                          ? "border-red-300 text-red-600 bg-red-50 dark:bg-red-950/30"
+                          : "border-slate-200 text-slate-600"
+                      )}
+                    >
+                      Hashtags: {auditoria.metricasTexto.hashtagsCount}/3
+                    </Badge>
+                  </div>
                   {auditoria.hallazgos.length > 0 && (
                     <Button
                       type="button"

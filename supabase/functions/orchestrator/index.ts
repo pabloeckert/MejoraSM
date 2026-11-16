@@ -171,7 +171,7 @@ async function callAI(
         body.systemInstruction = { parts: [{ text: systemMsg.content }] };
       }
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model || "gemini-1.5-flash"}:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model || "gemini-2.5-flash"}:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -304,7 +304,18 @@ async function callAgent(
       500
     );
   } catch (e: any) {
-    console.warn(`[orchestrator] Anthropic (${model}) falló o timeout (${e.message}), fallback a Groq`);
+    console.warn(`[orchestrator] Anthropic (${model}) falló o timeout (${e.message}), evaluando fallback...`);
+    if (Deno.env.get("GEMINI_API_KEY")) {
+      try {
+        return await withRetry(
+          () => callAI("gemini", "gemini-2.5-flash", system, messages, temperature, LLM_TIMEOUT_MS),
+          1,
+          500
+        );
+      } catch (geminiErr: any) {
+        console.warn(`[orchestrator] Gemini fallback falló (${geminiErr.message}), pasando a Groq`);
+      }
+    }
     try {
       return await withRetry(
         () => callAI("groq", "openai/gpt-oss-120b", system, messages, temperature, LLM_TIMEOUT_MS),
@@ -1364,16 +1375,28 @@ Proponé un tema nuevo, específico y accionable para el próximo posteo.`;
       500
     );
   } catch (e: any) {
-    console.warn(`[orchestrator] pickAutoTopic Anthropic falló o timeout (${e.message}), fallback a Groq`);
-    try {
-      topic = await withRetry(
-        () => callAI("groq", "openai/gpt-oss-120b", system, [{ role: "user", content: user }], 0.9, LLM_TIMEOUT_MS),
-        1,
-        500
-      );
-    } catch (groqErr: any) {
-      console.warn(`[orchestrator] pickAutoTopic Groq falló (${groqErr.message}), usando pilar editorial predeterminado`);
-      const defaultTopics = [
+    console.warn(`[orchestrator] pickAutoTopic Anthropic falló o timeout (${e.message}), evaluando fallback...`);
+    if (Deno.env.get("GEMINI_API_KEY")) {
+      try {
+        topic = await withRetry(
+          () => callAI("gemini", "gemini-2.5-flash", system, [{ role: "user", content: user }], 0.9, LLM_TIMEOUT_MS),
+          1,
+          500
+        );
+      } catch (geminiErr: any) {
+        console.warn(`[orchestrator] pickAutoTopic Gemini falló (${geminiErr.message}), pasando a Groq`);
+      }
+    }
+    if (!topic) {
+      try {
+        topic = await withRetry(
+          () => callAI("groq", "openai/gpt-oss-120b", system, [{ role: "user", content: user }], 0.9, LLM_TIMEOUT_MS),
+          1,
+          500
+        );
+      } catch (groqErr: any) {
+        console.warn(`[orchestrator] pickAutoTopic Groq falló (${groqErr.message}), usando pilar editorial predeterminado`);
+        const defaultTopics = [
         "Por qué las pymes colapsan al crecer en ventas sin procesos operativos estandarizados",
         "El peligro de operar con WhatsApp, CRM y facturación en silos desconectados",
         "Por qué comprar software sin diagnosticar antes los procesos destruye la rentabilidad",

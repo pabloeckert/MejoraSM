@@ -135,4 +135,23 @@ describe("reelScriptEngine (Sprint S+9: Motor de Guiones B2B para Reels / Video 
     expect(guion.bloques[1].texto).toContain("arquitectura del flujo de trabajo");
     expect(guion.bloques[2].texto).toContain("mejoraok.com");
   });
+
+  it("exporta subtítulos sincronizados en formato SRT estándar para quemado o accesibilidad", () => {
+    const input = {
+      propuesta_id: "PROP-SRT-01",
+      titulo_portada: "Subtítulos sincronizados B2B",
+      copy_tres_pasos: {
+        dolor: "Tu equipo pierde tiempo valioso en reuniones improductivas.",
+        reencuadre: "El problema no son las reuniones sino la falta de una agenda con acuerdos de servicio claros.",
+        direccion: "Completá el diagnóstico en mejoraok.com.",
+      },
+    };
+
+    const guion = generarGuionReel(input);
+    const srt = guion.exportarSRT();
+
+    expect(srt).toContain("-->");
+    expect(srt).toMatch(/\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}/);
+    expect(srt).toContain("reuniones");
+  });
 });

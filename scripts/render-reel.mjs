@@ -125,6 +125,22 @@ html, body { width: 1080px; height: 1920px; background: transparent; }
 </div></body></html>`;
 }
 
+function generateSrtSubtitles(brief, durationS = DURATION_S) {
+  const pad = (n, z = 2) => String(n).padStart(z, "0");
+  const ts = (s) => {
+    const mins = Math.floor(s / 60);
+    const secs = Math.floor(s % 60);
+    const ms = Math.floor((s % 1) * 1000);
+    return `00:${pad(mins)}:${pad(secs)},${pad(ms, 3)}`;
+  };
+
+  const seg1 = brief.headline || "";
+  const seg2 = brief.subtext || "";
+  const seg3 = "Mejora Continua · mejoraok.com";
+
+  return `1\n${ts(0)} --> ${ts(3.5)}\n${seg1}\n\n2\n${ts(3.5)} --> ${ts(7.0)}\n${seg2}\n\n3\n${ts(7.0)} --> ${ts(durationS)}\n${seg3}\n`;
+}
+
 async function renderOverlay(brief) {
   const templateHtml = await readFile(STORY_TEMPLATE, "utf8");
   const html = overlayHtml(brief, fontFacesFrom(templateHtml));
@@ -210,10 +226,19 @@ async function main() {
   await mkdir(usedDir, { recursive: true });
   await rename(photo.path, path.join(usedDir, photo.name));
 
+  const srtContent = generateSrtSubtitles(brief, DURATION_S);
+  await writeFile(path.join(WORK_DIR, "reel.srt"), srtContent, "utf8");
+
   await writeFile(
     path.join(WORK_DIR, "reel.json"),
     JSON.stringify(
-      { video: path.relative(ROOT, outPath), caption: brief.caption || brief.headline || "", headline: brief.headline, oferta: OFERTA },
+      {
+        video: path.relative(ROOT, outPath),
+        subtitles: path.relative(ROOT, path.join(WORK_DIR, "reel.srt")),
+        caption: brief.caption || brief.headline || "",
+        headline: brief.headline,
+        oferta: OFERTA,
+      },
       null,
       2
     )
