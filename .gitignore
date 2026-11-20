@@ -94,3 +94,8 @@ tsconfig.node.tsbuildinfo
 
 # VS Code workspace files
 *.code-workspace
+
+# System & Cloud junk
+desktop.ini
+Desktop.ini
+.tmp.driveupload

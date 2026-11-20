@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { proposalsApi, templatesApi } from "@/services/supabase";
+import { templatesApi } from "@/services/supabase";
 import type { ProposalDetail } from "@/components/ProposalDetailDialog";
 import {
   getLocalProposals,
@@ -41,9 +41,6 @@ export function useApproveProposal() {
   return useMutation({
     mutationFn: async (id: string) => {
       approveLocalProposal(id);
-      if (import.meta.env.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.includes("placeholder")) {
-        Promise.resolve(proposalsApi.approve(id)).catch(() => {});
-      }
       return id;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
@@ -55,9 +52,6 @@ export function useRejectProposal() {
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
       rejectLocalProposal(id, reason);
-      if (import.meta.env.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.includes("placeholder")) {
-        Promise.resolve(proposalsApi.reject(id, reason)).catch(() => {});
-      }
       return id;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
@@ -67,15 +61,12 @@ export function useRejectProposal() {
 export function useScheduleProposal() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, date, oferta }: { id: string; date: string; oferta?: string }) => {
+    mutationFn: async ({ id, date }: { id: string; date: string; oferta?: string }) => {
       const all = getLocalProposals();
       const updated = all.map((p) =>
         p.propuesta_id === id ? { ...p, dia_programado: date, estado: "aprobado" as const } : p
       );
       saveLocalProposals(updated);
-      if (import.meta.env.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.includes("placeholder")) {
-        Promise.resolve(proposalsApi.schedule(id, date, oferta || "")).catch(() => {});
-      }
       return id;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
@@ -87,9 +78,6 @@ export function useCancelProposal() {
   return useMutation({
     mutationFn: async (id: string) => {
       rejectLocalProposal(id, "Cancelada antes de publicar");
-      if (import.meta.env.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.includes("placeholder")) {
-        Promise.resolve(proposalsApi.cancel(id)).catch(() => {});
-      }
       return id;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),
@@ -107,9 +95,6 @@ export function useReactivateProposal() {
           : p
       );
       saveLocalProposals(updated);
-      if (import.meta.env.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.includes("placeholder")) {
-        Promise.resolve(proposalsApi.reactivate(id)).catch(() => {});
-      }
       return id;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals"] }),

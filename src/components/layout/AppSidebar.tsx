@@ -100,16 +100,8 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       <div className="border-t border-sidebar-border px-6 py-4">
-        <div className="mb-2 text-xs font-semibold text-sidebar-foreground truncate" title="pabloeckert@gmail.com">
-          pabloeckert@gmail.com
-        </div>
         <button
-          onClick={() => {
-            localStorage.removeItem("mejorasm_auth_session");
-            localStorage.removeItem("mejorasm_auth_user");
-            supabase.auth.signOut().catch(() => {});
-            window.location.reload();
-          }}
+          onClick={() => supabase.auth.signOut()}
           className="mb-2 flex w-full items-center gap-2 text-xs font-medium text-sidebar-foreground/70 hover:text-sidebar-foreground"
         >
           <LogOut className="h-3.5 w-3.5" />

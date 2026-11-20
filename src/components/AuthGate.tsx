@@ -10,41 +10,14 @@ import { ResetPassword } from "@/pages/ResetPassword";
 // Una sola cuenta compartida (la que está en app_admins).
 export function AuthGate({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [pinAuthorized, setPinAuthorized] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("mejorasm_auth_session") === "valid";
-  });
-
-  // En un navegador nuevo o sin sesión de Supabase guardada, NO mostramos pantalla de carga:
-  // Mostramos el formulario de ingreso con PIN inmediatamente (0ms).
-  const [loading, setLoading] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    if (localStorage.getItem("mejorasm_auth_session") === "valid") return false;
-    // Solo esperamos verificación si existe explícitamente un token previo de Supabase en localStorage
-    return Object.keys(localStorage).some(
-      (k) => k.startsWith("sb-") && k.endsWith("-auth-token")
-    );
-  });
+  const [loading, setLoading] = useState(true);
   const [recovery, setRecovery] = useState(false);
 
   useEffect(() => {
-    // Timeout de seguridad: si getSession() tarda más de 800ms (por Supabase pausado o lentitud de red),
-    // cancelamos el loading para mostrar el login con PIN de inmediato sin colgar la UI.
-    const safetyTimer = setTimeout(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
       setLoading(false);
-    }, 800);
-
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        clearTimeout(safetyTimer);
-        setSession(data.session);
-        setLoading(false);
-      })
-      .catch(() => {
-        clearTimeout(safetyTimer);
-        setLoading(false);
-      });
+    });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event, newSession) => {
       // El link de "blanqueo" del email (si por algún motivo cae en el SPA
@@ -54,16 +27,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
       setSession(newSession);
     });
 
-    return () => {
-      clearTimeout(safetyTimer);
-      subscription.subscription.unsubscribe();
-    };
+    return () => subscription.subscription.unsubscribe();
   }, []);
 
   const isLocalSoberano =
     import.meta.env.DEV && import.meta.env.MODE !== "test";
 
-  if (isLocalSoberano || pinAuthorized) {
+  if (isLocalSoberano) {
     return <>{children}</>;
   }
 
@@ -80,7 +50,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   if (!session) {
-    return <Login onPinSuccess={() => setPinAuthorized(true)} />;
+    return <Login />;
   }
 
   return <>{children}</>;
